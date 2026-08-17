@@ -1,0 +1,2919 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Prioritization-%26-Sorting/">
+      
+      
+        <link rel="prev" href="../Reviewing-Items-in-the-Editor/">
+      
+      
+        <link rel="next" href="../Priorities-for-Flashcards/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>4. Prioritization & Sorting - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-priority-system-explained" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              4. Prioritization & Sorting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-priority-system-explained" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Priority System Explained
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Priority System Explained">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#priority-value-absolute-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Value (Absolute Priority)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#relative-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relative Priority
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priority-inheritance-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Inheritance System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priority Inheritance System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-priorities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting Priorities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting Priorities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#main-priority-popup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main Priority Popup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#light-priority-popup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Light Priority Popup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quick-priority-shortcuts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Priority Shortcuts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-editor-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Editor Widget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bulk-priority-for-a-multi-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bulk Priority for a Multi-Selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-priority-change-increms-flashcards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Priority Change (IncRems &amp; Flashcards)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-card-priority-flashcards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Card Priority (Flashcards)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorities-in-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priorities in Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priorities in Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keeping-the-badges-in-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping the badges in sync
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorities-on-pdf-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priorities on PDF Highlights
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priorities on PDF Highlights">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-a-highlights-priority-comes-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where a highlight's priority comes from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-highlight-badges-in-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping highlight badges in sync
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sorting-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sorting Criteria
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sorting Criteria">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#saved-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved Presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-incremental-rem-randomness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) Incremental Rem Randomness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-flashcard-randomness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Flashcard Randomness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-flashcard-ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Flashcard Ratio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-randomness-works-the-priority-weighted-lottery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Randomness Works: The Priority-Weighted Lottery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priority-shield" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Shield
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priority Shield">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it Measures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-interpret-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Interpret It
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weighted-shield" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weighted Shield
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-shield-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Shield History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-plugin-prioritizes-due-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the Plugin Prioritizes Due Items
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How the Plugin Prioritizes Due Items">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prepared-in-advance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepared in advance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-priority-system-explained" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Priority System Explained
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Priority System Explained">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#priority-value-absolute-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Value (Absolute Priority)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#relative-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relative Priority
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priority-inheritance-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Inheritance System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priority Inheritance System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Use Cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-priorities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting Priorities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting Priorities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#main-priority-popup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main Priority Popup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#light-priority-popup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Light Priority Popup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quick-priority-shortcuts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Priority Shortcuts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-editor-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Editor Widget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bulk-priority-for-a-multi-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bulk Priority for a Multi-Selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-priority-change-increms-flashcards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Priority Change (IncRems &amp; Flashcards)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-card-priority-flashcards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Card Priority (Flashcards)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorities-in-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priorities in Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priorities in Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keeping-the-badges-in-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping the badges in sync
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorities-on-pdf-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priorities on PDF Highlights
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priorities on PDF Highlights">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-a-highlights-priority-comes-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where a highlight's priority comes from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-highlight-badges-in-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping highlight badges in sync
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sorting-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sorting Criteria
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sorting Criteria">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#saved-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved Presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1-incremental-rem-randomness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) Incremental Rem Randomness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-flashcard-randomness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Flashcard Randomness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-flashcard-ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Flashcard Ratio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-randomness-works-the-priority-weighted-lottery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Randomness Works: The Priority-Weighted Lottery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priority-shield" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Shield
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priority Shield">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it Measures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-interpret-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Interpret It
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weighted-shield" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weighted Shield
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-shield-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Shield History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-plugin-prioritizes-due-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the Plugin Prioritizes Due Items
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How the Plugin Prioritizes Due Items">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prepared-in-advance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepared in advance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>4. Prioritization & Sorting</h1>
+
+<p><strong>Mastering the Queue: Prioritization &amp; Sorting</strong></p>
+<p>To get the most out of Incremental RemNote, it's essential to understand how to manage your review queue effectively. This guide breaks down the advanced prioritization and sorting tools at your disposal, allowing you to tailor your learning sessions to your exact needs.</p>
+<hr />
+<h2 id="the-priority-system-explained">The Priority System Explained<a class="headerlink" href="#the-priority-system-explained" title="Permanent link">&para;</a></h2>
+<p>With incremental reading, you can quickly accumulate thousands of articles, notes, and videos. Without a system to manage this volume, the learning process can become chaotic. This is where the priority system comes in.</p>
+<p>By assigning a priority to each item, you tell the plugin what is most important to you. The plugin then uses this information to intelligently sort your queue, ensuring that you review the most critical material first. So, <strong>priorities are there to manage information overflow</strong>. This concept is central to methodologies like the one used in SuperMemo. For a deeper dive into the theory, see SuperMemo's article on the <a href="https://help.supermemo.org/wiki/Priority_queue">Priority queue</a>.</p>
+<p>Setting priorities helps you manage the balance of <a href="https://help.supermemo.org/wiki/Priority_queue#Volume_vs._retention_battle_in_learning">Volume vs. retention</a> in learning effectively. It prevents your queue from being overloaded with low-value items, which could prevent you from reviewing your high-value investments.</p>
+<blockquote>
+<p>If you want to ensure that you keep a high retention of previously added material, you cannot overload the learning process with new material (new topics[= passive reading Incremental Rem]) because you will not have enough time left to do your daily item review.</p>
+</blockquote>
+<h3 id="priority-value-absolute-priority">Priority Value (Absolute Priority)<a class="headerlink" href="#priority-value-absolute-priority" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A numerical value from 0 to 100.</li>
+<li>This is the number that is stored in the "Priority" property of the Incremental Rem or Card Rem.</li>
+<li><strong>Lower numbers mean higher priority.</strong> <code>0</code> is for your most critical material, while <code>100</code> is for the least important.</li>
+</ul>
+<p><strong>💡 Pro-Tip for an Efficient Workflow:</strong></p>
+<p>For faster and more effective prioritization, we recommend using a smaller range of values, such as <strong>1-10</strong>.</p>
+<ul>
+<li><strong>Why?</strong> It helps reduce decision fatigue. Spending mental energy deciding if an item is a 53 or a 58 has a negligible practical effect on your queue.</li>
+<li><strong>Benefits:</strong> Sticking to a smaller scale makes prioritizing quicker and more intuitive. You still get the full benefit of the <strong>Relative Priority</strong> percentile, which automatically ranks the item against everything else.</li>
+</ul>
+<p>The full 0-100 range is included for maximum flexibility and to align with the well stablished standard of SuperMemo, but a simpler scale is often more powerful in practice.</p>
+<h3 id="relative-priority">Relative Priority<a class="headerlink" href="#relative-priority" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A percentile rank from 0% to 100%.</li>
+<li>Positions the current Rem relative to all other incremental items OR Card Rems in your entire knowledge base. Setting it to 10% means this item is more important than 90% of your other items.</li>
+</ul>
+<hr />
+<h2 id="priority-inheritance-system">Priority Inheritance System<a class="headerlink" href="#priority-inheritance-system" title="Permanent link">&para;</a></h2>
+<p>To streamline workflow and make priority management more intuitive, new items automatically inherit their priority from their closest parent or ancestor that is also prioritized.</p>
+<ul>
+<li><strong>How it works (True Priorities):</strong> When you tag a new Rem as <code>Incremental</code> (or generate flashcards), the plugin searches up through the Rem's parents looking for a "true" origin priority to inherit. A priority is considered "true" if it's an Incremental Rem priority, or a Flashcard priority whose source is "manual" or "incremental" (that is, one originated from a processed Incremental Rem when "Dismiss" was pressed). Purely inherited Flashcard priorities are skipped, acting as transparent pass-throughs so the plugin can find the real source higher up the tree.</li>
+<li><strong>Smart Category Matching:</strong> Proximity is the strongest factor. If the direct parent has a true priority (even of a different type), the new child inherits it immediately. However, if the closest true ancestor possesses <em>both</em> an Incremental Rem priority and a Flashcard priority, the child will smartly inherit the priority from the matching category space (e.g., a new Incremental Rem will inherit the ancestor's Incremental Rem priority, while a new flashcard will inherit the ancestor's Flashcard priority).</li>
+<li><strong>Fallback:</strong> If no true prioritized ancestor is found, the new item will receive the default priority value you have set in the plugin settings.</li>
+</ul>
+<p>This system is particularly useful for hierarchically organized notes. For example, if you have an important book summary with a high priority (e.g., 5), any new extracts or notes you create within that summary will automatically inherit the same priority, saving you from setting it manually each time.</p>
+<p>The "<a href="#main-priority-popup">Set Priority</a>" and "Reschedule" popups also display the ancestor's priority, giving you immediate context when you decide to manually override the inherited value.</p>
+<h3 id="use-cases">Use Cases<a class="headerlink" href="#use-cases" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Use Case 1: Deconstructing a High-Priority Document</strong></li>
+</ul>
+<p>Imagine you have a PDF of a crucial research paper with a priority of 10. As you read and create highlights (extracts) from it, each new highlight will automatically be assigned a priority of 10. This ensures that all the core concepts from that paper are reviewed together and with the urgency they deserve, without any manual adjustments.</p>
+<ul>
+<li><strong>Use Case 2: Hierarchical Note-Taking</strong></li>
+</ul>
+<p>If you have a parent rem for a broad topic like "Quantum Mechanics" with a set priority, any new child rems you create under it (e.g., "Wave-Particle Duality," "Superposition") will inherit that priority. This keeps your knowledge hierarchy organized and ensures that foundational topics and their sub-topics are treated with the same level of importance in your reviews.</p>
+<hr />
+<h2 id="setting-priorities">Setting Priorities<a class="headerlink" href="#setting-priorities" title="Permanent link">&para;</a></h2>
+<p>There are several ways to set priorities in Incremental RemNote, each designed for a different context.</p>
+<ul>
+<li><strong>Main Priority Popup (<code>Opt+P</code>):</strong> The comprehensive tool. Best for deep analysis, seeing relative priorities, ancestors, and using the "Shield" logic.</li>
+<li><strong>Light Priority Popup (<code>Ctrl+Opt+P</code>):</strong> A streamlined, instant-opening version. Best for quick, friction-free adjustments during study sessions.</li>
+<li><strong>Quick Priority Shortcuts (<code>Ctrl+Opt+↑/↓</code>):</strong> The fastest method. Adjusts absolute priority instantly without any UI popping up.</li>
+<li><strong>Priority Editor Widget:</strong> An always-on visual control in the editor or queue.</li>
+<li><strong>Batch Tools:</strong> Advanced tables for managing priorities en masse for documents or tags.</li>
+</ul>
+<hr />
+<h3 id="main-priority-popup">Main Priority Popup<a class="headerlink" href="#main-priority-popup" title="Permanent link">&para;</a></h3>
+<p><strong>Shortcut:</strong> <code>Opt+P</code> (or <code>/Prioritize</code>)</p>
+<p>This is the fully-featured priority interface. Access it by pressing <code>Opt+P</code> or clicking the "Change Priority" button in the queue.</p>
+<p>It displays detailed context, including:
+1.  <strong>Absolute Priority Value:</strong> The number (0-100) stored in the Rem.
+2.  <strong>Relative Priority:</strong> Where this item stands compared to the rest of your knowledge base (as a percentile).
+3.  <strong>Visual Slider:</strong> A slider for absolute value, giving you both precise control and intuitive visual ranking. The color of the slider indicates the absolute priority, while the color of the selector circle indicates the relative priority.
+4.  <strong>Ancestor Context:</strong> Shows the priority of the closest parent prioritized Rem, helping you check inheritance.
+5.  <strong>Scope Analysis:</strong> Lets you see how this item ranks within specific documents vs. the entire knowledge base.</p>
+<p><strong>When to use:</strong> When you need full context or want to analyze your priority distribution.</p>
+<h4 id="what-the-priority-dialog-displays">What the Priority dialog displays:<a class="headerlink" href="#what-the-priority-dialog-displays" title="Permanent link">&para;</a></h4>
+<p><img alt="new priority dialog" src="../assets/uploaded/457026b6-0e93-44c4-be9c-84c230ee8b4a.png" width="500" /></p>
+<ul>
+<li>(1) [Absolute] Priority input field (selected when the dialog opens, so that you can just type the priority and press Enter to save)</li>
+<li>(2) Priority Badge: the number shows the absolute priority; the <strong>color code</strong> provides visual indication of the <strong>relative priority</strong> (shown in 4)</li>
+<li>(3) You can slide this button to select the priority. Pay attention that the <strong>position on the slider</strong> indicates <strong>absolute priority</strong>, but the <strong>color</strong> of the button indicates the <strong>relative priority</strong> (shown in 4)</li>
+<li>(4) Relative priority of the IncRem (or flashcard), in the scope shown on 6, as well as the number of items that form this scope</li>
+<li>(5) The priority of the closest ancestor, for reference. Shows the name of the closest ancestor, its relationship with the current rem (e.g. parent, grandparent), and if it is an IncRem or a flashcard.</li>
+<li>(6) The <strong>scope</strong> to be used for the calculation of the <strong>Relative Priority</strong>. May be "All KB" or a Document. If you select the Document tab, it will display a document scope. You can then use the arrows to go up and down on the hierarchy, and see how the current rem is proportionally positioned in relation to each of these scopes.</li>
+</ul>
+<hr />
+<h3 id="light-priority-popup">Light Priority Popup<a class="headerlink" href="#light-priority-popup" title="Permanent link">&para;</a></h3>
+<p><strong>Shortcut:</strong> <code>Ctrl+Opt+P</code></p>
+<p>Designed for speed. This popup opens instantly and provides just the essentials:
+*   A slider for the <strong>Incremental Rem</strong> priority or/and
+*   A slider for the <strong>Flashcard</strong> priority.</p>
+<p>It works exactly like the main popup but skips the heavy calculations (like checking ancestor trees or calculating precise universe percentiles) to ensure zero lag.</p>
+<p><strong><em>Note:</em>* If you are on </strong>Windows*<em> instead of Mac, you may need to disable the default keybindings for "Add All Properties" in the settings to avoid conflicts with this plugin. Go to Settings &gt; Keyboard Shortcuts, search for "Add All Properties" and disable it.</em></p>
+<p><strong>When to use:</strong> For routine day-to-day adjustments when speed is paramount.</p>
+<p><img alt="Light Priority Widget" src="../assets/light-priority-widget.png" width="400" /></p>
+<hr />
+<h3 id="quick-priority-shortcuts">Quick Priority Shortcuts<a class="headerlink" href="#quick-priority-shortcuts" title="Permanent link">&para;</a></h3>
+<p><strong>Shortcuts:</strong> 
+*   <code>Ctrl+Opt+Up Arrow</code>: <strong>Increase</strong> priority number (make <strong>less</strong> important). E.g., 10 → 15 with the default step of 5.
+*   <code>Ctrl+Opt+Down Arrow</code>: <strong>Decrease</strong> priority number (make <strong>more</strong> important). E.g., 20 → 15 with the default step of 5.</p>
+<p><em>Note: In this system, lower numbers mean higher importance (1 is top priority, 100 is low).</em></p>
+<p>These shortcuts allow you to adjust priorities on the fly without breaking your flow. You can use them on the current item in the queue or any focused Rem in the editor. A small toast notification will confirm the change.</p>
+<p>The step in which priorities will increase or decrease can be configured in the settings.</p>
+<p><strong>When to use:</strong> During review sessions when you want to adjust an item's priority up or down in a predefined step without stopping.</p>
+<p><img alt="Quick Priority in the Editor" src="../assets/quick-priority-editor.gif" width="600" /></p>
+<p><img alt="Quick Priority in the Queue" src="../assets/quick-priority-queue.gif" width="600" /></p>
+<hr />
+<h3 id="priority-editor-widget">Priority Editor Widget<a class="headerlink" href="#priority-editor-widget" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> Right side of the editor (when a Incremental Rem or a Card is focused) or potentially inline.</p>
+<p>This widget provides a persistent visual indicator of the item's priority.
+*   <strong>Clicking it</strong> opens the full priority popup.
+*   <strong>Expanding it</strong> reveals quick <code>+</code> / <code>-</code> buttons to adjust priority by 1 or 10 points directly.</p>
+<p><strong>When to use:</strong> When editing a document and you want to manage priorities without using keyboard shortcuts.</p>
+<p><img alt="Priority Editor" src="../assets/priority-editor.png" width="800" /></p>
+<hr />
+<h3 id="bulk-priority-for-a-multi-selection">Bulk Priority for a Multi-Selection<a class="headerlink" href="#bulk-priority-for-a-multi-selection" title="Permanent link">&para;</a></h3>
+<p><strong>Shortcuts:</strong> <code>Opt+P</code> (full popup) and <code>Ctrl+Opt+P</code> (light popup), the same keys you use on a single Rem.</p>
+<p>Select several Rems — with the row checkboxes in a <strong>table</strong>, or by dragging across bullets in the editor — and either priority shortcut now opens in <strong>batch mode</strong>, applying your choice to every selected Rem at once. Previously these commands looked only at the <em>focused</em> Rem, and a table selection has no focused Rem, so they answered <code>No Rem found to set priority</code>.</p>
+<p>The popup header shows the scope (<code>Priority Settings — 6 rems</code>) along with what the selection is made of, e.g. <code>2 IncRems, 4 with cards</code>.</p>
+<p><strong>What gets written where.</strong> Each Rem is routed by what it already is, mirroring the sections the single-Rem popup would have shown for it:</p>
+<table>
+<thead>
+<tr>
+<th>Selected Rem</th>
+<th>Receives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Has the <strong>Incremental</strong> powerup</td>
+<td>The Incremental priority</td>
+</tr>
+<tr>
+<td>Has flashcards or a <strong>CardPriority</strong></td>
+<td>The card priority</td>
+</tr>
+<tr>
+<td>Both</td>
+<td>Both</td>
+</tr>
+<tr>
+<td>Neither</td>
+<td>Nothing — it is skipped and counted in the header</td>
+</tr>
+</tbody>
+</table>
+<p>An IncRem with no cards is therefore never tagged <code>CardPriority</code> just because it shared a selection with flashcards. A bulk edit also never creates an <strong>inheritance anchor</strong> on a bare Rem — that stays a deliberate single-Rem action.</p>
+<p><strong>Both sliders reflect the whole selection.</strong> The sections shown come from every target, not from the first one: select a flashcard <em>first</em> and an IncRem second and you still get both sliders. Each one is labelled with how many Rems it will touch.</p>
+<p><strong>Sliders open on the class average.</strong> With mixed values the header also reports the spread — <code>IncRem mixed 27–74 (avg 50)</code> — so an average is never mistaken for everyone's current value.</p>
+<blockquote>
+<p>[!IMPORTANT]
+<strong>Only the sliders you actually move are applied.</strong> Nudge a slider to write it. Without this rule, opening the popup over six rows and touching only the card slider would push the first Rem's Incremental value onto every IncRem in the selection.</p>
+</blockquote>
+<hr />
+<h3 id="batch-priority-change-increms-flashcards">Batch Priority Change (IncRems &amp; Flashcards)<a class="headerlink" href="#batch-priority-change-increms-flashcards" title="Permanent link">&para;</a></h3>
+<p><strong>Access:</strong> Document Menu (top right 3 dots) → "Batch Priority Change"</p>
+<p>A powerful table view for unified priority management across an entire document tree.</p>
+<ul>
+<li><strong>View:</strong> Displays a hierarchical list of all Prioritized items (both Incremental Rems and Flashcards) in the document.</li>
+<li><strong>Bulk Operations:</strong><ul>
+<li><strong>Increase/Decrease:</strong> Adjust all selected priorities by a percentage.</li>
+<li><strong>Spread:</strong> Distribute priorities evenly across a range (e.g., set selected items from 10 to 50).</li>
+<li><strong>Set Fixed:</strong> Set all selected items to a specific value.</li>
+</ul>
+</li>
+<li><strong>Sorting/Filtering:</strong> Sort by name, priority, next repetition date, etc. Filter by search text, type, or priority range.</li>
+<li><strong>Multi-Select Type Filter:</strong> Hold <code>Cmd/Ctrl</code> while clicking in the "All Types" dropdown to instantly filter by multiple categories at once (e.g. showing only "Extracts" and items that "Has Cards").</li>
+<li><strong>Filter-Aware Bulk Actions:</strong> When any filter is active (search, type, or priority range), bulk action buttons automatically adapt:<ul>
+<li><strong>Check All Filtered / Uncheck All Filtered</strong> — only toggles items matching the current filters; out-of-scope items remain unchanged.</li>
+<li><strong>Preview Filtered</strong> — calculates new priorities only for the filtered subset, preserving existing calculations for items outside the filter.</li>
+<li><strong>Apply to Filtered</strong> — applies changes exclusively to the filtered items.</li>
+<li>When no filters are active, buttons revert to their standard labels and affect all items as before.</li>
+</ul>
+</li>
+</ul>
+<p><img alt="batch priority change widget" src="../assets/batch-priority-change-widget-new.png" width="900" /></p>
+<hr />
+<h3 id="batch-card-priority-flashcards">Batch Card Priority (Flashcards)<a class="headerlink" href="#batch-card-priority-flashcards" title="Permanent link">&para;</a></h3>
+<p><strong>Access:</strong> Focus on a Tag Rem → Document Menu → "Batch Assign Card Priority for tagged Rems"</p>
+<p>Designed specifically for <strong>Flashcards</strong>. You can now assign <code>CardPriority</code> to hundreds of rems at once, based on a tag.</p>
+<p><strong>Use Cases:</strong>
+*   <strong>Topic Prioritization:</strong> When you have a specific topic or exam tag (e.g., <code>#Exam1</code>) and want to ensure all related flashcards are prioritized highly.
+*   <strong>System Migration:</strong> If you used to use tags to prioritize your cards (like <code>#important!</code>, <code>#P1</code>, <code>#P2</code>), you can convert your old manual system to the new one in bulk.</p>
+<p><strong>Features:</strong>
+*   <strong>Smart Randomization:</strong> Assigns random priorities within a specific range (e.g., 20-40). This distributes the load so important cards don't all pile up on the same day.
+*   <strong>Intelligent Handling:</strong> Capable of checking if the item is also an Incremental Rem, allowing you to use its existing IncRem priority as the Card Priority.
+*   <strong>Safety:</strong> Safely updates rems that already have <code>manual</code> priorities by requiring explicit "Overwrite" confirmation.</p>
+<p><img alt="batch card priority widget" src="../assets/uploaded/b4fed324-d03d-4fb6-871f-2c643ed63467.png" width="500" /></p>
+<hr />
+<h3 id="other-methods">Other Methods<a class="headerlink" href="#other-methods" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Reschedule Command (<code>Ctrl+J</code>):</strong> The reschedule popup also includes a priority slider, allowing you to change both the due date and the priority in one go.</li>
+</ul>
+<p><img alt="Reschedule Widget" src="../assets/reschedule.png" width="400" /></p>
+<ul>
+<li><strong>Extract with Priority (<code>Opt+Shift+X</code>):</strong> When focused on a Rem or having a text selection, you can immediately create an extract and open the priority popup for the new item.</li>
+</ul>
+<hr />
+<h2 id="priorities-in-tables">Priorities in Tables<a class="headerlink" href="#priorities-in-tables" title="Permanent link">&para;</a></h2>
+<p>Tables are the one place the <strong><a href="#priority-editor-widget">Priority Editor Widget</a></strong> cannot follow you. RemNote does not render <em>any</em> plugin widget inside a table cell — the badge you see on every ordinary bullet simply has nowhere to mount there — so a table of flashcards gave you no way to see priorities at a glance.</p>
+<p>Instead, the plugin writes each Rem's priority band into a hidden tag and draws the badge with CSS, which works even in the lightweight rendering tables use before you hover a row.</p>
+<p><img alt="Priority band badges in a table" src="../assets/priority-band-tables.png" width="800" /></p>
+<p><strong>What you see.</strong> A small coloured pill at the <strong>top-right of the row's first cell</strong>, reading the band the Rem falls in — <code>50s</code> for a priority of 50–59 — and coloured on the same scale as every other priority badge in the plugin, so a more important <code>10s</code> reads warm and a less important <code>50s</code> reads green.</p>
+<p>One badge appears per <strong>row</strong>, not per cell: the row's priority belongs to the Rem in the primary column, while the other columns display that Rem's slot values, which have no priority of their own. Scanning that column tells you the shape of a whole table at a glance.</p>
+<p><strong>Colour follows relative priority, per population.</strong> Like the Priority Editor, a badge is coloured by where its priority <em>ranks</em>, not by its absolute number — in a knowledge base whose priorities cluster low, <code>P20</code> can be the 9th percentile and is drawn accordingly. Incremental Rems are ranked against Incremental Rems and flashcards against flashcards, exactly as the popup does it, so a table mixing both colours each row on its own scale. The mapping is recalculated at startup — once the priority caches have finished loading, which on a large knowledge base is some seconds into the session — and after a <em>Refresh</em>, so it is a recent snapshot rather than a live figure.</p>
+<p><strong>Why bands and not the exact number.</strong> The only channel that reaches inside a table cell is a tag, and a tag is a yes/no — it cannot carry a value. Ten band tags give you ten steps; showing <code>74</code> exactly would need a tag per possible priority.</p>
+<p><strong>Which Rems get a badge.</strong> Only Rems that could actually appear as a table row: those carrying at least one <strong>non-powerup tag that defines slots</strong> (the tag whose slots become the table's columns). The plugin's own powerups don't count. Without that filter, every card and extract in a large knowledge base would be tagged — tens of thousands of synced writes for Rems that will never be seen in a table.</p>
+<blockquote>
+<p>[!NOTE]
+A table built from a <strong>document or portal view</strong> rather than from a tag has no tag to key on, so its rows show no badges.</p>
+</blockquote>
+<p><strong>Turning it off.</strong> Setting: <strong>Show Priority Badges in Table Cells</strong> (default on). It takes effect after a reload. The band tags themselves are always hidden from the tag bar, whether or not the badges are drawn.</p>
+<h3 id="keeping-the-badges-in-sync">Keeping the badges in sync<a class="headerlink" href="#keeping-the-badges-in-sync" title="Permanent link">&para;</a></h3>
+<p>The band follows your priorities automatically — every priority write updates it, including inherited priorities flowing down a cascade, priorities set in bulk, and priorities changed from the IncRem List, Main View, Page Range, reschedule and editor-review widgets. Two commands exist for the rest:</p>
+<ul>
+<li><strong>Refresh Priority Badges (Tables)</strong> — recomputes bands for every IncRem and every Rem with a card priority. Run it <strong>once after enabling the feature</strong> to fill in Rems whose priority was set before it existed, or any time you suspect drift. Progress and a completion summary are reported as toasts and in the developer console.</li>
+<li><strong>Remove All Priority Band Tags</strong> — strips every band tag. Unlike the full scope of <em><a href="../Plugin-Commands-Reference/#remove-cardpriority-tags">Remove CardPriority Tags…</a></em>, <strong>this destroys nothing</strong>: bands are a derived mirror of priorities that still live in the Incremental and CardPriority slots, so <em>Refresh</em> rebuilds them exactly.</li>
+</ul>
+<blockquote>
+<p>[!TIP]
+If you ran the plugin before the eligibility filter existed, run <strong>Remove All Priority Band Tags</strong> once and then <strong>Refresh Priority Badges (Tables)</strong> to shed the bands that were applied to Rems outside any table.</p>
+<p>[!NOTE]
+<strong>Before v1.0.27</strong>, only some priority writes updated the band: batch changes, the Priority &amp; Interval batch save, reschedules, editor reviews and the list-view widgets all left the badge showing the previous value until the next <em>Refresh</em>. If you have been using tables since before that release, one run of <strong>Refresh Priority Badges (Tables)</strong> clears any badges left stale by it.</p>
+<p>One category is still not covered automatically: <strong>removing</strong> a card priority outright, via <em><a href="../Plugin-Commands-Reference/#remove-cardpriority-tags">Remove CardPriority Tags…</a></em> or the single-Rem cleanup. A Rem that is also an Incremental Rem keeps the correct badge (it falls back to the incremental priority), but a plain flashcard Rem holds its old badge until a <em>Refresh</em>.</p>
+</blockquote>
+<hr />
+<h2 id="priorities-on-pdf-highlights">Priorities on PDF Highlights<a class="headerlink" href="#priorities-on-pdf-highlights" title="Permanent link">&para;</a></h2>
+<p>The same band mechanism carries priorities back into your <strong>PDF and web highlights</strong> — the one place they were previously invisible. Until now a highlight's importance lived only on the Incremental Rem or flashcards made from it, so re-reading a source told you nothing about what you had judged important.</p>
+<p><strong>Two places it shows.</strong> A small coloured pill on the highlight in the <strong>Highlights side panel</strong>, and the highlight's <strong>marker in the PDF itself</strong> takes the band colour, so importance is legible while skimming the document.</p>
+<p><strong>Colour means priority; line style means provenance.</strong> Both markers carry the band colour, and the line distinguishes what the highlight is to you:</p>
+<table>
+<thead>
+<tr>
+<th>Highlight</th>
+<th>Underline</th>
+<th>Side bar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Extracted</strong> — an Incremental Rem was made from it</td>
+<td>dashed</td>
+<td><strong>solid</strong></td>
+</tr>
+<tr>
+<td><strong>Linked only</strong> — flashcards or other prioritised Rems reference it, but nothing was extracted</td>
+<td>dotted</td>
+<td><strong>dotted</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The marker follows the existing "peek" toggle: with PDF highlight borders switched off, no marker is drawn and only the side-panel badge remains.</p>
+<h3 id="where-a-highlights-priority-comes-from">Where a highlight's priority comes from<a class="headerlink" href="#where-a-highlights-priority-comes-from" title="Permanent link">&para;</a></h3>
+<p>A highlight has no priority of its own — it inherits from <strong>every Rem that links to it</strong>, by any route:</p>
+<ul>
+<li>an <strong>Incremental Rem extracted</strong> from it (the pin reference the extraction flow leaves behind);</li>
+<li><strong>flashcards or any prioritised Rem that references it</strong>, including links you made by hand, long before this feature existed;</li>
+<li>a rem whose <strong>direct child</strong> holds the pin. This supports the concept workflow: retitle an extract with the concept it defines, break its prose into children, and the pin moves down with the prose — the priority stays on the concept and is still found.</li>
+</ul>
+<p><strong>Several links average, plainly.</strong> When more than one Rem links to a highlight, the badge shows the plain average of their priorities. No weighting: a highlight cited by one high-priority card and three low-priority ones lands in between, which is what "how much does this passage matter" should mean.</p>
+<p><strong>Dismissed Rems count only as a fallback.</strong> A dismissed Rem contributes its last recorded priority — dismissal means the material was <em>processed and its cards made</em>, not that it was unimportant — but only when <strong>no live Rem</strong> links the highlight. If anything still active points at it, that is what the badge reflects. A Rem dismissed before it was ever reviewed recorded no priority and contributes nothing.</p>
+<blockquote>
+<p>[!NOTE]
+Unlike table badges, highlight badges are <strong>not</strong> gated by the <em>Show Priority Badges in Table Cells</em> setting; that setting governs tables only.</p>
+</blockquote>
+<h3 id="keeping-highlight-badges-in-sync">Keeping highlight badges in sync<a class="headerlink" href="#keeping-highlight-badges-in-sync" title="Permanent link">&para;</a></h3>
+<p>Setting a priority on an extract updates its highlight <strong>immediately</strong>. Everything else is reconciled by <strong>Refresh Priority Badges (Tables)</strong>, which runs in two phases and reports each separately in the developer console:</p>
+<ol>
+<li><strong>Table badges</strong> — walks every Incremental Rem and every Rem with a card priority, updating their own badges, and harvests the links it sees along the way.</li>
+<li><strong>Highlight badges</strong> — takes each highlight and pulls from everything referencing it, applying the averaging and fallback rules above.</li>
+</ol>
+<p>The second phase works in reverse deliberately. Pushing from each Rem outward made the result depend on processing order when several Rems shared a highlight, and it could never see links from dismissed Rems or from flashcards that were never extracted.</p>
+<blockquote>
+<p>[!TIP]
+Highlights linked only to hand-made flashcards are found through those links, not through any tag the plugin applies — so a PDF you annotated and built cards from years ago picks up badges on the first <em>Refresh</em>, with nothing to migrate.</p>
+</blockquote>
+<hr />
+<h2 id="sorting-criteria">Sorting Criteria<a class="headerlink" href="#sorting-criteria" title="Permanent link">&para;</a></h2>
+<p>Accessed via the <em>three-dot menu in the top-right of the queue</em>, the <strong>"Sorting Criteria"</strong> popup lets you control the mix and order of cards in your review session.</p>
+<blockquote>
+<p>[!NOTE]
+<strong>Knowledge Base Scope:</strong> Your Sorting Criteria configurations are scoped to your active Knowledge Base. If you use multiple Knowledge Bases, you can maintain completely different sorting priorities and ratios for each one without interference. The name of the currently active Knowledge Base is displayed at the top of the popup as a reminder.</p>
+</blockquote>
+<p><img alt="Screenshot of the " src="../assets/sorting-criteria-preset.png" width="350" /></p>
+<h3 id="saved-presets">Saved Presets<a class="headerlink" href="#saved-presets" title="Permanent link">&para;</a></h3>
+<p>At the top of the Sorting Criteria popup there is a <strong>Presets</strong> panel. It lets you snapshot your current configuration and restore it in one click:</p>
+<ul>
+<li><strong>Save:</strong> type a name and press Enter (or click 💾 Save) — saves the three current slider values as a named preset. Saving with an existing name overwrites it.</li>
+<li><strong>Load:</strong> select a preset from the dropdown to apply all three settings instantly.</li>
+<li><strong>Delete:</strong> select a preset and click Delete.</li>
+</ul>
+<p>Presets are scoped to the active Knowledge Base, just like the settings themselves.</p>
+<hr />
+<h3 id="1-incremental-rem-randomness">1) Incremental Rem Randomness<a class="headerlink" href="#1-incremental-rem-randomness" title="Permanent link">&para;</a></h3>
+<ul>
+<li>This slider adjusts how strictly the queue follows your priority settings.</li>
+<li><strong><code>20%</code> (Default):</strong> Most of the queue follows strict priority order, while a slice is randomized via the priority-weighted lottery — dedicating part of every session to surfacing lower-priority "golden nuggets" without disturbing your high-priority core.</li>
+<li><strong><code>0%</code>:</strong> The queue is sorted strictly by priority. Your highest-priority (lowest number) items will always appear first.</li>
+<li><strong><code>100%</code> (Max):</strong> Every due incremental item is eligible to be reshuffled — but <strong>not uniformly</strong>. Higher-priority items remain far more likely to surface first, following the <a href="#how-randomness-works-the-priority-weighted-lottery">Priority-Weighted Lottery</a> described below.</li>
+<li>Increasing randomness can be useful for discovering older, lower-priority items you might otherwise not see — without letting them crowd out the items closest to your <a href="#priority-shield">Priority Shield</a>.</li>
+</ul>
+<blockquote>
+<p>[!NOTE]
+Randomness is no longer a blind shuffle. The portion of the queue it randomizes is filled by a <strong>priority-weighted draw</strong>, so the items it pulls forward are still biased toward higher priority. See <a href="#how-randomness-works-the-priority-weighted-lottery">How Randomness Works: The Priority-Weighted Lottery</a>. Because of this, <strong>higher slider values are now safe</strong> — they explore deeper into your collection while keeping the priority gradient intact.</p>
+<p>[!NOTE]
+<strong>Slider feel:</strong> the slider is intentionally non-linear (the displayed percentage is the <em>actual</em> fraction randomized). It eases in so you get fine control over small values near the left, while the middle of the slider reaches a meaningful ~25%. Drag further right for more aggressive exploration.</p>
+</blockquote>
+<p><strong>💡 Pro-Tip for an Efficient Learning:</strong></p>
+<p>The default is <strong>20%</strong> — a moderate amount of randomness now that it's priority-safe. Feel free to raise it as you get comfortable with Incremental Reading: a higher degree of randomness dedicates more of your study time to diving into material that can bring you valuable insights and "golden nuggets", and thanks to the priority-weighted lottery your high-priority items still come first.</p>
+<h3 id="2-flashcard-randomness">2) Flashcard Randomness<a class="headerlink" href="#2-flashcard-randomness" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Similar purposes of the Incremental Rem Randomness, but this setting is used solely to the creation of <a href="../Priority-Review-Document/">Priority Review Document</a>s. It does not affect the regular RemNote flashcard queue (it cannot be managed by a plugin). If you want review your high priority flashcards first, you MUST create a <a href="../Priority-Review-Document/">Priority Review Document</a> and enter the queue in that document.</li>
+<li>Like the Incremental Rem slider, the randomness it adds is <strong>priority-weighted</strong>, not uniform — see <a href="#how-randomness-works-the-priority-weighted-lottery">How Randomness Works: The Priority-Weighted Lottery</a>. The new weighting takes effect on <strong>newly generated</strong> Priority Review Documents.</li>
+</ul>
+<h3 id="3-flashcard-ratio">3) Flashcard Ratio<a class="headerlink" href="#3-flashcard-ratio" title="Permanent link">&para;</a></h3>
+<p>The core idea is to strike a balance between learning new things and retaining what you've already learned. As the SuperMemo guide states:</p>
+<blockquote>
+<p>Only a small proportion of time-consuming topics [= passive reading Incremental Rem] is allowed in the learning queue. This proportion is chosen to maximize the fun and efficiency of learning: sufficient inflow of new material combined with the necessary review of your previous investment.</p>
+</blockquote>
+<ul>
+<li>This slider controls the balance between regular RemNote flashcards (= active recall) and Incremental Rems (= passive reading).</li>
+<li><strong>Slide Left:</strong> Decreases the number of regular flashcards shown between incremental rems. All the way to the left (<code>Only Incremental Rem</code>) will hide flashcards completely.</li>
+<li><strong>Slide Right:</strong> Increases the number of flashcards. All the way to the right (<code>Only Flashcards</code>) will hide Incremental Rems.</li>
+<li>The default is a balanced mix, showing a set number of flashcards for every one incremental rem.</li>
+</ul>
+<p>💡 <strong>Pro-Tip: Finding Your Ideal Balance</strong></p>
+<p>Use the Flashcard Ratio slider to tailor each study session to your goals.</p>
+<ul>
+<li>
+<p><strong>To manage a large flashcard backlog:</strong> Set the slider to a higher ratio, like <strong>8-10 cards</strong> per incremental rem. This dedicates more time to your existing reviews, ensuring you don't fall behind while still introducing new material to keep sessions engaging, while at the same time avoids boredom for not seeing new material.</p>
+</li>
+<li>
+<p><strong>To focus on new content:</strong> If your flashcard queue is manageable, set the slider to a lower ratio, like <strong>4-6 cards</strong> per incremental rem. This prioritizes your incremental reading and learning, allowing you to make faster progress through your articles, books, and videos, while ensures your review material will not be forgotten.</p>
+</li>
+</ul>
+<hr />
+<h3 id="how-randomness-works-the-priority-weighted-lottery">How Randomness Works: The Priority-Weighted Lottery<a class="headerlink" href="#how-randomness-works-the-priority-weighted-lottery" title="Permanent link">&para;</a></h3>
+<p>Both randomness sliders above — <a href="#1-incremental-rem-randomness">Incremental Rem Randomness</a> and <a href="#2-flashcard-randomness">Flashcard Randomness</a> — share the same engine. Understanding it helps you reason about <em>what</em> you'll actually see when you turn randomness up.</p>
+<h4 id="the-goal">The goal<a class="headerlink" href="#the-goal" title="Permanent link">&para;</a></h4>
+<p>Prioritization should guarantee two things at once:</p>
+<ol>
+<li><strong>Higher-priority items get reviewed more.</strong> The closer an item is to your <a href="#priority-shield">Priority Shield</a>, the more often it should appear.</li>
+<li><strong>Lower-priority items still get a real chance.</strong> Setting a flashcard to priority 80 should make it <em>rare</em> — never <em>invisible</em>. You should still stumble on the occasional "golden nugget" buried deep in your collection.</li>
+</ol>
+<h4 id="why-the-old-behavior-fell-short">Why the old behavior fell short<a class="headerlink" href="#why-the-old-behavior-fell-short" title="Permanent link">&para;</a></h4>
+<p>Randomness used to be applied as <strong>blind uniform swaps</strong>: a number of swaps proportional to your slider value, each one exchanging two items picked <em>completely at random</em> from anywhere in the queue. The trouble is that a uniform swap has <strong>no sense of distance</strong>. An item one rank below your cutoff and an item in the very <em>last</em> quartile had the <strong>exact same</strong> chance of being pulled forward into your session.</p>
+<p>The practical consequence: as soon as you raised randomness, the "random" part of your reviews was spread <strong>flat</strong> across every priority level. You'd spend about as much effort on your lowest-priority material as on the items just past your shield — which defeats the purpose of prioritizing in the first place.</p>
+<h4 id="what-it-does-now">What it does now<a class="headerlink" href="#what-it-does-now" title="Permanent link">&para;</a></h4>
+<p>The slider still randomizes the <strong>same amount</strong> of the queue (so your saved <a href="#saved-presets">presets</a> behave exactly as before, and <code>0%</code> is still strict priority order). The difference is <em>how</em> the randomized slots are filled: instead of a uniform draw, the items competing for the <strong>earlier</strong> positions are drawn with probability proportional to their <strong>Weighted-Shield weight</strong>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>W = e^(−2.3026 × p/100)
+</code></pre></div>
+<p>…where <code>p</code> is the item's priority percentile. This is the <strong>same curve</strong> used by the <a href="#weighted-shield">Weighted Shield Breakdown</a>, where a top-priority item (<code>p = 0</code>) weighs about <strong>10×</strong> a bottom-priority one (<code>p = 100</code>). The randomness is now a <strong>lottery with weighted tickets</strong>: high-priority items hold far more tickets, but every item holds at least one.</p>
+<h4 id="what-you-can-expect">What you can expect<a class="headerlink" href="#what-you-can-expect" title="Permanent link">&para;</a></h4>
+<p>The flat tail becomes a <strong>smooth, decaying gradient</strong>. With the default settings:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Comparison</th>
+<th style="text-align: center;">Old (uniform)</th>
+<th style="text-align: center;">New (weighted)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">2nd quartile vs. <strong>last</strong> quartile</td>
+<td style="text-align: center;">1× (equal)</td>
+<td style="text-align: center;"><strong>~3× more likely</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Each 10-percentile step down in priority</td>
+<td style="text-align: center;">no change</td>
+<td style="text-align: center;"><strong>~1.26× less likely</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Top decile vs. bottom decile (per item)</td>
+<td style="text-align: center;">1× (equal)</td>
+<td style="text-align: center;"><strong>~8× more likely</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Chance of the lowest-priority items</td>
+<td style="text-align: center;">same as everything else</td>
+<td style="text-align: center;">small but <strong>never zero</strong></td>
+</tr>
+</tbody>
+</table>
+<p>So a 2nd-quartile item now genuinely outdraws a 3rd-quartile item, which outdraws a 4th — exactly the decreasing-effort profile prioritization is meant to produce — while your deep, low-priority material still resurfaces now and then.</p>
+<blockquote>
+<p>[!NOTE]
+<strong>Where it applies:</strong> the live queue's Incremental Rem injection (Incremental Rem Randomness) <strong>and</strong> the <a href="../Priority-Review-Document/">Priority Review Document</a> for both IncRems and flashcards (Flashcard Randomness). In-order review mode is left untouched, since it follows document order rather than priority. Priority Review Documents adopt the new weighting on <strong>newly generated</strong> documents.</p>
+<p>[!TIP]
+<strong>Advanced — tuning the steepness.</strong> The decay constant <code>k</code> (default <code>2.3026 = ln 10</code>, the 10× curve) is configurable in synced storage under <code>weightSelectionK</code>. A <strong>larger</strong> <code>k</code> favors high priority more aggressively (low-priority items appear more rarely); a <strong>smaller</strong> <code>k</code> flattens the curve toward the old uniform behavior. Most users never need to touch it — the default mirrors the Weighted Shield exactly, so the analytics and the queue tell one consistent story.</p>
+</blockquote>
+<hr />
+<h2 id="priority-shield">Priority Shield<a class="headerlink" href="#priority-shield" title="Permanent link">&para;</a></h2>
+<p>Inspired by advanced metrics in SuperMemo (Priority Protection), the <strong>Priority Shield</strong> is a real-time diagnostic tool that helps you understand and manage your learning load. It gives you a clear, numerical value for your "Priority Protection" — your capacity to process high-priority material.</p>
+<p>You can find it displayed below the answer buttons in the queue (this can be toggled in settings) on IncRems, and above the answer buttons on Flashcards.</p>
+<h3 id="what-it-measures">What it Measures<a class="headerlink" href="#what-it-measures" title="Permanent link">&para;</a></h3>
+<p>The shield displays the priority of the <strong>most important due Incremental Rem / Flashcard that you have not yet reviewed</strong>. It provides separate metrics for your entire <strong>Knowledge Base (KB)</strong> and the current <strong>Document</strong> (if you are studying a specific document). </p>
+<p>The Shield metric for Incremental Rems is separate of that for Flashcards; each one consider exclusively its own scope (IncRems or Flashcards).</p>
+<blockquote>
+<p>[!NOTE]
+<strong>Card Shield only:</strong> The card shield uses a <strong>"start of today"</strong> boundary — only cards with a <code>nextRepetitionTime</code> on or before midnight of the current day (user's local timezone) are counted. Cards that become due <em>during</em> the session (e.g. from an <em>Again</em> rating) are excluded until the next day. This keeps the shield stable throughout the day and aligns with the SuperMemo principle that the Outstanding Queue is formed once per day. See <a href="../Priorities-for-Flashcards/">Priorities-for-Flashcards#start-of-today-boundary</a> for full details.</p>
+</blockquote>
+<p><img alt="priority-shield-increm" src="../assets/uploaded/b698cb43-4f16-4907-a92a-ab1cda800ca7.png" width="1000" /></p>
+<p><img alt="priority-shield-cards" src="../assets/uploaded/206bcc27-a186-42be-9d52-66afccc16b9e.png" width="1000" /></p>
+<h3 id="how-to-interpret-it">How to Interpret It<a class="headerlink" href="#how-to-interpret-it" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A <strong>HIGH</strong> shield value (e.g., Absolute: 30, Percentile: 32%) is <strong>GOOD</strong>. It means you have successfully reviewed all your high-priority items, and the most important one remaining is of relatively lower importance. Your critical material is "shielded" and protected.</li>
+<li>A <strong>LOW</strong> shield value (e.g., Absolute: 5, Percentile: 4%) is a <strong>WARNING</strong>. It indicates that you are falling behind on highly important material.</li>
+<li>A shield reading <code>100%</code> means you have no overdue items in that scope—the ideal state!</li>
+<li><strong>🛡️ Active Shield Animation:</strong> When the absolute priority of the item you are currently reviewing perfectly matches the active shield value, the "🛡️" indicator and corresponding text will subtly pulse and glow in blue. This provides rewarding visual feedback that you are directly attacking the absolute most important pending material in your queue!</li>
+</ul>
+<p>The core purpose of the Priority Shield is to move beyond guessing and provide you with concrete data to build a sustainable and effective study strategy. By knowing the exact priority of the most important Incremental Rem you have yet to review, you can answer critical questions about your learning habits:</p>
+<ul>
+<li><strong>Am I creating new material faster than I can review it?</strong> If you consistently see a low Priority Shield value (e.g., your Relative Priority Shield is only protecting 4% of your top priority Incremental Rems), it's a strong indicator that the inflow of new Incremental Rems is too high, and your most important knowledge is at risk of being forgotten.</li>
+<li><strong>Is my "<a href="#sorting-criteria">Sorting Criteria</a>" <a href="#1-incremental-rem-randomness">Randomness</a> setting right for me?</strong> The Priority Shield gives you direct feedback on your randomness setting. If your shield value is too low, you might want to decrease the randomness to focus more strictly on high-priority items. Conversely, if you feel your reviews are too rigid, you can increase randomness and watch how it affects your shield value over time.</li>
+<li><strong>Am I at risk of burnout?</strong> The history graph allows you to see trends. If you notice your Priority Shield value steadily declining over days or weeks, it may be a sign that your workload is becoming unmanageable, allowing you to adjust your strategy <em>before</em> you feel overwhelmed.</li>
+</ul>
+<h3 id="weighted-shield">Weighted Shield<a class="headerlink" href="#weighted-shield" title="Permanent link">&para;</a></h3>
+<p>While the standard Priority Shield identifies the <em>single</em> most important item you’ve missed, the <strong>Weighted Shield</strong> (represented by the ⚖️ icon) provides a macro-level diagnostic of your entire workload. It measures the fraction of your total priority-weighted queue that has been processed. </p>
+<p><img alt="Weighted Shield" src="../assets/shield-weighted-card.png" width="1000" /></p>
+<p><strong>How it works:</strong>
+* Each item is weighted exponentially by its priority percentile. High-priority items carry significantly more weight than low-priority items (a top-priority item carries approximately 10× the weight of a bottom-priority item).
+* As you process items, your shield percentage increases.
+* Processing high-priority items gives a much larger boost to your shield than processing low-priority items.
+* <strong>100%</strong> means everything due in your queue is successfully processed!
+* <strong>A low percentage</strong> means a significant portion of your highly-weighted material remains unreviewed.</p>
+<p><strong>Weighted Shield Breakdown Popup:</strong>
+Clicking on the Weighted Shield metric in the queue toolbar will open a detailed breakdown popup. This popup divides your knowledge base into ten percentile buckets (e.g., 0-10%, 10-20%, etc.) and shows you exactly how much of the weighted volume within each bucket is currently due versus processed. This allows you to pinpoint exactly <em>where</em> in your priority hierarchy your backlog is accumulating.</p>
+<p>You can also open this popup directly from the command palette via <strong>Open Weighted Shield Popup</strong> (<code>quick: wsh</code>) — it uses the current sub-queue when invoked from the queue, and the focused rem when invoked from the editor.</p>
+<p><img alt="Weighted Shield Breakdown" src="../assets/weighted-shield-breakdown3.png" width="600" /></p>
+<p>The popup table contains two columns that may need explanation:</p>
+<ul>
+<li>
+<p><strong>Avg W (Average Weight):</strong> The mean exponential weight of all items within that percentile bucket. Each individual item's weight is computed using the formula $W = e^{-2.3026 \cdot \dfrac{p}{100}}$, where $p$ is the item's relative priority percentile (0–100%). This means an item at the very top (p ≈ 0%) gets a weight near <strong>1.0</strong>, while an item at the very bottom (p = 100%) gets a weight of exactly $e^{-2.3026} \approx 0.1$ — i.e., approximately 10× less influential. The "Avg W" column shows the average of these individual weights across all items in the bucket, giving you a sense of how heavy-weighted that bucket is.</p>
+</li>
+<li>
+<p><strong>W Share (Weight Share):</strong> The percentage of the <em>total</em> priority weight that belongs to this bucket. It is calculated as:</p>
+<p><code>W Share = (sum of weights in bucket) / (total weight across all buckets) × 100</code></p>
+<p>This tells you what fraction of your overall weighted workload lives in each priority tier. For example, a "W Share" of 22% in the 0–10% bucket means that the top 10% of your items — even if they are few in number — collectively account for 22% of your entire priority-weighted workload. This is the core reason why processing high-priority items moves the Weighted Shield so much more than processing low-priority ones.</p>
+</li>
+</ul>
+<p><strong>Ad-hoc Subset Stats (Threshold Slider):</strong></p>
+<p>Immediately below each bucket table (one for the Knowledge Base scope, one for the Document scope when applicable) there is an interactive <strong>Absolute Priority threshold slider</strong>. Drag it to define an ad-hoc subset composed of <em>every</em> item whose absolute priority is <strong>less than or equal to</strong> the chosen value (i.e. all items at least as important as that threshold), and the panel beside it instantly recomputes a row of statistics for that set:</p>
+<ul>
+<li><strong>Rel %ile</strong> — the relative percentile rank of the threshold itself (<code>count of items in subset / total items × 100</code>). In other words, what fraction of the universe is contained in the subset.</li>
+<li><strong>Items</strong> — total number of items in the subset.</li>
+<li><strong>Due</strong> — number of those items currently due (unprocessed).</li>
+<li><strong>% Done</strong> — degree of processing of the ad-hoc subset: <code>(items − due) / items × 100</code>.</li>
+<li><strong>Avg W</strong> — mean exponential weight of items in the subset (using the same $W = e^{-2.3026 \cdot p/100}$ formula as the bucket table, with $p$ being each item's relative percentile across the <em>full</em> universe).</li>
+<li><strong>W Share</strong> — sum of weights in the subset as a percentage of the total weight across all items.</li>
+</ul>
+<p>This lets you answer questions the fixed deciles can't — e.g. <em>"How protected is everything I've prioritized at 25 or less (25 or more important)?"</em> or <em>"What share of my total weighted workload sits in my top-50 items?"</em> — without leaving the popup. The slider is fully interactive in both the Flashcard and Incremental Rem Weighted Shield popups, and works for both the KB-wide and Document-scoped sections side by side.</p>
+<p><strong>Default position — the Monthly Higher Shield:</strong></p>
+<p>Rather than opening at the bottom of the priority axis, the slider auto-positions to the <strong>highest absolute-priority shield value reached in the last 30 days</strong> for that scope (KB or Document) and item type (Flashcards or Incremental Rems) — read from the same per-day records that drive the <a href="../Plugin-Widgets-Reference/#44-priority-shield-graph">Priority Shield Graph</a>. A small caption directly under the slider explains the gap:</p>
+<blockquote>
+<p>📈 <strong>Monthly higher shield:</strong> priority ≤ <strong>N</strong> → <strong>X</strong> due to catch up</p>
+</blockquote>
+<p>When the current scope already covers everything up to that cutoff (no due items at-or-above the historical high), the caption switches to:</p>
+<blockquote>
+<p>✓ <strong>At monthly higher priority shield (≤ N)</strong></p>
+</blockquote>
+<p>The catch-up count is anchored to the historical cutoff and does not change as you drag the slider — so the message keeps its meaning while you use the slider to explore other thresholds. If the lookup finds no history for the last 30 days (fresh KB, never-seen document), the slider falls back to the bottom-of-axis default and the caption is hidden. Cards and Incremental Rems are looked up independently against their respective shield-history keys, so each section shows its own historical high.</p>
+<p>The same <code>priority ≤ N → X due to catch up</code> summary, computed live for both scopes (KB / Doc) and both item kinds (IncRem / Cards), is also surfaced in the <a href="../History-Queue-Dashboard-and-Mastery-Drill/#monthly-higher-shield-catch-up">Practiced Queues live dashboard</a> in the right sidebar — so you can keep an eye on it without opening the popup.</p>
+<p><strong>Why "Weight processed" differs from "Processed %":</strong></p>
+<p>The popup header shows two separate figures that often diverge significantly, and understanding the difference is the key to reading this metric correctly:</p>
+<blockquote>
+<p><em>Example: <code>Processed: 7,706 (22.3%)</code> — but <code>Weight processed: 36.6% of total weight</code></em></p>
+</blockquote>
+<ul>
+<li><strong>Processed (22.3%)</strong> is a plain item count: 22.3% of all your Rems with cards have their cards non-due. Every Rem counts equally, regardless of its priority.</li>
+<li><strong>Weight processed (36.6%)</strong> is the priority-weighted fraction: it sums up the exponential weights of processed items and divides by the total weight of <em>all</em> items. Because high-priority items weigh so much more, even a relatively small number of processed high-priority items can push this figure well above the raw count percentage.</li>
+</ul>
+<p>In this example, the 22.3% of items you've processed happen to be disproportionately <em>high-priority</em> ones — so they contribute 36.6% of the total weight. <strong>This gap is actually good news</strong>: it means your study habits are prioritizing the right material. Conversely, if the weight percentage were <em>lower</em> than the raw count percentage, it would signal that you've been processing mostly low-priority items while your most valuable material sits unreviewed.</p>
+<p>The <strong>Weighted Shield value</strong> (⚖️ %) shown in the shield header is precisely this "Weight processed" figure — making it a far more meaningful measure of your learning efficiency than a simple count of items reviewed.</p>
+<p><strong>Card Priority × Memory Analytics Tab:</strong></p>
+<p>When both Incremental Rems and Cards groups are present, the wide popup exposes a second tab — <strong>Card Priority × Memory Analytics</strong> — that replays FSRS over every card in your knowledge base and aggregates per priority-percentile bucket. Each bucket holds an equal number of cards (deciles by inherited Rem priority, so a Rem with multiple cards contributes one entry per card), plus a consolidated <strong>All KB</strong> row at the bottom for comparison.</p>
+<p><img alt="Card Priority × Memory Analytics" src="../assets/weighted-shield-memory-analytics.png" width="1000" /></p>
+<p>20 columns are organized into four groups, with hover tooltips explaining each one:</p>
+<ul>
+<li><strong>Identity</strong> — bucket label and the raw priority range it covers.</li>
+<li><strong>Population</strong> <em>(always-current — not affected by the period filter)</em> — <code>Items</code> (cards in the bucket), <code>Due</code> (cards with <code>nextRepetitionTime ≤ now</code>), <code>Done</code>, <code>%New</code> (cards never graded), <code>%Stale</code> (cards overdue by &gt; 2× their last interval).</li>
+<li><strong>Throughput</strong> <em>(period-filtered)</em> — total / avg <code>Reps</code>, total / avg <code>Time</code>, <code>CPM</code>, <code>t/rep</code>, and per-card <code>Cost</code>. <code>Cost</code> is lifetime-coverage <code>totalMinutes / coverageYears</code> when the period is "All", and annualized <code>time-in-period / period-length</code> when the period is finite.</li>
+<li><strong>Outcome</strong> <em>(period-filtered)</em> — <code>Lapses</code> (per non-new card), <code>Retention</code> = <code>(gradeable − Again) / gradeable</code>, <code>Avg pR</code>, <code>R-dev = Retention − Avg pR</code> in percentage points (positive ⇒ you remember better than FSRS expected; negative ⇒ you forget more), and average <code>Grade</code> (1 = Again, 4 = Easy).</li>
+<li><strong>FSRS today</strong> <em>(always-current)</em> — average current FSRS Difficulty <code>D</code>, Retrievability <code>R</code> (as of today), and Stability <code>S</code> across all cards reviewed at least once.</li>
+</ul>
+<p><code>Avg pR</code> is the average FSRS-predicted retrievability at the moment of every gradeable rep in the period, except the first rep of each card / each post-RESET lifetime (the model has no prior state to predict from). For learning and relearning reps where FSRS leaves <em>r</em> undefined, the forgetting curve is computed locally from the previous gradeable rep's stability — so <code>Avg pR</code> and <code>Retention</code> share the same denominator and <code>R-dev</code> is meaningful.</p>
+<p>To stay aligned with the <a href="../Study-Dashboard/">Study Dashboard</a> and Practiced Queues conventions: each rep's <code>responseTime</code> is capped at the user's <code>flashcard_response_time_limit</code> setting (default 180s), only gradeable scores (Again / Hard / Good / Easy) are counted, and the full history is iterated unless the user opts in to the toggle described below.</p>
+<p><strong>Time-period filter (default: This Year)</strong> — a row of preset buttons (Today, Yesterday, Last 7d, This Week, Last Week, Last 30d, This Month, Last Month, Last 365d, This Year, Last Year, <strong>All</strong>, <strong>Since…</strong>, <strong>Custom</strong>) lives just above the table. Custom accepts flexible date input (DD/MM/YYYY, YYYY-MM-DD, DDMMYYYY, DDMMYY, plus a calendar picker). The current selection persists in device-local storage and is restored on next open. The same persistence and <strong>Since…</strong> preset were also added to the <a href="../Study-Dashboard/">Study Dashboard</a> for parity.</p>
+<p><strong>Ignore reps before last RESET toggle</strong> — a checkbox in the status bar that, when enabled, drops every repetition up to and including the last RESET on each card. Useful after importing documents whose foreign repetition history would otherwise skew retention, time, and CPM. The same toggle was added to the <a href="../Study-Dashboard/">Study Dashboard</a>.</p>
+<p>Results are session-cached so reopening the popup in the same session is instant; flipping the toggle or the period re-runs the aggregation (typically a few seconds for tens of thousands of cards) and updates the cache. A "Computed N seconds ago over X cards — Recompute" pill at the top of the tab lets you force a fresh run.</p>
+<blockquote>
+<p><strong>Note on Cards bucketing — unified per-card universe:</strong>
+The Weighted Shield of Flashcards, the standard Priority Shield (cards), the relative percentile shown next to a card's priority, the document-scope percentile, and the percentiles attached to portals in a Priority Review Document are <strong>all computed over the same per-card universe</strong>. Each card is one item, inherits its owning Rem's priority, and its own <code>nextRepetitionTime</code> decides whether it counts as due. A Rem that owns 5 cards contributes 5 items at the same priority. A rem's effective percentile is the <strong>mean rank of its cards</strong> within the sorted card population — so the 5-card rem occupies 5 adjacent ranks and lands at the midpoint of its own cluster, while a 1-card rem at the same priority lands at a single rank within the same cluster. This means a rem with more cards weighs slightly more in the percentile ranking, but every shield, every badge and the PRD now read from a single consistent ranking. The PRD itself still produces one portal per due rem (deduplicated) — only the percentile metadata it attaches comes from this unified universe.</p>
+<p>[!NOTE]
+Both <strong>Shields</strong> can be toggled on and off the queue toolbar in the plugins <a href="../Plugin-Settings-Reference/#queue">Settings</a>.</p>
+</blockquote>
+<h4 id="queue-selection-odds">Queue Selection Odds<a class="headerlink" href="#queue-selection-odds" title="Permanent link">&para;</a></h4>
+<p>At the bottom of the <strong>Weighted Shield Breakdown</strong> tab there is a <strong>🎲 Queue Selection Odds</strong> panel that answers a question the tables above only imply: <em>how much more often does the queue actually pick an item at this priority than an item at that one?</em></p>
+<p><img alt="The Queue Selection Odds panel comparing a card at absolute priority 15 (16.9th percentile) with one at 35 (47.9th): 2.04×, head-to-head 67.1% / 32.9%, with a real sample item under each side" src="../assets/queue-selection-odds.png" width="900" /></p>
+<p>Pick a universe from the dropdown — <strong>Incremental Rems</strong> or <strong>Cards</strong>, each in <strong>🌐 Knowledge Base</strong> or <strong>📄 Document Scope</strong> — and set two items, <strong>A</strong> and <strong>B</strong>. Your choice is remembered on your device and restored the next time the popup opens, surviving a full RemNote restart; it is not synced, so each device keeps its own. If the saved universe isn't on offer this time (a Document scope that isn't in play, say), the panel simply opens on the first one available. Each side accepts either a <strong>relative percentile</strong> or an <strong>absolute priority</strong>; whichever you type, the panel shows both, because it converts through the same sorted universe the bucket tables are built from:</p>
+<ul>
+<li>Type a <strong>relative percentile</strong> → it shows the <strong>absolute priority</strong> of the item sitting at that rank.</li>
+<li>Type an <strong>absolute priority</strong> → it shows the <strong>relative percentile</strong> that priority reaches, defined exactly as the threshold slider's <em>Rel %ile</em>: the share of the universe at or above it (<code>items with priority ≤ P / total × 100</code>).</li>
+</ul>
+<p>The middle column reports the verdict:</p>
+<ul>
+<li><strong>The ratio</strong> — e.g. <code>1.58× · Item A is more likely to be drawn</code>.</li>
+<li><strong>Head-to-head</strong> — the same thing as a split, e.g. <code>61.2% / 38.8%</code>: if only these two items competed for one slot, that's how often each would win it.</li>
+<li><strong>Δp</strong> — the percentile gap driving it.</li>
+</ul>
+<p><strong>Where the number comes from.</strong> It is the same curve as the rest of the popup, read as <em>lottery tickets</em>. An item holds</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>W = e^(−k × p/100)
+</code></pre></div>
+<p>…tickets, where <code>p</code> is its relative percentile and <code>k</code> is the decay constant of the <a href="#how-randomness-works-the-priority-weighted-lottery">priority-weighted lottery</a> (your synced <code>weightSelectionK</code>, default <code>2.3026</code>). The odds ratio is therefore</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>W_A / W_B = e^(k × (p_B − p_A)/100)
+</code></pre></div>
+<p>…it depends <strong>only on the gap</strong> between the two percentiles, not on where they sit. With the default <code>k</code>, every 10 percentile points is a factor of ~1.26, and the extremes (0% vs 100%) come out at the familiar ~10×. The panel header shows the <code>k</code> and the randomness percentage actually in force for the selected item type, so the numbers reflect <em>your</em> configuration rather than the defaults.</p>
+<p><strong>Sample items.</strong> Under each side the panel pulls a <strong>real item at that priority</strong> out of the current universe — the capped text of an actual Incremental Rem or card-bearing Rem — so the comparison has a face instead of two bare numbers. A front/back Rem (Concept · Descriptor, Question · Answer, …) shows both sides joined by an arrow, <code>front → back</code>, reading in the direction the card is asked — the same format the <a href="#main-priority-popup">priority popups</a> use. Clozed spans are marked with <code>{{ }}</code> on either side of the arrow, so a cloze Rem reads as the card it is — <code>the capital of France is {{Paris}}</code> rather than a bare sentence. Both apply in <strong>either</strong> universe, not just Cards: a Rem can be an Incremental Rem <em>and</em> a flashcard at the same time, so an Incremental Rem sample that has a back side or a cloze is shown as the card it also is. Click a sample to open that Rem; press <strong>🎲</strong> to draw another one at the same priority (each side re-draws independently, and never lands on the item it is already showing). When no item sits at exactly that absolute priority the nearest available one is used and prefixed with <code>≈</code>.</p>
+<blockquote>
+<p>[!NOTE]
+<strong>How literally to read the ratio.</strong> The lottery only fills the <em>randomized</em> share of the queue (your <a href="#1-incremental-rem-randomness">Incremental Rem Randomness</a> / <a href="#2-flashcard-randomness">Flashcard Randomness</a> setting); the remaining slots stay in strict priority order, where the more important item wins every time. Inside a session the lottery also ranks within the <strong>due</strong> population rather than the whole universe, so absolute percentiles shift — but the ratio survives, as long as the <em>gap</em> between the two items does. Read it as the relative pull of one priority over another, which is exactly the question the setting is meant to answer.</p>
+</blockquote>
+<h3 id="priority-shield-history">Priority Shield History<a class="headerlink" href="#priority-shield-history" title="Permanent link">&para;</a></h3>
+<p>You can track your performance over time by accessing the <strong>"Priority Shield History"</strong> graph from the queue menu (the three-dot icon). This graph plots your daily shield values, helping you identify trends and adjust your workload or priorities accordingly.</p>
+<p><strong>Interactivity &amp; Features:</strong>
+*   <strong>Dismissed Rems Tracking:</strong> The IncRem shield graph track your process progression with a stacked area chart: 
+    *   The <strong>green line</strong> plots your active Incremental Rems universe.
+    *   The <strong>black dashed line</strong> on top plots your <em>Total Universe</em> (IncRems + those marked with the <code>dismissed</code> powerup).
+    *   The <strong>yellow shaded area</strong> visually represents your volume of dismissed material.
+*   <strong>Detailed Tooltips</strong>: Hover over any IncRem graph to see a breakdown of your Incremental Rems, Dismissed Rems, Total Universe, and an calculated <strong>Processing Percentage</strong> metric showing exactly how much of your total universe has been successfully dismissed.
+*   <strong>Drag-to-Zoom:</strong> Click and drag your mouse horizontally over any chart to zoom into a specific time period. This is helpful for examining detailed progress over short durations.
+*   <strong>Optimize Priorities Zoom:</strong> A button automatically scales the absolute and relative priority Y-Axes to perfectly frame the visible data in your current zoom window. Highly beneficial for viewing subtle metric changes over time!
+*   <strong>Reset Data Range:</strong> A button appears when zoomed in, allowing you to quickly return to the full historical view.
+*   <strong>Scope Organization:</strong> Charts are organized into <strong>Document-level</strong> progress (for your current study context) and <strong>Knowledge Base-wide</strong> progress, separated by a visual divider.
+*   <strong>Automatic Y-Scaling:</strong> As you zoom or pan, the Universe Size axis adapts to the peak values in your visible range, providing maximum visual resolution.</p>
+<p><strong>Understanding the Metrics:</strong>
+*   <strong>Priority Shield:</strong> This metric represents your processing capacity for high-priority items. A higher shield value (closer to 100) means you are successfully reviewing your most important material on time.
+*   <strong>Document Shield:</strong> Shows your priority protection within the current document/folder scope (or original scope for Priority Review Documents). This helps you track how well you're keeping up with the most important items in specific contexts.
+*   <strong>Weighted Shield (⚖️):</strong> Plots the historical trajectory of your Weighted Shield parameter over time. A rising line indicates you are actively clearing out high-priority debt, while a dropping line means high-priority material is accumulating faster than you can review it. Toggle this line on and off using the global "Show Weighted Shield" checkbox at the top of the history widget.
+*   <strong>Universe Size:</strong> This metric is represented differently depending on the graph type:
+    *   <strong>For Incremental Rems:</strong> This chart tracks your <em>entire processing lifecycle</em> using three layered components:
+        *   <strong>Total Universe (Black dashed line):</strong> Represents the absolute maximum volume of material you have interacted with in this scope (Active IncRems + Dismissed Rems). It illustrates your global learning footprint.
+        *   <strong>Active Universe (Green line):</strong> Represents the actual volume of IncRems currently sitting in your queue to be processed. 
+        *   <strong>Dismissed Area (Yellow shading):</strong> Represents the physical volume of material you have permanently processed and marked with the <code>dismissed</code> powerup. The wider this area gets, the more material you have successfully cleared out of your queue.
+    *   <strong>For Cards:</strong> It simply shows the <strong>Universe Size (Dashed line)</strong> representing the total number of active Rems with Cards. Note that the Universe shown in the Card Shield is the number of <em>Rems</em> with Cards, which is different from the total number of <em>flashcards</em> shown in other RemNote UI (since a single Rem can generate several flashcards). The <code>cardPriority</code> powerup is assigned per rem, not per flashcard.
+*   <strong>Absolute Priority:</strong> Refers to the hard number set in the Incremental Rem or Flashcard priority property.
+*   <strong>Relative Priority (%)</strong> is the Rem's relative percentile rank within the scope (% of the scope or KB). This gives you a clearer metric for managing your learning load.
+    *   The higher the percentile of your Relative Priority shield, the more your top priority material is safeguarded and processed.
+    *   If your graph oscillates around a priority of 4%, you know that only the top 4% of your learning material is guaranteed a timely repetition.
+    *   You can increase that number by doing more work, reducing the inflow of new material, deprioritizing less important items, or reducing the randomization degree in your <strong>Sorting Criteria</strong>.</p>
+<p><strong>Understanding Universe Size Changes:</strong>
+*   For <strong>Incremental Rems</strong>, observing your layers change over time paints a clear picture of your workflow:
+    *   If your <strong>Active Universe (Green)</strong> drops but your <strong>Total Universe (Black)</strong> remains steady and your <strong>Dismissed Area (Yellow)</strong> expands, you are successfully processing and dismissing items faster than you are adding them! You are burning through your backlog!
+    *   If your <strong>Active Universe (Green)</strong> increases while the <strong>Dismissed Area (Yellow)</strong> stays flat, you are actively adding new IncRems to your queue without clearing out old ones. This influx expands your active workload, and will likely drop your priority percentiles because each remaining item becomes a smaller percentage of the larger expanding whole.
+    *   If your <strong>Total Universe (Black)</strong> drops, it means you have physically deleted IncRems from your Knowledge Base entirely, or completely stripped their <code>Incremental</code> tag rather than using the <code>Dismissed</code> powerup.
+*   For <strong>Flashcards</strong>, this number will usually only increase (unless you delete cards). The evolution will show you the total size of your knowledge base over time.</p>
+<p><img alt="priority-shield-history" src="../assets/uploaded/1a1591e2-7aaf-4304-be75-48f4e1260fc9.png" width="900" /></p>
+<p><img alt="Priority Shield Graph Zoom" src="../assets/priority-shield-graph-zoom.gif" width="800" /></p>
+<hr />
+<h2 id="how-the-plugin-prioritizes-due-items">How the Plugin Prioritizes Due Items<a class="headerlink" href="#how-the-plugin-prioritizes-due-items" title="Permanent link">&para;</a></h2>
+<p>Here is a complete breakdown of how the plugin decides which incremental item to show you next. The process balances strict priority with controlled variability.</p>
+<ol>
+<li>
+<p><strong>Sorts All Items by Priority First</strong>
+    The plugin begins by gathering <em>all</em> of your incremental rems—both due and not yet due—and sorts them into a master list. This initial sort is based purely on the <strong>Priority</strong> value you have set. Items with a lower number are considered higher priority and are moved to the front of the line. The due date is completely ignored during this step.</p>
+</li>
+<li>
+<p><strong>Filters for Due Items</strong>
+    Next, the plugin takes this priority-sorted list and filters it down, keeping only the items that are currently ready for review. It does this by checking if an item's <code>nextRepDate</code> is today or any day in the past. The result is a perfectly ordered list of all your due items, with the highest-priority ones at the top.</p>
+</li>
+<li>
+<p><strong>Applies Controlled Randomness (The "Shuffle")</strong>
+    This is where the "Sorting Randomness" setting comes into play. After creating the perfectly sorted list of due items, the plugin applies a degree of "shuffling".</p>
+<ul>
+<li><strong>At 0% randomness:</strong> No shuffling occurs. The list remains perfectly sorted by priority, and the plugin will deterministically show you the highest-priority due item. <em>(The default is </em><em>20%</em><em>, not 0% — see <a href="#1-incremental-rem-randomness">Incremental Rem Randomness</a> above.)</em></li>
+<li><strong>At &gt;0% randomness:</strong> The plugin performs a series of random swaps on the items in the sorted list. A higher randomness setting results in more shuffling. This introduces a controlled chance for a lower-priority (but still due) item to appear before a higher-priority one, achieving the aim of preservation of strict priorities with a tiny bit of serendipity. <em>Note: The randomness slider is built on an exponential curve—reserving the first 50% of the slider dial specifically for safely fine-tuning low amounts of randomness.</em></li>
+</ul>
+<p>Finally, the plugin picks the item at the very top of this final, potentially shuffled list and presents it to you in the queue.</p>
+</li>
+</ol>
+<p>The system is built to surface your highest-priority due material first, regardless of how long it has been overdue. The <strong>Sorting Randomness</strong> setting is a tool that allows you to introduce variability, preventing the queue from becoming too rigid and ensuring that even lower-priority items get a chance to surface over time.</p>
+<h3 id="prepared-in-advance">Prepared in advance<a class="headerlink" href="#prepared-in-advance" title="Permanent link">&para;</a></h3>
+<p>The four steps above do not run at the moment RemNote asks for the next item. They run <strong>while you are reading the current one</strong>, and the result is held ready.</p>
+<p>The reason is a hard time limit: RemNote waits about <strong>one second</strong> for a plugin to name the next item, and then gives up and shows a flashcard instead. On a large knowledge base the selection could exceed that — not because choosing is slow, but because every piece of information it needs has to be fetched from RemNote, and those requests queue behind whatever else is happening. The Incremental Rem you should have seen was silently replaced by a flashcard, and (before v1.0.39) counted as already reviewed, so it did not come back later in the session.</p>
+<p>With the decision prepared ahead of time, answering takes about a millisecond and the limit is never in play, no matter how large the knowledge base or how busy the moment.</p>
+<p>What this means in practice:</p>
+<ul>
+<li><strong>Your settings still apply immediately.</strong> Priority, due dates, the randomness sliders and the <a href="#3-flashcard-ratio">Flashcard Ratio</a> are re-read every time the next candidate is prepared — that is, once per item you review. A change you make mid-session takes effect from the following item.</li>
+<li><strong>Changing the queue mid-session is handled.</strong> Switching to a different document or study mode rebuilds the selection for the new context; that single turn shows a flashcard while the rebuild happens.</li>
+<li><strong>Nothing is lost to a missed turn.</strong> If an item is prepared but does not reach the screen, it returns to the front of the queue and is offered again on the next turn.</li>
+<li><strong>At the very start of a session</strong>, the first opportunity may pass as a flashcard while the first selection is being prepared — particularly right after RemNote starts, when the plugin is still building its index.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

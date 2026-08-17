@@ -1,0 +1,2206 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Plugin-Commands-Reference/">
+      
+      
+        <link rel="prev" href="../Plugin-Widgets-Reference/">
+      
+      
+        <link rel="next" href="../Plugin-Settings-Reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Plugin Commands Reference - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plugin-commands-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plugin Commands Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-incremental-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Incremental Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prioritization-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prioritization Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#special-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Special Operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Utilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queue-display-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue Display Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other utilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-maintenance-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System &amp; Maintenance Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-incremental-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Incremental Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prioritization-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prioritization Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#special-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Special Operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Utilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queue-display-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue Display Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other utilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#system-maintenance-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System &amp; Maintenance Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="plugin-commands-reference">Plugin Commands Reference<a class="headerlink" href="#plugin-commands-reference" title="Permanent link">&para;</a></h1>
+<p>This is a complete list of commands registered in RemNote by the <strong>Incremental RemNote</strong> plugin. You can access these via the Command Palette (<code>Cmd+/</code> / <code>Cmd+/</code> or <code>Cmd+K</code> / <code>Ctrl+K</code>) or their assigned keyboard shortcuts.</p>
+<p>See the <a href="../Keyboard-Shortcuts/">Keyboard Shortcuts</a> page for default bindings.</p>
+<blockquote>
+<p>[!NOTE]
+<strong>Selection-Aware Behavior:</strong> Most commands are now context-aware. If you are in the Flashcard Queue but have explicitly focused a different Rem in the <strong>Preview Document</strong> pane, the command will prioritize your active editor selection over the current flashcard. This allows you to adjust priorities or view history for surrounding material without losing your place in the queue.</p>
+</blockquote>
+<h2 id="core-incremental-commands">Core Incremental Commands<a class="headerlink" href="#core-incremental-commands" title="Permanent link">&para;</a></h2>
+<ul>
+<li>
+<p><strong><a href="../Getting-Started/#making-a-rem-incremental">Make Incremental (Extract)</a></strong> (<code>Opt+X</code> / <code>Alt+X</code>) — <code>quick: ext</code>
+  Tags the focused Rem with the <code>#Incremental</code> powerup.
+  <strong>Text Selection:</strong> If text is selected in the editor, it performs a <strong><a href="../Reviewing-Items-in-the-Editor/#extracting-text">Reviewing-Items-in-the-Editor#extracting-text</a></strong> (see below). If no text is selected, it initializes the current Rem with inherited or default priority.</p>
+</li>
+<li>
+<p><strong><a href="../Getting-Started/#making-a-rem-incremental">Extract with Priority</a></strong> (<code>Opt+Shift+X</code> / <code>Alt+Shift+X</code>) — <code>quick: ep</code>
+  Tags the target with the <code>#Incremental</code> powerup and immediately opens the <strong>Priority &amp; Interval Popup</strong>.
+  <strong>Text Selection:</strong> Performs a <strong><a href="../Reviewing-Items-in-the-Editor/#extracting-text">Reviewing-Items-in-the-Editor#extracting-text</a></strong>, creating a new child Rem from the selected text. The source text is highlighted in <strong>blue</strong>, and a <strong>reference pin</strong> to the new extract is inserted immediately after. The new extract includes a back-reference to the parent. The source Rem is also hidden from queue display so its slot doesn't show redundantly during review of the extract — the mechanism depends on what's installed: <strong>Remove from Queue</strong> powerup on the parent (preferred, survives extract relocation) when the <a href="../Utilities/#queue-display-utilities">Hide-in-Queue integration</a> is enabled or the standalone Hide in Queue plugin is installed; otherwise <strong>Remove Parent</strong> powerup on the extract itself (fallback — see <a href="../Utilities/#create-extract-source-rem-hiding-behavior">Create Extract behavior</a>). If you extract from a PDF highlight, the new sub-extract will also automatically inherit a reference pin bridging directly back to the original PDF source!
+  <strong>Multi-rem selection:</strong> When multiple Rems are selected, all are initialized as Incremental and the popup opens in <strong>batch mode</strong>.</p>
+</li>
+</ul>
+<p><img alt="Extract Selection Demo" src="../assets/extract-selected-text.gif" /></p>
+<ul>
+<li>
+<p><strong><a href="../Reviewing-Items-in-the-Queue/#reschedule">Reschedule Incremental Rem</a></strong> (<code>Ctrl+J</code>) — <code>quick: res</code>
+  Manually pick a new target date interval, overriding the standard scheduler algorithm.</p>
+</li>
+<li>
+<p><strong><a href="../Reviewing-Items-in-the-Editor/#read-points-for-rem-type-incremental-rems">Set Read Point (Bookmark)</a></strong> (<code>Ctrl+F7</code>) — <code>quick: srp</code>
+  Marks the <strong>focused rem</strong> — a descendant of a <strong>Rem-type</strong> Incremental Rem's outline — as that IncRem's current <strong>reading position</strong> (the rem-type analogue of a PDF/HTML highlight bookmark). The owning IncRem is resolved from the active review session (Editor Review Timer or queue) when its outline contains the focused rem; otherwise from the <strong>nearest ancestor</strong> tagged Incremental. Use it while reading a long note/outline extract to remember where you stopped. Saved positions are kept in a read-point history.</p>
+</li>
+<li>
+<p><strong><a href="../Reviewing-Items-in-the-Editor/#read-points-for-rem-type-incremental-rems">View Read Points (History)</a></strong> (<code>Ctrl+Shift+F7</code>) — <code>quick: vrp</code>
+  Opens the <strong><a href="../Plugin-Widgets-Reference/#68-read-points-popup">Read Points popup</a></strong> listing the read-point history for the current Rem-type IncRem (resolved from the focused rem or the active session). The most recent entry is the current reading position; click any entry to jump to that descendant.</p>
+</li>
+<li>
+<p><strong>Create Cloze Deletion</strong> (<code>Opt+Z</code> / <code>Alt+Z</code>)
+  Applies the native RemNote <strong>Cloze Deletion</strong> formatting to the selected text. Mimics the SuperMemo workflow for rapid creation of flashcards during incremental reading. Requires a selection — which can be plain text, a <strong>Rem reference</strong> (<code>[...](....md)</code>), or a mix of both; references anywhere in the selection (including on the front or back of a two-sided card) are clozed too, and the selected span is highlighted on the source Rem. The new cloze child is automatically tagged with the <strong>Remove Parent</strong> powerup, so the source Rem is hidden from queue display <em>only</em> while reviewing this specific cloze — sibling and descendant flashcards are unaffected. See <a href="../Utilities/#remove-parent-rp-new">Remove Parent</a> in Queue Display Utilities.</p>
+</li>
+<li>
+<p><strong>Create Cloze Deletion with Priority</strong> (<code>Opt+Shift+Z</code> / <code>Alt+Shift+Z</code>)
+  Identical to <strong>Create Cloze Deletion</strong>, but immediately opens the <strong><a href="../Prioritization-%26-Sorting/#light-priority-popup">Prioritization-&amp;-Sorting#set-priority-popup</a></strong> after creating the cloze child Rem. The popup is pre-filled with the auto-computed priority (see below) and shows a <strong>parent extract context panel</strong> — including the parent's text, its resolved priority with source label, the number of existing cloze children, and the suggested priority with its formula (e.g. <code>30 + 2×10</code>). Use this when you want to review and optionally override the computed value.</p>
+</li>
+</ul>
+<p>Both <code>Alt+Z</code> and <code>Alt+Shift+Z</code> apply <strong>automatic Card Priority graduation</strong>: each new cloze created from a parent extract inherits a priority derived from the parent's priority plus a per-cloze step increment, so that the most important fact (first cloze) gets the lowest priority number and subsequent, less critical clozes get progressively higher numbers. The formula is <code>clamp(parentPriority + min(existingCount, 10) × stepSize, 0, 100)</code>, where <code>existingCount</code> is the sum of (a) the parent's <code>#cloze-extract</code>-tagged children and (b) the cards the parent rem already owns itself (native clozes plus front/back-direction cards if it is a flashcard). The decrement is capped at 10 steps regardless of how many prior cards/clozes exist. <code>Alt+Z</code> applies this silently; <code>Alt+Shift+Z</code> shows it in the popup so you can adjust.</p>
+<ul>
+<li>
+<p><strong><a href="../Getting-Started/#dismissing-an-incremental-rem-dismiss-button">Dismiss Incremental Rem</a></strong> (<code>Ctrl+D</code>) — <code>quick: dis</code>
+  Equivalent to clicking the "<a href="../Reviewing-Items-in-the-Queue/#dismiss">Dismiss</a>" button. Removes the Incremental and transfers its history to the Dismissed powerup.</p>
+</li>
+<li>
+<p><strong><a href="../Getting-Started/#repetition-history-statistics">Open Repetition History</a></strong> (<code>Ctrl+Shift+H</code>) — <code>quick: his</code>
+  Displays a comprehensive history popup. For Incremental Rems, opens the <a href="../Getting-Started/#repetition-history-statistics">IncRem Repetition History</a>. For regular flashcards, opens the <a href="../Reviewing-Items-in-the-Queue/#flashcard-repetition-history">Flashcard Repetition History</a>.</p>
+</li>
+<li>
+<p><strong><a href="../Study-Dashboard/">Open Study Dashboard</a></strong> — <code>quick: sdb</code>
+  Opens the <a href="../Study-Dashboard/">Study Dashboard</a>: a filterable summary of Incremental, Dismissed, and Flashcard activity (Global or Document scope, with multiple period presets and a custom date range), plus an expandable hierarchy of every rem with activity showing total time, reps, retention, and speed. Auto-detects the focused rem in the editor or the current card in the queue to use as the Document-mode root; falls back to Global mode otherwise.</p>
+</li>
+<li>
+<p><strong><a href="../Reviewing-Items-in-the-Editor/#1-execute-repetition-command">Execute Incremental Rem Repetition (Review in Editor)</a></strong> (<code>Ctrl+Shift+J</code>) — <code>quick: er</code>
+  Open the Editor Review Timer to log a spaced-repetition event directly from your document, without needing to enter the queue.</p>
+</li>
+<li>
+<p><strong><a href="../Reviewing-Items-in-the-Queue/#next">Next Item in Queue</a></strong> (<code>Cmd+Right</code> / <code>Ctrl+Right</code>) — <code>quick: next</code>
+  Records a rep and advances to the next item. Equivalent of clicking the "Next" button. Also saves PDF page history before advancing.</p>
+</li>
+</ul>
+<h2 id="prioritization-commands">Prioritization Commands<a class="headerlink" href="#prioritization-commands" title="Permanent link">&para;</a></h2>
+<ul>
+<li>
+<p><strong><a href="../Prioritization-%26-Sorting/#main-priority-popup">Set Priority</a></strong> (<code>Opt+P</code> / <code>Alt+P</code>) — <code>quick: pri</code>
+  Opens the Full Priority widget to deeply adjust absolute and relative rankings of the Rem.</p>
+</li>
+<li>
+<p><strong><a href="../Prioritization-%26-Sorting/#main-priority-popup">Quick Set Priority</a></strong> (Light Widget) (<code>Ctrl+Opt+P</code> / <code>Ctrl+Alt+P</code>) — <code>quick: qpri</code>
+  Opens the zero-lag Light Priority widget for immediate integer adjustments.</p>
+</li>
+<li>
+<p><strong>Quick Increase Priority Number (Less Important)</strong> (<code>Ctrl+Opt+Up</code> / <code>Ctrl+Alt+Up</code>)
+  Instantly increases the priority number (making the item <em>less</em> important) by the configured <a href="../Plugin-Settings-Reference/#priority">Priority Step Size</a> (default: <code>5</code>). No popup is shown.</p>
+</li>
+<li>
+<p><strong>Quick Decrease Priority Number (More Important)</strong> (<code>Ctrl+Opt+Down</code> / <code>Ctrl+Alt+Down</code>)
+  Instantly decreases the priority number (making the item <em>more</em> important) by the configured <a href="../Plugin-Settings-Reference/#priority">Priority Step Size</a> (default: <code>5</code>). No popup is shown.</p>
+</li>
+<li>
+<p><strong><a href="../Prioritization-%26-Sorting/#batch-priority-change-increms-flashcards">Batch Priority Change</a></strong>
+  A powerful widget for managing the priorities of multiple Incremental Rems at once, designed for large documents with many nested items. (No quick code)</p>
+</li>
+</ul>
+<p><strong>Use Cases:</strong> Batch decrease priority of a document/branch after a test, or adjust priorities when your interest in a given subject increases or decreases.</p>
+<p><strong>Access:</strong>
+    - Via the <strong>Command Palette</strong>: search for "Batch Priority Change".
+    - From the <strong>Document Menu</strong> (<code>...</code> on a Rem) to act on it and its descendants.</p>
+<p><strong>Priority Operations:</strong>
+    - <strong>Increase Priority</strong>: Makes items more important by multiplying their priority value.
+    - <strong>Decrease Priority</strong>: Makes items less important.
+    - <strong>Spread Evenly</strong>: Distributes priorities linearly across a range you define.
+    - <strong>Adjust Proportionally</strong>: Remaps priorities to a new range while maintaining relative spacing.</p>
+<p><strong>Advanced Features:</strong> Interactive table with filtering by name/type/priority range, sorting by any column, "Preview Changes" mode, and CSV export.</p>
+<p><img alt="Batch Priority Change — Document Menu" src="../assets/uploaded/8589e1e8-1af1-410c-b705-5b56c9e6ee56.png" width="250" /></p>
+<p><img alt="batch priority change widget" src="../assets/batch-priority-change-widget-new.png" width="900" /></p>
+<ul>
+<li><strong><a href="../Prioritization-%26-Sorting/#batch-card-priority-flashcards">Batch Assign Card Priority for tagged rems</a></strong> (<code>Opt+Shift+C</code> / <code>Alt+Shift+C</code>)
+  Assign <code>CardPriority</code> to hundreds of rems at once, based on a tag. </li>
+</ul>
+<p><strong>Use Case:</strong> If you previously used tags to prioritize your cards (e.g., <code>#important!</code>, <code>#P1</code>, <code>#P2</code>, <code>#P3</code>) before the Incremental RemNote prioritization system, you can convert your old tagging system to the new one in bulk.</p>
+<p><strong>Features:</strong>
+    - Assign random priorities within a specific range (e.g., 20–40).
+    - Intelligently handles IncRems — use their existing IncRem priority as their Card Priority.
+    - Safely updates rems with existing <code>manual</code> or <code>incremental</code> priorities by requiring explicit "Overwrite" confirmation, with color-coded badges distinguishing <strong>Manual CP</strong> (amber) from <strong>Incremental CP</strong> (green).</p>
+<p><strong>Access:</strong> Focus a tag rem and run the command from the Command Palette, or use the Document Menu.</p>
+<p><img alt="Batch Card Priority Assignment by Tag" src="../assets/uploaded/b4fed324-d03d-4fb6-871f-2c643ed63467.png" width="450" /></p>
+<h2 id="special-operations">Special Operations<a class="headerlink" href="#special-operations" title="Permanent link">&para;</a></h2>
+<ul>
+<li>
+<p><strong><a href="../Priority-Review-Document/">Create Priority Review Document</a></strong> (<code>Opt+Shift+R</code> / <code>Alt+Shift+R</code>) — <code>quick: prd</code>
+  Generate a custom document that compiles your absolute highest priority Rems mixed with standard Flashcards for subset review.</p>
+</li>
+<li>
+<p><strong><a href="../Prioritization-%26-Sorting/#sorting-criteria">Open Sorting Criteria</a></strong> — <code>quick: sort</code>
+  Brings up the Sorting dialog to manipulate the flashcard:increm ratio and queue randomization.</p>
+</li>
+<li>
+<p><strong><a href="../Prioritization-%26-Sorting/#priority-shield">Open Priority Shield Graph</a></strong> — <code>quick: shi</code>
+  Open your dynamic progress tracker graph.</p>
+</li>
+<li>
+<p><strong><a href="../Prioritization-%26-Sorting/#weighted-shield">Open Weighted Shield Popup</a></strong> — <code>quick: wsh</code>
+  Open the Weighted Shield breakdown popup for the current scope (sub-queue when in the queue, focused rem when in the editor).</p>
+</li>
+<li>
+<p><strong><a href="../IncRem-List-and-Main-View/">Open Incremental Rems Main View</a></strong> (<code>Opt+Shift+I</code> / <code>Alt+Shift+I</code>) — <code>quick: inc</code>
+  Opens a full-page tracking list of every Incremental Rem in your Knowledge Base.</p>
+</li>
+<li>
+<p><strong><a href="../PDF-Incremental-Reading-Workflow/#3-pdf-control-panel">PDF Control Panel</a></strong> — <code>quick: pdf</code>
+  Opens the advanced PDF Control Panel popup for the current PDF source. Allows you to set page ranges for chapters, view and manage all other Rems using the same PDF, track reading time per session and total, view reading history, and set priorities — all from a single interface.</p>
+</li>
+</ul>
+<p><img alt="PDF Control Panel" src="../assets/uploaded/b4efa027-aed6-4e1e-ac7c-f8d310af2f88.gif" width="550" /></p>
+<ul>
+<li>
+<p><strong><a href="../PDF-Incremental-Reading-Workflow/#2-copying-and-pasting-sources">Copy Rem Sources</a></strong> (<code>Ctrl+Shift+F1</code>) — <code>quick: copy</code>
+  Copies all sources from the <strong>focused Rem</strong> into a session clipboard. Use this to capture the PDF source rem from a template chapter before pasting it onto other chapters/sections.</p>
+</li>
+<li>
+<p><strong><a href="../PDF-Incremental-Reading-Workflow/#2-copying-and-pasting-sources">Paste Rem Sources</a></strong> (<code>Opt+Shift+V</code> / <code>Alt+Shift+V</code>) — <code>quick: paste</code>
+  Adds the previously copied sources to <strong>all selected Rems</strong> (multi-select supported), or to the focused Rem if nothing is selected. Sources already present are silently skipped (idempotent). Together with <strong>Copy Rem Sources</strong>, this automates the <a href="../PDF-Incremental-Reading-Workflow/#2-copying-and-pasting-sources">PDF-Incremental-Reading-Workflow#2-copying-and-pasting-sources</a>.</p>
+</li>
+<li>
+<p><strong>No Inc Rem for 15 min</strong> (Queue Menu)
+  Temporarily disables the injection of Incremental Rems into your queue for 15 minutes, allowing you to focus purely on flashcards. A timer countdown widget appears in the queue to show the remaining time.</p>
+</li>
+<li>
+<p><strong>Toggle Inc Rems in this device</strong> (Queue Menu)
+  Permanently toggle whether Incremental Rems should appear in the queue on the current device (saved to local storage). Useful for devices with smaller screens where the reading interface is cluttered. A yellow banner will appear for 10 seconds whenever you enter the queue to remind you if they are disabled.</p>
+</li>
+</ul>
+<p><img alt="Queue Menu in Mobile" src="../assets/queue-menu-mobile.png" width="400" /></p>
+<p><img alt="Queue in Mobile showing No Inc Rem in this Device indicator" src="../assets/queue-mobile-devicenoincrem-indicator.png" width="400" /></p>
+<hr />
+<h2 id="utilities">Utilities<a class="headerlink" href="#utilities" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Mastery Drill</strong> — <code>quick: dri</code>
+  Opens the <a href="../History-Queue-Dashboard-and-Mastery-Drill/#mastery-drill">Mastery Drill</a> popup — a focused re-practice queue for cards rated <em>Forgot</em> or <em>Hard</em>. Cards are added automatically as you review; they leave the drill once rated <em>Good</em> or <em>Easy</em>.</li>
+</ul>
+<h3 id="queue-display-commands">Queue Display Commands<a class="headerlink" href="#queue-display-commands" title="Permanent link">&para;</a></h3>
+<p>These commands tag a Rem with one of the <a href="../Utilities/#queue-display-utilities">Utilities#queue-display-utilities</a> powerups. The tagged Rem then renders differently (or is removed entirely) during queue review. All commands work both from the editor and directly inside the Queue. See the <a href="../Utilities/#queue-display-utilities">Utilities</a> page for visual examples and full behavior of each powerup.</p>
+<p><strong>Always available:</strong></p>
+<ul>
+<li><strong>Remove Parent</strong> — <code>quick: rp</code>
+  Hides the immediate parent of the tagged Rem from the queue, on <strong>both front and back</strong> of the card (no "Hidden in queue" placeholder). Used internally by <strong>Create Cloze Deletion</strong> above.</li>
+<li><strong>Remove Grandparent</strong> — <code>quick: rgp</code>
+  Same as Remove Parent, one level up.</li>
+</ul>
+<p><strong>Gated by the <em>Enable Hide-in-Queue powerups and commands</em> setting</strong> (default off — see <a href="../Utilities/#activation">Utilities → Activation</a> for the standalone-plugin warning):</p>
+<ul>
+<li><strong>Hide in Queue</strong> — <code>quick: hiq</code>
+  Replaces the tagged Rem's content with a "Hidden in queue" placeholder on the front of descendant flashcards.</li>
+<li><strong>Remove from Queue</strong> — <code>quick: rfq</code>
+  Completely removes the tagged Rem from the queue's visual hierarchy. Used internally by <strong>Extract with Priority</strong> above when available.</li>
+<li><strong>No Hierarchy</strong> — <code>quick: nh</code>
+  Hides any ancestors on both front and back of the tagged flashcard.</li>
+<li><strong>Hide Parent</strong> — <code>quick: hp</code>
+  Hides the immediate parent on the front side of the tagged flashcard (revealed on the back).</li>
+<li><strong>Hide Grandparent</strong> — <code>quick: hgp</code>
+  Hides the grandparent on the front side of the tagged flashcard (revealed on the back).</li>
+</ul>
+<h3 id="other-utilities">Other utilities<a class="headerlink" href="#other-utilities" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Toggle Ignore Tag</strong> (<code>Ctrl+Shift+I</code>) — <code>quick: ign</code>
+  Adds or removes the <code>#ignore</code> tag on the <strong>focused editor Rem</strong>, or on a <strong>multi-rem selection</strong> (select several rems in the outline and run it from the Omnibar). The plugin registers CSS so ignored rems are rendered smaller and slightly dimmed (full opacity returns on hover/focus), and the <code>#ignore</code> chip itself is hidden from the editor tag bar to keep the document clean.
+  <strong>Multi-rem behavior:</strong> if <strong>every</strong> selected rem is already tagged, the tag is <strong>removed</strong> from all; otherwise it is <strong>added</strong> to those that lack it (so a mixed selection becomes uniformly tagged).</li>
+</ul>
+<p><strong>Use Case:</strong> During <a href="../IR-Flow--Reading-Extracting-and-Clozing/">Incremental Reading</a>, use this to signal that a snippet has already been read but wasn't important enough to make Incremental — it stays in place for archive or future consultation, and the de-emphasized styling tells you not to re-process it next time you're exposed to it.</p>
+<ul>
+<li><strong>Tag Rems With Images</strong> — <code>quick: img</code>
+  Scans for images and tags each Rem that holds one with <strong><code>HasImage</code></strong> — so RemNote's native document filter can isolate them. Checks <strong>front text and back text</strong>, so an image on the back of a flashcard counts.</li>
+<li><strong>Popup first:</strong> the <a href="../Plugin-Widgets-Reference/#69-image-scan-popup">Image Scan popup</a> offers two scopes — the <strong>focused Rem</strong> (or the <strong>open document</strong>), named on the button so you can verify the target, or the <strong>whole knowledge base</strong>.</li>
+<li><strong>Reports in place:</strong> the same popup shows live progress and then the result — scanned, holding images, tagged, cleared — alongside how to filter a document and how to build a Search Portal on the tag. It stays open until you close it.</li>
+<li><strong>Self-correcting:</strong> Rems inside the scanned scope that carry the tag but no longer hold an image lose it, so a re-run never leaves stale marks. Nothing outside the scope is touched.</li>
+<li><strong>Invisible tag:</strong> the <code>HasImage</code> chip is hidden from the editor tag bar (your own tags on the same Rem stay visible).</li>
+</ul>
+<p><strong>Use Case:</strong> reviewing all the figures of a chapter, or finding the images you have not yet turned into occlusion cards — neither of which RemNote's search can do, because an image carries no indexed text.</p>
+<p>📖 See <a href="../Utilities/#filter-a-document-by-images">Utilities → Filter a Document by Images</a> for the full workflow.</p>
+<ul>
+<li><strong>Bulletize Inline Selected Text</strong> (<code>Shift+F8</code>) — <code>quick: bul</code>
+  Toggles a <code>•</code> prefix at the start of each line <strong>within a single rem</strong>, across a multi-line selection. Built for restoring bullets that a <strong>PDF highlight flattened</strong> into soft-wrapped text (lines joined by <code>Shift+Enter</code>) before turning the highlight into an IncRem.</li>
+<li><strong>Toggle:</strong> if every non-empty selected line already starts with <code>•</code>, all are stripped; otherwise the prefix is added only to the lines that lack it (no double bullets).</li>
+<li><strong>Selection modes:</strong> a multi-line text selection acts on every line it touches (partial selections expand back to each line's start); a collapsed cursor bulletizes the rem's entire front text.</li>
+<li><strong>Formatting-safe:</strong> preserves highlights, colors, references and other inline nodes; empty lines are skipped; the bullet is inserted as a plain node.</li>
+</ul>
+<p>📖 See <a href="../Utilities/#bulletize-inline-selected-text">Utilities → Bulletize Inline Selected Text</a> for full behavior and examples.</p>
+<ul>
+<li><strong>Inlinize Detected List</strong> — <code>quick: inl</code>
+  Detects a list flattened onto one line by a PDF highlight (<code>… evitá-las: 1 Aumentar… 2 Deixar… 3 O Oficial…</code>, or bullets run together like <code>… reconhecidas: • alvos…; • ocorrem…</code>) and inserts a line break + <code>•</code> before each item, turning it into soft-wrapped bulleted lines <strong>in the same rem</strong>. Enumerated items keep their number; existing <code>•</code>/<code>-</code>/<code>*</code> markers are normalized to <code>•</code>. Acts on the <strong>focused rem</strong> (no selection needed) and is <code>Ctrl+Z</code>-able — the review checkpoint before breaking to children.</li>
+<li>
+<p><strong>Detection:</strong> enumerated lists follow an <strong>ascending chain</strong> (accepts only the next expected value at a word boundary, preferring markers after sentence punctuation), so stray numbers in prose aren't mistaken for markers. Supports decimal (<code>1</code>, <code>1.</code>, <code>1)</code>), lettered (<code>a)</code>, <code>b.</code>) and roman (<code>i.</code>, <code>ii.</code>) enumerators, <strong>depth/compound markers</strong> (<code>1.1</code>, <code>1.2</code>… and mixed <code>1.a</code>, <code>1.b</code>…, kept as flat siblings), plus <strong>bullet/dash lists</strong> (<code>•</code>, <code>-</code>, <code>*</code>) — a marker must stand alone, and dash/compound lists need a clause boundary (<code>:</code>, <code>;</code>, <code>.</code>) before the first item to rule out parenthetical dashes and inline version numbers.</p>
+</li>
+<li>
+<p><strong>Break Inline List Into Children</strong> — <code>quick: brl</code>
+  Splits an inline-bulletized list rem into child rems: the caput/title stays on the parent, each <code>•</code> line becomes a child (order preserved, <code>•</code> prefix stripped).</p>
+</li>
+<li><strong>PDF-highlight pin follows the caput:</strong> if the rem has a pin to a PDF highlight (toolbar-created <em>or</em> pasted as text + pin; the <code>#pdfextract</code> tag is optional), it's moved to the end of the caput instead of the last item.</li>
+<li><strong>Images &amp; other pins survive:</strong> a trailing image becomes its own <strong>last child item</strong>; other trailing references join the caput; a mid-list image stays with its item.</li>
+<li><strong>Undoable:</strong> snapshots the original text + created child IDs to synced storage first, so <strong>Restore List Rem</strong> can reverse it exactly.</li>
+<li>
+<p><strong>Flashcard-safe:</strong> refuses rems that have back text (to avoid scrambling a card). Run <strong>Inlinize Detected List</strong> first.</p>
+</li>
+<li>
+<p><strong>Restore List Rem</strong> — <code>quick: rlr</code>
+  Reverses the most recent <strong>Break Inline List Into Children</strong> on the focused rem: deletes exactly the children it created (skipping any you re-parented), rewrites the original front text from the snapshot, and clears the snapshot.</p>
+</li>
+</ul>
+<p>📖 See <a href="../Utilities/#inlinize-break-lists-from-pdf-highlights">Utilities → Inlinize &amp; Break Lists</a> for the detection algorithm, the full workflow, and limitations.</p>
+<ul>
+<li><strong>Text Case Converter</strong> (<code>Shift+F3</code>) — <code>quick: case</code>
+  Cycles through <strong>Title Case</strong> → <strong>UPPERCASE</strong> → <strong>lowercase</strong>.</li>
+<li><strong>Smart Detection:</strong> Automatically detects the current case and moves to the next stage.</li>
+<li><strong>Rich-Text Safe:</strong> Preserves bold, italic, highlights, and other formatting even across element boundaries.</li>
+<li><strong>Multi-Rem:</strong> Select one or more whole rems in the outline and the cycle applies to each rem's text (and the back text of concept/descriptor rems) in one shot.</li>
+<li><strong>Inspired by:</strong> This feature was inspired by Toshi's <a href="https://github.com/hitsu3r/remnote-text-case-converter">"Text Case Converter"</a> plugin.</li>
+</ul>
+<p>📖 See <a href="../Utilities/">Utilities</a> for more details and Title Case rules.</p>
+<p><img alt="Text Case Converter demo" src="../assets/text-case-converter.gif" /></p>
+<ul>
+<li><strong>Restructure Outline by Headings</strong> — <code>quick: roh</code>
+  Re-nests a flat or mis-pasted document so that paragraphs and lower-level headings sit under their preceding higher-level heading. Opens a side-by-side <strong>Before | After</strong> preview with per-rem <strong>Preserve / Flatten</strong> toggles for non-heading rems with existing children.</li>
+<li><strong>Scope:</strong> single rem selected → operates on its descendants; multi-rem selected → operates on those rems plus their descendants, slotting the result back into the selection's original position so unselected siblings keep their relative order.</li>
+<li><strong>Headings:</strong> supports <strong>H1 through H6</strong>. Heading-level skips (e.g. <code>H1 → H3</code> with no <code>H2</code> between) are handled — the <code>H3</code> nests directly under the <code>H1</code>.</li>
+<li><strong>Undo:</strong> after applying, an <strong>Outline Restructured</strong> banner appears in the sidebar with an <strong>Undo Restructure</strong> button; also available as the <code>Revert Last Outline Restructure</code> command (below). Single-slot, session-scoped.</li>
+</ul>
+<p>📖 See <a href="../Utilities/#restructure-outline-by-headings">Utilities → Restructure Outline by Headings</a> for the full algorithm and preview UI details.</p>
+<ul>
+<li>
+<p><strong>Revert Last Outline Restructure</strong> — <code>quick: rolr</code>
+  Reverts the most recent Restructure Outline by Headings operation in this session. Same effect as the <strong>Undo Restructure</strong> button on the sidebar banner. Restores every moved rem to its exact prior parent and position.</p>
+</li>
+<li>
+<p><strong>Set Next Heading Level</strong> — <code>quick: hn</code>
+  Styles the selected rem(s) as <strong>one heading level deeper than their parent</strong> — e.g. under an <code>H3</code> parent the rem becomes <code>H4</code>. Reuses the same H1–H6 detection/application as Restructure Outline by Headings, so H4/H5/H6 (stored in the Header powerup's <code>Size</code> slot) work too.</p>
+</li>
+<li><strong>Direct case:</strong> parent is a heading <code>Hn</code> → rem set to <code>H(n+1)</code> (clamped at <code>H6</code>).</li>
+<li><strong>Grandparent fallback:</strong> parent isn't a heading but the grandparent is <code>Hn</code> → a confirmation dialog offers to set the <strong>parent</strong> to <code>H(n+1)</code> and the <strong>rem</strong> to <code>H(n+2)</code> (e.g. grandparent <code>H2</code> → parent <code>H3</code>, rem <code>H4</code>); Cancel leaves both unchanged.</li>
+<li><strong>Multi-rem:</strong> select several rems → each is styled relative to its own parent; all grandparent-fallback cases are covered by a <strong>single</strong> confirmation, and a shared parent is promoted only once. Rems with no ancestor heading are skipped (reported in a summary toast).</li>
+</ul>
+<p>📖 See <a href="../Utilities/#set-next-heading-level">Utilities → Set Next Heading Level</a>.</p>
+<ul>
+<li><strong>Apply Heading Levels by Hierarchy (Table of Contents)</strong> — <code>quick: htoc</code>
+  Assigns heading levels (H1–H6) to the selected outline <strong>by each rem's depth in the hierarchy</strong>, to a level range you choose — a one-shot "table of contents". Never moves rems; only changes their level. Reuses the same H1–H6 detection/application as Restructure Outline by Headings.</li>
+<li><strong>Selection → forest:</strong> the selection is reduced to its topmost rems (forest roots) = the top level; everything beneath is leveled by depth. Selecting a parent and its descendants together is fine (no double-counting).</li>
+<li><strong>Mapping:</strong> pick a <strong>Top level</strong> and <strong>Deepest level</strong> in the preview. Top rems get the Top level, each level deeper adds one up to the Deepest level; rems deeper than the range <strong>keep their current level</strong> (left unchanged).</li>
+<li><strong>Preview &amp; undo:</strong> opens a Before | After popup with live Top/Deepest dropdowns and <code>old → new</code> badges; after Apply a sidebar <strong>Heading Levels Applied</strong> banner offers undo (own snapshot slot, separate from the restructure banner).</li>
+<li>Quick code is <code>htoc</code>, not <code>toc</code> (RemNote's built-in Table-of-Contents reference owns <code>toc</code>).</li>
+</ul>
+<p>📖 See <a href="../Utilities/#apply-heading-levels-by-hierarchy-table-of-contents">Utilities → Apply Heading Levels by Hierarchy</a>.</p>
+<ul>
+<li>
+<p><strong>Demote Heading Level (one level deeper)</strong> — <code>quick: hdmt</code>
+  Shifts the <strong>selected subtree's</strong> existing headings one level deeper (<code>H2 → H3</code>). RemNote's outline selection reports only the top-level rems, so this walks the whole selected subtree (like the ToC command) and shifts every heading within it; non-heading rems are left untouched. Clamped at <code>H6</code>. Opens the same Before | After preview as the ToC command and is undoable via the same banner.</p>
+</li>
+<li>
+<p><strong>Promote Heading Level (one level shallower)</strong> — <code>quick: hpmt</code>
+  Mirror of Demote: shifts the selected rems' headings one level shallower (<code>H2 → H1</code>), clamped at <code>H1</code>.</p>
+</li>
+<li>
+<p><strong>Revert Last Heading Level Change</strong> — <code>quick: rlh</code>
+  Reverts the most recent heading-level change (ToC or promote/demote) in this session, restoring each rem's prior level (including back to a plain paragraph). Same effect as the <strong>Undo Heading Changes</strong> button on the sidebar banner. Single-slot, session-scoped.</p>
+</li>
+<li>
+<p><strong>Find Rem (insert reference / open in pane)</strong> (<code>Opt+Shift+F</code> / <code>Alt+Shift+F</code>) — <code>quick: fir</code>
+  Opens a floating picker that finds Rems <strong>RemNote's <code>[[</code> reference search can't surface</strong> — Rems whose name is made entirely of high-frequency words (e.g. <code>Navegação Interior</code>) get out-ranked off RemNote's per-token candidate list, so typing the name never returns them. The picker searches each word separately, unions the results, keeps Rems containing all words, and floats exact-name matches to the top.</p>
+</li>
+<li><strong>Enter / click</strong> inserts a reference at the cursor; <strong>Ctrl/Cmd+Enter</strong> (or Ctrl/Cmd+click) inserts it as a <strong>pin</strong> (link chip without text — one keystroke vs. RemNote's right-click → Edit Alias → clear-text trick); <strong>Opt/Alt+Enter</strong> (or Opt/Alt+click) inserts the Rem's <strong>text then a pin</strong> ("Text with Pin" — preserves formatting/images, brings a card's back text after a practice-direction arrow, and marks the source's clozes rather than re-clozing them); <strong>Shift+Enter / Shift+click</strong> opens the Rem in a new pane (to reach "invisible" Rems).</li>
+<li><strong>Alias-aware:</strong> also matches a Rem by its <strong>aliases</strong> (<code>ALIAS</code> badge); picking one inserts a reference to the owning Rem that renders the alias text.</li>
+<li><strong>Cloze-aware:</strong> inserting inside a cloze keeps the reference inside it instead of breaking it.</li>
+<li><strong>Accent-insensitive</strong> (<code>navegacao interior</code> → <code>Navegação Interior</code>); <strong>selection-aware</strong> (selected text seeds the search and is replaced by the reference on insert).</li>
+</ul>
+<p>📖 See <a href="../Utilities/#find-rem-reference-or-open">Utilities → Find Rem — Reference or Open</a>.</p>
+<ul>
+<li><strong>Open Hovered Source in Popup</strong> (<code>Opt+O</code> / <code>Alt+O</code>)
+  Opens the <strong>PDF or web article behind a hovered reference pin in a centered modal popup — without leaving the queue.</strong> Clicking a pin directly navigates away and tears down the queue (losing your position and rating ability); this command shows the source on top of the queue instead. <strong>Hover</strong> the pin, then press the shortcut.</li>
+<li><strong>Source-only:</strong> acts on PDF/HTML <strong>highlights</strong> (auto-scrolls to the highlight), <strong>PDF source docs</strong>, and <strong>HTML sources</strong>. A plain Rem with no PDF/HTML source does nothing (just a toast) — default behavior is untouched.</li>
+<li><strong>Why hover, not right-click:</strong> RemNote exposes a <em>hover</em> event for references but <strong>no right-click event</strong>, and the navigating left-click can't be intercepted — so the queue-safe path is hover-to-identify + a shortcut you own.</li>
+<li><strong>Scroll to Highlight:</strong> the header has a <strong>🔖 Scroll to Highlight</strong> button to re-center on the highlight after scrolling around.</li>
+</ul>
+<p>📖 See <a href="../Utilities/#open-source-in-popup">Utilities → Open Source in Popup</a>.</p>
+<ul>
+<li><strong>Open Hovered Source in Floating Window</strong> (<code>Opt+Shift+O</code> / <code>Alt+Shift+O</code>)
+  Same source viewer as above, but opened as a <strong>non-blocking floating window on the right (~48% width)</strong> instead of a centered modal — so the <strong>card/editor stays visible beside it</strong> for peeking back and forth without close/reopen. <strong>Hover</strong> the pin, then press the shortcut.</li>
+<li><strong>Stays open while you use the PDF:</strong> highlighting, selecting, or clicking highlights in the reader does <strong>not</strong> dismiss it (outside-click-to-close is disabled).</li>
+<li><strong>Auto-closes on card advance</strong>, so a previous card's source never lingers over the next.</li>
+<li><strong>Esc closes it without closing the queue:</strong> the float "steals" the Esc key while open. (Inside the PDF iframe, use <code>✕</code>.)</li>
+<li>Same source-detection and 🔖 Scroll to Highlight behavior as the modal variant.</li>
+</ul>
+<p>📖 See <a href="../Utilities/#open-source-in-popup">Utilities → Open Source in Popup</a>.</p>
+<ul>
+<li><strong>Jump to Rem by ID</strong>
+  Utility to navigate quickly based on raw IDs.</li>
+</ul>
+<h2 id="system-maintenance-commands">System &amp; Maintenance Commands<a class="headerlink" href="#system-maintenance-commands" title="Permanent link">&para;</a></h2>
+<ul>
+<li>
+<p><strong>Show Incremental RemNote Panel</strong>
+  Brings back the <a href="../Getting-Started/#the-incremental-plugin-panel">Incremental RemNote panel</a> in the sidebar after you have closed it with its <strong>✕</strong>. The <strong>✕</strong> only lasts the session — the panel returns on its own next time you open RemNote — so this is for getting it back sooner.</p>
+</li>
+<li>
+<p><strong>Incremental RemNote: Settings</strong> (<code>is</code>)
+  Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a <strong>?</strong> beside each entry linking to the section of this manual that explains it. See <a href="../Plugin-Settings-Reference/#where-the-settings-are">Plugin Settings Reference</a> for what lives here and what stays in RemNote's own panel.</p>
+</li>
+<li>
+<p><strong>Import Incremental Rems with History</strong>
+  Bulk-imports Incremental Rems from a <strong>JSON payload</strong> — including each rem's <strong>full repetition history</strong>, priority and next-repetition date. Built for migrating an external study log (e.g. a spreadsheet with years of study sessions) into the plugin's native history format.</p>
+</li>
+<li><strong>Input:</strong> a version-1 JSON file following the format documented below. What matters is the JSON contract — how you produce the file is up to you. The repository ships <code>scripts/convert_study_log.py</code> <strong>only as a sample</strong> (an Excel → JSON converter tailored to one specific spreadsheet layout, with source-specific adjustments hardcoded); use it as a starting point, not as the reference.</li>
+<li><strong>Structure created:</strong> a root document (name configurable in the popup) → one document per book → one child rem per chapter. A book with a top-level <code>history</code> becomes Incremental itself; chapters are always Incremental.</li>
+<li><strong>History entries</strong> carry date, review time (<code>reviewTimeSeconds</code>, feeding the total-time-spent stats), interval, and free-form notes — displayed in the Repetition History popup like natively-recorded reps. A <code>madeIncremental</code> marker is appended <strong>after</strong> the imported reps, so the scheduler restarts interval counting at the import (counting hundreds of historical reps would explode the classic exponential scheduler's next interval).</li>
+<li><strong>Preview before import:</strong> the popup validates the payload and shows books/rems/entries counts plus a warning list of histories <strong>over 50 KB</strong> (worth verifying for sync after import).</li>
+<li><strong>Resume-safe:</strong> rems already created (matched by text under the same parent) that already carry the Incremental powerup are skipped, so an interrupted import can simply be re-run with the same file. Large imports can take a few minutes; keep the popup open.</li>
+</ul>
+<p><a id="import-json-format-version-1"></a></p>
+<p>#### Import JSON format (version 1)</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  "version": 1,            // required — must be exactly 1
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  "defaultPriority": 90,   // optional, 0–100 (default 90) — priority given to every imported rem
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  "nextRepDays": 10,       // optional, ≥ 0 (default 10) — next repetition = import day + N days
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  "books": [               // required, at least one
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    {
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>      "item": "2.01",                     // required — identifier (not displayed; used for bookkeeping)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>      "title": "2.01 - Arte Naval",       // required — text of the book document
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>      "history": [ /* entries */ ],       // optional or null — if present, the book rem itself becomes Incremental with this history
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      "chapters": [                       // required (may be empty)
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        {
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>          "chapter": "1",                 // required — raw grouping key (not displayed)
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>          "title": "Chapter 1",           // required — text of the chapter rem
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>          "history": [ /* entries */ ]    // required, at least one entry
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>        }
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>      ]
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    }
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>  ]
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>}
+</code></pre></div>
+<p>Each <strong>history entry</strong> follows the plugin's <code>IncrementalRep</code> interface. Fields used by an import:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>date</code></td>
+<td>✅</td>
+<td>Timestamp in <strong>milliseconds</strong> of when the session/review happened</td>
+</tr>
+<tr>
+<td><code>scheduled</code></td>
+<td>✅</td>
+<td>Scheduled timestamp (ms) — for external logs, usually the same as <code>date</code></td>
+</tr>
+<tr>
+<td><code>eventType</code></td>
+<td>recommended</td>
+<td>Use <code>"rep"</code> for imported sessions (omitted also counts as a rep)</td>
+</tr>
+<tr>
+<td><code>reviewTimeSeconds</code></td>
+<td>optional</td>
+<td>Session duration in <strong>seconds</strong> — feeds the total-time-spent stats</td>
+</tr>
+<tr>
+<td><code>interval</code></td>
+<td>optional</td>
+<td>Interval in days set at this rep (for external logs: days until the next session)</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td>optional</td>
+<td>Free-form note shown in the Repetition History views for this entry</td>
+</tr>
+</tbody>
+</table>
+<p>Entries must be sorted by <code>date</code> ascending. Do <strong>not</strong> include a <code>madeIncremental</code> marker — the importer appends one automatically (stamped with the next-rep date). Unknown fields are ignored; keep the payload minimal.</p>
+<ul>
+<li><strong>Update all inherited Card Priorities</strong> — <code>quick: ucp</code>
+  Crucial maintenance task. Recursively processes every flashcard and tagged Rem in your knowledge base, pre-computing and propagating <code>cardPriority</code> tags so that the queue loads instantly on startup.</li>
+</ul>
+<p>After the update completes, if any <strong>"Rem not found"</strong> errors were detected, the command automatically offers to <strong>remove orphan cards</strong> — flashcards whose parent Rem has since been deleted. The cleanup flow:
+  - Shows a summary of all orphan cards found (count + affected Rem IDs)
+  - <strong>Offers to preserve cards with review history.</strong> Orphan cards are split by whether they carry a <code>repetitionHistory</code> (past reviews and time-spent records, which still feed some RemNote statistics even after the parent Rem is gone). When any orphan has history, you choose:
+    - <strong>Delete only cards without history</strong> — keep the reviewed ones so their stats remain retrievable, or
+    - <strong>Delete all</strong> — remove everything, including reviewed cards (a second confirmation warns that their review/time-spent records will be lost).</p>
+<div class="highlight"><pre><span></span><code>If no orphan has any history, this prompt is skipped and all are removed.
+</code></pre></div>
+<ul>
+<li><strong>Every dialog states what would be lost:</strong> the number of reviews and the total time spent — for the whole batch in the overview, and per Rem (and per card, when one Rem has several) in the detail pages. Cards with nothing recorded read <code>no review history</code>. Time is summed from each rep's <code>responseTime</code>, capped at your <strong>Flashcard Response Time Limit</strong> setting so one walked-away review can't inflate the figure — the same convention the <a href="../Study-Dashboard/">Study Dashboard</a> uses.</li>
+<li>Presents the list in pages of <strong>12 Rems at a time</strong> so the dialog always fits on screen</li>
+<li>Double-checks each candidate live before removal (transient errors are skipped)</li>
+<li>Removes the chosen set in batches of 25 with progress toasts; the final summary reports how many were removed and how many were <strong>preserved</strong>, each with its review count and time spent (the removed figures count only the cards that were actually deleted, so a partial failure doesn't overstate the loss)</li>
+<li>You can cancel at any page without affecting already-confirmed removals</li>
+</ul>
+<p>Orphan cards are also flagged at <strong>startup</strong>: when the Card Priority cache finishes its background pass, any Rem whose cards exist but whose Rem cannot be found is counted and surfaced via a toast suggesting you run this command — <strong>nothing is deleted automatically at startup</strong>, since a Rem can transiently appear missing before sync finishes hydrating.</p>
+<p>📖 See <a href="../Troubleshooting/">Troubleshooting</a> for more details.</p>
+<ul>
+<li>
+<p><strong>Refresh Card Priority Cache</strong>
+  Forces a manual recalculation of the queue caching system.</p>
+</li>
+<li>
+<p><strong>Preserve history &amp; remove</strong> — <code>quick: phr</code>
+  Deletes a rem's content the way native delete does (the rem <strong>and its whole subtree</strong>), but first <strong>rescues all repetition history</strong> in that subtree so your study stats survive. Normally, deleting a flashcard / Incremental / Dismissed rem discards its reviews and time-spent — and the <a href="../Study-Dashboard/">Study Dashboard</a> total silently drops. This command prevents that.</p>
+</li>
+</ul>
+<p>Works both in the <strong>editor</strong> (on the focused rem) and in the <strong>queue</strong> (on the rem/card currently under review). It will:
+  - <strong>Consolidate every review in the subtree</strong> — flashcard <code>repetitionHistory</code>, Incremental powerup history, and Dismissed powerup history — onto the rem's own <strong>Dismissed</strong> powerup, chronologically. Flashcard reviews are converted to history entries (review time preserved and capped like the Dashboard's flashcard limit; the grade is kept). Reviews with no response time are skipped.
+  - <strong>Delete the descendants and remove the flashcards</strong>, then <strong>scrub the rem's content</strong> to a <code>🪦 Preserved history — content removed</code> tombstone and hide it from the editor and queue (via the always-on <code>Preserved History</code> powerup) so the stale text stops polluting your documents and search.
+  - <strong>Clean up the tombstone's tags:</strong> its <strong>Incremental</strong> and <strong>CardPriority</strong> powerups are removed (it holds no cards and is no longer an inheritance anchor), leaving just <strong>Dismissed</strong> + <strong>Preserved History</strong>.
+  - If <strong>no history</strong> is found to preserve, it just fully deletes the rem and its subtree (like <code>Cmd+Opt+Shift+Backspace</code>).</p>
+<p>A confirmation summarises the impact first, <strong>led by the name of the rem</strong> (so you can be sure of the target — important in the queue, where a previewer or sidebar widget can hold a different rem than the one under review): descendants to be deleted, flashcards to be removed, reviews/study-time to be preserved, and <strong>how many references from outside the subtree will break</strong>. The action <strong>cannot be undone</strong>. In the queue, the current card is advanced past before deletion so the queue never tries to render a rem you just removed.</p>
+<blockquote>
+<p>[!NOTE]
+Preserved flashcard reviews (<code>importedRep</code>) <strong>count toward the Study Dashboard's time and rep totals</strong> but are <strong>ignored by the scheduler</strong> — they never influence the rem's next-interval calculations, even if it's later re-incrementalized. In the repetition-history views they show a 🃏 marker with the source card's name and grade. For <strong>cloze</strong> cards, the preserved name wraps the clozed span in <code>{{…}}</code> (e.g. <code>flashcard {{inside}} that rem</code>) so multiple clozes from the same rem stay distinguishable.</p>
+</blockquote>
+<ul>
+<li><strong>Migrate Card Priorities to Hidden Slot…</strong> { #migrate-card-priority-hidden-slot }
+  Moves every card priority out of the <strong>visible</strong> <code>Priority</code> slot into a hidden one, and deletes the <code>Priority — 31</code> rows it leaves behind. Those rows are what make RemNote render a flashcard's priority <em>in place of</em> a table cell's own content, in simple and advanced tables alike.</li>
+</ul>
+<p>Every priority is backed up first — to your device and to a JSON file — and the run <strong>refuses to start if no backup could be written</strong>. Each value is read back from the hidden slot before its old row is deleted, so a Rem whose write failed keeps its row and its value; re-running the command retries exactly those. Nothing else changes: numbers, sources, inheritance, the Card Shield, percentiles and badges are untouched.</p>
+<p>The plugin also offers this automatically on startup while any visible rows remain. Afterwards, priorities can no longer be typed straight into the outline — use the Priority widget, Quick Priority or the batch tools.</p>
+<p>📖 See <a href="../Priorities-for-Flashcards/#hidden-slot">Where a priority is stored</a>.</p>
+<ul>
+<li><strong>Undo Card Priority Hidden-Slot Migration…</strong>
+  Restores every priority from the backup the migration took, which puts the visible <code>Priority</code> rows back — and with them the table-rendering problem. Reads the copy stored on this device; if that is gone, restore the downloaded JSON from the Debug popup instead.</li>
+</ul>
+<p><strong>Two steps once the old slot has been retired.</strong> A slot the plugin no longer registers cannot be written, so the first run only un-retires it and asks you to reload; the second actually restores the values. Priorities stay readable in the hidden slot in between.</p>
+<ul>
+<li>
+<p><strong>Remove CardPriority Tags…</strong> { #remove-cardpriority-tags }
+  Strips the <code>cardPriority</code> powerup and its slots from <strong>the knowledge base you currently have open</strong> — named in every dialog, and the only one touched. It asks which tags to remove first:</p>
+</li>
+<li>
+<p><strong>OK — inherited &amp; default only (recommended).</strong> Removes just the tags the plugin wrote by itself. <code>manual</code> priorities, the <code>incremental</code> anchors left by dismissed Incremental Rems, tags whose source is unreadable, and your shield history are all kept. <strong>Reversible:</strong> those priorities are computed from your document tree, so <em>Update all inherited Card Priorities</em> rebuilds them exactly. This is the option to use after turning <a href="../Priorities-for-Flashcards/#switching-it-off">Enable Flashcard Prioritisation</a> off.</p>
+</li>
+<li><strong>Cancel — remove everything.</strong> Wipes every <code>cardPriority</code> tag, <strong>including the priorities you set by hand</strong>, and clears this KB's <a href="../Prioritization-%26-Sorting/#priority-shield">Priority Shield</a> history (a dated backup of the history is saved first; the tags are not backed up). It cannot be undone, so it takes you through three further confirmations — and when manual priorities are at stake, the last-but-one offers to switch to the reversible scope instead.</li>
+</ul>
+<p>Both scopes report what they found before touching anything: how many tags are inherited/default, how many are manual/incremental, and how many carry no recognisable source.</p>
+<ul>
+<li><strong>Refresh Priority Badges (Tables and PDF Highlights)</strong>
+  Recomputes the band tags behind both the <a href="../Prioritization-%26-Sorting/#priorities-in-tables">table-cell badges</a> and the <a href="../Prioritization-%26-Sorting/#priorities-on-pdf-highlights">PDF highlight badges</a>. Bands are kept current by every priority write, so this is for the <strong>first run after enabling the feature</strong> and for repairing drift.</li>
+</ul>
+<p>Runs in two phases, reported separately in the developer console:
+  1. <strong>Table badges</strong> — walks every IncRem and every Rem with a card priority. Only Rems that can appear as a table row (tagged with a non-powerup tag that defines slots) are banded. Links are harvested along the way for phase 2.
+  2. <strong>Highlight badges</strong> — takes each highlight and pulls from every Rem referencing it, averaging where several link to one highlight and falling back to dismissed Rems only when nothing live does.</p>
+<p>The summary distinguishes badges <em>updated</em> from those <em>already correct</em> and those that <em>resolved to no priority</em>, so a <code>0 updated</code> run is unambiguous.</p>
+<ul>
+<li>
+<p><strong>Remove All Priority Band Tags</strong>
+  Strips every <code>PriorityBand0-9</code> tag. <strong>Destroys no data</strong> — unlike <em>Remove All CardPriority Tags</em>, bands are a derived mirror of priorities that still live in the Incremental and CardPriority slots, so <em>Refresh Priority Badges (Tables)</em> rebuilds them exactly. Useful for shedding bands applied before the eligibility filter existed, or to fully disable the feature's footprint.</p>
+</li>
+<li>
+<p><strong>Sanitize Rogue CardPriority Tags</strong>
+  Scans the whole knowledge base and removes "rogue" <code>cardPriority</code> tags — the powerup sitting on rems that own <strong>no flashcards</strong> with an <code>inherited</code>/<code>default</code> source (cascade artifacts on tag slots, property values, list items, etc.). Legitimate inheritance anchors (<code>manual</code>/<code>incremental</code> source, no cards) are preserved and never offered for deletion. Removals are confirmed in batches. 📖 See <a href="../Troubleshooting/">Troubleshooting</a>.</p>
+</li>
+<li>
+<p><strong>Cancel No Inc Rem Timer</strong>
+  Stops system checks when queues are temporarily empty.</p>
+</li>
+<li>
+<p><strong>Debug Incremental RemNote</strong> / <strong>Debug Video Detection</strong>
+  Opens the Debug Widget popup for the focused Rem (now on <strong>any</strong> Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the <strong><a href="../Troubleshooting/#search-linkage-diagnostics-debug-widget">Search / Linkage Diagnostics</a></strong> section for investigating why a Rem is invisible in reference search.</p>
+</li>
+<li>
+<p><strong>Toggle Priority Band Colour Logging</strong>
+  Prints the band → percentile → colour mapping each priority badge stylesheet is built from, to your developer console. Off by default; the setting is per device and survives a reload, so the mapping can be inspected on the next start. Use it if a badge's colour looks out of step with the <strong><a href="../Prioritization-%26-Sorting/#priority-editor-widget">Priority Editor</a></strong> for the same Rem.</p>
+</li>
+<li>
+<p><strong>Debug: Clear Flashcard History</strong>
+  Clears the Flashcard History sidebar's entries <strong>for the knowledge base you are currently in</strong> — since v1.0.37 each KB keeps its own list. Use this if you encounter sync errors with the flashcard history data (e.g., after a corrupted sync). A confirmation toast is shown on completion. See <a href="../History-Queue-Dashboard-and-Mastery-Drill/#how-the-history-lists-are-stored">How the history lists are stored</a>.</p>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2290 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Reviewing-Items-in-the-Editor/">
+      
+      
+        <link rel="prev" href="../Reviewing-Items-in-the-Queue/">
+      
+      
+        <link rel="next" href="../Prioritization-%26-Sorting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Reviewing Items in the Editor - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reviewing-items-in-the-editor" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reviewing Items in the Editor
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-execute-repetition-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Execute Repetition Command
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Execute Repetition Command">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use It
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opened-from-the-queue-previewer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opened from the queue previewer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#while-the-editor-review-timer-is-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        While the Editor Review Timer is running
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execute-repetition-vs-reschedule-in-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execute Repetition vs. Reschedule in Editor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-sequential-review-via-increm-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Sequential Review via IncRem Lists
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Sequential Review via IncRem Lists">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem-this-solves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem This Solves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-start-a-sequential-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Start a Sequential Review
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-pdf-support-in-the-timer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-PDF Support in the Timer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layout-responsiveness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout &amp; Responsiveness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reviewing-pdf-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing PDF Items
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-points-for-rem-type-incremental-rems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read Points for Rem-type Incremental Rems
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Read Points for Rem-type Incremental Rems">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setting-a-read-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting a Read Point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jumping-to-the-read-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Jumping to the Read Point
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-incremental-reading-extracts-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Incremental Reading: Extracts &amp; Clozes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Incremental Reading: Extracts &amp; Clozes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extracting-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extracting Text
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating Clozes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#built-in-remove-from-queue-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Built-in Remove From Queue Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-execute-repetition-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Execute Repetition Command
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Execute Repetition Command">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use It
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opened-from-the-queue-previewer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opened from the queue previewer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#while-the-editor-review-timer-is-running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        While the Editor Review Timer is running
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execute-repetition-vs-reschedule-in-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execute Repetition vs. Reschedule in Editor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-sequential-review-via-increm-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Sequential Review via IncRem Lists
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Sequential Review via IncRem Lists">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem-this-solves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem This Solves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-start-a-sequential-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Start a Sequential Review
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-pdf-support-in-the-timer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-PDF Support in the Timer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layout-responsiveness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout &amp; Responsiveness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reviewing-pdf-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing PDF Items
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-points-for-rem-type-incremental-rems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read Points for Rem-type Incremental Rems
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Read Points for Rem-type Incremental Rems">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setting-a-read-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting a Read Point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jumping-to-the-read-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Jumping to the Read Point
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-incremental-reading-extracts-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Incremental Reading: Extracts &amp; Clozes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Incremental Reading: Extracts &amp; Clozes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extracting-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extracting Text
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating Clozes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#built-in-remove-from-queue-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Built-in Remove From Queue Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="reviewing-items-in-the-editor">Reviewing Items in the Editor<a class="headerlink" href="#reviewing-items-in-the-editor" title="Permanent link">&para;</a></h1>
+<p>While the Queue (Flashcard) interface is the primary way to review Incremental Rems, there are times when you need the full power of the RemNote editor to process complex information. </p>
+<p>This page covers the two main alternative workflows for reviewing items outside of the queue: the <strong>Execute Repetition</strong> command (for single items) and <strong>Sequential Review</strong> via the IncRem lists (for batch processing).</p>
+<hr />
+<hr />
+<h2 id="1-execute-repetition-command">1. Execute Repetition Command<a class="headerlink" href="#1-execute-repetition-command" title="Permanent link">&para;</a></h2>
+<p>The <strong>Execute Repetition</strong> command (<code>Ctrl+Shift+J</code>) lets you register a review of an Incremental Rem directly from the editor, without entering the queue.</p>
+<h3 id="when-to-use-it">When to Use It<a class="headerlink" href="#when-to-use-it" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Reading in the editor</strong>: You opened an Incremental Rem in the editor (via "-&gt; Go to Rem" or navigation) and finished reviewing it there.</li>
+<li><strong>Extended work sessions</strong>: You spent significant time on an item and want to log both the review and the time spent.</li>
+<li><strong>Avoiding queue context switches</strong>: You want to continue working in the editor without returning to the queue.</li>
+</ul>
+<h3 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Focus on an Incremental Rem in the editor.</li>
+<li>Press <code>Ctrl+Shift+J</code> (or use the slash command "Execute Incremental Rem Repetition").</li>
+<li>A modernized popup appears (matching the design language of the priority and page-range widgets, with card sections, custom styling, and a keyboard shortcut hint bar):</li>
+</ol>
+<p><img alt="Execute Repetition popup" src="../assets/review-in-editor.png" width="500" /></p>
+<ol>
+<li>Choose from the available options:</li>
+<li><strong>Manual time entry</strong>: Enter the time you spent (in seconds) and click Submit.</li>
+<li><strong>Timer mode</strong>: Start a timer, review the content, then stop and submit.</li>
+<li><strong>📝 Note</strong> (optional): an observation stored on this repetition's history entry — shown later in the <a href="../Plugin-Widgets-Reference/#212-increm-repetition-history-aggregated-view">Repetition History popup</a>. If you choose <strong>Start Timer</strong>, the note is handed to the timer and saved when the session ends (you can still extend it there).</li>
+</ol>
+<h3 id="key-behavior">Key Behavior<a class="headerlink" href="#key-behavior" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Counts for interval calculation</strong>: Unlike editor reschedules (<code>Ctrl+J</code> in editor), the Execute Repetition command <strong>does count</strong> as a real review because you're confirming that you engaged with the content.</li>
+<li><strong>PDF Reading History Sync</strong>: If the Incremental Rem is a PDF or has a PDF source, the modal will automatically render the tracking <strong>PDF Page Controls</strong>. You can manipulate your current reading page directly from the popup and any time tracked by the Timer mode will perfectly log into your PDF Reading Analytics!</li>
+<li><strong>Multi-PDF support</strong>: If the Inc Rem has <strong>more than one PDF source</strong>, a PDF dropdown appears just above the Page Controls. Selecting a different PDF pins it as active for this Inc Rem (★ marks the <code>#preferthispdf</code> one) — Start Timer will then open and scroll to that PDF, and any subsequent reading-time writes target it. See the <a href="../PDF-Incremental-Reading-Workflow/#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf">PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf</a> section for the resolution chain.</li>
+<li><strong>Records review time</strong>: The time you enter is saved in the repetition history.</li>
+<li><strong>Schedules next review</strong>: Uses the same exponential algorithm as the queue's "Next" button.</li>
+<li><strong>Indicator in history</strong>: Shows with a ⌨️ indicator in the Repetition History widget.</li>
+<li><strong>Ahead-of-Schedule Warning Banner</strong>: If you review an Incremental Rem before its scheduled due date, an amber warning banner will appear at the top of the popup informing you how many days early you are:</li>
+</ul>
+<p><img alt="Ahead-of-Schedule warning banner" src="../assets/review-in-editor-warning.png" width="500" /></p>
+<ul>
+<li><strong>Scheduling Conflict (Next-Rep-Date Regression)</strong>: When confirming a review (via Confirm Review or Start Timer) would calculate a new due date earlier than the currently scheduled one (e.g. if you previously rescheduled it far in the future), a Scheduling Conflict dialog is shown before proceeding:</li>
+</ul>
+<p><img alt="Scheduling Conflict dialog" src="../assets/review-in-editor-scheduling-resolution.png" width="500" /></p>
+<p>You can resolve the conflict using the following options (which also support keyboard shortcuts):
+  - <strong>Keep Current Date</strong> (<code>Enter</code> or <code>1</code>): Log the review and time in history but preserve the existing future due date. (Note: once you start typing a custom interval, <code>Enter</code> confirms the typed interval instead).
+  - <strong>Use New Date</strong> (<code>2</code>): Proceed with the calculated shorter interval.
+  - <strong>Custom Interval</strong> (<code>3</code>): Reveals an inline input to set a custom review interval in days.
+  - <strong>Go Back</strong> (<code>←</code> or <code>Esc</code>): Return to the main popup.</p>
+<h3 id="opened-from-the-queue-previewer">Opened from the queue previewer<a class="headerlink" href="#opened-from-the-queue-previewer" title="Permanent link">&para;</a></h3>
+<p><code>Ctrl+Shift+J</code> in the queue acts on the Rem you have <strong>selected</strong> — typically one opened in the previewer (<code>P</code>) — rather than on the item being reviewed. The previewer is an editor surface, so it gets this same popup, and nothing is written until you confirm.</p>
+<p>When a queue <strong>Incremental Rem turn is running behind it</strong>, the popup accounts for the time in that turn:</p>
+<ul>
+<li><strong>Confirm Review</strong> — the minutes you record here are <strong>deducted</strong> from the running turn's clock, since you spent them on this Rem, not on the item the queue is showing. You stay in the queue; whatever ends that turn later (Next, Dismiss, Reschedule) records the remainder. The toast reports the deduction.</li>
+<li>
+<p><strong>⏱️ Start Timer</strong> — this navigates away, abandoning the turn. A confirmation appears first, naming the item you are leaving and how long it has been on screen:</p>
+<ul>
+<li><strong>Leave it due today</strong> (<code>Enter</code>) — records the repetition with that time and keeps the item due today, exactly like dragging the <strong>Next</strong> button down ("Repeat today"). It comes back in the queue.</li>
+<li><strong>Reschedule</strong> — records the repetition and applies the normal computed interval, like the <strong>Next</strong> button.</li>
+<li><strong>Carry to this Rem</strong> (minutes) — time you actually spent reading the previewed Rem before pressing the shortcut. It is taken off the abandoned item's recorded duration and <strong>back-dates the timer</strong> that starts next, so those minutes land on the Rem they belong to.</li>
+</ul>
+<p>The repetition is recorded either way — the reading you did is real; the only choice is what happens to the schedule.</p>
+</li>
+</ul>
+<h3 id="while-the-editor-review-timer-is-running">While the Editor Review Timer is running<a class="headerlink" href="#while-the-editor-review-timer-is-running" title="Permanent link">&para;</a></h3>
+<p>The same applies one surface over. If the <strong>Editor Review Timer</strong> is counting for one Rem and you press <code>Ctrl+Shift+J</code> on <strong>another</strong> Rem, that timer is still running while you record time here — so the popup treats it exactly like a live queue turn:</p>
+<ul>
+<li><strong>Confirm Review</strong> deducts the minutes you record from the <strong>running timer</strong>, which keeps counting for its own Rem. You stay where you are. A paused timer stays paused, just with less on the clock.</li>
+<li><strong>⏱️ Start Timer</strong> takes the timer away from that Rem, so the same confirmation appears first: <strong>Leave it due today</strong> (<code>Enter</code>) or <strong>Reschedule</strong>, plus the <strong>Carry to this Rem</strong> field. The abandoned review is recorded the way <strong>End Review</strong> would have recorded it — including the case where it came from the queue's <em>Review in Editor</em> handoff, whose repetition already exists and only needs its duration filled in.</li>
+</ul>
+<p>Starting a timer this way now also <strong>resets the clock</strong> for the Rem taking it over. Previously the new Rem inherited whatever the abandoned review had accumulated. This does not affect the queue's <em>Review in Editor</em> handoff, which carries your queue reading time forward by back-dating the timer's start — that carry is untouched.</p>
+<h3 id="execute-repetition-vs-reschedule-in-editor">Execute Repetition vs. Reschedule in Editor<a class="headerlink" href="#execute-repetition-vs-reschedule-in-editor" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Shortcut</th>
+<th>Counts for Interval?</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Execute Repetition</td>
+<td><code>Ctrl+Shift+J</code></td>
+<td>✅ Yes</td>
+<td>Register a completed review with time tracking</td>
+</tr>
+<tr>
+<td>Reschedule in Editor</td>
+<td><code>Ctrl+J</code></td>
+<td>❌ No</td>
+<td>Administratively adjust schedule without reviewing</td>
+</tr>
+</tbody>
+</table>
+<p>Use <strong>Execute Repetition</strong> when you've actually reviewed the content. Use <strong>Reschedule</strong> when you just want to move the due date without counting it as a review.</p>
+<hr />
+<h2 id="2-sequential-review-via-increm-lists">2. Sequential Review via IncRem Lists<a class="headerlink" href="#2-sequential-review-via-increm-lists" title="Permanent link">&para;</a></h2>
+<p>If you have a backlog of Incremental Rems and want to process them systematically in the editor instead of the queue, you can use the <strong>Sequential Review</strong> flow. This flow bridges the powerful filtering of the <a href="../IncRem-List-and-Main-View/">IncRem-List-and-Main-View</a> with the time-tracking of the Editor Review Timer.</p>
+<h3 id="the-problem-this-solves">The Problem This Solves<a class="headerlink" href="#the-problem-this-solves" title="Permanent link">&para;</a></h3>
+<p>The standard queue interface is optimized for rapid flashcard review, but Incremental Rems often require heavy reading, complex restructuring, extracting quotes, and AI assistance. The native "Go to Rem" workflow breaks you out of the queue, but fails to track your review time or automatically queue up the next item.</p>
+<p>Sequential Review solves this by creating a dedicated, queue-like experience that lives entirely inside the full RemNote editor. </p>
+<h3 id="how-to-start-a-sequential-review">How to Start a Sequential Review<a class="headerlink" href="#how-to-start-a-sequential-review" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Open the <a href="../IncRem-List-and-Main-View/">IncRem-List-and-Main-View</a> (or an IncRem List in a document).</li>
+<li>Click the <code>Sort</code> button and select <strong>Sort for Review (Queue Order)</strong>.</li>
+<li><em>Note: This locks your filters to "Due" and "Ascending". It authentically recreates the exact sorting mix you would experience in the standard queue: due Incremental Rems will be sorted by priority, incorporating the degree of randomness you have configured in your <a href="../Prioritization-%26-Sorting/#sorting-criteria">Prioritization-&amp;-Sorting#Sorting-Criteria</a>. If you want a completely random order, you can achieve this by setting the Incremental Rem randomness in the Sorting Criteria to 100% (full).</em></li>
+<li>Click the blue <strong>"Review in Editor"</strong> button at the top of the table.</li>
+</ol>
+<h3 id="the-workflow">The Workflow<a class="headerlink" href="#the-workflow" title="Permanent link">&para;</a></h3>
+<p>Once you click the button, you are transported to the editor for the first item in the list, and the <strong>Editor Review Timer</strong> widget appears at the bottom of your screen. </p>
+<p>The timer provides a range of powerful controls to manage your session without the risk of overlapping text in smaller windows.</p>
+<ol>
+<li><strong>Review your material</strong>: Read, edit, extract highlights, or create flashcards using the full power of the editor.</li>
+<li><strong>Pause if needed</strong>: If you need to step away mid-review, click the <strong>⏸ Pause</strong> button to freeze the timer. Click <strong>▶ Resume</strong> to continue. Only active (non-paused) time is recorded when the repetition is saved.<ul>
+<li><strong>📝 Review note</strong>: the button next to Pause toggles an inline note field — an observation saved onto this repetition's history entry when you hit <strong>Next / End Review / Dismiss</strong> (on Dismiss it becomes the <em>dismissal reason</em>). It prefills with any note typed earlier for this rem (in the queue's 📝 field or the <code>Ctrl+Shift+J</code> popup), so you can extend rather than retype.</li>
+</ul>
+</li>
+<li><strong>✓ Dismiss Button</strong>: If you've completely finished with an item (e.g. you've finished reading the full chapter and extracted all your flashcards), click the <strong>✓ Dismiss</strong> button (red, placed just before the cancel ✕). It is available in <strong>every</strong> flow that starts the timer — Sequential Review <em>and</em> <code>Ctrl+Shift+J</code> (Review in Editor) + <strong>Start Timer</strong>.<ul>
+<li><em>What happens under the hood</em>: Just like the "Dismiss" button in the queue, this records your final review time, transfers your history to the <strong>Dismissed</strong> powerup, and <strong>removes the Incremental status</strong> from the Rem, effectively clearing it from your active learning universe. It also stamps the Rem's priority onto its <code>cardPriority</code> tag, so the value outlives the Incremental powerup and anchors every flashcard created under that Rem afterwards — see <a href="../Priorities-for-Flashcards/#priority-sources">Priority Sources</a>. The dismissal also appears in the <a href="../Plugin-Widgets-Reference/#221-incremental-rem-history">Incremental Rem History</a> sidebar with a 🔴 <strong>Dismissed</strong> badge.</li>
+<li><em>When there are no further items queued</em> (e.g. single-item flows via <code>Ctrl+Shift+J</code>), Dismiss finalizes the item and ends the timer in place. When a queueList is present (Sequential Review), it dismisses the current item and advances to the next one.</li>
+</ul>
+</li>
+<li><strong>Move to the next item</strong>: When you are finished with the current review but want the item to remain incremental for future sessions, click the <strong>Next (N) →</strong> button on the timer widget.<ul>
+<li><em>What happens under the hood</em>: The plugin instantly records your repetition (logging the time spent and pushing the Next Rep Date forward), saves this reading history to the Incremental Tracker, and instantly teleports you to the editor of the <em>next</em> item in your sorted list.</li>
+</ul>
+</li>
+<li><strong>Finish the session</strong>: If you want to stop reviewing before the list is empty, simply click <strong>"End Review"</strong> on the green primary button. The destination sub-label ("and Back to IncRem List") confirms where you will land.</li>
+<li><strong>Cancel Timer</strong>: Discard the current item's timer and stay in the editor.</li>
+</ol>
+<h3 id="multi-pdf-support-in-the-timer">Multi-PDF Support in the Timer<a class="headerlink" href="#multi-pdf-support-in-the-timer" title="Permanent link">&para;</a></h3>
+<p>When the Inc Rem being reviewed has <strong>more than one PDF source</strong>, a small PDF dropdown appears in the timer's host section, next to the page controls. Switching:</p>
+<ul>
+<li><strong>Pins the chosen PDF</strong> as the active one for this Inc Rem (★ marks the <code>#preferthispdf</code> source),</li>
+<li><strong>Re-targets the page controls and the 🔖 Scroll button</strong> to the new PDF immediately,</li>
+<li><strong>Re-routes reading-time records</strong> (saved when you click Next / End Review / Dismiss) to the new <code>(IncRem, PDF)</code> pair.</li>
+</ul>
+<p>The switcher is hidden when the Inc Rem has zero or one PDF sources. See <a href="../PDF-Incremental-Reading-Workflow/#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf">PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf</a> for the full resolution chain across surfaces.</p>
+<h3 id="layout-responsiveness">Layout &amp; Responsiveness<a class="headerlink" href="#layout-responsiveness" title="Permanent link">&para;</a></h3>
+<p>The timer widget is designed to be fully responsive. If used in a narrow sidebar or a collapsed window, the buttons and controls will automatically wrap into multiple lines to prevent overlap and ensure the timer remains legible.</p>
+<p><img alt="Editor Review Timer with new Dismiss button and two-line labels" src="../assets/review-timer-done-button.png" width="800" /></p>
+<p>This flow provides the best of both worlds: the queue sorting, combined with the unrestricted creative workspace of the full editor!</p>
+<p><img alt="Sequential Review flow using IncRem List" src="../assets/sequential-review-increm-list.gif" width="800" /></p>
+<h3 id="reviewing-pdf-items">Reviewing PDF Items<a class="headerlink" href="#reviewing-pdf-items" title="Permanent link">&para;</a></h3>
+<p>When reviewing PDF items in the editor, the <strong>Review in Editor Timer</strong> (a widget registered in the <strong>DocumentAboveToolbar</strong> location) does not appear directly inside the PDF viewer interface. </p>
+<p>To access the timer and review controls, you must click the <strong>"Notes"</strong> button within the PDF viewer to open the associated document. The timer will then be visible at the top of the notes pane, above the document title.</p>
+<p><img alt="PDF Viewer interface" src="../assets/uploaded/9a136bf1-d00c-423c-acb9-6e998640a3a7.png" width="800" /></p>
+<p><img alt="Notes pane showing the Review in Editor Timer" src="../assets/uploaded/b802926f-a168-463c-8b63-892333bef427.png" width="900" /></p>
+<h4 id="tracking-progress-in-the-editor">Tracking Progress in the Editor<a class="headerlink" href="#tracking-progress-in-the-editor" title="Permanent link">&para;</a></h4>
+<p>When you are reading a PDF in the editor (instead of the queue), your reading position is not tracked automatically unless you use the extract/toggle widgets. To manually save an exact point as your current reading position:</p>
+<ol>
+<li>Create a highlight and click the <strong>Bookmark (🔖)</strong> widget in the PDF Highlight Toolbar.</li>
+<li>The popup will ask you to select which Incremental Rem you want to save the bookmark to (since a single PDF might be linked to multiple sibling chapters, and the plugin needs to know which one you are currently reviewing).</li>
+<li><strong>Smart Suggestions</strong>: If you previously assigned page ranges to your chapters (via the <a href="../PDF-Incremental-Reading-Workflow/#3-pdf-control-panel">PDF-Incremental-Reading-Workflow#3-pdf-control-panel</a> or inline widget), the Bookmarks popup will automatically suggest the correct Incremental Rem (marked with a ★) based on the page you are currently on.</li>
+<li><strong>Timer-aware</strong>: If you are currently using the <strong>Editor Review Timer</strong> (e.g. you clicked "Start Timer" from the Execute Repetition popup), the Bookmark popup will automatically detect the active IncRem — the same fast-path that works in the queue — and show an <strong>"Update Current Editor Review Reading"</strong> button at the top, letting you save the bookmark in one click.</li>
+</ol>
+<h4 id="jumping-back-to-your-last-bookmark">Jumping Back to Your Last Bookmark<a class="headerlink" href="#jumping-back-to-your-last-bookmark" title="Permanent link">&para;</a></h4>
+<p>Once you have a saved bookmark, the plugin gives you three ways to open the PDF and jump straight to it — all without closing your current document:</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>What to do</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Editor Toolbar</strong> (right of IncRem)</td>
+<td>Click <strong>🔖 Scroll to Position</strong></td>
+<td>PDF opens in a new pane to the right; reader scrolls to the bookmark</td>
+</tr>
+<tr>
+<td><strong>Execute Repetition popup</strong></td>
+<td>Click <strong>⏱️ Start Timer</strong></td>
+<td>Same split-pane open + scroll, then timer begins</td>
+</tr>
+<tr>
+<td><strong>Editor Review Timer bar</strong></td>
+<td>Click <strong>🔖 Scroll</strong> (appears next to page controls)</td>
+<td>Same split-pane open + scroll</td>
+</tr>
+</tbody>
+</table>
+<p>In all three cases the PDF mounts <strong>to the right of your current layout</strong> — the Incremental Rem you were reading stays visible on the left. If the PDF is already open in another pane, the plugin focuses that pane instead of creating a duplicate split.</p>
+<p><img alt="Scroll to Position from Priority Editor — PDF opens in split pane" src="../assets/scroll-review-in-editor.gif" /></p>
+<blockquote>
+<p><strong>Note:</strong> The <strong>🔖 Scroll</strong> button on the timer bar and the <strong>🔖 Scroll to Position</strong> button in the Priority Editor only appear when the last entry in your reading history carries a saved highlight bookmark (i.e. you previously clicked the 🔖 toolbar button on a highlight). A manually recorded page position (set via the Position button in the Priority Editor) does not show the scroll button, since there is no specific highlight to jump to.</p>
+</blockquote>
+<p><img alt="Scroll button on the Editor Review Timer toolbar" src="../assets/scroll-from-editor-toolbar.gif" /></p>
+<hr />
+<h2 id="read-points-for-rem-type-incremental-rems">Read Points for Rem-type Incremental Rems<a class="headerlink" href="#read-points-for-rem-type-incremental-rems" title="Permanent link">&para;</a></h2>
+<p>PDF and HTML Incremental Rems track your reading position with highlight <strong>bookmarks</strong> (see <a href="#jumping-back-to-your-last-bookmark">Jumping Back to Your Last Bookmark</a> above). <strong>Rem-type</strong> Incremental Rems — outline <em>headers</em> whose reading content lives in their <strong>descendants</strong> (e.g. a chapter title holding paragraphs and sub-items beneath it) — get the equivalent feature: a <strong>read point</strong>.</p>
+<p>A read point associates one <strong>descendant rem</strong> of the IncRem's outline as its current <strong>reading position</strong>, so when you return to a long note/outline you can jump straight to where you stopped instead of re-scanning from the top. Read points reuse the same reading-history infrastructure as PDF/HTML bookmarks, so every save is also kept in a read-point <strong>history</strong> (most recent = current position).</p>
+<h3 id="setting-a-read-point">Setting a Read Point<a class="headerlink" href="#setting-a-read-point" title="Permanent link">&para;</a></h3>
+<ol>
+<li>While reviewing (or simply editing) the outline, <strong>place your cursor in the descendant rem</strong> where you stopped reading.</li>
+<li>Run <strong>Set Read Point (Bookmark)</strong> (<code>Ctrl+F7</code>, quick code <code>srp</code>).</li>
+<li>The plugin resolves which Incremental Rem the read point belongs to:</li>
+<li>the <strong>active review session</strong> (Editor Review Timer or queue) when its outline contains the focused rem; otherwise</li>
+<li>the <strong>nearest ancestor</strong> tagged Incremental.</li>
+</ol>
+<p>A toast confirms the saved position (e.g. <code>🔖 Read point set: "…"</code>). The focused rem must be a <em>descendant</em> of an Incremental outline — you can't bookmark the outline header against itself.</p>
+<h3 id="jumping-to-the-read-point">Jumping to the Read Point<a class="headerlink" href="#jumping-to-the-read-point" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Editor Review Timer — 🔖 Go to Read Point.</strong> When you review a Rem-type IncRem that has a read point set, a <strong>🔖 Go to Read Point</strong> button appears in the <a href="#2-sequential-review-via-increm-lists">Editor Review Timer</a> bar (it parallels the PDF/HTML <strong>🔖 Scroll</strong> button). Clicking it navigates the current pane to the bookmarked descendant.</li>
+<li><strong>View Read Points (History)</strong> (<code>Ctrl+Shift+F7</code>, quick code <code>vrp</code>) opens the <strong><a href="../Plugin-Widgets-Reference/#68-read-points-popup">Read Points popup</a></strong> — the read-point history for the current IncRem (resolved from the focused rem or the active session). Each entry shows the descendant's text and date; click one to jump there, and the IncRem's name is shown under the title.</li>
+</ul>
+<h4 id="hybrid-increms-a-pdfhtml-source-and-their-own-descendant-content">Hybrid IncRems (a PDF/HTML source <em>and</em> their own descendant content)<a class="headerlink" href="#hybrid-increms-a-pdfhtml-source-and-their-own-descendant-content" title="Permanent link">&para;</a></h4>
+<p>An IncRem can be <strong>both</strong> a reading source (PDF/HTML) <strong>and</strong> an outline with its own descendants. Read points and the document's highlight bookmark are stored independently, so such an IncRem can carry both — they point at genuinely different places (a node in the outline vs. a spot in the document) and jump differently. When both exist, the Editor Review Timer shows <strong>both buttons</strong> — <strong>🔖 Scroll</strong> (to the PDF/HTML highlight) and <strong>🔖 Go to Read Point</strong> (to the descendant) — and tags whichever was saved most recently with a small green <strong><code>latest</code></strong> badge so you know which reflects your last reading action.</p>
+<blockquote>
+<p>Read points are also surfaced <strong>in the queue</strong>: see <a href="../Reviewing-Items-in-the-Queue/#read-point-and-status-emphasis-in-rem-type-cards">Read-point and status emphasis in Rem-type cards</a>.</p>
+</blockquote>
+<hr />
+<h2 id="3-incremental-reading-extracts-clozes">3. Incremental Reading: Extracts &amp; Clozes<a class="headerlink" href="#3-incremental-reading-extracts-clozes" title="Permanent link">&para;</a></h2>
+<p>For users coming from <strong>SuperMemo</strong>, the plugin supports a native "Incremental Reading" workflow within the RemNote editor. This allows you to break down large documents into smaller pieces (Extracts) and create flashcards (Clozes) without interrupting your reading flow.</p>
+<h3 id="extracting-text">Extracting Text<a class="headerlink" href="#extracting-text" title="Permanent link">&para;</a></h3>
+<p>When reading a long Incremental Rem (like a chapter or an article) in the editor, you can create a "sub-extract" from any portion of text:</p>
+<ol>
+<li><strong>Select the text</strong> you want to extract.</li>
+<li>Press <strong><code>Alt+X</code></strong> (standard) or <strong><code>Alt+Shift+X</code></strong> (to set a specific priority for the new piece).</li>
+<li><strong>What happens</strong>:<ul>
+<li>The selected text in the original Rem is highlighted in <strong>blue</strong>.</li>
+<li>A <strong>reference pin</strong> (↗) is inserted immediately after the highlight. Clicking this pin takes you to the new child Rem.</li>
+<li>A new child Rem is created containing the selected text.</li>
+<li>The <strong>parent Rem</strong> is automatically tagged with <code>#remove-from-queue</code> to prevent redundant queuing.</li>
+<li>The new Rem is initialized as an <strong>Incremental Rem</strong>.</li>
+<li>The new Rem includes a <strong>back-reference pin</strong> at the end, pointing back to the source document.</li>
+</ul>
+</li>
+</ol>
+<p>This allows you to "shred" a document into its most important parts while maintaining perfect traceability.</p>
+<p><img alt="Extract Selection Demo" src="../assets/extract-selected-text.gif" /></p>
+<h3 id="creating-clozes">Creating Clozes<a class="headerlink" href="#creating-clozes" title="Permanent link">&para;</a></h3>
+<p>To create flashcards during the reading process:</p>
+<ol>
+<li><strong>Select the keyword</strong> or phrase.</li>
+<li>Press <strong><code>Alt+Z</code></strong>.</li>
+<li><strong>What happens</strong>: A <strong>standalone child Rem</strong> is created containing the parent's full text, with the selected word marked as a cloze deletion. The parent is tagged with <code>#remove-from-queue</code> and the selected text is highlighted in yellow/red to signal it has been extracted. A violet <strong>↑</strong> badge appears on the card in the queue.</li>
+</ol>
+<p>For a full explanation of what this command does, how it differs from native RemNote clozes, and when to use each approach, see <strong><a href="../IR-Flow--Reading-Extracting-and-Clozing/#create-cloze-altz-altshiftz">IR-Flow--Reading-Extracting-and-Clozing#create-cloze-altz</a></strong>.</p>
+<h3 id="built-in-remove-from-queue-support">Built-in Remove From Queue Support<a class="headerlink" href="#built-in-remove-from-queue-support" title="Permanent link">&para;</a></h3>
+<p>The plugin natively handles the styling for the <code>#remove-from-queue</code> tag used by extracts.
+- When an extract is created, the parent/context Rem is tagged with <code>#remove-from-queue</code> so that its queue item acts seamlessly.
+- This ensures that you only see the specific snippet you extracted or interact with it properly, focusing your review on the most atomic piece of information.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

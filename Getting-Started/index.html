@@ -1,0 +1,2374 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Getting-Started/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../What-is-Incrementalism%3F/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>1. Getting Started - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#getting-started-with-incremental-remnote" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              1. Getting Started
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-incremental-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is Incremental Learning?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-incremental-plugin-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Incremental RemNote Panel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Incremental RemNote Panel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#making-a-rem-incremental" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making a Rem Incremental
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Making a Rem Incremental">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-slash-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 1: Slash Command
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-keyboard-shortcut" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 2: Keyboard Shortcut
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-3-document-menu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 3: Document Menu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-happens-when-you-make-a-rem-incremental" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Happens When You Make a Rem Incremental?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reviewing-incremental-rems-in-the-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing Incremental Rems in the Queue
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reviewing Incremental Rems in the Queue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-one-memory-one-action-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "One Memory, One Action" Principle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dismissing-an-incremental-rem-dismiss-button" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dismissing an Incremental Rem (Dismiss Button)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dismissing an Incremental Rem (Dismiss Button)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-happens-when-you-dismiss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Happens When You Dismiss?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#re-activating-a-dismissed-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-activating a Dismissed Rem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repetition-history-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repetition History &amp; Statistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Repetition History &amp; Statistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-single-history-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Single History View
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-aggregated-history-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Aggregated History View
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-access-smart-routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Access (Smart Routing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#switching-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Switching Views
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-markers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Markers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-priorities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting Priorities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting Priorities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-incremental-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is Incremental Learning?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-incremental-plugin-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Incremental RemNote Panel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Incremental RemNote Panel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#making-a-rem-incremental" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making a Rem Incremental
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Making a Rem Incremental">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-1-slash-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 1: Slash Command
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-2-keyboard-shortcut" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 2: Keyboard Shortcut
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-3-document-menu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method 3: Document Menu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-happens-when-you-make-a-rem-incremental" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Happens When You Make a Rem Incremental?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reviewing-incremental-rems-in-the-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing Incremental Rems in the Queue
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reviewing Incremental Rems in the Queue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-one-memory-one-action-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "One Memory, One Action" Principle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dismissing-an-incremental-rem-dismiss-button" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dismissing an Incremental Rem (Dismiss Button)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dismissing an Incremental Rem (Dismiss Button)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-happens-when-you-dismiss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Happens When You Dismiss?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#re-activating-a-dismissed-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-activating a Dismissed Rem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repetition-history-statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repetition History &amp; Statistics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Repetition History &amp; Statistics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-single-history-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Single History View
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-aggregated-history-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Aggregated History View
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-access-smart-routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Access (Smart Routing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#switching-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Switching Views
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-markers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Markers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-priorities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting Priorities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting Priorities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="getting-started-with-incremental-remnote">Getting Started with Incremental RemNote<a class="headerlink" href="#getting-started-with-incremental-remnote" title="Permanent link">&para;</a></h1>
+<p>Welcome to <strong>Incremental RemNote</strong>! This guide will walk you through the basics of making Rems incremental, reviewing them, and managing your learning workflow.</p>
+<hr />
+<h2 id="what-is-incremental-learning">What is Incremental Learning?<a class="headerlink" href="#what-is-incremental-learning" title="Permanent link">&para;</a></h2>
+<p>Incremental learning transforms how you acquire knowledge. Instead of reading a book from cover to cover or watching a full lecture, you break content into smaller pieces and review them over time—interleaved with flashcards and other material.</p>
+<p><strong>Key Benefits:</strong>
+- <strong>Process 1000+ sources in parallel</strong> without losing track
+- <strong>Prioritize ruthlessly</strong> to focus on what matters most
+- <strong>Build lasting knowledge</strong> by converting passive reading into active flashcards</p>
+<p>For a deeper understanding, see <a href="../What-is-Incrementalism%3F/">What is Incrementalism?</a>.</p>
+<hr />
+<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Open the <a href="https://www.remnote.com/plugins">RemNote Plugin Store</a></li>
+<li>Search for "<strong>Incremental RemNote</strong>"</li>
+<li>Click <strong>Install</strong></li>
+</ol>
+<hr />
+<h2 id="the-incremental-plugin-panel">The Incremental RemNote Panel<a class="headerlink" href="#the-incremental-plugin-panel" title="Permanent link">&para;</a></h2>
+<p>Once installed, the plugin adds a small <strong>Incremental RemNote</strong> 🌐 panel at the bottom of the left sidebar. It is the one fixed place to reach the plugin from, and where the onboarding tips live.</p>
+<p><strong>In the header:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>⚙</td>
+<td>Opens the plugin's <a href="../Plugin-Settings-Reference/">settings popup</a> — every setting the plugin owns, grouped</td>
+</tr>
+<tr>
+<td>?</td>
+<td>Opens this documentation, at the home page</td>
+</tr>
+<tr>
+<td>✕</td>
+<td>Hides the panel <strong>for this session</strong> — it is back next time you open RemNote. To bring it back sooner, run the <strong>Show Incremental RemNote Panel</strong> command</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Shortcut buttons:</strong></p>
+<ul>
+<li><strong>⌨</strong> — the <a href="../Keyboard-Shortcuts/">Keyboard Shortcuts</a> page.</li>
+<li><strong>Sorting</strong> — the <a href="../Prioritization-%26-Sorting/#sorting-criteria">flashcard/incremental mix and randomness</a> for your queue.</li>
+<li><strong>Priority Review</strong> — creates a <a href="../Priority-Review-Document/">Priority Review Document</a>, scoped to the document you currently have open. This is the same as using <strong>Create Priority Review Document</strong> in the document menu, without having to open the menu; the scope it will use is named under the button. With no document open, it falls back to the whole knowledge base.</li>
+</ul>
+<h3 id="tips">Tips<a class="headerlink" href="#tips" title="Permanent link">&para;</a></h3>
+<p>The panel shows <strong>one tip per session</strong>, drawn at random from the tips you have not retired yet. Answer it and the tip area is done until the next time you open RemNote — it will not hand you another one. Each tip has three answers:</p>
+<ul>
+<li><strong>I Got It</strong> — you know this one. It is never shown again. This is remembered per knowledge base and syncs across your devices.</li>
+<li><strong>✕</strong> — not now. The tip stays in the pile and can resurface later; the panel also goes quiet for two hours, so a reload does not immediately produce another one.</li>
+<li><strong>Learn More</strong> — opens the documentation section for the feature the tip is about. Tips that are habits rather than features have no such button.</li>
+</ul>
+<p>When you have answered <strong>I Got It</strong> to every tip, the tip area disappears for good and the panel keeps only its shortcuts.</p>
+<hr />
+<h2 id="making-a-rem-incremental">Making a Rem Incremental<a class="headerlink" href="#making-a-rem-incremental" title="Permanent link">&para;</a></h2>
+<p>The first step is to convert a Rem, PDF, or website into an "Incremental Rem" so it will appear in your queue.</p>
+<h3 id="method-1-slash-command">Method 1: Slash Command<a class="headerlink" href="#method-1-slash-command" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Focus on any Rem in the editor</li>
+<li>Type <code>/Make Incremental (Extract)</code> and select the command</li>
+<li>The Rem is now tagged with the <code>Incremental</code> powerup</li>
+</ol>
+<h3 id="method-2-keyboard-shortcut">Method 2: Keyboard Shortcut<a class="headerlink" href="#method-2-keyboard-shortcut" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><a href="../Keyboard-Shortcuts/#core-commands">Alt+X</a></strong> (or <strong>Opt+X</strong> on Mac) — Makes the focused Rem incremental. <strong>If text is selected</strong>, it creates a new <strong><a href="../Reviewing-Items-in-the-Editor/#extracting-text">Reviewing-Items-in-the-Editor#extracting-text</a></strong> from that selection.</li>
+<li><strong><a href="../Keyboard-Shortcuts/#core-commands">Alt+Shift+X</a></strong> — Makes the Rem incremental AND opens the priority popup. Supports <strong><a href="../Reviewing-Items-in-the-Editor/#extracting-text">Reviewing-Items-in-the-Editor#extracting-text</a></strong> from selections.</li>
+</ul>
+<p><img alt="Extract Selection Demo" src="../assets/extract-selected-text.gif" /></p>
+<h3 id="method-3-document-menu">Method 3: Document Menu<a class="headerlink" href="#method-3-document-menu" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Click the <strong>⋮</strong> (three dots) menu at the top-right of any document</li>
+<li>Select <strong>"Toggle Incremental Rem"</strong></li>
+<li>The priority popup will open automatically</li>
+</ol>
+<h3 id="what-happens-when-you-make-a-rem-incremental">What Happens When You Make a Rem Incremental?<a class="headerlink" href="#what-happens-when-you-make-a-rem-incremental" title="Permanent link">&para;</a></h3>
+<ol>
+<li>The Rem receives the <code>Incremental</code> powerup tag</li>
+<li>A <strong>"Made Incremental"</strong> event is recorded in the repetition history</li>
+<li>The Rem is scheduled for its first review (based on your Initial Interval setting, default: 1 day)</li>
+<li>The Rem will now appear in your queue, interleaved with flashcards</li>
+</ol>
+<hr />
+<h2 id="reviewing-incremental-rems-in-the-queue">Reviewing Incremental Rems in the Queue<a class="headerlink" href="#reviewing-incremental-rems-in-the-queue" title="Permanent link">&para;</a></h2>
+<p>When you enter the queue, your Incremental Rems appear alongside your flashcards. The <strong>Answer Buttons bar</strong> at the bottom provides your main actions:</p>
+<table>
+<thead>
+<tr>
+<th>Button</th>
+<th>Shortcut</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><a href="../Reviewing-Items-in-the-Queue/#next">Next</a></strong></td>
+<td>—</td>
+<td>Marks item as reviewed, schedules next repetition</td>
+</tr>
+<tr>
+<td><strong><a href="../Reviewing-Items-in-the-Queue/#reschedule">Reschedule</a></strong></td>
+<td><a href="../Keyboard-Shortcuts/#core-commands">Ctrl+J</a></td>
+<td>Manually set the next review date</td>
+</tr>
+<tr>
+<td><strong><a href="../Reviewing-Items-in-the-Queue/#dismiss">Dismiss</a></strong></td>
+<td>—</td>
+<td>Finishes the item, removes Incremental tag</td>
+</tr>
+<tr>
+<td><strong><a href="../Reviewing-Items-in-the-Queue/#change-priority">Change Priority</a></strong></td>
+<td><a href="../Keyboard-Shortcuts/#priority-commands">Alt+P</a></td>
+<td>Opens priority popup</td>
+</tr>
+<tr>
+<td><strong><a href="../Reviewing-Items-in-the-Queue/#review-in-editor">Review &amp; Open</a></strong></td>
+<td>—</td>
+<td>Reviews the item AND opens it in the editor</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-one-memory-one-action-principle">The "One Memory, One Action" Principle<a class="headerlink" href="#the-one-memory-one-action-principle" title="Permanent link">&para;</a></h3>
+<p>Before clicking "Next," always perform at least one productive action:
+- <strong>Extract</strong> a key sentence as a new Incremental Rem
+- <strong>Create</strong> a flashcard from important information
+- <strong>Rephrase</strong> a confusing passage
+- <strong>Highlight</strong> essential content</p>
+<p>Avoid "futile reviews" where you just glance at content without engaging.</p>
+<p>For more details, see <a href="../Reviewing-Items-in-the-Queue/">Reviewing Items in the Queue</a>.</p>
+<hr />
+<h2 id="dismissing-an-incremental-rem-dismiss-button">Dismissing an Incremental Rem (Dismiss Button)<a class="headerlink" href="#dismissing-an-incremental-rem-dismiss-button" title="Permanent link">&para;</a></h2>
+<p>When you've fully processed an item and extracted all valuable knowledge:</p>
+<ol>
+<li>Click the <strong>"Dismiss"</strong> button in the queue, OR</li>
+<li>Manually remove the <code>Incremental</code> tag in the editor</li>
+</ol>
+<h3 id="what-happens-when-you-dismiss">What Happens When You Dismiss?<a class="headerlink" href="#what-happens-when-you-dismiss" title="Permanent link">&para;</a></h3>
+<ol>
+<li>The Rem's <strong>complete repetition history is preserved</strong> in a <code>Dismissed</code> powerup</li>
+<li>The <code>Incremental</code> tag is removed</li>
+<li>A <strong>yellow left border</strong> appears in the editor to indicate the Rem has preserved history</li>
+<li>The item no longer appears in your queue</li>
+</ol>
+<p><img alt="Yellow left border visual indicator for dismissed Rems" src="../assets/visual-feedback-editor.png" width="600" /></p>
+<p><strong>Visual Settings:</strong>
+- <strong>Show Yellow Left Border for Dismissed Rems</strong> — Toggle the visual indicator (default: on)
+- <strong>Hide Dismissed Tag in Editor</strong> — Reduce clutter by hiding the tag (default: on)</p>
+<hr />
+<h2 id="re-activating-a-dismissed-rem">Re-activating a Dismissed Rem<a class="headerlink" href="#re-activating-a-dismissed-rem" title="Permanent link">&para;</a></h2>
+<p>If you want to review a dismissed item again:</p>
+<ol>
+<li>Make the Rem incremental again using <strong><a href="../Keyboard-Shortcuts/#core-commands">Alt+X</a></strong> or the slash command</li>
+<li>The old history is <strong>automatically restored and merged</strong></li>
+<li>A <strong>"Made Incremental"</strong> marker is added to distinguish the new learning session</li>
+</ol>
+<p>This allows you to:
+- See your complete learning journey across multiple sessions
+- Resume where you left off with preserved context
+- Analyze your long-term engagement with material</p>
+<hr />
+<h2 id="repetition-history-statistics">Repetition History &amp; Statistics<a class="headerlink" href="#repetition-history-statistics" title="Permanent link">&para;</a></h2>
+<p>The plugin offers two powerful views to analyze your learning progress: the <strong>Single History View</strong> for individual items and the <strong>Aggregated History View</strong> for entire folders and knowledge trees.</p>
+<h3 id="1-single-history-view">1. Single History View<a class="headerlink" href="#1-single-history-view" title="Permanent link">&para;</a></h3>
+<p>Gives you detailed insights into your review history for any specific Incremental Rem.</p>
+<p><strong>What it shows:</strong>
+*   <strong>Stats Row:</strong> Total reps, total time spent, age since first review
+*   <strong>Next Review:</strong> Scheduled date with days late/early indicator
+*   <strong>History Table:</strong> Date, time spent, interval, priority, and status for each repetition</p>
+<p><img alt="Repetition History Popup" src="../assets/repetition-history-popup.png" width="400" /></p>
+<h3 id="2-aggregated-history-view">2. Aggregated History View<a class="headerlink" href="#2-aggregated-history-view" title="Permanent link">&para;</a></h3>
+<p>Gives you a high-level overview of progress stats for a Rem and <strong>all its descendants</strong>. Perfect for checking your progress on a specific book, course, or topic.</p>
+<p><strong>What it shows:</strong>
+*   <strong>Tree-View Hierarchy:</strong> Displays a hierarchical tree of your Incremental Rems, sorted exactly as they appear in your document.
+*   <strong>Aggregated Metrics:</strong> Shows total repetitions, time spent, and item counts for the current selection <strong>plus</strong> all its descendants.</p>
+<p><img alt="Aggregated Repetition History" src="../assets/aggregated-repetition-history.gif" width="600" /></p>
+<h3 id="how-to-access-smart-routing">How to Access (Smart Routing)<a class="headerlink" href="#how-to-access-smart-routing" title="Permanent link">&para;</a></h3>
+<p>There is a single unified command: <strong>Open IncRem Repetition History</strong>.</p>
+<ul>
+<li><strong>Keyboard Shortcut:</strong> <a href="../Keyboard-Shortcuts/#view-navigation"><code>Ctrl+Shift+H</code></a> (works in both Queue and Editor)</li>
+<li><strong>In the Queue:</strong> Click the 📊 icon in the Answer Buttons info bar</li>
+</ul>
+<p><strong>Smart Behavior:</strong>
+*   If you select an <strong>Incremental Rem</strong> (or one with history), it opens the <strong>Single History View</strong>.
+*   If you select a <strong>Folder</strong> (that has Incremental descendants), it automatically opens the <strong>Aggregated History View</strong>.</p>
+<h3 id="switching-views">Switching Views<a class="headerlink" href="#switching-views" title="Permanent link">&para;</a></h3>
+<p>You can easily toggle between views using the button in the window header:
+*   Click <strong>"Show Aggregated"</strong> from the Single View to see the tree stats.
+*   Click <strong>"Show Single"</strong> from the Aggregated View to focus on the specific item.</p>
+<h3 id="event-markers">Event Markers<a class="headerlink" href="#event-markers" title="Permanent link">&para;</a></h3>
+<p>The history includes special event markers:</p>
+<table>
+<thead>
+<tr>
+<th>Marker</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>▶ <strong>Made Incremental</strong></td>
+<td>When the Rem was first made (or re-made) incremental</td>
+</tr>
+<tr>
+<td>⏸ <strong>Dismissed</strong></td>
+<td>When the Rem was dismissed via the Dismiss button</td>
+</tr>
+</tbody>
+</table>
+<p>These markers help you understand your learning timeline and distinguish between different review sessions. Each banner shows the <strong>date and the time of day</strong> (<code>Aug 13, 2026 · 09:44</code>) it was recorded — the same wall-clock detail the repetition rows carry — so a day holding several lifecycle events (made incremental → dismissed → made incremental again) still reads in order.</p>
+<hr />
+<h2 id="setting-priorities">Setting Priorities<a class="headerlink" href="#setting-priorities" title="Permanent link">&para;</a></h2>
+<p>Priority is crucial for managing information overload. Lower numbers = higher priority.</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>0-20</strong></td>
+<td>Critical, must review frequently</td>
+</tr>
+<tr>
+<td><strong>20-50</strong></td>
+<td>Important, regular review</td>
+</tr>
+<tr>
+<td><strong>50-80</strong></td>
+<td>Moderate, occasional review</td>
+</tr>
+<tr>
+<td><strong>80-100</strong></td>
+<td>Low priority, review when time permits</td>
+</tr>
+</tbody>
+</table>
+<h3 id="quick-methods">Quick Methods<a class="headerlink" href="#quick-methods" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><a href="../Keyboard-Shortcuts/#priority-commands">Alt+P</a></strong> — <a href="../Prioritization-%26-Sorting/#main-priority-popup">Full priority popup</a> with analytics</li>
+<li><strong><a href="../Keyboard-Shortcuts/#priority-commands">Ctrl+Opt+P</a></strong> — <a href="../Prioritization-%26-Sorting/#light-priority-popup">Light priority popup</a> (faster)</li>
+<li><strong><a href="../Keyboard-Shortcuts/#priority-commands">Ctrl+Opt+Up/Down</a></strong> — <a href="../Prioritization-%26-Sorting/#quick-priority-shortcuts">Quick Priority Change</a>: Adjust priority instantly without opening any popup</li>
+</ul>
+<p>For comprehensive details, see <a href="../Prioritization-%26-Sorting/">Prioritization &amp; Sorting</a>.</p>
+<hr />
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>Now that you understand the basics, explore these topics:</p>
+<ul>
+<li><a href="../Prioritization-%26-Sorting/">Prioritization &amp; Sorting</a> — Master the priority system</li>
+<li><a href="../Reviewing-Items-in-the-Queue/">Reviewing Items in the Queue</a> — Deep dive into the queue workflow</li>
+<li><a href="../Create-Incremental-Rem-from-PDF-Highlights/">Create Incremental Rem from PDF Highlights</a> — Extract from PDFs</li>
+<li><a href="../Keyboard-Shortcuts/">Keyboard Shortcuts</a> — Speed up your workflow</li>
+<li><a href="../Changelog/">Changelog</a> — See the latest features</li>
+</ul>
+<p><strong>Happy Incremental Learning!</strong> 🚀</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
