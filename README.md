@@ -1,6 +1,6 @@
 # Incremental RemNote
 
-![Incremental RemNote Logo](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-logo.png)
+![Incremental RemNote Logo](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-logo-2.jpeg)
 
 🇪🇸 [Español](https://github.com/bjsi/incremental-everything/blob/main/README_ES.md) | 🇧🇷 [Português Brasileiro](https://github.com/bjsi/incremental-everything/blob/main/README_PT-BR.md)
 
