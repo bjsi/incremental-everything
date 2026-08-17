@@ -72,8 +72,25 @@ export interface RawPriorityRead {
 // ── Migration state ─────────────────────────────────────────────────────────
 
 export interface HiddenSlotMigrationRecord {
-  /** When the migration completed. Absent while un-migrated. */
+  /**
+   * When a migration run finished, clean or not. This is the WRITE gate: from
+   * here on the visible slot is no longer written, because a run has deleted
+   * property children and writing the slot again would recreate them.
+   */
   migratedAt?: number;
+  /**
+   * When the visible slot was verified to hold nothing, anywhere in this KB —
+   * a run that finished with no failures, no leftovers and no rows kept back, or
+   * an exhaustive scan that found none.
+   *
+   * This is the REGISTRATION gate, and it is deliberately stricter than
+   * `migratedAt`: once set, the deprecated visible slot is not registered at all,
+   * which is what finally removes the empty "Priority" row from the editor. It
+   * also means `getPowerupProperty` on that slot stops resolving, so the
+   * fallback read returns nothing — which is safe only when nothing is left
+   * there. Never infer it; only a positive, exhaustive check may set it.
+   */
+  completedAt?: number;
   /** Rems whose value was moved, from the run that set migratedAt. */
   moved?: number;
   /** Visible property children deleted by that run. */
@@ -157,12 +174,61 @@ export async function isHiddenSlotMigrated(plugin: RNPlugin): Promise<boolean> {
   return migrated;
 }
 
+/**
+ * Records that the visible slot is verifiably empty everywhere, which stops it
+ * being registered at all from the next launch.
+ *
+ * Sets `migratedAt` alongside it when absent: the two must never disagree in the
+ * direction "registration skipped but the visible slot still written", which
+ * would have writers targeting a slot that no longer resolves.
+ */
+export async function markHiddenSlotMigrationComplete(
+  plugin: RNPlugin,
+  patch: Partial<HiddenSlotMigrationRecord> = {}
+): Promise<void> {
+  const now = Date.now();
+  const existing = await readHiddenSlotRecord(plugin);
+  await patchHiddenSlotRecord(plugin, {
+    ...patch,
+    migratedAt: existing?.migratedAt ?? now,
+    completedAt: now,
+  });
+}
+
+/**
+ * Whether the deprecated visible slot may be skipped at registration time.
+ *
+ * Read BEFORE registerPluginPowerups, so it cannot use the kbId memo warmed by
+ * later calls — it warms it instead. Returns false on any failure, which is the
+ * safe direction: registering a slot that is already there costs nothing, while
+ * skipping one that still holds values would make those values unreadable.
+ */
+export async function isVisiblePrioritySlotRetired(plugin: RNPlugin): Promise<boolean> {
+  try {
+    return !!(await readHiddenSlotRecord(plugin))?.completedAt;
+  } catch (err) {
+    console.warn(
+      '[CardPriority hidden-slot] could not read the migration record before registration; ' +
+        'registering the deprecated visible slot.',
+      err
+    );
+    return false;
+  }
+}
+
+/**
+ * Undoes both flags.
+ *
+ * `completedAt` must go too, or a restore would put values back into a slot that
+ * the next launch no longer registers — visible values that nothing can read.
+ */
 export async function clearHiddenSlotMigrationFlag(plugin: RNPlugin): Promise<void> {
   const kbId = await currentKbId(plugin);
   if (!kbId) return;
   const state = await readState(plugin);
   if (state[kbId]) {
     delete state[kbId].migratedAt;
+    delete state[kbId].completedAt;
     delete state[kbId].moved;
     delete state[kbId].childrenRemoved;
     await plugin.storage.setSynced(cardPriorityHiddenSlotStateKey, state);

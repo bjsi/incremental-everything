@@ -43,8 +43,8 @@
 import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, PRIORITY_VALUE_SLOT } from './types';
 import {
-  isHiddenSlotMigrated,
   patchHiddenSlotRecord,
+  markHiddenSlotMigrationComplete,
   readHiddenSlotRecord,
   clearHiddenSlotMigrationFlag,
 } from './slot_access';
@@ -186,6 +186,22 @@ export interface HiddenSlotMigrationReport {
   errors: number;
   errorSamples: string[];
   verdict: string;
+}
+
+/**
+ * Whether a run leaves the visible slot verifiably empty across the whole KB.
+ *
+ * Every one of these means a row (and possibly a value) survived somewhere:
+ * a write that did not read back, a row kept because it has children, or a rem
+ * that errored before its row could be dealt with. Only when all three are zero
+ * may the slot stop being registered — after that its reads no longer resolve, so
+ * a survivor would become an unreadable value rather than a cosmetic leftover.
+ *
+ * `staleVisible` is deliberately NOT here: those rows were deleted, and their
+ * values were the discarded ones.
+ */
+export function isCleanSweep(report: HiddenSlotMigrationReport): boolean {
+  return report.writeFailed === 0 && report.errors === 0 && report.keptWithChildren === 0;
 }
 
 /**
@@ -408,9 +424,9 @@ export async function runCardPriorityHiddenSlotMigration(
 
   const report = await migrateCardPriorityToHiddenSlot(plugin, onProgress);
 
-  // The flag is what stops every writer (on every device, once synced) from
-  // writing the visible slot — and therefore from recreating the property
-  // children this run just deleted.
+  // `migratedAt` stops every writer (on every device, once synced) from writing
+  // the visible slot — and therefore from recreating the property children this
+  // run just deleted.
   //
   // Set on ANY completed run, including a partial one. Withholding it until a run
   // is spotless looks safer and is worse: the very next priority write would
@@ -419,11 +435,19 @@ export async function runCardPriorityHiddenSlotMigration(
   // read falls back to the visible slot when the hidden one is empty — so a rem
   // whose hidden write failed keeps being read out of its surviving row until a
   // re-run moves it.
-  await patchHiddenSlotRecord(plugin, {
-    migratedAt: Date.now(),
+  const stamp = {
     moved: report.moved,
     childrenRemoved: report.childrenRemoved,
-  });
+  };
+  if (isCleanSweep(report)) {
+    // Nothing anywhere in the visible slot: no failed write, no row kept back, no
+    // error that could have left one. Only now may the slot stop being registered,
+    // because from that point its reads no longer resolve.
+    await markHiddenSlotMigrationComplete(plugin, stamp);
+    console.log(`${LOG} visible slot verified empty — it will not be registered again.`);
+  } else {
+    await patchHiddenSlotRecord(plugin, { ...stamp, migratedAt: Date.now() });
+  }
 
   // Values did not change, but ~every tagged rem did. Drop the warm store so the
   // next launch rebuilds from the database rather than trusting a copy taken
@@ -435,13 +459,20 @@ export async function runCardPriorityHiddenSlotMigration(
 }
 
 /**
- * Puts the visible slot back from the backup and clears the migrated flag, so
- * the plugin resumes writing both slots.
+ * Puts the visible slot back from the backup and clears both flags, so the plugin
+ * resumes registering and writing it.
  *
  * This is a real undo, not a cosmetic one: restoreCardPrioritySnapshot writes
  * through setPowerupProperty on the VISIBLE slot, which recreates the property
  * children — and with them the table-rendering bug the migration removed. That
  * is the point.
+ *
+ * TWO STEPS when the slot has been retired. A slot that is not registered in this
+ * session cannot be written, so restoring into it would silently fail on every
+ * rem. The first run therefore only clears the flags and asks for a reload; the
+ * second, with the slot registered again, does the restore. Splitting it is what
+ * keeps the undo honest — a single pass would report success having written
+ * nothing.
  */
 export async function undoCardPriorityHiddenSlotMigration(
   plugin: RNPlugin,
@@ -456,6 +487,23 @@ export async function undoCardPriorityHiddenSlotMigration(
         'JSON file, restore it from the Debug popup instead.',
     };
   }
+
+  const record = await readHiddenSlotRecord(plugin);
+  if (record?.completedAt) {
+    await clearHiddenSlotMigrationFlag(plugin);
+    console.log(`${LOG} flags cleared; the visible slot is registered again after a reload.`);
+    return {
+      restored: false,
+      note:
+        `Step 1 of 2 done: the old visible "Priority" slot is no longer retired.\n\n` +
+        `Nothing was written yet — that slot is not registered in this session, so values ` +
+        `restored into it would go nowhere. RELOAD RemNote, then run this command again to ` +
+        `restore the ${snapshot.rows.length} backed-up priorities.\n\n` +
+        `Your priorities are untouched and still readable in the meantime: they are in the ` +
+        `hidden slot, where the migration put them.`,
+    };
+  }
+
   const report = await restoreCardPrioritySnapshot(plugin, onProgress);
   await clearHiddenSlotMigrationFlag(plugin);
   await clearPersistedCardPriorities(plugin);
@@ -466,6 +514,46 @@ export async function undoCardPriorityHiddenSlotMigration(
 }
 
 // ── The startup offer ───────────────────────────────────────────────────────
+
+/**
+ * Confirms the visible slot is empty across the WHOLE knowledge base and, if so,
+ * records `completedAt` so the next launch stops registering it.
+ *
+ * Exhaustive by construction — a sampled scan cannot license retiring a slot,
+ * because the rems it did not look at are exactly the ones that would become
+ * unreadable. Runs at most once per knowledge base, and only in the two states
+ * where it can pay off:
+ *
+ *   * `migratedAt` set but `completedAt` absent — a run finished under an earlier
+ *     build that had no second flag, or a partial run has since been completed by
+ *     hand. This is the case that costs a full scan; on a 2k-rem library it is a
+ *     few seconds, once.
+ *   * no tagged rems at all — a knowledge base that has never had a card priority.
+ *     Nothing to scan, nothing to migrate, and stamping it here means the
+ *     deprecated slot is never registered again, so the row cannot appear.
+ */
+async function completeIfVisibleSlotIsEmpty(plugin: RNPlugin): Promise<boolean> {
+  const scan = await scanVisiblePrioritySlots(plugin);
+  if (!scan.resolved) {
+    // Either the slot definition is already gone, or it could not be read. Not
+    // evidence of emptiness, so nothing is stamped.
+    console.log(`${LOG} visible slot could not be resolved — leaving the record alone.`);
+    return false;
+  }
+  if (scan.withVisibleChild > 0) {
+    console.log(
+      `${LOG} ${scan.withVisibleChild} of ${scan.tagged} rem(s) still carry a visible Priority ` +
+        `row. Run "Migrate Card Priorities to Hidden Slot…" to move them.`
+    );
+    return false;
+  }
+  await markHiddenSlotMigrationComplete(plugin);
+  console.log(
+    `${LOG} visible slot verified empty across all ${scan.tagged} tagged rem(s) — it will not ` +
+      `be registered again. Reload to drop the leftover "Priority" row.`
+  );
+  return true;
+}
 
 /**
  * Offers the migration whenever this KB still has visible priority children.
@@ -485,16 +573,40 @@ export async function checkCardPriorityHiddenSlotMigration(plugin: RNPlugin): Pr
       console.log(`${LOG} offer skipped — light mode.`);
       return;
     }
-    if (await isHiddenSlotMigrated(plugin)) return;
 
     const record = await readHiddenSlotRecord(plugin);
+    if (record?.completedAt) return; // fully done: slot retired, nothing to check
+
+    // Already migrated, but never verified empty — the case a knowledge base
+    // migrated by v1.0.47 is in, since that build had no `completedAt`. One full
+    // scan settles it and the leftover row goes away on the next reload.
+    if (record?.migratedAt) {
+      await completeIfVisibleSlotIsEmpty(plugin);
+      return;
+    }
+
     if (record?.offerSuppressed) {
       console.log(`${LOG} offer suppressed by the user; run the command to migrate.`);
       return;
     }
 
     const probe = await scanVisiblePrioritySlots(plugin, { sample: true });
-    if (!probe.resolved || probe.withVisibleChild === 0) {
+    if (!probe.resolved) return;
+
+    if (probe.withVisibleChild === 0) {
+      if (probe.tagged === 0) {
+        // Never had a card priority. Retire the slot now so this knowledge base
+        // never grows the row in the first place.
+        await markHiddenSlotMigrationComplete(plugin);
+        console.log(
+          `${LOG} no card priorities in this knowledge base — the deprecated visible slot will ` +
+            `not be registered again.`
+        );
+        return;
+      }
+      // Rows may still exist outside the sample, so this is not evidence of
+      // emptiness and nothing is stamped. A later launch whose sample does hit one
+      // will offer the migration.
       console.log(
         `${LOG} no visible Priority rows found in ${probe.sampled} of ${probe.tagged} tagged ` +
           `rem(s) — nothing to offer.`
@@ -557,10 +669,12 @@ export async function checkCardPriorityHiddenSlotMigration(plugin: RNPlugin): Pr
       `✅ Card priorities migrated — "${kbName}"\n\n` +
         `${r.verdict}\n\n` +
         `Backup: ${result.backupNote}\n\n` +
-        (r.writeFailed > 0 || r.errors > 0
-          ? `Re-run the command to retry the ${r.writeFailed + r.errors} rem(s) that failed. ` +
-            `They kept their visible Priority row, so no value was lost.\n\n`
-          : '') +
+        (isCleanSweep(r)
+          ? `The old "Priority" slot is now retired: after the reload it is no longer registered, ` +
+            `so even the empty row goes away.\n\n`
+          : `Re-run the command to retry the rem(s) that were left behind — they kept their ` +
+            `visible Priority row, so no value was lost. The old slot stays registered until ` +
+            `none are left.\n\n`) +
         `Reload RemNote to see your tables render their real content.`
     );
   } catch (err) {

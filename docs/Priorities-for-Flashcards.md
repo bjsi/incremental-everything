@@ -87,6 +87,15 @@ The first time the plugin starts and finds visible `Priority` rows still in plac
 
 It is offered on **every start** until it has been done, because until then your tables are still rendering the wrong thing. Declining offers a *never ask again*, and the command is always available.
 
+### Retiring the old slot
+
+Deleting the values does not delete the *slot*, so a bare `Priority — Empty` row is left behind: RemNote draws a row for every slot the plugin registers, whether or not it holds anything. It goes away once the plugin stops registering that slot — and it only does that on **positive proof** that nothing is left in it: a migration run that finished with no failures, no rows kept back and no errors, or a full scan of every tagged Rem finding none.
+
+Until then the slot stays registered, which is deliberate. An unregistered slot cannot be read, so retiring one that still held a value would turn that value into an unreadable one rather than a visible row. A knowledge base migrated by v1.0.47 (which had no such check) gets its full scan automatically on the next start; expect one extra pass of a few seconds, once, then a reload to see the row disappear.
+
+!!! note "Undoing takes two steps once the slot is retired"
+    A retired slot cannot be written either, so restoring into it would silently write nothing. The first run of **Undo Card Priority Hidden-Slot Migration…** un-retires the slot and asks you to reload; the second actually restores the values. Your priorities stay readable in the hidden slot in between.
+
 !!! warning "One thing you lose"
     Priorities can no longer be typed straight into the outline, because there is no longer a row to type into. Use the [Priority widget](#1-the-unified-priority-widget-altp) (`Alt+P`), [Quick Priority](Keyboard-Shortcuts.md#priority-commands) or the [batch tools](#3-unified-batch-priority-change) instead.
 

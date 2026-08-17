@@ -2,6 +2,24 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.48 - August 17th, 2026
+
+### 🐛 Fixed - the old Priority row survived the migration as an empty leftover
+
+Migrating card priorities to the hidden slot removed the numbers but not the row: a bare **Priority — Empty** stayed under every tagged Rem, because RemNote draws a row for every slot the plugin registers, values or not.
+
+The plugin now stops registering that slot altogether — but only on positive proof that nothing is left in it: a migration run that finished with no failures, no rows kept back and no errors, or a full scan of every tagged Rem finding none. A knowledge base migrated by v1.0.47 gets that scan automatically on the next start (a few seconds, once); reload afterwards and the row is gone.
+
+Undoing now takes two steps once the slot is retired, since a slot that is not registered cannot be written either: the first run un-retires it and asks for a reload, the second restores the values. Priorities stay readable in the hidden slot in between.
+
+#### Technical explanation
+
+Two flags, not one. `migratedAt` is the WRITE gate and is set by any completed run, including a partial one — withholding it would have the next priority write recreate a property child on every Rem the run did clean. `completedAt` is the REGISTRATION gate and is strictly stricter: it may only be set on proof of emptiness, because an unregistered slot stops resolving through `getPowerupProperty`, which turns a surviving value into an unreadable one rather than a cosmetic row. `isCleanSweep` (no `writeFailed`, no `keptWithChildren`, no `errors`) is that proof from a run; `completeIfVisibleSlotIsEmpty` is the exhaustive-scan route for knowledge bases that were migrated before the flag existed. A knowledge base with no card priorities at all is stamped complete on sight, so it never grows the row in the first place.
+
+`registerPluginPowerups` takes `retireVisiblePrioritySlot` and spreads the slot in conditionally — the same shape as the settings registration being handed only the ids a knowledge base still has to read across — and `index.tsx` reads the record *before* registering, defaulting to registering if it cannot be read. The deprecated slot's `propertyLocation` also moves to `ONLY_IN_TABLE`, the least visible location that still renders, which governs newly created slot definition Rems only.
+
+📖 [Retiring the old slot](Priorities-for-Flashcards.md#retiring-the-old-slot)
+
 ## v1.0.47 - August 17th, 2026
 
 ### 🐛 Fixed - card priorities were blanking out table cells

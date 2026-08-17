@@ -80,11 +80,15 @@ import {
   setCardPriority,
 } from '../lib/card_priority';
 import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
-import { isHiddenSlotMigrated } from '../lib/card_priority/slot_access';
+import {
+  isHiddenSlotMigrated,
+  isVisiblePrioritySlotRetired,
+} from '../lib/card_priority/slot_access';
 import {
   scanVisiblePrioritySlots,
   runCardPriorityHiddenSlotMigration,
   undoCardPriorityHiddenSlotMigration,
+  isCleanSweep,
 } from '../lib/card_priority/hidden_slot_migration';
 import { computeClozeAutoPriority, ClozeAutoPriorityInfo } from '../lib/cloze_priority';
 import {
@@ -1893,6 +1897,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       'Backs up every priority first.',
     action: async () => {
       const kbName = (await plugin.kb.getCurrentKnowledgeBaseData())?.name || 'this knowledge base';
+
+      // Verified complete: the deprecated slot is no longer registered, so there
+      // is nothing to scan and nothing to move. Running the migration here would
+      // fail to resolve the slot definition and abort — say so instead.
+      if (await isVisiblePrioritySlotRetired(plugin)) {
+        alert(
+          `✅ Already migrated — "${kbName}"\n\nEvery card priority lives in the hidden slot and ` +
+            `the old visible "Priority" slot has been retired, so there is nothing left to move.\n\n` +
+            `To go back, run "Undo Card Priority Hidden-Slot Migration…".`
+        );
+        return;
+      }
+
       const alreadyDone = await isHiddenSlotMigrated(plugin);
 
       // A KB that has been migrated is not scanned first. The rems a previous run
@@ -1948,6 +1965,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       alert(
         `✅ Card priorities migrated — "${kbName}"\n\n${r.verdict}\n\n` +
           `Backup: ${result.backupNote}\n\n` +
+          (isCleanSweep(r)
+            ? `The old "Priority" slot is now retired: after the reload it is no longer ` +
+              `registered, so even the empty row goes away.\n\n`
+            : `Re-run this command to retry the rem(s) left behind. The old slot stays ` +
+              `registered until none are left.\n\n`) +
           `Reload RemNote to see your tables render their real content.`
       );
     },
@@ -1960,12 +1982,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       'Restore card priorities from the backup taken by the hidden-slot migration, putting the ' +
       'visible Priority rows back.',
     action: async () => {
+      const retired = await isVisiblePrioritySlotRetired(plugin);
       const go = confirm(
         `↩️ Undo the hidden-slot migration?\n\n` +
           `This restores every priority from the backup, which puts the visible "Priority" rows ` +
           `back on your rems — including inside table cells, where RemNote will again render ` +
           `them in place of the cell's own content.\n\n` +
-          `OK = restore    •    Cancel = keep things as they are`
+          (retired
+            ? `It takes TWO steps, because the old slot is currently retired and cannot be ` +
+              `written: this run only un-retires it, then you reload and run the command again ` +
+              `to restore the values. Nothing is lost in between — the priorities stay in the ` +
+              `hidden slot until the restore actually runs.\n\n`
+            : '') +
+          `OK = ${retired ? 'start (step 1 of 2)' : 'restore'}    •    Cancel = keep things as they are`
       );
       if (!go) {
         await plugin.app.toast('Undo cancelled');
@@ -1974,7 +2003,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const { restored, note } = await undoCardPriorityHiddenSlotMigration(plugin, (msg) =>
         console.log(`[CardPriority hidden-slot] ${msg}`)
       );
-      alert(restored ? `↩️ Restore finished\n\n${note}` : `⚠️ Nothing restored\n\n${note}`);
+      alert(
+        restored
+          ? `↩️ Restore finished\n\n${note}\n\nRELOAD RemNote now. The visible "Priority" slot ` +
+            `is registered again on the next start, and until then the restored values in it ` +
+            `cannot be read — priorities will fall back to inherited or default.`
+          : `⚠️ Nothing restored\n\n${note}`
+      );
     },
   });
 

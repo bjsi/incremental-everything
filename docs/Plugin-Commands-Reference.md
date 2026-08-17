@@ -399,6 +399,8 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 - **Undo Card Priority Hidden-Slot Migration…**
   Restores every priority from the backup the migration took, which puts the visible `Priority` rows back — and with them the table-rendering problem. Reads the copy stored on this device; if that is gone, restore the downloaded JSON from the Debug popup instead.
 
+  **Two steps once the old slot has been retired.** A slot the plugin no longer registers cannot be written, so the first run only un-retires it and asks you to reload; the second actually restores the values. Priorities stay readable in the hidden slot in between.
+
 - **Remove CardPriority Tags…** { #remove-cardpriority-tags }
   Strips the `cardPriority` powerup and its slots from **the knowledge base you currently have open** — named in every dialog, and the only one touched. It asks which tags to remove first:
 
