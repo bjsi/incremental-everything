@@ -6,7 +6,7 @@ Every setting lives in **one place**: the plugin's own settings popup.
 
 ## Where the settings are { #where-the-settings-are }
 
-Open the popup with the command **`Incremental RemNote: Settings`** (quick code `ies`). It groups the settings by area, hides the ones that do not apply — the Beta Scheduler's parameters stay out of sight until you switch that scheduler on — and links each entry to the section of this manual that explains it.
+Open the popup with the command **`Incremental RemNote: Settings`** (quick code `is`). It groups the settings by area, hides the ones that do not apply — the Beta Scheduler's parameters stay out of sight until you switch that scheduler on — and links each entry to the section of this manual that explains it.
 
 ![The Incremental RemNote settings popup](assets/settings-popup.png){ width="900" }
 

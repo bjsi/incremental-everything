@@ -304,7 +304,7 @@ export const IE_DOCS_BASE_URL = 'https://hugomarins.github.io/incremental-everyt
  */
 export const MORE_SETTINGS_POINTER =
   'MOVED: every Incremental RemNote setting now lives in the plugin\'s own settings window — ' +
-  'run the "Incremental RemNote: Settings" command from the omnibar (quick code: ies). The ' +
+  'run the "Incremental RemNote: Settings" command from the omnibar (quick code: is). The ' +
   'copies in this panel are the migration reading your existing values across; they disappear ' +
   'after you reload RemNote, and editing them here in the meantime has no effect.';
 

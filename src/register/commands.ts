@@ -3565,7 +3565,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'ie_open_settings',
     name: 'Incremental RemNote: Settings',
     description: 'Open the Incremental RemNote settings popup',
-    quickCode: 'ies',
+    quickCode: 'is',
     action: async () => {
       await plugin.widget.openPopup('ie_settings');
     },

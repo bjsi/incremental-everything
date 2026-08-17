@@ -22,7 +22,7 @@ The cleanest migration path is to disable IE's Mastery Drill while you finish an
 
 **Step 1 — Disable IE's Mastery Drill temporarily**
 
-In the plugin's settings popup (**`Incremental RemNote: Settings`**, quick code `ies`) → **Mastery Drill**, turn **Enable Mastery Drill** off. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
+In the plugin's settings popup (**`Incremental RemNote: Settings`**, quick code `is`) → **Mastery Drill**, turn **Enable Mastery Drill** off. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
 
 **Step 2 — Complete your old Mastery Drill queue *(optional)*
 
@@ -252,7 +252,7 @@ Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused s
 ![Mastery Drill](assets/mastery-drill.png){ width="900" }
 
 !!! info "Off by default — switch it on to use it"
-    Turn on **Enable Mastery Drill** in the [IE Settings popup](Plugin-Settings-Reference.md#where-the-settings-are) (command `ies`, under *Mastery Drill*) and reload RemNote.
+    Turn on **Enable Mastery Drill** in the [IE Settings popup](Plugin-Settings-Reference.md#where-the-settings-are) (command `is`, under *Mastery Drill*) and reload RemNote.
 
     While the drill is on, the plugin listens to every flashcard rating and keeps a list of the cards that need drilling, and it registers the drill popup, its command and the sidebar notification. Off, none of that runs — which is why it is opt-in rather than always present. Your flashcard and Practiced Queue history are unaffected either way.
 

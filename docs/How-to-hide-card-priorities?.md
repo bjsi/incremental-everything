@@ -18,7 +18,7 @@ If you are not migrated yet and want to hide the slots (properties) - priority a
 
 If you want to remove these tags (cardPriority) and slots altogether of all your database, follow these steps:
 
-- First, stop the plugin from writing new ones — otherwise they come straight back. Turn **Enable Flashcard Prioritisation** off (run **`Incremental RemNote: Settings`**, quick code `ies`), or switch to "[Light Mode](Full-Mode-x-Light-Mode.md)".
+- First, stop the plugin from writing new ones — otherwise they come straight back. Turn **Enable Flashcard Prioritisation** off (run **`Incremental RemNote: Settings`**, quick code `is`), or switch to "[Light Mode](Full-Mode-x-Light-Mode.md)".
 ![image](assets/uploaded/110d7e2f-4f78-41f2-8171-c7ae070aa4e4.png){ width="700" }
 
 - AFTER changing that setting, use the Omnibar to run the command **"Remove CardPriority Tags…"**. It asks which tags to remove:

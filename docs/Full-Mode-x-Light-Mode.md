@@ -95,7 +95,7 @@ The plugin auto-detects your platform (if you chose Full Mode):
 ```
 
 ### Manual Override
-**`Incremental RemNote: Settings` (quick code `ies`) → Performance → Performance Mode**
+**`Incremental RemNote: Settings` (quick code `is`) → Performance → Performance Mode**
 - Choose "Light Mode" or "Full Mode"
 
 **Platform-Specific Settings:**

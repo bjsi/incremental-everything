@@ -8,7 +8,9 @@ This page documents the major changes and improvements for each version of the I
 
 *Incremental Everything* is **Incremental RemNote** from this release on. Shorter, easier to say, and it names what it is — which matters most to someone meeting the plugin for the first time in RemNote's plugin library.
 
-Only the name changes. Nothing about your knowledge base moves: the plugin id, every powerup, every tag, every setting and all your history stay exactly as they are, and updating requires nothing from you. Two places where you will notice it: the command palette now answers to **Incremental RemNote: Settings** (the quick code `ies` is unchanged), and the sidebar panel is titled **Incremental RemNote** rather than *Incremental Plugin*.
+Nothing about your knowledge base moves: the plugin id, every powerup, every tag, every setting and all your history stay exactly as they are, and updating requires nothing from you. What you will notice is in the interface — the settings command is now **Incremental RemNote: Settings**, and the sidebar panel is titled **Incremental RemNote** rather than *Incremental Plugin*.
+
+The settings command's quick code is now **`is`** (it was `ies`). Shorter, and it no longer spells out initials of a name the plugin no longer has.
 
 ### 📝 Changed - card priorities are stored in a hidden slot
 
@@ -63,9 +65,9 @@ A degraded scale is invisible in the UI — a fallback colour looks exactly like
 
 ## v1.0.45 - August 14th, 2026
 
-### ✨ New - an Incremental RemNote panel in the sidebar
+### ✨ New - an Incremental Plugin panel in the sidebar
 
-The plugin now has one fixed place to reach it from: an **Incremental RemNote** panel at the bottom of the left sidebar. In its header, **⚙** opens the settings, **?** opens the documentation, and **✕** hides the panel for the session — it is back on the next start, and the **Show Incremental RemNote Panel** command brings it back sooner. Below it, three buttons: **⌨** for the shortcuts page, **Sorting** for the sorting criteria, and **Priority Review** for the Priority Review Document creator — already scoped to the document you have open, with that scope named under the button.
+The plugin now has one fixed place to reach it from: an **Incremental Plugin** panel at the bottom of the left sidebar. In its header, **⚙** opens the settings, **?** opens the documentation, and **✕** hides the panel for the session — it is back on the next start, and the **Show Incremental Plugin Panel** command brings it back sooner. Below it, three buttons: **⌨** for the shortcuts page, **Sorting** for the sorting criteria, and **Priority Review** for the Priority Review Document creator — already scoped to the document you have open, with that scope named under the button.
 
 Under the shortcuts it shows **one tip per session**. **I Got It** retires a tip for good, **✕** puts it back in the pile for later, and **Learn More** opens the page that explains the feature. Either answer ends the tip for that session — the panel will not chain into a second one. When every tip has been retired the tip area goes away and the shortcuts stay.
 
@@ -75,11 +77,11 @@ Under the shortcuts it shows **one tip per session**. **I Got It** retires a tip
 
 Everything is sized for a column the user can drag down to ~130px: 11px type, short labels, and tip bodies capped at ~90 characters by the type's own contract, since a longer one wraps to five lines and the panel starts to squat.
 
-📖 [The Incremental RemNote Panel](Getting-Started.md#the-incremental-plugin-panel)
+📖 [The Incremental Plugin Panel](Getting-Started.md#the-incremental-plugin-panel)
 
 ### ✨ New - all the settings are in one window now
 
-The last five settings that stayed in RemNote's own plugin panel — **Enable Flashcard Prioritisation**, **Performance Mode**, the two **Always Use Light Mode** switches and **Enable Hide-in-Queue Powerups and Commands** — have moved into the plugin's settings popup with everything else, and are editable there. The plugin's section of **Settings → Plugins → Incremental RemNote** is now empty.
+The last five settings that stayed in RemNote's own plugin panel — **Enable Flashcard Prioritisation**, **Performance Mode**, the two **Always Use Light Mode** switches and **Enable Hide-in-Queue Powerups and Commands** — have moved into the plugin's settings popup with everything else, and are editable there. The plugin's section of **Settings → Plugins → Incremental Everything** is now empty.
 
 They were kept back on the theory that RemNote's own panel is where you would look first if the plugin ever felt heavy. There was no heaviness to chase, so the split bought nothing and cost a second place to look.
 
@@ -514,9 +516,9 @@ The same move applies to the distribution graph inside a **Priority Review Docum
 
 ### ✨ New: a settings popup of the plugin's own
 
-RemNote's plugin settings panel is one flat list, and this plugin had grown to more than thirty entries in it. **`Incremental RemNote: Settings`** (quick code `ies`) opens a proper settings window instead: grouped by area, searchable, with a **?** beside entries that links straight to the section of this manual explaining them, and a *Reset* on anything you have changed from its default.
+RemNote's plugin settings panel is one flat list, and this plugin had grown to more than thirty entries in it. **`Incremental Everything: Settings`** (quick code `ies`) opens a proper settings window instead: grouped by area, searchable, with a **?** beside entries that links straight to the section of this manual explaining them, and a *Reset* on anything you have changed from its default.
 
-![The Incremental RemNote settings popup, showing the Scheduling group](assets/settings-popup.png){ width="900" }
+![The Incremental Everything settings popup, showing the Scheduling group](assets/settings-popup.png){ width="900" }
 
 It also hides what does not apply. The Beta Scheduler's *First Review Interval* and *Max Interval* appear only once that scheduler is on; the *Multiplier* disappears when it is, since the saturating curve ignores it; the Mastery Drill's parameters appear only when the drill is enabled. Each switch says which settings it reveals, so nothing vanishes without explanation.
 
@@ -532,7 +534,7 @@ Your existing settings are carried over on first load — nothing to re-enter �
 
 Per-flashcard priorities are the one part of this plugin that works across your **entire** knowledge base rather than on the Rems you are handling: it tags every flashcard-bearing Rem with the `cardPriority` powerup and keeps those tags in step as you edit. On a large library that is a long initial pass and continuous background work — and most people never needed it, because it exists to serve one feature: flashcards inside [Priority Review Documents](Priority-Review-Document.md).
 
-It now waits to be asked. **Settings → Plugins → Incremental RemNote → Enable Flashcard Prioritisation**, off by default.
+It now waits to be asked. **Settings → Plugins → Incremental Everything → Enable Flashcard Prioritisation**, off by default.
 
 With it off, **nothing else changes**. Extracts, incremental reading, PDF and video, the scheduler, the queue, the Mastery Drill and priorities on Incremental Rems themselves are untouched. A flashcard's inherited priority is still resolved and still displayed everywhere — the plugin walks up the ancestry on each read instead of storing the answer. Priorities you set yourself are still saved: `Alt+P` records `manual`, and dismissing an Incremental Rem still stamps `incremental` on the flashcards beneath it, because both are deliberate acts on identified Rems.
 
@@ -628,7 +630,7 @@ Existing entries keep their current text and shrink naturally as they are rewrit
 
 ### 🛠️ New: Synced Storage Key Audit (Debug Widget)
 
-A diagnostic behind the `Debug Incremental RemNote` command. It reconstructs every storage key the plugin is capable of writing — from your Incremental Rems, PDFs, documents and videos — probes each one, and reports how many exist, how much space each family occupies, which individual keys are approaching RemNote's 900KB per-key and 10MB total ceilings, and how many orphaned keys are left behind by deleted Rems.
+A diagnostic behind the `Debug Incremental Everything` command. It reconstructs every storage key the plugin is capable of writing — from your Incremental Rems, PDFs, documents and videos — probes each one, and reports how many exist, how much space each family occupies, which individual keys are approaching RemNote's 900KB per-key and 10MB total ceilings, and how many orphaned keys are left behind by deleted Rems.
 
 This is what produced the numbers behind the three fixes above, and it is how the storage picture will be verified once RemNote provides deletion and enumeration APIs.
 
@@ -638,7 +640,7 @@ This is what produced the numbers behind the three fixes above, and it is how th
 
 ### ⚠️ Service notice: the plugin is temporarily out of operation on RemNote 1.27.16
 
-RemNote 1.27.16 — now on the **stable** channel as well as beta — introduced *"safeguards that prevent plugins from saving oversized data or creating too many relationships"*. Three of them break Incremental RemNote, and none can be worked around from the plugin's side:
+RemNote 1.27.16 — now on the **stable** channel as well as beta — introduced *"safeguards that prevent plugins from saving oversized data or creating too many relationships"*. Three of them break Incremental Everything, and none can be worked around from the plugin's side:
 
 - **You can no longer create new Incremental Rems.** A plugin's powerup may now be applied to at most **5000 Rems**. Applying the `Incremental` tag to Rem number 5001 is rejected outright. A powerup *is* its set of tagged Rems, so there is no way to mark something as incremental without that relationship — and no redesign brings a knowledge base of 5000+ incremental items back under the ceiling. The `Card Priority` tag is far past it too.
 - **Nothing new can be saved to plugin storage.** Plugins are capped at **1000 synced-storage keys**, there is no API to delete a key, and writing `null` to one does not release it — as confirmed by direct experiment. The plugin's storage is therefore permanently full: new Priority Review Documents, reading positions for newly added PDFs, and video positions can no longer be stored.
@@ -1797,7 +1799,7 @@ The same problem affected extracts (`Alt+Shift+X`): the source Rem was tagged wi
 
 ### ✨ New: Hide-in-Queue Powerups Incorporated (Optional Integration)
 
-Incremental RemNote can now register the powerups and commands originally distributed by the standalone **Hide in Queue** plugin (Hide in Queue, Remove from Queue, No Hierarchy, Hide Parent, Hide Grandparent), plus two new ones: **Remove Parent** and **Remove Grandparent** (which the cloze/extract flows above use internally).
+Incremental Everything can now register the powerups and commands originally distributed by the standalone **Hide in Queue** plugin (Hide in Queue, Remove from Queue, No Hierarchy, Hide Parent, Hide Grandparent), plus two new ones: **Remove Parent** and **Remove Grandparent** (which the cloze/extract flows above use internally).
 
 - The incorporated 5 are gated by a new setting, **Enable Hide-in-Queue powerups and commands** (default: **off**). Enable it only after uninstalling the standalone plugin — the powerup codes are identical and RemNote throws a fatal `Duplicated powerup` error if both register the same code.
 - **Remove Parent** and **Remove Grandparent** are always registered regardless of the setting, since the cloze and extract creators depend on them.
@@ -2144,7 +2146,7 @@ When triggering **Make Incremental (Alt+X)** on a rem that has **multiple PDF so
 
 ### ✨ New: History, Queue Dashboard & Mastery Drill (integrated from companion plugin)
 
-All features from the standalone *History, Queue Dashboard and Mastery Drill* plugin have been fully ported into **Incremental RemNote**. You no longer need to install a separate plugin.
+All features from the standalone *History, Queue Dashboard and Mastery Drill* plugin have been fully ported into **Incremental Everything**. You no longer need to install a separate plugin.
 
 **What's included:**
 
@@ -2203,7 +2205,7 @@ Hovering the old-items warning badge now shows an explanation of why stale items
 
 ### 📚 Documentation & Command Standardization
 
-* **Command Renaming:** The primary `Alt+X` command previously known as "Incremental RemNote" has been officially renamed to **Make Incremental (Extract)** across all documentation and the Command Palette to better reflect its core functionality.
+* **Command Renaming:** The primary `Alt+X` command previously known as "Incremental Everything" has been officially renamed to **Make Incremental (Extract)** across all documentation and the Command Palette to better reflect its core functionality.
 * **Command Quick Codes:** Added **Quick Codes** to 18 registered commands, allowing you to trigger tasks even faster via the Command Palette (e.g., `/ext` for Extract, `/pri` for Set Priority, `/res` for Reschedule, `/dis` for Dismiss Incremental Rem, `/pdf` for PDF Control Panel, `/inc` for Incremental Rems Main View, `/shi` for Priority Shield Graph).
 
 📖 See the updated [Plugin Commands Reference](Plugin-Commands-Reference.md) or [Keyboard Shortcuts](Keyboard-Shortcuts.md) for the full list of command names, shortcuts, and Quick Codes.
@@ -3127,7 +3129,7 @@ When you create a new Incremental Rem — via **Extract with Priority** (`Opt+Sh
 
 ### 🐛 Bug Fix: Incremental Queue Iframe Height
 
-*   **Fixed Iframe Collapse:** Resolved a visual issue where the Incremental RemNote iframe would occasionally shrink or fail to expand to its full height while reviewing in the queue. This was caused by a race condition with RemNote's background pre-fetching engine incorrectly scrubbing our layout CSS mid-review. The necessary CSS is now safely registered globally, ensuring perfect height expansion during every review session.
+*   **Fixed Iframe Collapse:** Resolved a visual issue where the Incremental Everything iframe would occasionally shrink or fail to expand to its full height while reviewing in the queue. This was caused by a race condition with RemNote's background pre-fetching engine incorrectly scrubbing our layout CSS mid-review. The necessary CSS is now safely registered globally, ensuring perfect height expansion during every review session.
 
 ---
 
@@ -3357,7 +3359,7 @@ The **Collapse Queue Top Bar** setting has been temporarily disabled as it was n
 ### ✨ Dismiss Command Enhancements
 
 *   **Multi-select support:** The "Dismiss Incremental Rem (Untag)" command (`Ctrl+D`) now supports dismissing multiple selected Rems at once in the editor, with a contextual toast showing the count (e.g., "3 Incremental Rems dismissed.").
-*   **Supersedes Untag command:** The old "Untag Incremental RemNote" command was redundant — the Dismiss command now does everything it did and more (explicit history transfer, cache cleanup, multi-select). The Untag command can be safely removed in a future cleanup.
+*   **Supersedes Untag command:** The old "Untag Incremental Everything" command was redundant — the Dismiss command now does everything it did and more (explicit history transfer, cache cleanup, multi-select). The Untag command can be safely removed in a future cleanup.
 
 ### 🗑️ Removed: "Next Repetition" Command
 
@@ -3635,7 +3637,7 @@ Fixed a performance bug where the card priority cache would continuously trigger
 
 ### 🎬 New Feature: Video Extracts & Incremental Video
 
-The **100th improvement** to Incremental RemNote Plus brings a major new capability: **Video Extracts** — letting you apply incremental learning to YouTube videos just like you do with PDFs and articles.
+The **100th improvement** to Incremental Everything Plus brings a major new capability: **Video Extracts** — letting you apply incremental learning to YouTube videos just like you do with PDFs and articles.
 
 **What's new:**
 
@@ -4646,7 +4648,7 @@ The `lastDetectedOSKey` intentionally remains in **synced storage** because:
 ### "Done (untag)" button smart Card Priority Inheritance Implementation
 
 #### Overview
-Enhanced the "Done (untag)" button in the Incremental RemNote Plugin to intelligently handle card priority inheritance when removing the Incremental tag from a Rem.
+Enhanced the "Done (untag)" button in the Incremental Everything Plugin to intelligently handle card priority inheritance when removing the Incremental tag from a Rem.
 
 #### Problem Solved
 When removing the Incremental tag from a Rem, descendant flashcards could lose their priority reference for inheritance. This implementation ensures that if the Rem or any of its descendants have flashcards, the Rem is automatically tagged with cardPriority to maintain the inheritance chain.
@@ -4863,7 +4865,7 @@ This update introduces powerful new tools for managing card priorities in bulk a
 
 
 * You can now assign `CardPriority` to hundreds of rems at once, based on a tag.
-* **Use Case:** If you used to use tags to prioritize your cards (before Incremental RemNote prioritization system), like `#important!`, `#P1`, `#P2`, `#P3`, you can convert your old and more primitive system to the new one in bulk.
+* **Use Case:** If you used to use tags to prioritize your cards (before Incremental Everything prioritization system), like `#important!`, `#P1`, `#P2`, `#P3`, you can convert your old and more primitive system to the new one in bulk.
 * Access by focusing a tag rem and using the command `Batch Assign Card Priority for tagged rems` (or via the Document Menu).
 * **Features:**
     * Assign random priorities within a specific range (e.g., 20-40).
@@ -5369,7 +5371,7 @@ For users who primarily work on the beta version of RemNote, a new "Preferred Re
 
 ## v0.1.4 (Plus Version release) - September 3, 2025
 
-This initial version is a fork of the original Incremental RemNote plugin, focused on enhancing the user interface, adding powerful new features for prioritization, and fixing core layout and compatibility issues.
+This initial version is a fork of the original Incremental Everything plugin, focused on enhancing the user interface, adding powerful new features for prioritization, and fixing core layout and compatibility issues.
 
 ### ✨ New Features & Major Enhancements
 
