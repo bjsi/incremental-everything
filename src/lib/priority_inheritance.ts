@@ -1,6 +1,9 @@
 import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { powerupCode, prioritySlotCode } from './consts';
-import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from './card_priority/types';
+import { CARD_PRIORITY_CODE, SOURCE_SLOT } from './card_priority/types';
+// Leaf module (consts + types only), so importing it here introduces no cycle
+// even though card_priority/index.ts imports this file.
+import { getRawCardPriorityString } from './card_priority/slot_access';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
 
@@ -137,7 +140,6 @@ export async function findClosestAncestorWithAnyPriority(
   if (!rem) return null;
 
   const CARD_PRIORITY_CODE = 'cardPriority';
-  const PRIORITY_SLOT = 'priority';
   const SOURCE_SLOT = 'prioritySource';
 
   // We use explicitParentId as an override if provided. When creating a Rem and moving it,
@@ -158,7 +160,9 @@ export async function findClosestAncestorWithAnyPriority(
     currentLevel++; // Increment level for each parent we check
 
     // Fetch Card Priority details
-    const parentCardPriorityValue = await parent.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+    // Hidden slot first, then the pre-migration visible one — see
+    // card_priority/slot_access.ts.
+    const parentCardPriorityValue = await getRawCardPriorityString(parent);
     const parentCardSource = await parent.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
     const parentIncPriority = await getIncrementalPriorityOnly(parent);
 
@@ -272,7 +276,7 @@ export async function getInitialPriority(
 ): Promise<number> {
   // 1. Check own cardPriority slot first — same guard used in getCardPriority() and
   //    handleCardPriorityInheritance(), so the precedence logic is unified across all paths.
-  const ownPriorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+  const ownPriorityValue = await getRawCardPriorityString(rem);
   const ownSource = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
   if (
     ownPriorityValue &&

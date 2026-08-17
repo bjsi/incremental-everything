@@ -80,6 +80,17 @@ import {
   setCardPriority,
 } from '../lib/card_priority';
 import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
+import {
+  isHiddenSlotMigrated,
+  isVisiblePrioritySlotRetired,
+} from '../lib/card_priority/slot_access';
+import {
+  countCardPriorityTaggedRems,
+  migrationProgressReporter,
+  runCardPriorityHiddenSlotMigration,
+  undoCardPriorityHiddenSlotMigration,
+  isCleanSweep,
+} from '../lib/card_priority/hidden_slot_migration';
 import { computeClozeAutoPriority, ClozeAutoPriorityInfo } from '../lib/cloze_priority';
 import {
   REMOVE_PARENT_POWERUP_CODE,
@@ -1300,7 +1311,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
   plugin.app.registerCommand({
     id: 'debug-incremental-everything',
-    name: 'Debug Incremental Everything',
+    name: 'Debug Incremental RemNote',
     action: async () => {
       const rem = await plugin.focus.getFocusedRem();
       if (!rem) {
@@ -1871,6 +1882,128 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       await removeAllCardPriorityTags(plugin, { scope: 'all' });
+    },
+  });
+
+  // The hidden-slot migration, offered automatically on startup while the KB
+  // still has visible Priority rows (lib/card_priority/hidden_slot_migration.ts)
+  // and available here for a re-run — a partial run leaves the failed rems with
+  // their visible row intact, and running it again picks up exactly those.
+  await plugin.app.registerCommand({
+    id: 'migrate-card-priority-hidden-slot',
+    name: 'Migrate Card Priorities to Hidden Slot…',
+    description:
+      'Move every card priority out of the visible Priority slot into a hidden one, so ' +
+      'flashcards inside tables render their own content instead of a "Priority — 31" row. ' +
+      'Backs up every priority first.',
+    action: async () => {
+      const kbName = (await plugin.kb.getCurrentKnowledgeBaseData())?.name || 'this knowledge base';
+
+      // Verified complete: the deprecated slot is no longer registered, so there
+      // is nothing to scan and nothing to move. Running the migration here would
+      // fail to resolve the slot definition and abort — say so instead.
+      if (await isVisiblePrioritySlotRetired(plugin)) {
+        alert(
+          `✅ Already migrated — "${kbName}"\n\nEvery card priority lives in the hidden slot and ` +
+            `the old visible "Priority" slot has been retired, so there is nothing left to move.\n\n` +
+            `To go back, run "Undo Card Priority Hidden-Slot Migration…".`
+        );
+        return;
+      }
+
+      const alreadyDone = await isHiddenSlotMigrated(plugin);
+
+      // NO row scan before the run, sampled or full.
+      //
+      // A sampled scan must never decide this. `taggedRem()` order is the order the
+      // migration walks, so an interrupted run leaves a migrated head and an
+      // untouched tail — and a probe that found nothing would refuse the very
+      // re-run needed to finish, which is exactly what happened after a restart
+      // killed a run part-way through a 45k-rem library. A full scan would be
+      // correct but costs the same walk the migration itself does, so it would
+      // double the work to answer a question the run answers anyway.
+      //
+      // The run is idempotent: an already-migrated rem takes the "hidden slot wins"
+      // branch and writes nothing. So the command always offers, and the report
+      // states what was actually found.
+      const scanLine = alreadyDone
+        ? 'Re-running to pick up any rems a previous run left behind.'
+        : `${await countCardPriorityTaggedRems(plugin)} rem(s) carry the CardPriority tag.`;
+
+      const go = confirm(
+        `🔧 Migrate Card Priorities to Hidden Slot — "${kbName}"\n\n` +
+          `${scanLine}\n\n` +
+          `Every priority is backed up first — to local storage AND a JSON file you keep — then ` +
+          `the values move to a hidden slot and the visible rows are deleted.\n\n` +
+          `Priorities can no longer be typed directly into the outline afterwards; use the ` +
+          `Priority popup, Quick Priority or the batch tools. Reversible with "Undo Card ` +
+          `Priority Hidden-Slot Migration".\n\n` +
+          `OK = run it now    •    Cancel = abort`
+      );
+      if (!go) {
+        await plugin.app.toast('Migration cancelled');
+        return;
+      }
+
+      await plugin.app.toast('Backing up card priorities…');
+      const result = await runCardPriorityHiddenSlotMigration(
+        plugin,
+        migrationProgressReporter(plugin)
+      );
+      if (result.aborted) {
+        alert(`⚠️ Migration aborted\n\n${result.aborted}\n\nNothing on your rems was changed.`);
+        return;
+      }
+      const r = result.report!;
+      alert(
+        `✅ Card priorities migrated — "${kbName}"\n\n${r.verdict}\n\n` +
+          `Backup: ${result.backupNote}\n\n` +
+          (isCleanSweep(r)
+            ? `The old "Priority" slot is now retired: after the reload it is no longer ` +
+              `registered, so even the empty row goes away.\n\n`
+            : `Re-run this command to retry the rem(s) left behind. The old slot stays ` +
+              `registered until none are left.\n\n`) +
+          `Reload RemNote to see your tables render their real content.`
+      );
+    },
+  });
+
+  await plugin.app.registerCommand({
+    id: 'undo-card-priority-hidden-slot',
+    name: 'Undo Card Priority Hidden-Slot Migration…',
+    description:
+      'Restore card priorities from the backup taken by the hidden-slot migration, putting the ' +
+      'visible Priority rows back.',
+    action: async () => {
+      const retired = await isVisiblePrioritySlotRetired(plugin);
+      const go = confirm(
+        `↩️ Undo the hidden-slot migration?\n\n` +
+          `This restores every priority from the backup, which puts the visible "Priority" rows ` +
+          `back on your rems — including inside table cells, where RemNote will again render ` +
+          `them in place of the cell's own content.\n\n` +
+          (retired
+            ? `It takes TWO steps, because the old slot is currently retired and cannot be ` +
+              `written: this run only un-retires it, then you reload and run the command again ` +
+              `to restore the values. Nothing is lost in between — the priorities stay in the ` +
+              `hidden slot until the restore actually runs.\n\n`
+            : '') +
+          `OK = ${retired ? 'start (step 1 of 2)' : 'restore'}    •    Cancel = keep things as they are`
+      );
+      if (!go) {
+        await plugin.app.toast('Undo cancelled');
+        return;
+      }
+      const { restored, note } = await undoCardPriorityHiddenSlotMigration(
+        plugin,
+        migrationProgressReporter(plugin)
+      );
+      alert(
+        restored
+          ? `↩️ Restore finished\n\n${note}\n\nRELOAD RemNote now. The visible "Priority" slot ` +
+            `is registered again on the next start, and until then the restored values in it ` +
+            `cannot be read — priorities will fall back to inherited or default.`
+          : `⚠️ Nothing restored\n\n${note}`
+      );
     },
   });
 
@@ -3430,9 +3563,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
   plugin.app.registerCommand({
     id: 'ie_open_settings',
-    name: 'Incremental Everything: Settings',
-    description: 'Open the Incremental Everything settings popup',
-    quickCode: 'ies',
+    name: 'Incremental RemNote: Settings',
+    description: 'Open the Incremental RemNote settings popup',
+    quickCode: 'is',
     action: async () => {
       await plugin.widget.openPopup('ie_settings');
     },
@@ -3442,8 +3575,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // than the next start.
   plugin.app.registerCommand({
     id: showPluginHubCommandId,
-    name: 'Show Incremental Plugin Panel',
-    description: 'Bring back the Incremental Plugin panel in the sidebar after closing it',
+    name: 'Show Incremental RemNote Panel',
+    description: 'Bring back the Incremental RemNote panel in the sidebar after closing it',
     action: async () => {
       await plugin.storage.setSession(pluginHubHiddenKey, false);
       await plugin.app.toast('Plugin panel restored.');

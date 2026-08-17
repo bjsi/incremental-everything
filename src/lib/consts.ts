@@ -104,6 +104,18 @@ export const enableFlashcardPrioritisationId = 'enable-flashcard-prioritisation'
  * `{ [kbId]: record }` — the same shape as the shield history.
  */
 export const flashcardPrioritisationOptOutStateKey = 'flashcard-prioritisation-opt-out-state';
+/**
+ * Per-KB record of the CardPriority hidden-slot migration: whether this KB's
+ * priority values have been moved out of the VISIBLE `priority` slot into the
+ * hidden `priorityValue` one, and whether the user asked not to be offered it
+ * again. See lib/card_priority/slot_access.ts and hidden_slot_migration.ts.
+ *
+ * SYNCED, and KB-partitioned as `{ [kbId]: record }` like the key above: the
+ * migration changes the knowledge base itself, so every device must learn that
+ * it has happened — a device still writing the visible slot would recreate the
+ * property children the migration deleted.
+ */
+export const cardPriorityHiddenSlotStateKey = 'card-priority-hidden-slot-state';
 
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';
@@ -119,7 +131,7 @@ export const ieSettingsMigratedKey = 'ie_settings_migrated';
 export const ieSettingsMigrationReportKey = 'ie_settings_migration_report';
 
 // --- Onboarding hub (see lib/onboarding_tips.ts, widgets/plugin_hub.tsx) ---
-/** Sidebar widget id for the "Incremental Plugin" hub panel. */
+/** Sidebar widget id for the "Incremental RemNote" hub panel. */
 export const pluginHubWidgetId = 'plugin_hub';
 /**
  * Synced, KB-partitioned record of the tips the user has answered "I Got It"

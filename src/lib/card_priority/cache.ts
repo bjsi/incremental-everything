@@ -4,9 +4,8 @@ import {
   CardPriorityInfo,
   PrioritySource,
   calculateCardRemPercentilesFromCards,
-  CARD_PRIORITY_CODE,
-  PRIORITY_SLOT,
 } from './types';
+import { getRawCardPriorityString } from './slot_access';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
 import {
   writeCardPriorityCache,
@@ -478,7 +477,7 @@ async function tryWarmPhase1(
     const mismatches = (
       await Promise.all(
         sample.map(async (rem) => {
-          const live = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+          const live = await getRawCardPriorityString(rem);
           const stored = store.byRem.get(rem._id)!;
           const liveNum = parseInt(live);
           return !isNaN(liveNum) && liveNum === stored.priority ? null : rem._id;

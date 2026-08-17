@@ -17,7 +17,7 @@ import {
 } from '../lib/consts';
 import {
     CARD_PRIORITY_CODE,
-    PRIORITY_SLOT,
+    getRawCardPriorityString,
     setCardPriority,
     getCardPriorityValue,
 } from '../lib/card_priority';
@@ -117,7 +117,7 @@ function PriorityLight() {
             rem.hasPowerup(CARD_PRIORITY_CODE), // check using constant
             rem.getCards(),
             getCardPriorityValue(rp, rem),
-            rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT), // Get raw string check
+            getRawCardPriorityString(rem), // Get raw string check (hidden slot, then visible)
             getIESetting(rp, defaultPriorityId),
         ]);
         console.log(`[PriorityLight] parallel SDK fetches: ${Math.round(performance.now() - t1)}ms (cards: ${cards.length})`);

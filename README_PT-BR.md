@@ -1,12 +1,12 @@
-# Incremental Everything
+# Incremental RemNote
 
-![Logo Incremental Everything](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-logo.png)
+![Logo Incremental RemNote](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-logo.png)
 
 🇺🇸 [English](https://github.com/bjsi/incremental-everything/blob/main/README.md) | 🇪🇸 [Español](https://github.com/bjsi/incremental-everything/blob/main/README_ES.md)
 
 **Um Sistema Completo de Aprendizado para o RemNote.**
 
-O Incremental Everything permite que você intercale suas revisões de flashcards com notas, livros, sites e vídeos. Fortemente inspirado na [Leitura Incremental](https://supermemo.guru/wiki/Incremental_reading) do SuperMemo, ele transforma o RemNote em uma poderosa ferramenta de aprendizado contínuo que lida com todo o ciclo de vida do conhecimento: **Aquisição → Processamento → Maestria**.
+O Incremental RemNote permite que você intercale suas revisões de flashcards com notas, livros, sites e vídeos. Fortemente inspirado na [Leitura Incremental](https://supermemo.guru/wiki/Incremental_reading) do SuperMemo, ele transforma o RemNote em uma poderosa ferramenta de aprendizado contínuo que lida com todo o ciclo de vida do conhecimento: **Aquisição → Processamento → Maestria**.
 
 ## 🚀 Funcionalidades
 
@@ -38,7 +38,7 @@ Um conjunto completo de ferramentas de histórico e prática, agora integrado à
 - **Modo Completo (Usuário Avançado de Desktop)**: Conjunto completo de funcionalidades, com uma carga pesada de cache na inicialização (a prioridade de todos os Rems com flashcards), que habilita cálculos estatísticos em tempo real para análises detalhadas.
 
 ### 🧰 Mais que Leitura Incremental: um Conjunto de Ferramentas para sua BC
-Além do ciclo principal de aprendizado, o Incremental Everything traz **dezenas de utilitários independentes** que tornam mais rápido o dia a dia de tomar notas e organizar sua base de conhecimento — úteis mesmo quando você não está revisando. Alguns exemplos:
+Além do ciclo principal de aprendizado, o Incremental RemNote traz **dezenas de utilitários independentes** que tornam mais rápido o dia a dia de tomar notas e organizar sua base de conhecimento — úteis mesmo quando você não está revisando. Alguns exemplos:
 
 - **Ferramentas de estrutura e títulos**: [Reestruturar Outline por Títulos](https://hugomarins.github.io/incremental-everything/Utilities/#restructure-outline-by-headings) (reaninha sob seus títulos um documento plano ou mal colado), [Aplicar Níveis de Título por Hierarquia (Sumário)](https://hugomarins.github.io/incremental-everything/Utilities/#apply-heading-levels-by-hierarchy-table-of-contents) e [Definir Próximo Nível de Título](https://hugomarins.github.io/incremental-everything/Utilities/#set-next-heading-level) — todas com pré-visualização lado a lado e desfazer em um clique.
 - **Controle de exibição na fila**: [Ocultar / Remover Pai e Avô, entre outros](https://hugomarins.github.io/incremental-everything/Utilities/#queue-display-utilities), para limpar como os Rems ancestrais aparecem nos seus flashcards.
@@ -51,13 +51,13 @@ Além do ciclo principal de aprendizado, o Incremental Everything traz **dezenas
 
 ## Instalação
 
-- Abra a [loja de plugins do RemNote](https://www.remnote.com/plugins), procure por "Incremental Everything" e instale o plugin.
+- Abra a [loja de plugins do RemNote](https://www.remnote.com/plugins), procure por "Incremental RemNote" e instale o plugin.
 
 ## 📚 Documentação e Suporte
 
 Este README cobre o básico. Para os guias completos, visite o **Manual do Usuário**:
 
-👉 **[Incremental Everything — Manual do Usuário](https://hugomarins.github.io/incremental-everything/)**
+👉 **[Incremental RemNote — Manual do Usuário](https://hugomarins.github.io/incremental-everything/)**
 
 *(A documentação saiu do Wiki do GitHub em agosto de 2026. O novo site tem busca completa, funciona no celular e possui temas claro e escuro — atualize seus favoritos, por favor.)*
 
@@ -67,7 +67,7 @@ Este README cobre o básico. Para os guias completos, visite o **Manual do Usuá
   * [Leitura Incremental de Páginas Web no RemNote](https://youtu.be/eXRlfCTOQNw)
   * [Leitura Incremental no RemNote](https://youtu.be/SL7wjgntrbg)
 
-- **Playlist de Prioridades**: [Priorização no Incremental Everything](https://www.youtube.com/playlist?list=PLpmcfTqNVuo9DWjeIrMZZfG140kOZD8Tl) – Cobre a configuração de prioridades, herança, o Escudo de Prioridade, criação de Documentos de Revisão Prioritária e como usar a priorização para gerenciar a sobrecarga de informações.
+- **Playlist de Prioridades**: [Priorização no Incremental RemNote](https://www.youtube.com/playlist?list=PLpmcfTqNVuo9DWjeIrMZZfG140kOZD8Tl) – Cobre a configuração de prioridades, herança, o Escudo de Prioridade, criação de Documentos de Revisão Prioritária e como usar a priorização para gerenciar a sobrecarga de informações.
 
 - **O que é Leitura Incremental?**: [Jornada Incremental - Leitura Incremental em Termos Simples](https://youtu.be/V4xEziM8mco)
 
@@ -146,7 +146,7 @@ O plugin agora possui **Modo Leve Automático**.
 
 - Um exemplo rápido de interoperabilidade de plugins.
 - Integra-se com meu [plugin de prova de teoremas Lean](https://github.com/bjsi/remnote-lean) para agendar conjuntos de problemas de provas matemáticas ao longo do tempo.
-- O plugin Lean fornece o widget de fila e o plugin Incremental Everything fornece o agendamento.
+- O plugin Lean fornece o widget de fila e o plugin Incremental RemNote fornece o agendamento.
 - Espero que outros desenvolvedores possam construir integrações semelhantes com seus plugins!
 
 ![Matemática Incremental](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/lean.png)

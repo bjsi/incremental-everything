@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/inc-logo.png" width="400" alt="Incremental Everything Logo" />
+  <img src="assets/inc-logo-2.png" width="400" alt="Incremental RemNote Logo" />
 </p>
 
 > **Review notes, PDFs, Youtube videos and web articles incrementally alongside your flashcards, and tackle overload by prioritizing your learning.**
 
-Welcome to the official **User's Manual** for the **Incremental Everything plugin** for RemNote!
+Welcome to the official **User's Manual** for the **Incremental RemNote plugin** for RemNote!
 
 This Wiki is your comprehensive guide to mastering a powerful learning technique inspired by SuperMemo's Incremental Reading. Whether you want to read books and articles in parallel, watch videos incrementally, or manage your writing projects more effectively, this plugin allows you to seamlessly interleave all of your learning material directly into your daily flashcard queue.
 
@@ -18,7 +18,7 @@ ___
   * [Incremental Reading Web Pages in RemNote](https://youtu.be/eXRlfCTOQNw)
   * [Incremental Reading in RemNote](https://youtu.be/SL7wjgntrbg)
 
-- **Priorities Playlist**: [Prioritization in Incremental Everything](https://www.youtube.com/playlist?list=PLpmcfTqNVuo9DWjeIrMZZfG140kOZD8Tl) – Covers setting priorities, inheritance, the Priority Shield, creating Priority Review Documents, and how to use prioritization to manage information overload.  
+- **Priorities Playlist**: [Prioritization in Incremental RemNote](https://www.youtube.com/playlist?list=PLpmcfTqNVuo9DWjeIrMZZfG140kOZD8Tl) – Covers setting priorities, inheritance, the Priority Shield, creating Priority Review Documents, and how to use prioritization to manage information overload.  
 
 - **What is Incremental Reading?**: [Incremental Journey - Incremental Reading in Simple Terms](https://youtu.be/V4xEziM8mco)
 
@@ -28,7 +28,7 @@ See the latest changes and improvements in our [Changelog](Changelog.md).
 
 ---
 
-# 🚀 Incremental Everything: Your Complete Learning System is Here
+# 🚀 Incremental RemNote: Your Complete Learning System is Here
 
 **TL;DR:** The plugin now delivers a complete learning workflow from first encounter with material to lifetime retention, with robust prioritization to handle information overload. Works seamlessly on mobile too!
 
@@ -36,7 +36,7 @@ See the latest changes and improvements in our [Changelog](Changelog.md).
 
 Hey RemNote community! 👋
 
-I'm excited to share that **Incremental Everything (Plus)** has reached a major milestone. Since implementing flashcard priorities in v0.2.0, I've been focused on completing the missing pieces of the learning puzzle. The result? A comprehensive system that handles the entire learning lifecycle while giving you the tools to manage the inevitable information overflow.
+I'm excited to share that **Incremental RemNote** has reached a major milestone. Since implementing flashcard priorities in v0.2.0, I've been focused on completing the missing pieces of the learning puzzle. The result? A comprehensive system that handles the entire learning lifecycle while giving you the tools to manage the inevitable information overflow.
 
 ## 🎯 What Makes This Complete Now?
 
@@ -62,7 +62,7 @@ I'm excited to share that **Incremental Everything (Plus)** has reached a major 
 
 ### The Prioritization Solution
 
-Here's the reality of serious learning: **you will always have more to learn than time available**. Traditional SRS systems ignore this, treating all due cards equally. Incremental Everything embraces it:
+Here's the reality of serious learning: **you will always have more to learn than time available**. Traditional SRS systems ignore this, treating all due cards equally. Incremental RemNote embraces it:
 
 - **Dual Priority Systems**: Separate priorities for reading material (IncRems) and [flashcards](Priorities-for-Flashcards.md)
 - **[Inheritance by Default](Prioritization-&-Sorting.md#priority-inheritance-system)**: Child cards inherit priorities from parent notes automatically
@@ -112,7 +112,7 @@ If you're familiar with Anki or any SRS system (except SuperMemo), you know the 
 - **No way to triage** when overwhelmed
 - **Guilt** over skipped reviews
 
-Incremental Everything solves this by:
+Incremental RemNote solves this by:
 - ✅ **Guaranteeing** high-priority items get reviewed
 - ✅ **Mixing** acquisition and retention in one flow
 - ✅ **Tracking** your capacity with [priority shields](Prioritization-&-Sorting.md#priority-shield)
@@ -139,7 +139,7 @@ The minimum cost comes from intelligent prioritization—you spend your limited 
 
 ## 🚀 Getting Started
 
-1. Install **Incremental Everything (Plus)** from RemNote plugin library
+1. Install **Incremental RemNote** from RemNote plugin library
 2. Tag any rem with `#Incremental` (using [Alt+X or Alt+Shift+X](Keyboard-Shortcuts.md#core-commands)) to add it to your reading queue
 3. [Set priorities](Prioritization-&-Sorting.md#main-priority-popup) ([Alt+P](Keyboard-Shortcuts.md#priority-commands)) on important material
 4. Enter queue and [start reviewing](Reviewing-Items-in-the-Queue.md)

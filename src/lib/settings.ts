@@ -1,5 +1,5 @@
 /**
- * Single source of truth for Incremental Everything's user settings: their
+ * Single source of truth for Incremental RemNote's user settings: their
  * types, defaults, presentation metadata, and where each one is stored.
  *
  * Every read goes through `getIESetting` / `useIESetting` rather than
@@ -243,7 +243,7 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
   flashcardPriority: {
     label: 'Flashcard Prioritisation',
     blurb:
-      'Per-flashcard priorities. This is the only part of Incremental Everything that does ' +
+      'Per-flashcard priorities. This is the only part of Incremental RemNote that does ' +
       'heavy background work across your whole knowledge base, so it is opt-in.',
   },
   performance: {
@@ -303,8 +303,8 @@ export const IE_DOCS_BASE_URL = 'https://hugomarins.github.io/incremental-everyt
  * tail of the last description is the single spot available to say so.
  */
 export const MORE_SETTINGS_POINTER =
-  'MOVED: every Incremental Everything setting now lives in the plugin\'s own settings window — ' +
-  'run the "Incremental Everything: Settings" command from the omnibar (quick code: ies). The ' +
+  'MOVED: every Incremental RemNote setting now lives in the plugin\'s own settings window — ' +
+  'run the "Incremental RemNote: Settings" command from the omnibar (quick code: is). The ' +
   'copies in this panel are the migration reading your existing values across; they disappear ' +
   'after you reload RemNote, and editing them here in the meantime has no effect.';
 
@@ -762,7 +762,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     title: 'Enable Hide-in-Queue Powerups and Commands',
     description:
       'Registers the "Hide in Queue", "Remove from Queue", "No Hierarchy", "Hide Parent" and ' +
-      '"Hide Grandparent" powerups and commands inside Incremental Everything.\n\n' +
+      '"Hide Grandparent" powerups and commands inside Incremental RemNote.\n\n' +
       'WARNING: only enable this if you do NOT have the standalone "Hide in Queue" plugin ' +
       'installed — duplicate powerup registration throws a fatal error that breaks this plugin. ' +
       'Uninstall the standalone plugin first, then reload RemNote.\n\n' +

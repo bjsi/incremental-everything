@@ -8,7 +8,7 @@ This page explains how the plugin allows you to layer a priority system on top o
 
 ## Switching it on { #the-opt-in }
 
-Flashcard prioritisation is **off by default**. Turn it on in the plugin's settings popup — run **`Incremental Everything: Settings`** (quick code `ies`) → **Flashcard Prioritisation** → *Enable Flashcard Prioritisation* — then reload RemNote. (Before v1.0.45 this switch lived in RemNote's own plugin settings panel.)
+Flashcard prioritisation is **off by default**. Turn it on in the plugin's settings popup — run **`Incremental RemNote: Settings`** (quick code `is`) → **Flashcard Prioritisation** → *Enable Flashcard Prioritisation* — then reload RemNote. (Before v1.0.45 this switch lived in RemNote's own plugin settings panel.)
 
 It is opt-in because it is the one part of the plugin that works across your **entire** knowledge base rather than on the Rems you are handling. While it is on, the plugin tags flashcard-bearing Rems with the `cardPriority` powerup and keeps those tags in step as you edit — on a large library that means a long initial pass and continuous background work, and RemNote can feel slow until it settles.
 
@@ -65,6 +65,51 @@ This is the "magic" that makes the system manageable. You don't need to prioriti
 * **Action:** You highlight a sentence and create a flashcard from it.
 * **Result:** That new flashcard automatically inherits Priority **10**.
 * **Benefit:** If you decide the whole book is less important later and change the book's priority to 80, **all** flashcards generated from it update to 80 instantly (unless you manually overrode specific ones or specific branches / chapters / sections).
+
+## Where a priority is stored { #hidden-slot }
+
+A priority is a value on the `cardPriority` powerup. Until v1.0.48 it lived in a **visible** slot, which means RemNote drew a `Priority — 31` row under every prioritised Rem. From v1.0.48 it lives in a **hidden** slot instead, and that row is gone.
+
+### Why it moved
+
+The difference between the two is where the value physically lives. Since RemNote's v1.27 storage overhaul, a **hidden** slot holds its value directly on the Rem, while a **visible** one materialises it as a **child Rem** underneath. Three consequences follow, and all three favour hidden:
+
+**Fewer moving parts.** The plugin writes this value on tens of thousands of Rems. Every one of them used to carry an extra child Rem that could be duplicated, detached from its slot definition, or left behind by an import — states this plugin has [repair tooling](Troubleshooting.md) for precisely because they happen. A value stored directly has none of those failure modes.
+
+**Less clutter.** A priority is bookkeeping the plugin does on your behalf. It does not need a row in your outline, and on a knowledge base where most flashcards carry one, those rows were the plugin's largest visible footprint in your notes.
+
+**It stops RemNote blanking out table cells.** When the prioritised Rem is *itself a table cell* — which is what a filled tag slot is — RemNote's cell renderer sees that child Rem, switches the cell into list mode, draws the child, and never draws the cell's own content at all. The cell shows `Priority — 31` where your text should be. It affects **simple and advanced tables alike**: any column whose cells carry flashcards, because those cells are the Rems the plugin tags. A hidden slot leaves nothing there for the renderer to mistake for cell content.
+
+### The migration
+
+The first time the plugin starts and finds visible `Priority` rows still in place, it offers to move them:
+
+* **Every priority is backed up first**, to your device and to a JSON file you keep. If the backup cannot be written, **the migration refuses to run**.
+* Values move to the hidden slot one Rem at a time, and each one is **read back before the old row is deleted** — a value that failed to write keeps its visible row, so nothing can be lost in the gap.
+* A `Priority` row that has **children of its own** is never deleted, since removing it would take that subtree with it. Its value still moves to the hidden slot; the report says how many were kept, and re-running removes them once you have moved those children yourself.
+* **Interrupting it is safe.** Each Rem is finished before the next is started, so a crash, a restart or a quit leaves the Rems done actually done and the rest untouched. Run the command again to finish; already-migrated Rems are skipped, and the backup from the first attempt is reused rather than overwritten — it holds the pre-migration state, which is the one worth going back to.
+* Nothing else changes: the numbers, the sources, inheritance, the Card Shield, percentiles, the badges and the [Priority Review Documents](Priority-Review-Document.md) all work exactly as before.
+
+It is offered on **every start** until it has been done, because until then your tables are still rendering the wrong thing. Declining offers a *never ask again*, and the command is always available.
+
+### Retiring the old slot
+
+Deleting the values does not delete the *slot*, so a bare `Priority — Empty` row is left behind: RemNote draws a row for every slot the plugin registers, whether or not it holds anything. It goes away once the plugin stops registering that slot — and it only does that on **positive proof** that nothing is left in it: a migration run that finished with no failures, no rows kept back and no errors, or a full scan of every tagged Rem finding none.
+
+Until then the slot stays registered, which is deliberate. An unregistered slot cannot be read, so retiring one that still held a value would turn that value into an unreadable one rather than a visible row. A knowledge base whose migration was interrupted, or finished before that check existed, gets the full scan automatically on the next start; expect one extra pass of a few seconds, once, then a reload to see the row disappear.
+
+!!! note "Undoing takes two steps once the slot is retired"
+    A retired slot cannot be written either, so restoring into it would silently write nothing. The first run of **Undo Card Priority Hidden-Slot Migration…** un-retires the slot and asks you to reload; the second actually restores the values. Your priorities stay readable in the hidden slot in between.
+
+!!! warning "One thing you lose"
+    Priorities can no longer be typed straight into the outline, because there is no longer a row to type into. Use the [Priority widget](#1-the-unified-priority-widget-altp) (`Alt+P`), [Quick Priority](Keyboard-Shortcuts.md#priority-commands) or the [batch tools](#3-unified-batch-priority-change) instead.
+
+Two commands drive it manually:
+
+* **Migrate Card Priorities to Hidden Slot…** — runs it now, and is also how you retry after a partial run. Rems that failed keep their visible row, so a second run picks up exactly those.
+* **Undo Card Priority Hidden-Slot Migration…** — restores the backup, which puts the visible rows back. The table problem comes back with them; that is what makes it a true undo.
+
+Until a knowledge base is migrated the plugin writes **both** slots, so hand edits of the `Priority` row keep working in the meantime. Reads always prefer the hidden slot and fall back to the visible one, so a half-migrated knowledge base — or one migrated on your desktop and not yet synced to your phone — reads correctly throughout.
 
 ## Setting & Managing Priorities
 

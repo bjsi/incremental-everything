@@ -491,7 +491,7 @@ export function IESettingsWidget() {
           borderBottom: '1px solid var(--rn-clr-background-tertiary, #f1f5f9)',
         }}
       >
-        <span style={{ fontSize: 15, fontWeight: 700 }}>Incremental Everything — Settings</span>
+        <span style={{ fontSize: 15, fontWeight: 700 }}>Incremental RemNote — Settings</span>
         <span style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
           {modifiedCount} changed from default
         </span>

@@ -578,7 +578,7 @@ This is a property of the **search ranking**, not a corruption of the Rem — wh
 The Debug Widget now opens on **any** focused Rem (not just IncRem/CardPriority/Dismissed ones):
 
 1. Focus the Rem you want to inspect.
-2. Run **`Debug Incremental Everything`** from the command palette.
+2. Run **`Debug Incremental RemNote`** from the command palette.
 3. Scroll to the **Search / Linkage Diagnostics** section (at the bottom of the widget) and click **Probe Searchability**.
 
 ### What It Reports

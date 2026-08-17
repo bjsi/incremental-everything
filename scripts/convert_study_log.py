@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Convert a study-log Excel workbook into the JSON format consumed by the
-"Import Incremental Rems with History" command of the Incremental Everything
+"Import Incremental Rems with History" command of the Incremental RemNote
 RemNote plugin.
 
 NOTE: this script is a SAMPLE, tailored to one specific spreadsheet layout

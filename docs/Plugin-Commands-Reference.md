@@ -1,6 +1,6 @@
 # Plugin Commands Reference
 
-This is a complete list of commands registered in RemNote by the **Incremental Everything (Plus)** plugin. You can access these via the Command Palette (`Cmd+/` / `Cmd+/` or `Cmd+K` / `Ctrl+K`) or their assigned keyboard shortcuts.
+This is a complete list of commands registered in RemNote by the **Incremental RemNote** plugin. You can access these via the Command Palette (`Cmd+/` / `Cmd+/` or `Cmd+K` / `Ctrl+K`) or their assigned keyboard shortcuts.
 
 See the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page for default bindings.
 
@@ -93,7 +93,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Batch Assign Card Priority for tagged rems](Prioritization-&-Sorting.md#batch-card-priority-flashcards)** (`Opt+Shift+C` / `Alt+Shift+C`)
   Assign `CardPriority` to hundreds of rems at once, based on a tag. 
   
-  **Use Case:** If you previously used tags to prioritize your cards (e.g., `#important!`, `#P1`, `#P2`, `#P3`) before the Incremental Everything prioritization system, you can convert your old tagging system to the new one in bulk.
+  **Use Case:** If you previously used tags to prioritize your cards (e.g., `#important!`, `#P1`, `#P2`, `#P3`) before the Incremental RemNote prioritization system, you can convert your old tagging system to the new one in bulk.
 
   **Features:**
     - Assign random priorities within a specific range (e.g., 20–40).
@@ -297,10 +297,10 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
 ## System & Maintenance Commands
 
-- **Show Incremental Plugin Panel**
-  Brings back the [Incremental Plugin panel](Getting-Started.md#the-incremental-plugin-panel) in the sidebar after you have closed it with its **✕**. The **✕** only lasts the session — the panel returns on its own next time you open RemNote — so this is for getting it back sooner.
+- **Show Incremental RemNote Panel**
+  Brings back the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel) in the sidebar after you have closed it with its **✕**. The **✕** only lasts the session — the panel returns on its own next time you open RemNote — so this is for getting it back sooner.
 
-- **Incremental Everything: Settings** (`ies`)
+- **Incremental RemNote: Settings** (`is`)
   Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
 
 - **Import Incremental Rems with History**
@@ -387,6 +387,20 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
   > [!NOTE]
   > Preserved flashcard reviews (`importedRep`) **count toward the Study Dashboard's time and rep totals** but are **ignored by the scheduler** — they never influence the rem's next-interval calculations, even if it's later re-incrementalized. In the repetition-history views they show a 🃏 marker with the source card's name and grade. For **cloze** cards, the preserved name wraps the clozed span in `{{…}}` (e.g. `flashcard {{inside}} that rem`) so multiple clozes from the same rem stay distinguishable.
 
+- **Migrate Card Priorities to Hidden Slot…** { #migrate-card-priority-hidden-slot }
+  Moves every card priority out of the **visible** `Priority` slot into a hidden one, and deletes the `Priority — 31` rows it leaves behind. Those rows are what make RemNote render a flashcard's priority *in place of* a table cell's own content, in simple and advanced tables alike.
+
+  Every priority is backed up first — to your device and to a JSON file — and the run **refuses to start if no backup could be written**. Each value is read back from the hidden slot before its old row is deleted, so a Rem whose write failed keeps its row and its value; re-running the command retries exactly those. Nothing else changes: numbers, sources, inheritance, the Card Shield, percentiles and badges are untouched.
+
+  The plugin also offers this automatically on startup while any visible rows remain. Afterwards, priorities can no longer be typed straight into the outline — use the Priority widget, Quick Priority or the batch tools.
+
+  📖 See [Where a priority is stored](Priorities-for-Flashcards.md#hidden-slot).
+
+- **Undo Card Priority Hidden-Slot Migration…**
+  Restores every priority from the backup the migration took, which puts the visible `Priority` rows back — and with them the table-rendering problem. Reads the copy stored on this device; if that is gone, restore the downloaded JSON from the Debug popup instead.
+
+  **Two steps once the old slot has been retired.** A slot the plugin no longer registers cannot be written, so the first run only un-retires it and asks you to reload; the second actually restores the values. Priorities stay readable in the hidden slot in between.
+
 - **Remove CardPriority Tags…** { #remove-cardpriority-tags }
   Strips the `cardPriority` powerup and its slots from **the knowledge base you currently have open** — named in every dialog, and the only one touched. It asks which tags to remove first:
 
@@ -413,7 +427,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 - **Cancel No Inc Rem Timer**
   Stops system checks when queues are temporarily empty.
 
-- **Debug Incremental Everything** / **Debug Video Detection**
+- **Debug Incremental RemNote** / **Debug Video Detection**
   Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
 
 - **Toggle Priority Band Colour Logging**

@@ -13,6 +13,7 @@ import {
 import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { isPowerupPropertySafe } from '../powerupSlotFilter';
 import { CardPriorityInfo, PrioritySource } from './types';
+import { clearRawCardPriority, getRawCardPriorityString } from './slot_access';
 import { calculateNewPriority, setCardPriority } from './index';
 import { loadPersistedCardPriorities } from './persistence';
 import * as _ from 'remeda';
@@ -146,10 +147,13 @@ export async function summarizeCardPriorityTags(plugin: RNPlugin): Promise<{
   };
 }
 
-/** Strips the three slots and the tag itself from one rem. */
+/** Strips every slot and the tag itself from one rem. */
 async function stripCardPriorityTag(rem: PluginRem): Promise<void> {
   try {
-    await rem.setPowerupProperty('cardPriority', 'priority', []);
+    // clearRawCardPriority covers BOTH priority slots — the visible one and the
+    // hidden one it migrated to. Clearing only the visible slot would leave the
+    // value behind, ready to reappear the moment the powerup was re-applied.
+    await clearRawCardPriority(rem);
     await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
     await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
   } catch (e) {
@@ -582,7 +586,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
 
             let existingPriority: CardPriorityInfo | null = null;
             if (hasPowerupTag) {
-              const priorityValue = await rem.getPowerupProperty('cardPriority', 'priority');
+              const priorityValue = await getRawCardPriorityString(rem);
               const source = await rem.getPowerupProperty('cardPriority', 'prioritySource');
 
               if (priorityValue && (source === 'manual' || source === 'incremental')) {
@@ -1099,7 +1103,7 @@ export async function removeCardPriorityFromRem(plugin: RNPlugin, rem: PluginRem
     
     console.log(`[CardPriority Cleanup] Emptying properties via setPowerupProperty as fallback...`);
     try {
-      await rem.setPowerupProperty('cardPriority', 'priority', []);
+      await clearRawCardPriority(rem); // both priority slots, visible and hidden
       await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
       await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
     } catch (e) {}
@@ -1429,7 +1433,8 @@ export async function dumpRemPriorityStructure(
       let cardPriorityValue: string | null = null;
       if (hasCardPriority) {
         try { cardPrioritySource = (await node.getPowerupProperty('cardPriority', 'prioritySource')) || null; } catch { /* ignore */ }
-        try { cardPriorityValue = (await node.getPowerupProperty('cardPriority', 'priority')) || null; } catch { /* ignore */ }
+        // Effective value: hidden slot first, then the pre-migration visible one.
+        try { cardPriorityValue = (await getRawCardPriorityString(node)) || null; } catch { /* ignore */ }
       }
 
       const hasCards = authoritativeCardCount > 0 || remGetCardsCount > 0;

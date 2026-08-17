@@ -1,5 +1,5 @@
 # Plugin Widgets Reference
-This page serves as a comprehensive visual and functional guide to every widget in the **Incremental Everything (Plus)** plugin.
+This page serves as a comprehensive visual and functional guide to every widget in the **Incremental RemNote** plugin.
 
 ---
 
@@ -378,11 +378,11 @@ A feature-rich table of all your Incremental Rems with two entry points:
 ## 6. Utility Popups
 
 ### 6.0. IE Settings
-**Command:** `Incremental Everything: Settings` (quick code `ies`)
+**Command:** `Incremental RemNote: Settings` (quick code `is`)
 
 The plugin's own settings window: every setting it owns, grouped by area rather than listed flat, with a search box, a *Reset* on anything changed from its default, and a **?** beside entries that opens the section of this manual explaining them. Settings whose parent switch is off are hidden — the Beta Scheduler's parameters, the Mastery Drill's — and the switch that governs them says so. The five settings that stay in RemNote's own panel are shown here read-only, with a pointer to where they are changed.
 
-![The Incremental Everything settings popup](assets/settings-popup.png){ width="900" }
+![The Incremental RemNote settings popup](assets/settings-popup.png){ width="900" }
 
 📖 **Full documentation:** [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are)
 
@@ -505,14 +505,14 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 
 📖 **Full documentation:** [Filter a Document by Images](Utilities.md#filter-a-document-by-images)
 
-### 6.10. Incremental Plugin Panel
+### 6.10. Incremental RemNote Panel
 *(Left Sidebar)*
 
-The plugin's hub, at the bottom of the left sidebar. Header controls: **⚙** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation, **✕** hides the panel for the session — it returns on the next start, and the **Show Incremental Plugin Panel** command brings it back sooner. Three shortcut buttons: **⌨** ([Keyboard Shortcuts](Keyboard-Shortcuts.md)), **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and **Priority Review** — which creates a [Priority Review Document](Priority-Review-Document.md) scoped to the document you currently have open, naming that scope under the button.
+The plugin's hub, at the bottom of the left sidebar. Header controls: **⚙** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation, **✕** hides the panel for the session — it returns on the next start, and the **Show Incremental RemNote Panel** command brings it back sooner. Three shortcut buttons: **⌨** ([Keyboard Shortcuts](Keyboard-Shortcuts.md)), **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and **Priority Review** — which creates a [Priority Review Document](Priority-Review-Document.md) scoped to the document you currently have open, naming that scope under the button.
 
 Below the shortcuts it shows **one onboarding tip per session**, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile; the panel also goes quiet for two hours) and **Learn More** (opens the tip's documentation section). Either answer closes the tip area until the next start — it never chains into a second tip.
 
-📖 **Full documentation:** [The Incremental Plugin Panel](Getting-Started.md#the-incremental-plugin-panel)
+📖 **Full documentation:** [The Incremental RemNote Panel](Getting-Started.md#the-incremental-plugin-panel)
 
 ---
 

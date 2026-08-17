@@ -33,6 +33,7 @@
 import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, LAST_UPDATED_SLOT, PrioritySource } from './card_priority/types';
 import { setCardPriority, getCardPriority } from './card_priority';
+import { getRawCardPriorityString } from './card_priority/slot_access';
 import { safeRemTextToString } from './pdfUtils';
 import { readRawText } from './raw_slot_dump';
 import { scanKbForDetachedSlots, LeftoverProperty } from './raw_slot_scan';
@@ -240,7 +241,12 @@ export async function repairDetachedCardPriorities(
 
       // Verify through the API that was broken. A write that does not read back
       // means the repair does not work on this build and we must stop.
-      const check = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null);
+      //
+      // Read the EFFECTIVE value, not the visible slot: after the hidden-slot
+      // migration setCardPriority writes the hidden slot only, and checking the
+      // visible one would report every successful repair as a failed write and
+      // abort the run after five of them.
+      const check = await getRawCardPriorityString(rem).catch(() => null);
       if (check != null && String(check).trim() === String(storedValue)) {
         report.repaired++;
       } else {
@@ -385,8 +391,10 @@ export async function testDeleteOrphanProperties(
       probe.ownerRemId = owner._id;
       probe.ownerText = (await safeRemTextToString(plugin, owner.text)).slice(0, 120);
       probe.ownerChildCountBefore = ((await owner.getChildrenRem().catch(() => [])) || []).length;
-      probe.apiValueBefore =
-        (await owner.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null)) ?? null;
+      // Effective value (hidden slot first, then the pre-migration visible one).
+      // Reading the visible slot alone would make this gate refuse every orphan on
+      // a migrated knowledge base, where no owner has a visible value any more.
+      probe.apiValueBefore = (await getRawCardPriorityString(owner).catch(() => null)) || null;
 
       // Refuse unless the owner already has a readable priority in its own slot.
       //
@@ -422,8 +430,7 @@ export async function testDeleteOrphanProperties(
       probe.deleted = true;
 
       probe.ownerChildCountAfter = ((await owner.getChildrenRem().catch(() => [])) || []).length;
-      probe.apiValueAfter =
-        (await owner.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null)) ?? null;
+      probe.apiValueAfter = (await getRawCardPriorityString(owner).catch(() => null)) || null;
       probe.resolvedAfter = (await getCardPriority(plugin, owner).catch(() => null))?.priority ?? null;
 
       // The test is "did anything CHANGE", not "is there a value". An earlier

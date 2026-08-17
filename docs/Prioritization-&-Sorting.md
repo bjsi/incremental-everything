@@ -1,7 +1,7 @@
 **Mastering the Queue: Prioritization & Sorting**
 
 
-To get the most out of Incremental Everything, it's essential to understand how to manage your review queue effectively. This guide breaks down the advanced prioritization and sorting tools at your disposal, allowing you to tailor your learning sessions to your exact needs.
+To get the most out of Incremental RemNote, it's essential to understand how to manage your review queue effectively. This guide breaks down the advanced prioritization and sorting tools at your disposal, allowing you to tailor your learning sessions to your exact needs.
 
 ---
 ## The Priority System Explained
@@ -64,7 +64,7 @@ If you have a parent rem for a broad topic like "Quantum Mechanics" with a set p
 ---
 ## Setting Priorities
 
-There are several ways to set priorities in Incremental Everything, each designed for a different context.
+There are several ways to set priorities in Incremental RemNote, each designed for a different context.
 
 *   **Main Priority Popup (`Opt+P`):** The comprehensive tool. Best for deep analysis, seeing relative priorities, ancestors, and using the "Shield" logic.
 *   **Light Priority Popup (`Ctrl+Opt+P`):** A streamlined, instant-opening version. Best for quick, friction-free adjustments during study sessions.

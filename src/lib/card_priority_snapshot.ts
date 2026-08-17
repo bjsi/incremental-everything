@@ -1,13 +1,16 @@
 // lib/card_priority_snapshot.ts
 //
-// Full backup / verify / restore of every rem's three CardPriority slot values.
+// Full backup / verify / restore of every rem's CardPriority slot values.
 //
-// Built for a slot-visibility migration that was ultimately abandoned (RemNote
-// applies slot options only when the slot definition Rem is created, so an
-// existing knowledge base cannot be flipped by re-registration — see the note in
-// register/powerups.tsx). It is kept because the capability is worth having on
-// its own: any bulk operation that touches priorities — a repair pass, a batch
-// re-prioritisation, a cross-KB import — deserves a way back.
+// Built for a slot-visibility migration that was first attempted by flipping the
+// existing slot and abandoned (RemNote applies slot options only when the slot
+// definition Rem is created, so an existing knowledge base cannot be flipped by
+// re-registration — see the note in register/powerups.tsx). The migration is now
+// done differently, by moving the value to a NEW hidden slot
+// (lib/card_priority/hidden_slot_migration.ts), and this is the backup that run
+// refuses to start without. It is equally worth having on its own: any bulk
+// operation that touches priorities — a repair pass, a batch re-prioritisation, a
+// cross-KB import — deserves a way back.
 //
 // Three properties make it a safety net rather than a report:
 //
@@ -23,10 +26,12 @@
 //
 // Costs the same three reads per rem as a cache build (~92s on a 45k library).
 
+import dayjs from 'dayjs';
 import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import {
   CARD_PRIORITY_CODE,
   PRIORITY_SLOT,
+  PRIORITY_VALUE_SLOT,
   SOURCE_SLOT,
   LAST_UPDATED_SLOT,
 } from './card_priority/types';
@@ -38,9 +43,17 @@ const CHUNK_SIZE = 2000;
 /** Slot reads per batch, matching the cache builder. */
 const READ_BATCH = 100;
 
-/** [remId, priority, source, lastUpdated] — tuples, not objects: at 45k rows the
- *  repeated JSON keys of an object form roughly triple the stored bytes. */
-export type SnapshotRow = [string, string, string, string];
+/**
+ * [remId, priority, source, lastUpdated, priorityValue] — tuples, not objects: at
+ * 45k rows the repeated JSON keys of an object form roughly triple the stored
+ * bytes.
+ *
+ * `priorityValue` (the hidden slot) was added with the hidden-slot migration.
+ * Rows captured before it are 4 long, and `undefined` there means NOT CAPTURED,
+ * which a restore must treat differently from the empty string: it leaves the
+ * hidden slot alone rather than clearing it.
+ */
+export type SnapshotRow = [string, string, string, string, string?];
 
 export interface SnapshotMeta {
   kbId: string;
@@ -67,12 +80,29 @@ const metaKey = (kbId: string) => `${META_PREFIX}::${kbId}`;
 const chunkKey = (kbId: string, i: number) => `${CHUNK_PREFIX}::${kbId}::${i}`;
 
 async function readTrio(rem: PluginRem): Promise<SnapshotRow> {
-  const [priority, source, lastUpdated] = await Promise.all([
+  const [priority, source, lastUpdated, priorityValue] = await Promise.all([
     rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT),
     rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT),
     rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT),
+    rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_VALUE_SLOT).catch(() => ''),
   ]);
-  return [rem._id, priority ?? '', source ?? '', lastUpdated ?? ''];
+  return [rem._id, priority ?? '', source ?? '', lastUpdated ?? '', priorityValue ?? ''];
+}
+
+/** The value a rem effectively has, from whichever slot holds it — the same
+ *  hidden-wins-over-visible rule as card_priority/slot_access.ts. */
+async function readEffectivePriority(rem: PluginRem): Promise<string> {
+  const [hidden, visible] = await Promise.all([
+    rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_VALUE_SLOT).catch(() => null),
+    rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null),
+  ]);
+  return (hidden || null) ?? (visible || null) ?? '';
+}
+
+/** The effective value a snapshot row recorded, under the same rule. */
+function rowEffectivePriority(row: SnapshotRow): string {
+  const [, visible, , , hidden] = row;
+  return (hidden || null) ?? (visible || null) ?? '';
 }
 
 export interface CaptureResult {
@@ -142,6 +172,37 @@ export async function captureCardPrioritySnapshot(
   return { meta, rows, approxBytes, storedLocally, storeError };
 }
 
+/**
+ * Hands the captured rows to the user as a JSON file.
+ *
+ * The file is the copy that matters: local storage is convenient for the in-app
+ * verify/restore, but it is the same storage layer a bad migration would be
+ * poking at, and it has limits nobody has measured at 45k rows. Returns whether
+ * the download actually started, so a caller can refuse to proceed without it.
+ *
+ * Must be called from a widget realm — it needs a DOM. The index widget has one.
+ */
+export function downloadCardPrioritySnapshotFile(result: {
+  meta: SnapshotMeta;
+  rows: SnapshotRow[];
+}): boolean {
+  try {
+    const blob = new Blob([JSON.stringify({ meta: result.meta, rows: result.rows })], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `card-priority-snapshot-${dayjs().format('YYYY-MM-DD-HHmmss')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return true;
+  } catch (err) {
+    console.error('[CardPriority snapshot] file download failed', err);
+    return false;
+  }
+}
+
 export async function loadSnapshot(
   plugin: RNPlugin
 ): Promise<{ meta: SnapshotMeta; rows: SnapshotRow[] } | null> {
@@ -183,6 +244,11 @@ export interface VerifyReport {
  * someone edited it between capture and verify — expected, and not a reason to
  * restore. A value that went empty means it was lost, which is. Collapsing them
  * into one "differs" count would bury the distinction that decides what to do.
+ *
+ * Compares EFFECTIVE values (hidden slot first, then visible), not the visible
+ * slot alone. Otherwise the hidden-slot migration — which moves every value from
+ * one slot to the other without changing a single number — would report the whole
+ * knowledge base as lost.
  */
 export async function verifyCardPrioritySnapshot(
   plugin: RNPlugin,
@@ -202,11 +268,12 @@ export async function verifyCardPrioritySnapshot(
   for (let i = 0; i < rows.length; i += READ_BATCH) {
     const batch = rows.slice(i, i + READ_BATCH);
     const results = await Promise.all(
-      batch.map(async ([remId, priority]) => {
+      batch.map(async (row) => {
+        const remId = row[0];
+        const was = rowEffectivePriority(row);
         const rem = await plugin.rem.findOne(remId);
-        if (!rem) return { remId, gone: true, now: '', was: priority };
-        const now = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
-        return { remId, gone: false, now: now ?? '', was: priority };
+        if (!rem) return { remId, gone: true, now: '', was };
+        return { remId, gone: false, now: await readEffectivePriority(rem), was };
       })
     );
 
@@ -277,6 +344,13 @@ export interface RestoreReport {
  * 'inherited'/'default' rows while flashcard prioritisation is off) and runs
  * syncPriorityBand. Neither belongs in a restore, whose only job is to put back
  * the exact bytes that were there.
+ *
+ * Restores BOTH slots to exactly what was captured, which is what makes this the
+ * undo for the hidden-slot migration: putting a value back into the visible slot
+ * recreates the property child, and with it the table-rendering bug the migration
+ * removed. A pre-migration snapshot has no hidden field at all (4-long row) —
+ * that is "not captured", and the hidden slot is left untouched rather than
+ * cleared, so an undo cannot silently strip values the backup never saw.
  */
 export async function restoreCardPrioritySnapshot(
   plugin: RNPlugin,
@@ -295,15 +369,23 @@ export async function restoreCardPrioritySnapshot(
     for (let i = 0; i < rows.length; i += READ_BATCH) {
       const batch = rows.slice(i, i + READ_BATCH);
       await Promise.all(
-        batch.map(async ([remId, priority, source, lastUpdated]) => {
+        batch.map(async (row) => {
+          const [remId, priority, source, lastUpdated, priorityValue] = row;
           try {
             const rem = await plugin.rem.findOne(remId);
             if (!rem) {
               skipped++;
               return;
             }
-            const now = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
-            if ((now ?? '') === priority) {
+            const [nowVisible, nowHidden] = await Promise.all([
+              rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null),
+              rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_VALUE_SLOT).catch(() => null),
+            ]);
+            const hiddenCaptured = priorityValue !== undefined;
+            if (
+              (nowVisible ?? '') === priority &&
+              (!hiddenCaptured || (nowHidden ?? '') === priorityValue)
+            ) {
               skipped++;
               return;
             }
@@ -315,6 +397,15 @@ export async function restoreCardPrioritySnapshot(
                 LAST_UPDATED_SLOT,
                 lastUpdated ? [lastUpdated] : []
               ),
+              ...(hiddenCaptured
+                ? [
+                    rem.setPowerupProperty(
+                      CARD_PRIORITY_CODE,
+                      PRIORITY_VALUE_SLOT,
+                      priorityValue ? [priorityValue] : []
+                    ),
+                  ]
+                : []),
             ]);
             written++;
           } catch {

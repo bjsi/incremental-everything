@@ -1,21 +1,21 @@
 # Plugin Settings Reference
 
-This page documents every configurable setting in the **Incremental Everything (Plus)** plugin.
+This page documents every configurable setting in the **Incremental RemNote** plugin.
 
 Every setting lives in **one place**: the plugin's own settings popup.
 
 ## Where the settings are { #where-the-settings-are }
 
-Open the popup with the command **`Incremental Everything: Settings`** (quick code `ies`). It groups the settings by area, hides the ones that do not apply — the Beta Scheduler's parameters stay out of sight until you switch that scheduler on — and links each entry to the section of this manual that explains it.
+Open the popup with the command **`Incremental RemNote: Settings`** (quick code `is`). It groups the settings by area, hides the ones that do not apply — the Beta Scheduler's parameters stay out of sight until you switch that scheduler on — and links each entry to the section of this manual that explains it.
 
-![The Incremental Everything settings popup](assets/settings-popup.png){ width="900" }
+![The Incremental RemNote settings popup](assets/settings-popup.png){ width="900" }
 
 *Above: the Scheduling group with the Beta Scheduler on, so its two parameters are shown and the Multiplier is hidden. The **?** opens this manual at the matching section; **Reset** appears on anything changed from its default, next to a **modified** badge.*
 
 **RemNote's own plugin settings panel is empty for this plugin.** Up to v1.0.44, five of them stayed behind there — *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches and *Enable Hide-in-Queue Powerups and Commands* — on the theory that RemNote's panel is where you would look first if the plugin ever felt heavy. It never was: there was no performance problem to chase, and the split only gave you a second place to look. Since **v1.0.45** they are in the popup with everything else, and editable there.
 
 !!! note "Upgrading from an earlier version"
-    Your existing settings are carried over automatically the first time you load a version that moves them — nothing to re-enter, and nothing you have changed in the popup is overwritten. A setting appears in **Settings → Plugins → Incremental Everything** for the single session in which it is being read across, carrying a note that says so, and is gone after the next reload. Editing it there in the meantime has no effect.
+    Your existing settings are carried over automatically the first time you load a version that moves them — nothing to re-enter, and nothing you have changed in the popup is overwritten. A setting appears in **Settings → Plugins → Incremental RemNote** for the single session in which it is being read across, carrying a note that says so, and is gone after the next reload. Editing it there in the meantime has no effect.
 
 ---
 
@@ -151,7 +151,7 @@ In calibrated mode the section also shows the measured average itself — in bot
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| **Enable Hide-in-Queue Powerups and Commands** | Boolean | `false` | Registers five additional [Queue Display](Utilities.md#queue-display-utilities) powerups and their commands — **Hide in Queue**, **Remove from Queue**, **No Hierarchy**, **Hide Parent**, and **Hide Grandparent** — that were originally part of the standalone Hide in Queue plugin. These powerup codes are identical to those in that plugin; enabling this setting while the standalone plugin is still installed causes a fatal `Duplicated powerup` error and prevents Incremental Everything from loading. **Uninstall the standalone Hide in Queue plugin before enabling this.** The two powerups added by Incremental Everything itself — **Remove Parent** and **Remove Grandparent** — are always registered regardless of this setting. A RemNote reload is required after changing. 📖 [Hide in Queue](Utilities.md#hide-in-queue). |
+| **Enable Hide-in-Queue Powerups and Commands** | Boolean | `false` | Registers five additional [Queue Display](Utilities.md#queue-display-utilities) powerups and their commands — **Hide in Queue**, **Remove from Queue**, **No Hierarchy**, **Hide Parent**, and **Hide Grandparent** — that were originally part of the standalone Hide in Queue plugin. These powerup codes are identical to those in that plugin; enabling this setting while the standalone plugin is still installed causes a fatal `Duplicated powerup` error and prevents Incremental RemNote from loading. **Uninstall the standalone Hide in Queue plugin before enabling this.** The two powerups added by Incremental RemNote itself — **Remove Parent** and **Remove Grandparent** — are always registered regardless of this setting. A RemNote reload is required after changing. 📖 [Hide in Queue](Utilities.md#hide-in-queue). |
 
 ---
 

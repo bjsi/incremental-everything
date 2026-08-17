@@ -77,6 +77,7 @@ const PLUGIN_SLOT_DISPLAY_NAMES: Record<string, string> = {
   [`${powerupCode}:${repHistorySlotCode}`]: 'History',
   [`${powerupCode}:${originalIncrementalDateSlotCode}`]: 'Created',
   'cardPriority:priority': 'Priority',
+  'cardPriority:priorityValue': 'Priority Value',
   'cardPriority:prioritySource': 'Priority Source',
   'cardPriority:lastUpdated': 'Last Updated',
   [`${dismissedPowerupCode}:${dismissedHistorySlotCode}`]: 'History',

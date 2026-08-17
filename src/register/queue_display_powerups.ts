@@ -241,7 +241,7 @@ export async function registerCoreQueueDisplayPowerups(plugin: ReactRNPlugin) {
 }
 
 /* Gated: ports the standalone Hide in Queue plugin's powerups + CSS into
-   Incremental Everything. Only call when the user's integration setting is on
+   Incremental RemNote. Only call when the user's integration setting is on
    AND they have uninstalled the standalone plugin (otherwise RemNote throws
    "Duplicated powerup" and the entire plugin fails to load). */
 export async function registerHideInQueueLegacyPowerups(plugin: ReactRNPlugin) {

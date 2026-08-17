@@ -5,7 +5,7 @@ The **Priority Review Document** is a powerful feature designed to solve the "in
 ---
 ## The Problem: Why do I need this?
 
-In the standard RemNote queue, plugins like *Incremental Everything* can control when **Incremental Rems** (articles, videos, notes) appear. However, plugins **cannot control the order of standard Flashcards**. RemNote's native scheduler decides which flashcard comes next, regardless of the priority you set in this plugin.
+In the standard RemNote queue, plugins like *Incremental RemNote* can control when **Incremental Rems** (articles, videos, notes) appear. However, plugins **cannot control the order of standard Flashcards**. RemNote's native scheduler decides which flashcard comes next, regardless of the priority you set in this plugin.
 
 This creates a problem when you are overwhelmed. If you have 1000 due flashcards, but only time to review 50, you want to ensure those 50 are your *most important* ones. In the standard queue, you might spend your time reviewing low-priority trivia while critical exams or project knowledge remains unseen.
 

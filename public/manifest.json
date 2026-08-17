@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "incremental-everything",
-  "name": "Incremental Everything",
+  "name": "Incremental RemNote",
   "author": "Jamesb and Hugomarins (cont. Jonathangimeno)",
   "repoUrl": "https://github.com/bjsi/incremental-everything",
   "supportUrl": "https://github.com/bjsi/incremental-everything/issues",
@@ -10,7 +10,7 @@
   "version": {
     "major": 1,
     "minor": 0,
-    "patch": 46
+    "patch": 48
   },
   "unlisted": false,
   "theme": [],

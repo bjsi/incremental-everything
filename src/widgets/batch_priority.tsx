@@ -12,7 +12,8 @@ import {
   allIncrementalRemKey,
   allCardPriorityInfoKey
 } from '../lib/consts';
-import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, CardPriorityInfo } from '../lib/card_priority/types';
+import { CARD_PRIORITY_CODE, SOURCE_SLOT, CardPriorityInfo } from '../lib/card_priority/types';
+import { getRawCardPriorityString } from '../lib/card_priority/slot_access';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { setCardPriority } from '../lib/card_priority';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
@@ -214,7 +215,7 @@ function BatchPriority() {
               if (sourceStr === 'manual' || sourceStr === 'incremental') {
                 hasValidCardPriority = true;
                 cardPrioritySource = sourceStr;
-                const priorityStr = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+                const priorityStr = await getRawCardPriorityString(rem);
                 currentCardPriority = parseInt(priorityStr);
                 if (isNaN(currentCardPriority)) currentCardPriority = 50;
               }
