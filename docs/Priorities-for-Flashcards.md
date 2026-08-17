@@ -68,13 +68,17 @@ This is the "magic" that makes the system manageable. You don't need to prioriti
 
 ## Where a priority is stored { #hidden-slot }
 
-A priority is a value on the `cardPriority` powerup. Until v1.0.47 it lived in a **visible** slot, which means RemNote drew a `Priority — 31` row under every prioritised Rem. From v1.0.47 it lives in a **hidden** slot instead, and that row is gone.
+A priority is a value on the `cardPriority` powerup. Until v1.0.48 it lived in a **visible** slot, which means RemNote drew a `Priority — 31` row under every prioritised Rem. From v1.0.48 it lives in a **hidden** slot instead, and that row is gone.
 
 ### Why it moved
 
-A visible slot's value is stored in a child Rem. When the prioritised Rem is *itself a table cell* — which is what a filled tag slot is — RemNote's cell renderer sees that child, switches the cell into list mode, draws the child, and never draws the cell's own content at all. The cell shows `Priority — 31` where your text should be.
+The difference between the two is where the value physically lives. Since RemNote's v1.27 storage overhaul, a **hidden** slot holds its value directly on the Rem, while a **visible** one materialises it as a **child Rem** underneath. Three consequences follow, and all three favour hidden:
 
-It affects **simple and advanced tables alike**: any table column whose cells carry flashcards is affected, because those cells are the Rems the plugin tags. A hidden slot stores its value without a child Rem, so nothing is left for the cell renderer to mistake for cell content.
+**Fewer moving parts.** The plugin writes this value on tens of thousands of Rems. Every one of them used to carry an extra child Rem that could be duplicated, detached from its slot definition, or left behind by an import — states this plugin has [repair tooling](Troubleshooting.md) for precisely because they happen. A value stored directly has none of those failure modes.
+
+**Less clutter.** A priority is bookkeeping the plugin does on your behalf. It does not need a row in your outline, and on a knowledge base where most flashcards carry one, those rows were the plugin's largest visible footprint in your notes.
+
+**It stops RemNote blanking out table cells.** When the prioritised Rem is *itself a table cell* — which is what a filled tag slot is — RemNote's cell renderer sees that child Rem, switches the cell into list mode, draws the child, and never draws the cell's own content at all. The cell shows `Priority — 31` where your text should be. It affects **simple and advanced tables alike**: any column whose cells carry flashcards, because those cells are the Rems the plugin tags. A hidden slot leaves nothing there for the renderer to mistake for cell content.
 
 ### The migration
 
@@ -92,7 +96,7 @@ It is offered on **every start** until it has been done, because until then your
 
 Deleting the values does not delete the *slot*, so a bare `Priority — Empty` row is left behind: RemNote draws a row for every slot the plugin registers, whether or not it holds anything. It goes away once the plugin stops registering that slot — and it only does that on **positive proof** that nothing is left in it: a migration run that finished with no failures, no rows kept back and no errors, or a full scan of every tagged Rem finding none.
 
-Until then the slot stays registered, which is deliberate. An unregistered slot cannot be read, so retiring one that still held a value would turn that value into an unreadable one rather than a visible row. A knowledge base migrated by v1.0.47 (which had no such check) gets its full scan automatically on the next start; expect one extra pass of a few seconds, once, then a reload to see the row disappear.
+Until then the slot stays registered, which is deliberate. An unregistered slot cannot be read, so retiring one that still held a value would turn that value into an unreadable one rather than a visible row. A knowledge base whose migration was interrupted, or finished before that check existed, gets the full scan automatically on the next start; expect one extra pass of a few seconds, once, then a reload to see the row disappear.
 
 !!! note "Undoing takes two steps once the slot is retired"
     A retired slot cannot be written either, so restoring into it would silently write nothing. The first run of **Undo Card Priority Hidden-Slot Migration…** un-retires the slot and asks you to reload; the second actually restores the values. Your priorities stay readable in the hidden slot in between.

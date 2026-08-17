@@ -673,9 +673,9 @@ export async function checkCardPriorityHiddenSlotMigration(plugin: RNPlugin): Pr
       return;
     }
 
-    // Already migrated, but never verified empty — the case a knowledge base
-    // migrated by v1.0.47 is in, since that build had no `completedAt`. One full
-    // scan settles it and the leftover row goes away on the next reload.
+    // Already migrated, but never verified empty: a run that was interrupted after
+    // committing some rems, or one that finished before this second flag existed.
+    // One full scan settles it and the leftover row goes away on the next reload.
     if (record?.migratedAt) {
       await completeIfVisibleSlotIsEmpty(plugin);
       return;

@@ -4,55 +4,38 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.48 - August 17th, 2026
 
-### 🐛 Fixed - the old Priority row survived the migration as an empty leftover
+### 📝 Changed - card priorities are stored in a hidden slot
 
-Migrating card priorities to the hidden slot removed the numbers but not the row: a bare **Priority — Empty** stayed under every tagged Rem, because RemNote draws a row for every slot the plugin registers, values or not.
+A card priority used to live in a **visible** slot, which meant RemNote drew a `Priority — 31` row under every prioritised Rem. It now lives in a **hidden** slot, and that row is gone. The numbers, the sources, inheritance, the Card Shield, percentiles, the badges and [Priority Review Documents](Priority-Review-Document.md) all work exactly as before.
 
-The plugin now stops registering that slot altogether — but only on positive proof that nothing is left in it: a migration run that finished with no failures, no rows kept back and no errors, or a full scan of every tagged Rem finding none. A knowledge base migrated by v1.0.47 gets that scan automatically on the next start (a few seconds, once); reload afterwards and the row is gone.
+Three reasons to move it:
 
-Undoing now takes two steps once the slot is retired, since a slot that is not registered cannot be written either: the first run un-retires it and asks for a reload, the second restores the values. Priorities stay readable in the hidden slot in between.
+* **It fits how RemNote stores slots now.** Since the v1.27 storage overhaul a hidden slot holds its value directly, while a visible one still materialises it as a child Rem under the tagged Rem. Fewer moving parts for a value the plugin writes on tens of thousands of Rems, and one less structure that can be left behind, duplicated or detached.
+* **Less clutter, less intrusion.** A priority is bookkeeping the plugin does for you. It does not need a row in your outline, and on a knowledge base where most flashcards carry one, those rows were the plugin's largest footprint in your notes.
+* **It stops RemNote blanking out table cells.** A flashcard that lives in a table cell had its priority row drawn *in place of the cell's own content*, so the cell looked empty or wrong — in **simple and advanced tables alike**, any column whose cells carry flashcards. The cause is the child Rem: RemNote's cell renderer sees it, switches the cell into list mode, draws the child and never draws the cell's value at all. A hidden slot leaves nothing there to mistake for cell content. (Reported to RemNote separately; this makes the plugin stop triggering it.)
 
-#### Technical explanation
+### The migration
 
-Two flags, not one. `migratedAt` is the WRITE gate and is set by any completed run, including a partial one — withholding it would have the next priority write recreate a property child on every Rem the run did clean. `completedAt` is the REGISTRATION gate and is strictly stricter: it may only be set on proof of emptiness, because an unregistered slot stops resolving through `getPowerupProperty`, which turns a surviving value into an unreadable one rather than a cosmetic row. `isCleanSweep` (no `writeFailed`, no `keptWithChildren`, no `errors`) is that proof from a run; `completeIfVisibleSlotIsEmpty` is the exhaustive-scan route for knowledge bases that were migrated before the flag existed. A knowledge base with no card priorities at all is stamped complete on sight, so it never grows the row in the first place.
+Existing knowledge bases are moved over by a migration the plugin offers on startup, and which **Migrate Card Priorities to Hidden Slot…** runs on demand:
 
-`registerPluginPowerups` takes `retireVisiblePrioritySlot` and spreads the slot in conditionally — the same shape as the settings registration being handed only the ids a knowledge base still has to read across — and `index.tsx` reads the record *before* registering, defaulting to registering if it cannot be read. The deprecated slot's `propertyLocation` also moves to `ONLY_IN_TABLE`, the least visible location that still renders, which governs newly created slot definition Rems only.
+* **Every priority is backed up first** — to your device and to a JSON file you keep. If no backup can be written, the migration refuses to run.
+* Each value is **read back from the hidden slot before its old row is deleted**, so a write that did not land keeps its row and its value.
+* **Interrupting it is safe.** A crash or a restart leaves the finished Rems finished and the rest untouched; run it again to complete it, and the original backup is reused rather than overwritten.
+* Reversible with **Undo Card Priority Hidden-Slot Migration…**.
 
-### 🐛 Fixed - an interrupted migration reported "nothing to migrate"
+Once a knowledge base is verified to hold nothing in the old slot, the plugin **stops registering that slot at all** — which is what removes the leftover empty `Priority` row, since RemNote draws a row for every slot a plugin registers, values or not.
 
-A restart part-way through a large migration left it half done, and the command then refused to finish the job: **Nothing to migrate — no visible Priority rows were found in the 400 rem(s) sampled.**
-
-The check took the *first* 400 tagged Rems — the same order the migration works through — so it sampled precisely the ones the killed run had already finished. Samples are now spread across the whole knowledge base, and the command no longer refuses on sampled evidence at all: it always offers, and the report says what it actually found. Re-running is safe and idempotent, so an already-migrated Rem is simply skipped.
-
-Two related improvements for long runs: the **existing backup is reused instead of overwritten**, since the one from the first attempt holds the pre-migration state a rollback needs (and skipping the re-capture saves ~90 seconds on a 45k-Rem library); and progress is now reported by toast every 15 seconds, not only to the console — the run had looked hung.
-
-Two smaller things in the same area: the report now accounts for **every** Rem it walked — a re-run after an interruption reported 30,784 moved out of 45,164 with no explanation of the difference, which was mostly Rems an earlier pass had already finished — and the console now says at startup which way the deprecated slot went, so "no output" is no longer indistinguishable from "the check never ran".
-
-#### Technical explanation
-
-`strideSample` steps through `taggedRem()` rather than taking a prefix, the same approach as the warm-start self-check in `card_priority/cache.ts`. A sampled result is now treated as evidence in the positive direction only: rows found proves rows exist, rows not found proves nothing about the Rems it skipped, so only a full scan may retire the slot. The command's pre-scan is gone entirely — a full one would double the walk to answer what the run answers anyway — leaving a cheap `countCardPriorityTaggedRems` for the dialog.
-
-Once the slot is retired the read path stops asking for it at all, rather than making a call per Rem that can only fail and be caught — on a 45k-Rem cold cache build that was 45,000 doomed round trips. The flag is memoised per realm, warmed at activation in the index realm (where the cache build lives) and on the first record read anywhere else.
-
-📖 [Retiring the old slot](Priorities-for-Flashcards.md#retiring-the-old-slot)
-
-## v1.0.47 - August 17th, 2026
-
-### 🐛 Fixed - card priorities were blanking out table cells
-
-A flashcard that lives in a table cell had its `Priority — 31` row drawn *in place of* the cell's own content, so the cell looked empty or wrong. It affected **simple and advanced tables alike** — any column whose cells carry flashcards.
-
-The priority now lives in a hidden slot, so no row is drawn and nothing is left for the cell to mistake for its content. On the first start after updating, the plugin offers to move an existing knowledge base over: **every priority is backed up first**, to your device and to a JSON file, and the migration refuses to run if no backup could be written. The offer repeats on every start until it is done, with a *never ask again* on the decline path, and **Migrate Card Priorities to Hidden Slot…** / **Undo Card Priority Hidden-Slot Migration…** run and reverse it by hand.
-
-Numbers, sources, inheritance, the Card Shield, percentiles, badges and Priority Review Documents are unaffected. The one loss: priorities can no longer be typed straight into the outline, since there is no row to type into — the Priority widget, Quick Priority and the batch tools are the way in.
+The one thing you lose: priorities can no longer be typed straight into the outline, because there is no row to type into. Use the Priority widget (`Alt+P`), Quick Priority or the batch tools.
 
 #### Technical explanation
 
-A visible slot stores its value in a property child Rem; a hidden one does not. When the tagged Rem is itself a table cell — a filled tag slot — RemNote's cell renderer sees the child, switches the cell into list mode, draws the child and never emits the cell's own value at all. Captured in both renderers: `table_cell_list-*` with `data-rem-container-property="priority"` in a simple table, and a `data-rem-property="alternative-denomination-"` cell tagged `cardpriority` rendered as `tree-node--table-cell-list` in an advanced one, with an untagged property cell in the same row rendering correctly as the control.
+The existing `priority` slot could not simply be re-registered `hidden`: RemNote applies slot options when the slot definition Rem is **created** and does not mutate an existing one — measured directly, a registration with `hidden: true` ran while `getPowerupSlotByCode` kept resolving the slot natively, which it only does for visible slots. So the value moves to a new code, `priorityValue`, whose definition Rem exists in no knowledge base yet and is therefore created hidden everywhere.
 
-The existing `priority` slot cannot be flipped — RemNote applies slot options when the slot definition Rem is created and does not mutate an existing one — so the value moves to a new code, `priorityValue`, whose definition Rem does not exist in any knowledge base yet and is therefore created hidden everywhere. `lib/card_priority/slot_access.ts` is now the single place the value is read or written: reads take the hidden slot first and fall back to the visible one, folded into the callers' existing `Promise.all` so the extra call costs no wall-clock time; writes go to the hidden slot always and to the visible one only while the knowledge base is un-migrated, which is what keeps hand edits of the `Priority` row working until the rows are actually removed. The migrated flag is per-KB in *synced* storage, so a phone cannot recreate the children a desktop migration deleted.
+`lib/card_priority/slot_access.ts` is now the only place the value is read or written. Reads take the hidden slot first and fall back to the visible one, folded into callers’ existing `Promise.all` so the extra call costs no wall-clock time; writes go to the hidden slot always and to the visible one **only while a knowledge base is un-migrated**, which is what keeps hand edits of the old row working right up to the moment the rows are removed.
 
-Per Rem the order is write hidden → read it back → only then delete the visible child, identified by the slot definition Rem it is tagged with rather than by its text (the row's text is the value, not the slot name). A write that does not read back leaves the row alone and is reported, so a partial run loses nothing and re-running picks up exactly those Rems. `lib/card_priority_snapshot.ts` — built for the first, abandoned attempt at this migration — is the backup, now capturing both slots and comparing *effective* values so a migration that moves every value without changing one is not reported as a knowledge base of losses.
+Two flags, per knowledge base, in synced storage so a phone cannot recreate what a desktop migration deleted. `migratedAt` is the **write** gate, set by any completed run including a partial one — withholding it would have the next priority write recreate a child on every Rem the run did clean. `completedAt` is the **registration** gate and is strictly stricter, because an unregistered slot stops resolving through `getPowerupProperty`: retiring one that still held a value would turn that value into an unreadable one rather than a cosmetic row. Only proof of emptiness sets it — a run with no failed writes, no rows kept back and no errors, or an exhaustive scan finding none. Sampled scans are treated as evidence in the positive direction only, and the sample is strided across `taggedRem()` rather than taken from the front, since that is the order the migration itself walks.
+
+Per Rem: write hidden → read it back → only then delete the row. Rows are identified by the rem **reference to their slot definition inside their own text** (`refIdsIn(child.text)`, the signal `lib/raw_slot_scan.ts` classifies on) — not by `getTagRems()`, which post-overhaul reports nothing on a property Rem. All matching rows are removed, not the first, since several property Rems can carry the same slot; a row with children of its own is left alone rather than taking that subtree with it. `lib/card_priority_snapshot.ts` — built for an earlier, abandoned attempt at this migration — is the backup, now capturing both slots and comparing *effective* values, so moving every value without changing one is not reported as a knowledge base of losses.
 
 📖 [Where a priority is stored](Priorities-for-Flashcards.md#hidden-slot)
 

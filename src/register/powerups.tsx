@@ -141,7 +141,7 @@ export async function registerPluginPowerups(
         ...(opts.retireVisiblePrioritySlot ? [] : [deprecatedVisiblePrioritySlot]),
         // (logged below, so which of the two happened is verifiable in the console)
         {
-          // Where the priority VALUE lives from v1.0.47 on. Hidden, so RemNote
+          // Where the priority VALUE lives from v1.0.48 on. Hidden, so RemNote
           // stores it without materialising a property child rem — which is the
           // whole point: a visible slot's child is what makes a tagged rem that
           // is itself a table cell render "Priority — 31" in place of its own

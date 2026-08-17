@@ -11,7 +11,7 @@ export const CARD_PRIORITY_CODE = 'cardPriority';
  */
 export const PRIORITY_SLOT = 'priority';
 /**
- * Where the priority value lives from v1.0.47 on: a HIDDEN slot, whose values
+ * Where the priority value lives from v1.0.48 on: a HIDDEN slot, whose values
  * RemNote stores without creating a property child (confirmed in
  * lib/powerup_slot_compat.ts — a rem with hidden slots set can have zero
  * property children). Registered fresh, so unlike PRIORITY_SLOT it is hidden in
