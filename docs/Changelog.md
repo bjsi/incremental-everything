@@ -652,7 +652,7 @@ All three have been reported to the RemNote team with the supporting evidence, a
 
 ### 📚 New: the User's Manual has moved to a dedicated documentation site
 
-The documentation has left the GitHub Wiki and now lives at **[hugomarins.github.io/incremental-everything](https://hugomarins.github.io/incremental-everything/)**.
+The documentation has left the GitHub Wiki and now lives at **[hugomarins.github.io/incremental-remnote](https://hugomarins.github.io/incremental-remnote/)**.
 
 The Wiki had outgrown itself: 28 pages with no real search, a flat sidebar that gave no sense of where you were, and an appearance fixed by GitHub. The new site is built with **MkDocs Material** and fixes exactly those things:
 

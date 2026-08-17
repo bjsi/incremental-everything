@@ -31,7 +31,7 @@ Un conjunto completo de herramientas de historial y práctica, ahora integrado e
 - **Panel de Colas Practicadas**: métricas de la sesión en tiempo real (velocidad, retención, antigüedad de las tarjetas) y un historial completo de cada sesión de práctica, con copia de seguridad mediante Exportar/Importar.
 - **Mastery Drill**: una cola de repráctica enfocada en las tarjetas que calificaste como *Forgot* u *Hard* — inspirada en el Final Drill de SuperMemo. Ábrela con el comando `Mastery Drill` o desde la notificación de la Barra Lateral Izquierda.
 
-👉 [Documentación completa](https://hugomarins.github.io/incremental-everything/History-Queue-Dashboard-and-Mastery-Drill/)
+👉 [Documentación completa](https://hugomarins.github.io/incremental-remnote/History-Queue-Dashboard-and-Mastery-Drill/)
 
 ### 📱 Modos de Rendimiento
 - **Modo Ligero (Predeterminado para Móvil/Web)**: Características rápidas, estables y esenciales solamente. Previene fallos en teléfonos y tabletas.
@@ -40,14 +40,14 @@ Un conjunto completo de herramientas de historial y práctica, ahora integrado e
 ### 🧰 Más que Lectura Incremental: un Conjunto de Herramientas para tu BC
 Más allá del ciclo principal de aprendizaje, Incremental RemNote incluye **docenas de utilidades independientes** que agilizan la toma de notas y la organización de tu base de conocimiento en el día a día — útiles incluso cuando no estás repasando. Algunos ejemplos:
 
-- **Herramientas de esquema y encabezados**: [Reestructurar Esquema por Encabezados](https://hugomarins.github.io/incremental-everything/Utilities/#restructure-outline-by-headings) (reanida bajo sus encabezados un documento plano o mal pegado), [Aplicar Niveles de Encabezado por Jerarquía (Tabla de Contenidos)](https://hugomarins.github.io/incremental-everything/Utilities/#apply-heading-levels-by-hierarchy-table-of-contents) y [Establecer Siguiente Nivel de Encabezado](https://hugomarins.github.io/incremental-everything/Utilities/#set-next-heading-level) — todas con vista previa lado a lado y deshacer en un clic.
-- **Control de la cola**: [Ocultar / Eliminar Padre y Abuelo, entre otras](https://hugomarins.github.io/incremental-everything/Utilities/#queue-display-utilities), para depurar cómo aparecen los Rems ancestros en tus tarjetas.
-- **Ayudas de edición**: [Conversor de Mayúsculas/Minúsculas](https://hugomarins.github.io/incremental-everything/Utilities/#text-case-converter) (ciclo con Shift+F3, con reglas de capitalización para inglés y portugués) y [Convertir en Viñetas el Texto Seleccionado](https://hugomarins.github.io/incremental-everything/Utilities/#bulletize-inline-selected-text), para restaurar las viñetas que los resaltados de PDF aplanan.
-- **Navegación y fuentes**: [Find Rem](https://hugomarins.github.io/incremental-everything/Utilities/#find-rem--reference-or-open) (encuentra Rems que la búsqueda `[[` de RemNote no muestra) y [Abrir Fuente en Popup / Ventana Flotante](https://hugomarins.github.io/incremental-everything/Utilities/#open-source-in-popup), para consultar un PDF o una web sin salir de la cola.
-- **Analíticas y diagnóstico**: el [Panel de Estudio](https://hugomarins.github.io/incremental-everything/Study-Dashboard/) con estadísticas de aprendizaje de toda la base de conocimiento, y el [conjunto de Historiales y el Panel de Colas Practicadas](https://hugomarins.github.io/incremental-everything/History-Queue-Dashboard-and-Mastery-Drill/) para volver a cualquier documento, tarjeta o sesión pasada.
-- **Detalle por elemento**: explora la línea de tiempo de un solo elemento con los popups de [Historial de Repeticiones de Tarjetas](https://hugomarins.github.io/incremental-everything/Plugin-Widgets-Reference/#211-flashcard-repetition-history) e [Historial de Repeticiones de IncRems](https://hugomarins.github.io/incremental-everything/Plugin-Widgets-Reference/#212-increm-repetition-history--aggregated-view) — este último con un **resumen agregado** de repeticiones, tiempo y conteos de todo el subárbol de descendientes de un Rem. Todo respaldado por un motor **FSRS v6** integrado que calcula Dificultad / Estabilidad / Recuperabilidad por tarjeta, además de un [desglose del Escudo ponderado por prioridad](https://hugomarins.github.io/incremental-everything/Prioritization-&-Sorting/#weighted-shield) en el que puedes hacer clic para ver qué parte de tu carga de trabajo ya has procesado.
+- **Herramientas de esquema y encabezados**: [Reestructurar Esquema por Encabezados](https://hugomarins.github.io/incremental-remnote/Utilities/#restructure-outline-by-headings) (reanida bajo sus encabezados un documento plano o mal pegado), [Aplicar Niveles de Encabezado por Jerarquía (Tabla de Contenidos)](https://hugomarins.github.io/incremental-remnote/Utilities/#apply-heading-levels-by-hierarchy-table-of-contents) y [Establecer Siguiente Nivel de Encabezado](https://hugomarins.github.io/incremental-remnote/Utilities/#set-next-heading-level) — todas con vista previa lado a lado y deshacer en un clic.
+- **Control de la cola**: [Ocultar / Eliminar Padre y Abuelo, entre otras](https://hugomarins.github.io/incremental-remnote/Utilities/#queue-display-utilities), para depurar cómo aparecen los Rems ancestros en tus tarjetas.
+- **Ayudas de edición**: [Conversor de Mayúsculas/Minúsculas](https://hugomarins.github.io/incremental-remnote/Utilities/#text-case-converter) (ciclo con Shift+F3, con reglas de capitalización para inglés y portugués) y [Convertir en Viñetas el Texto Seleccionado](https://hugomarins.github.io/incremental-remnote/Utilities/#bulletize-inline-selected-text), para restaurar las viñetas que los resaltados de PDF aplanan.
+- **Navegación y fuentes**: [Find Rem](https://hugomarins.github.io/incremental-remnote/Utilities/#find-rem--reference-or-open) (encuentra Rems que la búsqueda `[[` de RemNote no muestra) y [Abrir Fuente en Popup / Ventana Flotante](https://hugomarins.github.io/incremental-remnote/Utilities/#open-source-in-popup), para consultar un PDF o una web sin salir de la cola.
+- **Analíticas y diagnóstico**: el [Panel de Estudio](https://hugomarins.github.io/incremental-remnote/Study-Dashboard/) con estadísticas de aprendizaje de toda la base de conocimiento, y el [conjunto de Historiales y el Panel de Colas Practicadas](https://hugomarins.github.io/incremental-remnote/History-Queue-Dashboard-and-Mastery-Drill/) para volver a cualquier documento, tarjeta o sesión pasada.
+- **Detalle por elemento**: explora la línea de tiempo de un solo elemento con los popups de [Historial de Repeticiones de Tarjetas](https://hugomarins.github.io/incremental-remnote/Plugin-Widgets-Reference/#211-flashcard-repetition-history) e [Historial de Repeticiones de IncRems](https://hugomarins.github.io/incremental-remnote/Plugin-Widgets-Reference/#212-increm-repetition-history--aggregated-view) — este último con un **resumen agregado** de repeticiones, tiempo y conteos de todo el subárbol de descendientes de un Rem. Todo respaldado por un motor **FSRS v6** integrado que calcula Dificultad / Estabilidad / Recuperabilidad por tarjeta, además de un [desglose del Escudo ponderado por prioridad](https://hugomarins.github.io/incremental-remnote/Prioritization-&-Sorting/#weighted-shield) en el que puedes hacer clic para ver qué parte de tu carga de trabajo ya has procesado.
 
-👉 Consulta la página de **[Utilidades](https://hugomarins.github.io/incremental-everything/Utilities/)** para la lista completa, y la **[Referencia de Comandos del Complemento](https://hugomarins.github.io/incremental-everything/Plugin-Commands-Reference/)** para todos los comandos.
+👉 Consulta la página de **[Utilidades](https://hugomarins.github.io/incremental-remnote/Utilities/)** para la lista completa, y la **[Referencia de Comandos del Complemento](https://hugomarins.github.io/incremental-remnote/Plugin-Commands-Reference/)** para todos los comandos.
 
 ## Instalación
 
@@ -57,7 +57,7 @@ Más allá del ciclo principal de aprendizaje, Incremental RemNote incluye **doc
 
 Este README cubre lo básico. Para las guías completas, por favor visita el **Manual de Usuario**:
 
-👉 **[Incremental RemNote — Manual de Usuario](https://hugomarins.github.io/incremental-everything/)**
+👉 **[Incremental RemNote — Manual de Usuario](https://hugomarins.github.io/incremental-remnote/)**
 
 *(La documentación dejó el Wiki de GitHub en agosto de 2026. El nuevo sitio permite búsqueda completa, funciona en móvil y tiene temas claro y oscuro — actualiza tus marcadores, por favor.)*
 
@@ -72,7 +72,7 @@ Este README cubre lo básico. Para las guías completas, por favor visita el **M
 - **¿Qué es la Lectura Incremental?**: [Viaje Incremental - Lectura Incremental en Términos Simples](https://youtu.be/V4xEziM8mco)
 
 ### Enlaces Útiles
-- **[Registro de Cambios](https://hugomarins.github.io/incremental-everything/Changelog/)**: Mira las últimas características y actualizaciones.
+- **[Registro de Cambios](https://hugomarins.github.io/incremental-remnote/Changelog/)**: Mira las últimas características y actualizaciones.
 - **[Discord](http://bit.ly/RemNoteDiscord)**: Únete a la comunidad y chatea con nosotros (busca los canales del complemento).
 
 
@@ -99,7 +99,7 @@ Este README cubre lo básico. Para las guías completas, por favor visita el **M
 ### Programación
 
 - **Programador Predeterminado**: Usa una fórmula exponencial — `intervalo = ⌈Multiplicador ^ N⌉` días (el multiplicador es 1.5 por defecto). Simple y eficaz para elementos que necesitan pocas revisiones.
-- **Programador Beta (Curva de Saturación)**: Una alternativa opcional en la que los intervalos comienzan en un *Intervalo de Primera Revisión* configurable (por defecto 5 días) y se acercan gradualmente a un *Intervalo Máximo* (por defecto 30 días). Ideal para elementos que necesitan muchas revisiones (libros, capítulos). Consulta la página [IncRem Scheduler](https://hugomarins.github.io/incremental-everything/IncRem-Scheduler/) para más detalles.
+- **Programador Beta (Curva de Saturación)**: Una alternativa opcional en la que los intervalos comienzan en un *Intervalo de Primera Revisión* configurable (por defecto 5 días) y se acercan gradualmente a un *Intervalo Máximo* (por defecto 30 días). Ideal para elementos que necesitan muchas revisiones (libros, capítulos). Consulta la página [IncRem Scheduler](https://hugomarins.github.io/incremental-remnote/IncRem-Scheduler/) para más detalles.
 - Puedes establecer manualmente la próxima fecha de repetición usando el comando **Reprogramar** (**Ctrl+J**), o las funciones de tablas y propiedades de RemNote.
 
 ### 📱 Soporte Móvil
@@ -140,7 +140,7 @@ El complemento ahora cuenta con **Modo Ligero Automático**.
 - El complemento guardará automáticamente tu progreso y velocidad de reproducción.
 - Puedes abrir la sección de notas redimensionable a la izquierda para tomar notas mientras ves.
 
-![Video Incremental](https://hugomarins.github.io/incremental-everything/assets/YT-extract-mode.png)
+![Video Incremental](https://hugomarins.github.io/incremental-remnote/assets/YT-extract-mode.png)
 
 ### Matemáticas Incrementales
 
