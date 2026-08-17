@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/inc-logo-2.png" width="400" alt="Incremental RemNote Logo" />
+  <img src="assets/inc-logo-2.jpeg" width="400" alt="Incremental RemNote Logo" />
 </p>
 
 > **Review notes, PDFs, Youtube videos and web articles incrementally alongside your flashcards, and tackle overload by prioritizing your learning.**

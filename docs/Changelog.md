@@ -12,6 +12,8 @@ Nothing about your knowledge base moves: the plugin id, every powerup, every tag
 
 The settings command's quick code is now **`is`** (it was `ies`). Shorter, and it no longer spells out initials of a name the plugin no longer has.
 
+**This manual has moved with the name**, to **[hugomarins.github.io/incremental-remnote](https://hugomarins.github.io/incremental-remnote/)**. The old address no longer resolves — a GitHub Pages address is built from the repository name, and there is no way to keep both — so **update your bookmarks**. The links inside the plugin (the **?** beside every setting, the panel's documentation button, and RemNote's own plugin page from this version on) all point at the new address already. If you are on an earlier version, its plugin-page links still point at the old one and will not resolve until you update.
+
 ### 📝 Changed - card priorities are stored in a hidden slot
 
 A card priority used to live in a **visible** slot, which meant RemNote drew a `Priority — 31` row under every prioritised Rem. It now lives in a **hidden** slot, and that row is gone. The numbers, the sources, inheritance, the Card Shield, percentiles, the badges and [Priority Review Documents](Priority-Review-Document.md) all work exactly as before.
@@ -652,7 +654,7 @@ All three have been reported to the RemNote team with the supporting evidence, a
 
 ### 📚 New: the User's Manual has moved to a dedicated documentation site
 
-The documentation has left the GitHub Wiki and now lives at **[hugomarins.github.io/incremental-everything](https://hugomarins.github.io/incremental-everything/)**.
+The documentation has left the GitHub Wiki and now lives at **[hugomarins.github.io/incremental-remnote](https://hugomarins.github.io/incremental-remnote/)**.
 
 The Wiki had outgrown itself: 28 pages with no real search, a flat sidebar that gave no sense of where you were, and an appearance fixed by GitHub. The new site is built with **MkDocs Material** and fixes exactly those things:
 

@@ -289,7 +289,7 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
 };
 
 /** Documentation site the "?" help links point at. */
-export const IE_DOCS_BASE_URL = 'https://hugomarins.github.io/incremental-everything/';
+export const IE_DOCS_BASE_URL = 'https://hugomarins.github.io/incremental-remnote/';
 
 /**
  * Appended by register/settings.ts to the description of whichever setting it

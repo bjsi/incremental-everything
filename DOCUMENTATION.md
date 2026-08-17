@@ -1,6 +1,6 @@
 # Documentation — where it lives and how to update it
 
-The User's Manual is published at **<https://hugomarins.github.io/incremental-everything/>**.
+The User's Manual is published at **<https://hugomarins.github.io/incremental-remnote/>**.
 
 Its source lives in this repository under [`docs/`](docs/). There is no separate documentation repository any more.
 
@@ -66,7 +66,7 @@ mkdocs serve      # http://127.0.0.1:8000
 
 **Links between pages** point at the Markdown file, not the published URL — `[Utilities](Utilities.md)`, `[the Shield](Prioritization-&-Sorting.md#weighted-shield)`. MkDocs rewrites them and warns when a target disappears. The old wiki-style `[[Page#anchor|label]]` syntax does **not** work here.
 
-**Published URLs** are `https://hugomarins.github.io/incremental-everything/<Page-File-Name>/` (directory URLs, no `.md`), with anchors appended after the trailing slash: `.../Utilities/#find-rem--reference-or-open`. Use this form only when linking from outside the docs (README, plugin manifest, Discord).
+**Published URLs** are `https://hugomarins.github.io/incremental-remnote/<Page-File-Name>/` (directory URLs, no `.md`), with anchors appended after the trailing slash: `.../Utilities/#find-rem--reference-or-open`. Use this form only when linking from outside the docs (README, plugin manifest, Discord).
 
 **Assets** live in `docs/assets/`, referenced relatively: `![Alt](assets/thing.png)`. Images that had been pasted straight into the old GitHub Wiki (and so lived on GitHub's CDN under opaque UUID filenames) were downloaded into `docs/assets/uploaded/`.
 
