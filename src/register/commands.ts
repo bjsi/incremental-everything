@@ -1311,7 +1311,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
   plugin.app.registerCommand({
     id: 'debug-incremental-everything',
-    name: 'Debug Incremental Everything',
+    name: 'Debug Incremental RemNote',
     action: async () => {
       const rem = await plugin.focus.getFocusedRem();
       if (!rem) {
@@ -3563,8 +3563,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
   plugin.app.registerCommand({
     id: 'ie_open_settings',
-    name: 'Incremental Everything: Settings',
-    description: 'Open the Incremental Everything settings popup',
+    name: 'Incremental RemNote: Settings',
+    description: 'Open the Incremental RemNote settings popup',
     quickCode: 'ies',
     action: async () => {
       await plugin.widget.openPopup('ie_settings');
@@ -3575,8 +3575,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // than the next start.
   plugin.app.registerCommand({
     id: showPluginHubCommandId,
-    name: 'Show Incremental Plugin Panel',
-    description: 'Bring back the Incremental Plugin panel in the sidebar after closing it',
+    name: 'Show Incremental RemNote Panel',
+    description: 'Bring back the Incremental RemNote panel in the sidebar after closing it',
     action: async () => {
       await plugin.storage.setSession(pluginHubHiddenKey, false);
       await plugin.app.toast('Plugin panel restored.');

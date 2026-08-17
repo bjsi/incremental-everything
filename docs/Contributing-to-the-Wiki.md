@@ -37,4 +37,4 @@ When writing or editing pages, please follow these general best practices:
 * **Link between pages:** Link to the Markdown file, not the published URL — e.g. `[Utilities](Utilities.md)` or `[the Shield](Prioritization-&-Sorting.md#weighted-shield)`. MkDocs converts these to the right links and warns if a target no longer exists.
 * **Screenshots:** Explaining complex visual tasks is usually easier with a screenshot or a short GIF. Put image files in `docs/assets/` and reference them relatively, e.g. `![Alt text](assets/my-screenshot.png)`. If you'd rather not deal with files, just attach the image to your GitHub Issue and we will add it.
 
-Thank you for helping us make the Incremental Everything documentation better for everyone!
+Thank you for helping us make the Incremental RemNote documentation better for everyone!

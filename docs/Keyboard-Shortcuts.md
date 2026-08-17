@@ -1,6 +1,6 @@
 # Keyboard Shortcuts
 
-Using keyboard shortcuts is the fastest way to interact with the Incremental Everything plugin. This page provides a reference for all the shortcuts added by the plugin, as well as native RemNote shortcuts that are essential to the workflow.
+Using keyboard shortcuts is the fastest way to interact with the Incremental RemNote plugin. This page provides a reference for all the shortcuts added by the plugin, as well as native RemNote shortcuts that are essential to the workflow.
 
 The same shortcuts are listed **twice**, in two different orders — pick whichever matches what you already know:
 
@@ -12,7 +12,7 @@ Also on this page: **[keys inside plugin popups](#keys-inside-plugin-popups)**, 
 ---
 ## Plugin Shortcuts
 
-This table lists all the custom keyboard shortcuts that are unique to the Incremental Everything plugin.
+This table lists all the custom keyboard shortcuts that are unique to the Incremental RemNote plugin.
 
 ### Core Commands
 

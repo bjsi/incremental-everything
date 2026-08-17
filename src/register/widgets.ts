@@ -5,7 +5,7 @@ import { getIESetting } from '../lib/settings';
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
 
-  // The "Incremental Plugin" hub: shortcuts to settings, docs, sorting criteria
+  // The "Incremental RemNote" hub: shortcuts to settings, docs, sorting criteria
   // and the Priority Review Document creator, plus one onboarding tip at a time.
   // Ungated on purpose — it is the entry point to everything else, so it has to
   // be visible before the user knows there is a settings popup to find.

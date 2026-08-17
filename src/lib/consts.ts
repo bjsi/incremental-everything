@@ -131,7 +131,7 @@ export const ieSettingsMigratedKey = 'ie_settings_migrated';
 export const ieSettingsMigrationReportKey = 'ie_settings_migration_report';
 
 // --- Onboarding hub (see lib/onboarding_tips.ts, widgets/plugin_hub.tsx) ---
-/** Sidebar widget id for the "Incremental Plugin" hub panel. */
+/** Sidebar widget id for the "Incremental RemNote" hub panel. */
 export const pluginHubWidgetId = 'plugin_hub';
 /**
  * Synced, KB-partitioned record of the tips the user has answered "I Got It"

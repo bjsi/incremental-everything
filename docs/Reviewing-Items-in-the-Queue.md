@@ -12,7 +12,7 @@ Flashcard Rem | Test and strengthen memory of atomic knowledge through active re
 
 (Table adapted from the [Pleasurable Learning channel](https://www.youtube.com/watch?v=W9gZZ_UOJhg))
 
-During a study session, Incremental Everything presents your Incremental Rems one by one (intermingled with your flashcards). To interact with them, you'll use the Answer Buttons bar at the bottom of the screen.
+During a study session, Incremental RemNote presents your Incremental Rems one by one (intermingled with your flashcards). To interact with them, you'll use the Answer Buttons bar at the bottom of the screen.
 
 Each button is designed for a specific action to manage your learning flow efficiently.
 
@@ -369,7 +369,7 @@ To get accurate D/S/R values that match RemNote's internal calculations, you nee
 
 1.  Go to **RemNote Settings → Schedulers → Global Default Scheduler**.
 2.  Copy the weights array (19 or 21 comma-separated numbers).
-3.  Go to **Plugin Settings → Incremental Everything → FSRS Global Weights**.
+3.  Go to **Plugin Settings → Incremental RemNote → FSRS Global Weights**.
 4.  Paste the weights string (e.g., `[1, 3, 10, 45, 7.011, 0.46, ...]`).
 
 If left empty, the official FSRS v6.1.1 default weights are used, which will produce approximate but likely inaccurate values for your specific study patterns.
@@ -380,7 +380,7 @@ If left empty, the official FSRS v6.1.1 default weights are used, which will pro
 
 FSRS defines stability as *the interval at which recall probability is 90%*. That is why "S: 4.2y" and "your next review is in 4.2 years" are usually the same sentence — but only if your scheduler is aiming at 90%.
 
-If you set a different **requested retention** in RemNote, the interval you get is no longer the stability. Tell the plugin which value you use in **Plugin Settings → Incremental Everything → Requested Retention** (default `90%`), and the card info bar reports the scheduling you will really see:
+If you set a different **requested retention** in RemNote, the interval you get is no longer the stability. Tell the plugin which value you use in **Plugin Settings → Incremental RemNote → Requested Retention** (default `90%`), and the card info bar reports the scheduling you will really see:
 
 *   **The interval behind the next stability.** The `→ 4.2y` after Stability is still the *stability* a Good rating produces; the interval it converts to is printed right after it — `→ 4.2y (int. 1.7y)` at 95%.
 *   **The U-Factor.** It divides by the interval you will actually get, so it stops overstating how far your reviews are being pushed out. Off the 90% default a second value appears in parentheses — `U-Factor: 3.11× (3.30×)` — the first the real one, the second the textbook figure at 90% retention.

@@ -1,6 +1,6 @@
-# Getting Started with Incremental Everything
+# Getting Started with Incremental RemNote
 
-Welcome to **Incremental Everything**! This guide will walk you through the basics of making Rems incremental, reviewing them, and managing your learning workflow.
+Welcome to **Incremental RemNote**! This guide will walk you through the basics of making Rems incremental, reviewing them, and managing your learning workflow.
 
 ---
 
@@ -20,14 +20,14 @@ For a deeper understanding, see [What is Incrementalism?](What-is-Incrementalism
 ## Installation
 
 1. Open the [RemNote Plugin Store](https://www.remnote.com/plugins)
-2. Search for "**Incremental Everything**"
+2. Search for "**Incremental RemNote**"
 3. Click **Install**
 
 ---
 
-## The Incremental Plugin Panel
+## The Incremental RemNote Panel { #the-incremental-plugin-panel }
 
-Once installed, the plugin adds a small **Incremental Plugin** 🌐 panel at the bottom of the left sidebar. It is the one fixed place to reach the plugin from, and where the onboarding tips live.
+Once installed, the plugin adds a small **Incremental RemNote** 🌐 panel at the bottom of the left sidebar. It is the one fixed place to reach the plugin from, and where the onboarding tips live.
 
 **In the header:**
 
@@ -35,7 +35,7 @@ Once installed, the plugin adds a small **Incremental Plugin** 🌐 panel at the
 |---------|--------------|
 | ⚙ | Opens the plugin's [settings popup](Plugin-Settings-Reference.md) — every setting the plugin owns, grouped |
 | ? | Opens this documentation, at the home page |
-| ✕ | Hides the panel **for this session** — it is back next time you open RemNote. To bring it back sooner, run the **Show Incremental Plugin Panel** command |
+| ✕ | Hides the panel **for this session** — it is back next time you open RemNote. To bring it back sooner, run the **Show Incremental RemNote Panel** command |
 
 **Shortcut buttons:**
 

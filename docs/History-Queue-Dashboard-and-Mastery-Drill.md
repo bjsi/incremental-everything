@@ -1,6 +1,6 @@
 # History, Queue Dashboard & Mastery Drill
 
-These features were originally developed as a companion plugin (*History, Queue Dashboard and Mastery Drill*) and have been fully integrated into **Incremental Everything** as of v0.2.182.
+These features were originally developed as a companion plugin (*History, Queue Dashboard and Mastery Drill*) and have been fully integrated into **Incremental RemNote** as of v0.2.182.
 
 They add a suite of history and practice tools to your right sidebar: a **Live Session Dashboard** with real-time study metrics, a **Practiced Queues History** to track sessions over time, a **Flashcard History** to find recently reviewed cards, a **Visited Rem History** to retrace your navigation, and a **Mastery Drill** queue to deliberately target your most difficult material.
 
@@ -10,7 +10,7 @@ They add a suite of history and practice tools to your right sidebar: a **Live S
 
 ## Migrating from the Standalone Plugin
 
-> **This section only applies to users who previously had the *History, Queue Dashboard and Mastery Drill* plugin installed.** If you are a new Incremental Everything user, skip ahead.
+> **This section only applies to users who previously had the *History, Queue Dashboard and Mastery Drill* plugin installed.** If you are a new Incremental RemNote user, skip ahead.
 
 ### Background
 
@@ -22,7 +22,7 @@ The cleanest migration path is to disable IE's Mastery Drill while you finish an
 
 **Step 1 — Disable IE's Mastery Drill temporarily**
 
-In the plugin's settings popup (**`Incremental Everything: Settings`**, quick code `ies`) → **Mastery Drill**, turn **Enable Mastery Drill** off. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
+In the plugin's settings popup (**`Incremental RemNote: Settings`**, quick code `ies`) → **Mastery Drill**, turn **Enable Mastery Drill** off. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
 
 **Step 2 — Complete your old Mastery Drill queue *(optional)*
 

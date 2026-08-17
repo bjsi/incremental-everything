@@ -939,7 +939,7 @@ ${html}[data-rem-tags~="${slug}"]::before {
   // Caveat: on a single-line highlight the two corners nearly coincide, so the
   // badge can sit close to the counter.
   const badges = `
-/* Priority band badges on highlights (Incremental Everything) */
+/* Priority band badges on highlights (Incremental RemNote) */
 ${pdf}[data-rem-tags*="priorityband"],
 ${html}[data-rem-tags*="priorityband"] {
   position: relative;
@@ -1039,7 +1039,7 @@ ${incOverride}::before {
   // ::before rather than ::after because that is the pseudo-element the corner
   // placement was actually verified with against a live table.
   return `
-/* Priority band badges in table cells (Incremental Everything) */
+/* Priority band badges in table cells (Incremental RemNote) */
 .tree-node--table-cell .rem[data-rem-tags*="priorityband"] .rem-text {
   position: relative;
 }

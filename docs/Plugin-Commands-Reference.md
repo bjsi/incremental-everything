@@ -1,6 +1,6 @@
 # Plugin Commands Reference
 
-This is a complete list of commands registered in RemNote by the **Incremental Everything (Plus)** plugin. You can access these via the Command Palette (`Cmd+/` / `Cmd+/` or `Cmd+K` / `Ctrl+K`) or their assigned keyboard shortcuts.
+This is a complete list of commands registered in RemNote by the **Incremental RemNote** plugin. You can access these via the Command Palette (`Cmd+/` / `Cmd+/` or `Cmd+K` / `Ctrl+K`) or their assigned keyboard shortcuts.
 
 See the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page for default bindings.
 
@@ -93,7 +93,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Batch Assign Card Priority for tagged rems](Prioritization-&-Sorting.md#batch-card-priority-flashcards)** (`Opt+Shift+C` / `Alt+Shift+C`)
   Assign `CardPriority` to hundreds of rems at once, based on a tag. 
   
-  **Use Case:** If you previously used tags to prioritize your cards (e.g., `#important!`, `#P1`, `#P2`, `#P3`) before the Incremental Everything prioritization system, you can convert your old tagging system to the new one in bulk.
+  **Use Case:** If you previously used tags to prioritize your cards (e.g., `#important!`, `#P1`, `#P2`, `#P3`) before the Incremental RemNote prioritization system, you can convert your old tagging system to the new one in bulk.
 
   **Features:**
     - Assign random priorities within a specific range (e.g., 20–40).
@@ -297,10 +297,10 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
 ## System & Maintenance Commands
 
-- **Show Incremental Plugin Panel**
-  Brings back the [Incremental Plugin panel](Getting-Started.md#the-incremental-plugin-panel) in the sidebar after you have closed it with its **✕**. The **✕** only lasts the session — the panel returns on its own next time you open RemNote — so this is for getting it back sooner.
+- **Show Incremental RemNote Panel**
+  Brings back the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel) in the sidebar after you have closed it with its **✕**. The **✕** only lasts the session — the panel returns on its own next time you open RemNote — so this is for getting it back sooner.
 
-- **Incremental Everything: Settings** (`ies`)
+- **Incremental RemNote: Settings** (`ies`)
   Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
 
 - **Import Incremental Rems with History**
@@ -427,7 +427,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 - **Cancel No Inc Rem Timer**
   Stops system checks when queues are temporarily empty.
 
-- **Debug Incremental Everything** / **Debug Video Detection**
+- **Debug Incremental RemNote** / **Debug Video Detection**
   Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
 
 - **Toggle Priority Band Colour Logging**

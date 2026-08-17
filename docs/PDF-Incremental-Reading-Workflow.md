@@ -1,12 +1,12 @@
 # PDF Incremental Reading Workflow
 
-This page documents how to use the **Incremental Everything** plugin to incrementally read long PDFs by breaking them into chapters or sections, each managed as a separate Incremental Rem.
+This page documents how to use the **Incremental RemNote** plugin to incrementally read long PDFs by breaking them into chapters or sections, each managed as a separate Incremental Rem.
 
 ---
 
 ## Overview: The Full Incremental Workflow
 
-The **Incremental Everything** approach to PDFs is designed to support deep reading without feeling overwhelmed. The workflow typically looks like this:
+The **Incremental RemNote** approach to PDFs is designed to support deep reading without feeling overwhelmed. The workflow typically looks like this:
 
 1. **Split & Prioritize**: Instead of one massive PDF to read, you create multiple Incremental Rems for the PDF (e.g., one per chapter or section) and assign each a priority.
 2. **Read in the Queue**: When a chapter is due, it appears in your Queue. The PDF Reader automatically opens at your last saved reading position.

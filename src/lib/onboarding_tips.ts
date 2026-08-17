@@ -2,7 +2,7 @@ import { RNPlugin } from '@remnote/plugin-sdk';
 import { onboardingTipsStateKey, onboardingTipsSnoozeKey } from './consts';
 
 /**
- * The tip pile behind the Incremental Plugin sidebar hub.
+ * The tip pile behind the Incremental RemNote sidebar hub.
  *
  * A tip is one small thing the plugin can do, phrased so it can be acted on
  * immediately. **One tip per session**: the panel draws a tip when it mounts,

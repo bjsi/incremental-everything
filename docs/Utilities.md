@@ -592,7 +592,7 @@ The ring is drawn in RemNote's **accent** colour — the same one the app uses f
 
 ## Queue Display Utilities
 
-A collection of powerups and commands incorporated into Incremental Everything (originally from the standalone **Hide in Queue** plugin), plus two new powerups — **Remove Parent** and **Remove Grandparent** — that improve how parent/ancestor Rems are rendered during queue review.
+A collection of powerups and commands incorporated into Incremental RemNote (originally from the standalone **Hide in Queue** plugin), plus two new powerups — **Remove Parent** and **Remove Grandparent** — that improve how parent/ancestor Rems are rendered during queue review.
 
 ---
 
@@ -600,7 +600,7 @@ A collection of powerups and commands incorporated into Incremental Everything (
 
 The 5 powerups originally from the Hide in Queue plugin (Hide in Queue, Remove from Queue, No Hierarchy, Hide Parent, Hide Grandparent) are gated by the **Enable Hide-in-Queue powerups and commands** setting in Plugin Settings.
 
-> ⚠️ **Important.** Only enable this setting if you do **NOT** have the standalone Hide in Queue plugin installed. The powerup codes are identical, and RemNote throws a fatal `Duplicated powerup` error if both plugins try to register the same code — Incremental Everything will fail to load. If you currently use the standalone plugin, uninstall it first, then enable the setting and reload RemNote.
+> ⚠️ **Important.** Only enable this setting if you do **NOT** have the standalone Hide in Queue plugin installed. The powerup codes are identical, and RemNote throws a fatal `Duplicated powerup` error if both plugins try to register the same code — Incremental RemNote will fail to load. If you currently use the standalone plugin, uninstall it first, then enable the setting and reload RemNote.
 
 The two new powerups — **Remove Parent** and **Remove Grandparent** — are always registered regardless of the setting, because the [Cloze](IR-Flow--Reading-Extracting-and-Clozing.md) and [Extract](IR-Flow--Reading-Extracting-and-Clozing.md) creators apply Remove Parent automatically to newly-created Rems.
 

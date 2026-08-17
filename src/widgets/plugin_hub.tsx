@@ -15,7 +15,7 @@ import {
 } from '../lib/onboarding_tips';
 
 /**
- * The "Incremental Plugin" sidebar hub.
+ * The "Incremental RemNote" sidebar hub.
  *
  * The plugin's surface is spread across a slash-command list, a settings popup,
  * two document menus and a dozen shortcuts, none of which announce themselves.
@@ -304,9 +304,9 @@ export function PluginHub() {
           <span
             className="truncate"
             style={{ fontSize: 12.5, fontWeight: 600 }}
-            title="Incremental Plugin"
+            title="Incremental RemNote"
           >
-            Incremental Plugin
+            Incremental RemNote
           </span>
         </div>
         <div className="flex items-center gap-0.5">

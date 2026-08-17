@@ -63,7 +63,7 @@ const deprecatedVisiblePrioritySlot = {
 };
 
 /**
- * Registers the Incremental Everything powerups (and card priority powerup) with RemNote.
+ * Registers the Incremental RemNote powerups (and card priority powerup) with RemNote.
  *
  * @param plugin ReactRNPlugin entry point used to communicate with RemNote.
  * @param opts.retireVisiblePrioritySlot Omit the deprecated visible `priority`
@@ -90,7 +90,7 @@ export async function registerPluginPowerups(
   await plugin.app.registerPowerup({
     name: 'Incremental',
     code: powerupCode,
-    description: 'Incremental Everything Powerup',
+    description: 'Incremental RemNote Powerup',
     options: {
       slots: [
         {

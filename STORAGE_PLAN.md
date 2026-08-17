@@ -1,6 +1,6 @@
 # Plugin storage plan
 
-Working document for reducing what Incremental Everything keeps in RemNote's plugin synced storage. Pick it up at "Phases" — the sections above it exist so the decisions don't have to be re-derived.
+Working document for reducing what Incremental RemNote keeps in RemNote's plugin synced storage. Pick it up at "Phases" — the sections above it exist so the decisions don't have to be re-derived.
 
 Last measured: **2026-08-05**. Last updated: 2026-08-05 (Phases 2, 3 and 5 done).
 
@@ -29,7 +29,7 @@ Two capabilities are still missing and shape everything below:
 
 ## 2. Current measurements
 
-From the Synced Storage Key Audit (Debug Widget → `Debug Incremental Everything` → **Scan Keys**), 2026-08-05:
+From the Synced Storage Key Audit (Debug Widget → `Debug Incremental RemNote` → **Scan Keys**), 2026-08-05:
 
 - **841 live keys** of the 1000 advisory ceiling (840 distinct — the review-graph key is counted in two families)
 - **2.16 MB** total, 21.6% of the 10 MB advisory budget
