@@ -9,6 +9,7 @@ import {
   RemType,
   QueueInteractionScore,
 } from '@remnote/plugin-sdk';
+import { convertRemTree } from '../lib/markup_to_richtext';
 import {
   powerupCode,
   currentIncRemKey,
@@ -24,6 +25,7 @@ import {
   showPluginHubCommandId,
   nextInQueueCommandId,
   togglePdfHighlightBordersCommandId,
+  convertExtractedMarkupCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
   allCardPriorityInfoKey,
@@ -39,6 +41,7 @@ import {
   enableMasteryDrillId,
   enableFlashcardPrioritisationId,
   hasImagePowerupName,
+  cardEnablementAnchorKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
 import {
@@ -111,6 +114,7 @@ import {
   nextCase,
   transformCase,
   transformTitleCase,
+  parseAcronymList,
 } from '../lib/text_case_converter_utils';
 import {
   OUTLINE_SNAPSHOT_KEY,
@@ -147,7 +151,7 @@ import {
   syncAllHighlightBands,
 } from '../lib/priority_bands';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
-import { batchPriorityTargetRemIdsKey } from '../lib/consts';
+import { batchPriorityTargetRemIdsKey, titleCaseAcronymsId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 
 // Opens a priority popup against one or many rems. Single-rem calls behave
@@ -189,6 +193,33 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const enabled = await togglePdfHighlightBorders(plugin);
       await plugin.app.toast(
         enabled ? 'Highlight marker borders shown' : 'Highlight marker borders hidden (peek)'
+      );
+    },
+  });
+
+  // Convert literal markup left by PDF text-layer extraction into rich text.
+  // RemNote's highlight extraction runs no parser, so formulas arrive as the
+  // characters \[ ... \] and bold as **...**; this turns them into real nodes.
+  await plugin.app.registerCommand({
+    id: convertExtractedMarkupCommandId,
+    name: 'Convert extracted markup to rich text',
+    quickCode: 'cem',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      if (!focused) {
+        await plugin.app.toast('No focused rem — place your cursor in a rem first.');
+        return;
+      }
+      const kids = await focused.getDescendants();
+      const { scanned, converted } = await convertRemTree(
+        plugin,
+        focused._id,
+        kids.length > 0
+      );
+      await plugin.app.toast(
+        converted === 0
+          ? `Nothing to convert (${scanned} rem${scanned === 1 ? '' : 's'} scanned).`
+          : `Converted ${converted} of ${scanned} rem${scanned === 1 ? '' : 's'}.`
       );
     },
   });
@@ -1137,6 +1168,28 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // Open the batch card priority widget
       await plugin.widget.openPopup('batch_card_priority');
+    },
+  });
+
+  // Card Enablement Audit. The batch form of the debug widget's single-Rem
+  // "Probe Card Enablement": it takes an anchor Rem and asks every Rem in its
+  // orbit whether it actually produces flashcards, then fixes the two states a
+  // flag can fix. Opens on ANY focused Rem — unlike the card-priority batch
+  // above, "nothing is tagged with this" is not a reason to refuse, since the
+  // panel's descendants scope does not need a tag at all.
+  plugin.app.registerCommand({
+    id: 'card-enablement-audit',
+    name: 'Audit Card Enablement (tagged / referencing / descendants)',
+    description:
+      'Find Rems that generate no flashcards — direction set to none, cards switched off — and fix them in bulk.',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      if (!focused) {
+        await plugin.app.toast('Please focus on a rem first');
+        return;
+      }
+      await plugin.storage.setSession(cardEnablementAnchorKey, focused._id);
+      await plugin.widget.openPopup('card_enablement_audit');
     },
   });
 
@@ -3027,9 +3080,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           .map((e: any) => (typeof e === 'string' ? e : e?.text ?? ''))
           .join('');
 
+      // Acronyms the user declared in Settings → Other; they join the built-in
+      // list so Title Case can restore "gt" to "GT" after a lowercase pass.
+      const extraAcronyms = parseAcronymList(await getIESetting(plugin, titleCaseAcronymsId));
+
       const applyNextCase = (richText: any[], fullText: string, next: 'lower' | 'title' | 'upper') =>
         next === 'title'
-          ? transformTitleCase(richText, fullText)
+          ? transformTitleCase(richText, fullText, extraAcronyms)
           : transformCase(
               richText,
               next === 'upper' ? (s) => s.toUpperCase() : (s) => s.toLowerCase()
@@ -3051,7 +3108,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         const combined = rems
           .map((r) => `${richTextToPlain(r.text as any[])}\n${richTextToPlain(r.backText as any[])}`)
           .join('\n');
-        const next = nextCase(detectCase(combined));
+        const next = nextCase(detectCase(combined, extraAcronyms));
 
         for (const rem of rems) {
           const frontRT = (rem.text || []) as any[];
@@ -3076,7 +3133,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       const fullText = richTextToPlain(textSelection.richText);
-      const next = nextCase(detectCase(fullText));
+      const next = nextCase(detectCase(fullText, extraAcronyms));
       const transformed = applyNextCase(textSelection.richText, fullText, next);
 
       await plugin.editor.delete();

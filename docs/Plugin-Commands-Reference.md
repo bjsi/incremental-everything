@@ -157,6 +157,16 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **Mastery Drill** — `quick: dri`
   Opens the [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill) popup — a focused re-practice queue for cards rated *Forgot* or *Hard*. Cards are added automatically as you review; they leave the drill once rated *Good* or *Easy*.
 
+- **Convert extracted markup to rich text** — `quick: cem`
+  Turns markup left behind by PDF text-layer extraction into real RemNote rich text: `\[…\]` and `$$…$$` become a display formula, `\(…\)` and `$…$` an inline one, `**bold**` and `*italic*` become formatting.
+  RemNote's PDF highlight extraction copies the page's text layer **verbatim** — it runs no markdown or LaTeX parser — so highlights over a PDF whose text layer carries markup in source form arrive as literal characters. This command finishes the conversion afterwards.
+  Focus a Rem and run it. If the Rem has descendants, the **whole subtree** is converted, so it can be pointed at a chapter or an entire Highlights document at once. Images, Rem references and formulas that are already rich text pass through untouched, and Rems with nothing to convert are never rewritten — so it is safe to re-run.
+
+  A single `$` is matched conservatively, since a lone dollar is more often a price than a formula: the opening `$` may not be followed by a space, the closing one may not be preceded by a space or followed by a digit, the span may not contain another `$` or cross a line break, and `\$` is never a delimiter. So `It costs $5 and $10 more.` is left alone.
+
+  > [!NOTE]
+  > When you **author** a text layer, write `\[…\]` / `\(…\)`, not `$$…$$` / `$…$`. RemNote unescapes markdown inside dollar-delimited spans before the math parser sees them, which strips the backslash from `\,` `\;` `\{` `\}` `\%` `\\` — the formula still renders, just wrongly (a thin space becomes a literal comma). Dollar delimiters are recognised by this command for PDFs you did not author.
+
 ### Queue Display Commands
 
 These commands tag a Rem with one of the [Utilities#queue-display-utilities](Utilities.md#queue-display-utilities) powerups. The tagged Rem then renders differently (or is removed entirely) during queue review. All commands work both from the editor and directly inside the Queue. See the [Utilities](Utilities.md#queue-display-utilities) page for visual examples and full behavior of each powerup.
@@ -253,10 +263,11 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
   - **Smart Detection:** Automatically detects the current case and moves to the next stage.
   - **Rich-Text Safe:** Preserves bold, italic, highlights, and other formatting even across element boundaries.
+  - **Acronyms & numerals:** Title Case keeps acronyms and initialisms uppercase (`(ab)` → `(AB)`), from a built-in list plus your own in **IE Settings → Other → Title Case Acronyms**, and recognises Roman numerals used as numbering (`seção ii` → `Seção II`).
   - **Multi-Rem:** Select one or more whole rems in the outline and the cycle applies to each rem's text (and the back text of concept/descriptor rems) in one shot.
   - **Inspired by:** This feature was inspired by Toshi's ["Text Case Converter"](https://github.com/hitsu3r/remnote-text-case-converter) plugin.
 
-  📖 See [Utilities](Utilities.md) for more details and Title Case rules.
+  📖 See [Utilities](Utilities.md#text-case-converter) for more details and Title Case rules, and [Acronyms and initialisms](Utilities.md#acronyms-and-initialisms).
 
   ![Text Case Converter demo](assets/text-case-converter.gif)
 
@@ -345,6 +356,19 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
   ![Two empty Extra Card Detail Rems, boxed in red, between real ECD content under a flashcard](assets/empty-ecd-rems.png){ width="800" }
 
   📖 See [Utilities → Delete Empty Extra Card Detail Rems](Utilities.md#delete-empty-extra-card-detail-rems).
+
+- **Audit Card Enablement (tagged / referencing / descendants)**
+  Takes one anchor Rem, asks every Rem in its orbit whether it actually generates flashcards, and switches the broken ones back on in bulk.
+
+  - **Four combinable scopes:** Rems **tagged with** the anchor, Rems **referencing** it, its **descendants**, and *expand each match* to add every match's own subtree — the one that reaches an imported deck, where the tag sits on the container and the cards belong to its children.
+  - **One verdict per Rem,** as clickable filter chips: `dir=none`, `practice off`, `table`, `ancestor off`, `paused deck`, `not surfaced`, `no material`, `OK`. Each row shows the cards currently **surfaced** and the card **records** that exist, which is what separates a Rem whose cards were switched off from one that never had any.
+  - **Two bulk fixes:** set the **flashcard direction** (`forward` by default, or `both` / `backward` / `none`), and switch **Enable Cards** on or off. Rows a switch cannot fix — a disabling ancestor, a paused deck, a per-card disable — are labelled as such rather than offered a button that would change the flag and nothing else.
+  - **Undoable:** every Rem's prior flag and direction is captured before the first write, downloaded as JSON, and restorable from the panel.
+  - **Optional card priority** on whatever the run enables, so the new cards enter the queue where you chose.
+
+  **Use Case:** after an **Anki import** that lands hundreds of Rems at `direction=none`. They read as ordinary flashcards and are never scheduled — and because they own **no card records at all**, no card-driven tool can see them and RemNote's search cannot express the question.
+
+  📖 See [Utilities → Card Enablement Audit](Utilities.md#card-enablement-audit).
 
 ## System & Maintenance Commands
 

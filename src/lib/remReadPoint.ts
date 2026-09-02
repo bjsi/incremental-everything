@@ -1,7 +1,9 @@
 // lib/remReadPoint.ts
 import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { addPageToHistory, getPageHistory, PageHistoryEntry } from './pdfUtils';
+import { readRawPdfState } from './pdf_state';
 import { powerupCode, currentIncRemKey, editorReviewTimerRemIdKey } from './consts';
+import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
 
 /**
  * Read points (bookmarks) for rem-type IncRems — outline headers whose reading
@@ -53,6 +55,112 @@ export const getRemReadPointHistory = async (
   return history
     .filter((h) => h.highlightId)
     .sort((a, b) => b.timestamp - a.timestamp);
+};
+
+/**
+ * Existence-only probe: does this Rem have a read point at all?
+ *
+ * Deliberately does NOT go through getPageHistory/loadPdfState. That path costs
+ * a findOne, two hasPowerup probes to resolve the state host, and — for a Rem
+ * with no state yet, the common case — two legacy-key lookups on top. This
+ * needs one `getPowerupProperty` on a Rem object the caller already holds, and
+ * resolves nothing: no rem texts, no ancestor walk.
+ *
+ * That makes it cheap enough for a per-Rem indicator (the Priority Editor's
+ * collapsed badge renders once per visible Rem). Callers must already know the
+ * Rem carries `powerup` — pass the Dismissed powerup for a dismissed Rem.
+ */
+export const hasRemReadPoint = async (
+  rem: PluginRem,
+  powerup: string = powerupCode
+): Promise<boolean> => {
+  const raw = await readRawPdfState(rem, powerup);
+  // Fast reject: a read point stores the Rem's own id as a source key, so a
+  // blob that never mentions it (a pure PDF reader) can't hold one.
+  if (!raw || !raw.includes(rem._id)) return false;
+  try {
+    const history = JSON.parse(raw)?.bySource?.[rem._id]?.history;
+    // Legacy history shapes are bare page numbers, which carry no read point.
+    return Array.isArray(history) && history.some((h: any) => h?.highlightId);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * A read point resolved into the chain of rems that leads to it.
+ */
+export interface ReadPointPath {
+  /** The bookmarked rem (the deepest segment of `path`). */
+  remId: string;
+  /** Display texts, from just below the IncRem down to the read point. */
+  path: string[];
+  /** Rem ids parallel to `path`, so any segment can be opened. */
+  pathIds: string[];
+  /** False when the read point no longer sits under the IncRem. */
+  withinTarget: boolean;
+  /** When the read point was set. */
+  timestamp: number;
+}
+
+/** Ancestors kept when the read point turns out to live outside the IncRem. */
+const ORPHAN_PATH_SEGMENTS = 4;
+
+/**
+ * Resolve `incRemId`'s current read point together with the ancestors leading
+ * to it, starting just below `incRemId` itself — what the reading position of
+ * an outline looks like written out, and the counterpart of "page N of a range"
+ * for a PDF.
+ *
+ * Read points live under the same synced page-history storage as PDF bookmarks
+ * (see the module comment), so this also answers for dismissed rems. Returns
+ * null when no read point is set or the bookmarked rem has been deleted.
+ *
+ * If the bookmarked rem has since been moved out of the outline the upward walk
+ * never meets `incRemId`; rather than dropping the information, the last few
+ * ancestors are kept and `withinTarget` is false so callers can say so.
+ */
+export const getReadPointPath = async (
+  plugin: RNPlugin,
+  incRemId: string,
+  maxDepth = 50
+): Promise<ReadPointPath | null> => {
+  const entry = await getRemReadPoint(plugin, incRemId);
+  if (!entry?.highlightId) return null;
+
+  const targetRem = await plugin.rem.findOne(entry.highlightId);
+  if (!targetRem) return null;
+
+  const ids: string[] = [entry.highlightId];
+  let withinTarget = false;
+  // Untyped walker: getParentRem() is loosely typed in the SDK (see
+  // isDescendantOf above).
+  let current: any = targetRem;
+  for (let i = 0; i < maxDepth; i++) {
+    const parent = await current.getParentRem();
+    if (!parent) break;
+    if (parent._id === incRemId) {
+      withinTarget = true;
+      break;
+    }
+    ids.unshift(parent._id);
+    current = parent;
+  }
+
+  if (!withinTarget && ids.length > ORPHAN_PATH_SEGMENTS) {
+    ids.splice(0, ids.length - ORPHAN_PATH_SEGMENTS);
+  }
+
+  const path = await Promise.all(
+    ids.map(async (id) => {
+      const r = id === entry.highlightId ? targetRem : await plugin.rem.findOne(id);
+      if (!r) return '…';
+      const text = (await resolveRemTextForBreadcrumb(plugin, r.text)).trim();
+      return text || 'Untitled';
+    })
+  );
+
+  return { remId: entry.highlightId, path, pathIds: ids, withinTarget, timestamp: entry.timestamp };
 };
 
 /**

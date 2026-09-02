@@ -2,6 +2,138 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.75 - September 2nd, 2026
+
+### ✨ New - where you stopped reading an outline, shown next to where you stopped in a PDF
+
+Both surfaces that already reported PDF reading progress now do the same for a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems): the **Repetition History** popup gains a footer, and the **Priority Editor** a panel, each showing the clickable path from the Rem down to the bookmarked descendant and the date it was set. The collapsed Priority Editor marks a Rem that has one with a green bookmark.
+
+📖 [Read Points](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point) · [IncRem Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view)
+
+### ✨ New - Text Case Converter keeps acronyms and Roman numerals uppercase
+
+Title Case no longer flattens an acronym to *(Ab)* or a `Seção II` to *Seção Ii*: maritime, institutional and technical acronyms are built in, Roman numerals are recognised where they read as numbering, capitals you already typed are preserved, and your own terms go in **IE Settings → Other → Title Case Acronyms**.
+
+📖 [Acronyms and initialisms](Utilities.md#acronyms-and-initialisms)
+
+### ⚡ Improved - Priority Shield History opens on the Knowledge Base graphs
+
+The four charts were reordered: Knowledge Base first (Card, then IncRem), then the document scope — the widest view no longer needs a scroll.
+
+📖 [Priority Shield Graph](Plugin-Widgets-Reference.md#44-priority-shield-graph)
+
+### ⚡ Improved - the incremental and dismissed left borders span the whole block
+
+The green and amber markers now run down the Rem *and* its descendants instead of stopping at its first line, so an outline reads as one block at a glance; the document you are currently inside keeps its title-only marker.
+
+📖 [Editor colour coding](Colour-Coding-Reference.md#editor)
+
+## v1.0.74 - September 2nd, 2026
+
+### ✨ New - Priority Review Documents no longer hand you a parent's answer
+
+A due flashcard whose parent or grandparent is also due is held back, and the blocking ancestor takes its place in the document — practise it now, and the descendant is free next time.
+
+📖 [Ancestor Spoiler Protection](Priority-Review-Document.md#ancestor-spoiler-protection)
+
+## v1.0.73 - September 1st, 2026
+
+### ✨ New - Priority Review Queue pinned to your sidebar
+
+The `#Priority Review Queue` tag Rem is pinned to your sidebar the first time a review document is built — once, and never again if you unpin it — so the queue is reachable on mobile, where the plugin panel is not. Review documents are now created under that tag Rem instead of at the top level.
+
+📖 [The Priority Review Queue in your sidebar](Priority-Review-Document.md#the-priority-review-queue-in-your-sidebar)
+
+## v1.0.72 - August 30th, 2026
+
+### ✨ New - `$` and `$$` recognised as LaTeX delimiters
+
+**Convert extracted markup to rich text** now also converts `$…$` and `$$…$$`, for PDFs whose text layer you did not author. A lone `$` is matched conservatively, so prices are left alone.
+
+📖 [Convert extracted markup to rich text](Plugin-Commands-Reference.md#convert-extracted-markup-to-rich-text)
+
+## v1.0.71 - August 30th, 2026
+
+### 🐛 Fixed - queue opened with no plugin widgets
+
+The right sidebar and every plugin widget sometimes failed to appear on queue entry, until you clicked the Practiced Queues tab by hand.
+
+## v1.0.70 - August 30th, 2026
+
+### ✨ New - Card Enablement Audit
+
+A Rem can look exactly like a flashcard and generate nothing. The new **Audit Card Enablement** command takes one anchor Rem, asks every Rem tagged with it, referencing it or descended from it whether it actually produces cards, and switches the broken ones back on in bulk — with a card priority for the ones it enables, and an undo.
+
+The case it was built for is an **Anki import**: hundreds of Rems arrive with the flashcard direction set to `none`. They read as ordinary cards and are never scheduled — and because they own **no card records at all**, no card-driven tool can see them and RemNote's search cannot express the question.
+
+📖 [Card Enablement Audit](Utilities.md#card-enablement-audit)
+
+#### Technical explanation
+
+The walk is Rem-driven rather than card-driven, which is the whole point: a Rem at `direction=none` produces zero rows in `card.getAll()`, so the Suppressed Cards breakdown is structurally blind to it however it is filtered. Verdicts follow `CARD_STATE_REFERENCE.md` and are ordered by what a fix would accomplish — a disabling ancestor outranks the Rem's own direction, since setting a direction under one writes the slot and produces nothing.
+
+Three things make it usable at scale, where the single-Rem debug probe is not: the card table is fetched once and indexed by `remId` instead of once per Rem; ancestor chains are memoised per parent id, so the hundreds of rows of an imported deck resolve one shared chain and get their breadcrumb from the same walk; and plain-string rich text is joined locally rather than paying a `normalize` + `toString` round trip per Rem. Writes are sequential under a suppression lease, and the cards created are counted by reading back afterwards rather than predicted.
+
+### ✨ New - remove card priorities in bulk
+
+The **Batch Card Priority** panel can now take priorities off the same selection it assigns them to. Undoable, with the before-state downloaded as JSON, and the table badge goes with the priority.
+
+It counts only Rems that physically carry the tag — a Rem with no tag still *resolves* an inherited priority, but there is nothing there to remove.
+
+📖 [Removing card priorities in bulk](Priorities-for-Flashcards.md#removing-card-priorities)
+
+### 🐛 Fixed - one "slot which doesn't exist" toast per Rem during a bulk priority removal
+
+Removing priorities from 223 Rems produced 223 toasts. The removals themselves worked.
+
+#### Technical explanation
+
+`clearRawCardPriority` cleared both priority slots unconditionally, the retired visible one included. Its rejection was caught, but RemNote raises the host-level warning before the promise reaches that catch. The read path already skipped the retired slot; this is the same guard on the write side, keyed on retirement rather than migration — a migrated KB whose visible slot is still registered can hold a stale value that must still be cleared. `stripCardPriorityTag` threads the plugin handle through, and the popup realm warms the retired-slot memo once per run instead of asking per Rem.
+
+## v1.0.69 - August 30th, 2026
+
+### ✨ New - All Tips
+
+A fourth button on the sidebar tip opens the whole pile: acknowledged ones first, newest at the top with the date you answered them, then the ones still to come. Each row has its own **Learn More**, and each unanswered one its own **I Got It**. When no tip is on screen the panel shows a **💡 All tips** link instead.
+
+![The sidebar tip with its four buttons: I Got It, Learn More and All Tips, and the ✕ in the corner](assets/panel-hub-2.png){ width="400" }
+
+📖 [All Tips](Getting-Started.md#all-tips)
+
+### 🐛 Fixed - the same tips kept coming back
+
+Two causes. Tips were drawn at random, so with a few left in the pile the same one recurred; they are now offered in rotation, least recently seen first. And "one tip per session" only held while the sidebar stayed put — RemNote remounts it as you use the app, and each remount drew again.
+
+📖 [Tips](Getting-Started.md#tips)
+
+#### Technical explanation
+
+Acknowledgements were never lost, but lived in synced storage alone — what lost the Card shield history in the storage overhaul. They are now mirrored locally, read as the union of both, and merged before writing, so an un-hydrated `getSynced` can neither resurrect a retired tip nor overwrite a full record with one id. Existing ones are copied to the mirror on the next panel mount. An acknowledgement made before `getCurrentKnowledgeBaseData()` resolved used to land in a `default` bucket no later read consulted; that bucket is now folded into the current knowledge base.
+
+`pickTip` takes a last-shown map (never-shown first, then oldest, random tie-breaks); the drawn tip is held in session storage. Both are local — pacing, not decisions. New **Onboarding Tips State** section in the Debug popup: every store and partition, per-tip presence in each, rotation order, and a reset.
+
+## v1.0.68 - August 29th, 2026
+
+### ✨ New - convert markup left by PDF extraction into real rich text
+
+RemNote's PDF highlight extraction copies the page's text layer **verbatim** — it runs no markdown or LaTeX parser at all. So a highlight over a formula arrives as the literal characters `\[C_{WP} = \frac{A_{WP}}{L_{PP}B}\]`, and a bold heading as `**2.3.1. Efeito** *squat*`.
+
+The new **Convert extracted markup to rich text** command (`cem`) turns that markup into real RemNote nodes: display and inline formulas become KaTeX, `**bold**` and `*italic*` become formatting. Focus a Rem and run it — if the Rem has descendants the whole subtree is converted, so you can point it at a chapter or an entire Highlights document in one go.
+
+This pairs with a PDF whose text layer has been rebuilt to carry markup in *source* form. Highlights over such a PDF land as plain characters, and this command finishes the job after the fact.
+
+Rems with nothing to convert are left untouched and never rewritten, so the command is safe to re-run over material you have already processed.
+
+📖 [Convert extracted markup to rich text](Plugin-Commands-Reference.md#convert-extracted-markup-to-rich-text)
+
+#### Technical explanation
+
+The converter walks a Rem's rich text array and only transforms text nodes — raw strings and `i: 'm'` — passing images, Rem references and existing formulas through untouched, so a caption that already holds an image keeps it. A node's own formatting is preserved on the plain runs surrounding an extracted formula.
+
+Delimiters are `\[…\]` and `\(…\)` rather than `$$…$$` / `$…$` deliberately. RemNote unescapes markdown inside dollar-delimited spans **before** the math parser sees them, which strips the backslash from `\,` `\;` `\{` `\}` `\%` `\\`. The formula still renders, just wrongly — a thin space silently becomes a literal comma — which makes the corruption easy to miss. Backslash-bracket delimiters pass through intact, and RemNote normalises them to `$…$` / `$$…$$` on storage, so the stored form looks identical either way; only the surviving backslashes tell the two apart.
+
+Display formulas are matched before inline ones, since a display formula may itself contain parentheses that would otherwise be read as an inline delimiter.
+
 ## v1.0.66 - August 29th, 2026
 
 ### ✨ New - hide the front-side table properties of a single card

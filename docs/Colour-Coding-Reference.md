@@ -28,12 +28,15 @@ It appears wherever a priority is shown as colour: the **table-cell badges** (`7
 
 | Marker | Colour | Meaning | Setting |
 |---|---|---|---|
-| Left border, 3px | **green** | The Rem is an Incremental Rem | Green Left Border for IncRems |
-| Left border, 3px | **amber** `#f59e0b` | Dismissed, with preserved history | Yellow Left Border for Dismissed Rems |
+| Left border, 3px | **green** | The Rem is an Incremental Rem — spans the Rem **and its descendants** | Green Left Border for IncRems |
+| Left border, 3px | **amber** `#f59e0b` | Dismissed, with preserved history — spans the Rem **and its descendants** | Yellow Left Border for Dismissed Rems |
 | Text background | **blue** `#8ad0f3` (dark `#1e496b`) | A PDF/web highlight you have **extracted** from (`#pdfextract`) | — |
 | Text background | **green** `#75f8b2` (dark `#1a5c3a`) | A highlight that is itself an Incremental Rem | — |
 | Dimmed, shrunk text | — | Tagged `#ignore` — archived, still readable | — |
 | Yellow background + red text | — | Source text already used for a cloze (`Opt+Z`) | — |
+| Bookmark glyph in the [Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget) | **green** `#10b981` | The Rem has a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) — expand the widget to see where | — |
+
+Both left borders run down the whole block, so an outline reads as one unit rather than a marked first line above unmarked children. Two places keep a single-line marker instead: the document you are currently inside, which is marked on its title only — a bar down the entire page says nothing useful — and the queue, portals, hover previews and PDF highlights, where there is no block to span.
 
 ### Reference pin rings
 

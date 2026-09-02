@@ -148,12 +148,14 @@ export async function summarizeCardPriorityTags(plugin: RNPlugin): Promise<{
 }
 
 /** Strips every slot and the tag itself from one rem. */
-async function stripCardPriorityTag(rem: PluginRem): Promise<void> {
+export async function stripCardPriorityTag(rem: PluginRem, plugin?: RNPlugin): Promise<void> {
   try {
     // clearRawCardPriority covers BOTH priority slots — the visible one and the
     // hidden one it migrated to. Clearing only the visible slot would leave the
     // value behind, ready to reappear the moment the powerup was re-applied.
-    await clearRawCardPriority(rem);
+    // `plugin` lets it skip the visible slot once that slot is retired, which
+    // otherwise costs one host-level "slot which doesn't exist" toast per rem.
+    await clearRawCardPriority(rem, plugin);
     await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
     await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
   } catch (e) {
@@ -331,7 +333,7 @@ export async function removeAllCardPriorityTags(
 
       await Promise.all(
         batch.map(async ({ rem }) => {
-          await stripCardPriorityTag(rem);
+          await stripCardPriorityTag(rem, plugin);
           removedIds.add(rem._id);
         })
       );
@@ -482,7 +484,7 @@ async function clearCurrentKbShieldHistory(plugin: RNPlugin, currentKbId: string
  * read of the database, and advancing it would postpone the staleness rebuild
  * (see the header note in persistence.ts).
  */
-async function pruneCardPriorityCopies(plugin: RNPlugin, removedIds: Set<string>): Promise<void> {
+export async function pruneCardPriorityCopies(plugin: RNPlugin, removedIds: Set<string>): Promise<void> {
   if (removedIds.size === 0) return;
 
   const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];

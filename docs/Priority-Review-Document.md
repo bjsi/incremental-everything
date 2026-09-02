@@ -40,7 +40,7 @@ You can create a review document from anywhere in RemNote:
 
 * **Sidebar Panel:** The **Priority Review** button in the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel), which names the scope it will use underneath it. The two buttons beside it are the other half of the workflow — **👁** opens the **Priority Review Queue** Rem, where every document you have built is listed, and **🧹** runs [Clean Priority Review Documents](#cleaning-a-review-document).
 
-![The Incremental RemNote panel: the Priority Review button with its eye and broom actions, and the scope it is about to use named underneath](assets/panel-hub.png){ width="700" }
+![The Incremental RemNote panel: the Priority Review button with its eye and broom actions, and the scope it is about to use named underneath](assets/panel-hub-2.png){ width="400" }
 
 ### 2. Configure Your Session
 A popup will appear allowing you to tailor the session:
@@ -78,6 +78,18 @@ The plugin will generate a new document tagged `#Priority Review Queue` and auto
 ![Priority Review Document](assets/uploaded/10db4390-8299-4167-be38-7afc431d1aec.png){ width="800" }
 
 ![deleting priority review document](assets/uploaded/afd7a2d7-3318-4496-b69b-0f5b29dbe0c9.png){ width="800" }
+
+---
+
+## The Priority Review Queue in your sidebar
+
+Every review document is tagged `#Priority Review Queue`, and that tag Rem is the index of all of them: open it and the **All Tagged Bullets** table lists every review document you have built, on desktop and on your phone alike.
+
+The first time the plugin builds a review document, it **pins that tag Rem to your left sidebar**. This happens once per knowledge base, ever. If you unpin it, it stays unpinned — the plugin will not put it back.
+
+The reason is mobile. The plugin panel and the hub, which are where you would normally click through to the queue, are not rendered on a phone at all; the sidebar is. A pinned Priority Review Queue is one tap away from anywhere, which is what makes a review document you built at your desk practicable on the train.
+
+Review documents themselves are **not** pinned — that would add a timestamped sidebar entry per session, and the tag already lists them. They are created as children of the tag Rem, so they stay together instead of scattering one more top-level document per session. Nothing about how you find or practise them changes: they are listed as instances of the tag exactly as before, and practising the tag Rem still gathers every instance with its descendants.
 
 ---
 
@@ -134,6 +146,55 @@ After creation, if any items were skipped:
 - The full list with rem IDs is printed to the **browser console** for investigation.
 
 The document auto-closes only when there are no skipped items; otherwise the warning panel stays open until you explicitly click **Close**.
+
+---
+
+## Ancestor Spoiler Protection
+
+A descriptor with flashcards can sit above another descriptor with flashcards. When you practise the **child**, RemNote shows the parent above the question as context — **answer included**. If the parent's own card was due too and simply happened to come up later in the session, you have already read its answer: it gets graded as a successful recall it never had to make, and a card with years of accumulated stability walks away with years more.
+
+![A queue card for a second-level descriptor: the first-level descriptor above it is displayed in full, answer included, and both were due](assets/PRD-card-spoiler-protection.png){ width="800" }
+
+Above, the card being asked is the **second-level** descriptor — the stats bar belongs to *it*, not to the card it is about to give away. The **first-level** descriptor sits right on top of it with its answer, *encurtar caminho*, in plain sight, and it was due in the same session. When it came up a few minutes later it was graded **Good** (*Recalled With Effort*) in **17 seconds**, and its interval went from **1.3 years to 8.1 years** — next practice in 2034 — on the strength of a line that had already been read.
+
+![The plugin's Flashcard Repetition History for the first-level descriptor, with repetitions 9 and 10 boxed: a 1.3-year interval becoming 8.1 years, and stability going from 4.1 to 7.9 years](assets/PRD-card-spoiler-protection-consequence.png){ width="800" }
+
+The [Flashcard Repetition History](Reviewing-Items-in-the-Queue.md#flashcard-repetition-history) of that first-level card records the damage. Repetition 10 answered a card a little before (3.3 years since last repetition) the optimum time suggested by its calculated previous 4.1 years stability (Retrievability being estimated at 91.4%), and FSRS read that as a card far stronger than it was: stability **4.1 → 7.9 years**, a ×1.90 bump, and a decade of scheduling bought with no retrieval at all. Nothing in the history marks it as unearned — from here on, it is simply what the card knows about itself.
+
+RemNote does not prevent this natively, so the Priority Review Document does.
+
+### How It Works
+
+As each candidate flashcard Rem is pulled into the mixing loop, the plugin looks at its **parent and grandparent** — two levels, the range where the context line still carries an answer rather than a section or document title:
+
+1. If neither ancestor has a due card, the Rem is included as normal.
+2. If one does, the Rem is **held back**, and the blocking ancestor **takes its place in the document**.
+3. When *both* ancestors are due, the **grandparent** is the one swapped in — the highest blocker, not the nearest — so releasing it frees the parent for your next document, which in turn frees the original card. The tree drains top-down, one level per review.
+
+The swap is the point. Dropping the child on its own would leave the block standing: the parent might not be drawn this time, and the same pair would collide again in the next document. Practising the ancestor **now** is what makes the descendant free next time.
+
+Follow from that: The ancestor swapped in may be **lower priority** than the card it displaced. Its priority is beside the point — it is in the way.
+
+The item count is preserved — one item out, one item in — and cluster siblings need no check of their own, since they share the triggering Rem's parent and grandparent.
+
+Due-ness is read from the ancestor's **actual cards**, not from the plugin's priority cache, so a flashcard you created minutes ago still protects its descendants. A never-practised card counts as due — the case that matters most, since nothing has been recalled for the descendant to give away.
+
+### What You See
+
+After creation, if any items were held back:
+
+- A **purple 🎭 panel** lists each held-back Rem with its priority, the blocking parent or grandparent, and whether that ancestor was swapped in or was already in the document.
+- The document's **metadata code block** includes a `Held back (due ancestor): N flashcard rems, M ancestors swapped in` line.
+- The full list with Rem IDs is printed to the **browser console**.
+
+![The Create Priority Review Document popup after creation, showing the purple panel: six flashcard Rems held back, five blocking ancestors swapped in, each entry naming the parent or grandparent that blocked it](assets/PRD-card-spoiler-protection-notification.png){ width="500" }
+
+Each line reads *what was held back* over *what blocked it* — `P14 diferenças (em relação a IALA-B)` above `blocked by grandparent "Balizamentos de Uso Restrito" — swapped in`. Where an entry says **already in this document**, the blocking ancestor had been selected on its own merits, so nothing needed swapping. That is why the two counts in the header differ: six Rems held back, five ancestors added.
+
+Like the paused-document warning, the popup stays open until you click **Close**.
+
+> [!NOTE]
+> This check is always on and has no threshold — unlike the paused filter, there is no priority high enough to make reading an answer before recalling it a good trade.
 
 ---
 

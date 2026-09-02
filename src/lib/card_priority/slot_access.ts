@@ -248,6 +248,20 @@ let visibleSlotRetired: boolean | null = null;
 
 
 /**
+ * Whether the visible slot is retired, answered from the realm memo when it is
+ * warm and from the migration record when it is not.
+ *
+ * `isVisiblePrioritySlotRetired` is the registration-time entry point and always
+ * pays for the read (it runs before anything could have warmed the memo). This
+ * is the one for everybody else: a bulk write path asks once per run instead of
+ * once per rem.
+ */
+export async function visiblePrioritySlotRetired(plugin: RNPlugin): Promise<boolean> {
+  if (visibleSlotRetired !== null) return visibleSlotRetired;
+  return isVisiblePrioritySlotRetired(plugin);
+}
+
+/**
  * Undoes both flags.
  *
  * `completedAt` must go too, or a restore would put values back into a slot that
@@ -354,10 +368,27 @@ export async function writeRawCardPriority(
  * Clears both slots. Used by every path that strips the tag — leaving a value
  * in the hidden slot behind a removed powerup would make it reappear the moment
  * the powerup came back.
+ *
+ * The visible clear is SKIPPED once that slot is retired. Its rejection was
+ * always caught here, but RemNote raises "attempted to setPowerupProperty for a
+ * slot which doesn't exist" at the host level before the promise ever reaches
+ * this catch — one toast per rem, so a 223-rem removal produced 223 of them.
+ * The read path already skips the retired slot (rawCardPriorityReads); this is
+ * the same guard on the write side.
+ *
+ * Retirement, not migration, is the right test: a migrated KB whose visible slot
+ * is still registered can still be holding a stale value, and that one must be
+ * cleared. Pass `plugin` to get the guard — without it the visible clear is
+ * attempted, which is the old behaviour and stays correct on any KB that has not
+ * retired the slot.
  */
-export async function clearRawCardPriority(rem: PluginRem): Promise<void> {
+export async function clearRawCardPriority(rem: PluginRem, plugin?: RNPlugin): Promise<void> {
+  const skipVisible =
+    visibleSlotRetired === true || (plugin ? await visiblePrioritySlotRetired(plugin) : false);
   await Promise.all([
     rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_VALUE_SLOT, []).catch(() => undefined),
-    rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT, []).catch(() => undefined),
+    ...(skipVisible
+      ? []
+      : [rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT, []).catch(() => undefined)]),
   ]);
 }

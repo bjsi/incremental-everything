@@ -4,7 +4,7 @@ import {
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useRef, useEffect } from 'react';
-import { createPriorityReviewDocument, SkippedPausedItem } from '../lib/priority_review_document';
+import { createPriorityReviewDocument, SkippedPausedItem, SkippedAncestorItem } from '../lib/priority_review_document';
 import { getCardsPerRem, getSortingRandomness, getCardRandomness, getSortingPresets, setSortingRandomness, setCardRandomness, setCardsPerRem, SortingPreset, DEFAULT_RANDOMNESS, DEFAULT_CARD_RANDOMNESS } from '../lib/sorting';
 
 function ReviewDocumentCreator() {
@@ -50,6 +50,7 @@ function ReviewDocumentCreator() {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [skippedItems, setSkippedItems] = useState<SkippedPausedItem[]>([]);
+  const [ancestorItems, setAncestorItems] = useState<SkippedAncestorItem[]>([]);
   const [focusedSection, setFocusedSection] = useState<'scope' | 'number' | null>(null);
   const [pendingPreset, setPendingPreset] = useState<SortingPreset | null>(null);
 
@@ -86,6 +87,7 @@ function ReviewDocumentCreator() {
     setErrorMessage('');
     setSuccessMessage('');
     setSkippedItems([]);
+    setAncestorItems([]);
 
     try {
       const config = {
@@ -98,7 +100,7 @@ function ReviewDocumentCreator() {
 
       setSuccessMessage('Creating review document...');
 
-      const { doc, actualItemCount, skippedPausedItems } = await createPriorityReviewDocument(plugin, config);
+      const { doc, actualItemCount, skippedPausedItems, skippedAncestorItems } = await createPriorityReviewDocument(plugin, config);
 
       // Wait for document to be fully created
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -118,9 +120,10 @@ function ReviewDocumentCreator() {
       }
 
       setSkippedItems(skippedPausedItems);
+      setAncestorItems(skippedAncestorItems);
 
-      // Auto-close only when there are no skipped items to review
-      if (skippedPausedItems.length === 0) {
+      // Auto-close only when there is nothing held back for the user to review
+      if (skippedPausedItems.length === 0 && skippedAncestorItems.length === 0) {
         setTimeout(() => {
           plugin.widget.closePopup();
         }, 2000);
@@ -443,8 +446,8 @@ function ReviewDocumentCreator() {
         </label>
       </div>
 
-      {/* Info Box — hidden when warning panel is shown */}
-      {skippedItems.length === 0 && <div
+      {/* Info Box — hidden when a warning panel is shown */}
+      {skippedItems.length === 0 && ancestorItems.length === 0 && <div
         className="rounded-lg"
         style={{
           padding: '12px',
@@ -508,6 +511,44 @@ function ReviewDocumentCreator() {
       )}
       {successMessage && (
         <div style={{ color: '#10b981', fontSize: '14px' }}>{successMessage}</div>
+      )}
+
+      {ancestorItems.length > 0 && (
+        <div style={{ padding: '12px', backgroundColor: 'rgba(139, 92, 246, 0.12)', border: '1px solid rgba(139, 92, 246, 0.45)', borderRadius: '8px', fontSize: '13px' }}>
+          <div style={{ fontWeight: 600, marginBottom: '6px' }}>
+            🎭 {ancestorItems.length} flashcard rem{ancestorItems.length !== 1 ? 's' : ''} held back — a due ancestor would spoil them
+          </div>
+          <div style={{ color: 'var(--rn-clr-content-secondary)', fontSize: '11px', marginBottom: '8px' }}>
+            Practising these could show a due parent or grandparent — answer included — before that ancestor's own card is asked.
+            {ancestorItems.some((i) => i.ancestorAction === 'added')
+              ? ` ${ancestorItems.filter((i) => i.ancestorAction === 'added').length} blocking ancestor${ancestorItems.filter((i) => i.ancestorAction === 'added').length !== 1 ? 's were' : ' was'} added in their place, so they are free for your next review document.`
+              : ' Their blocking ancestors are already in this document.'}
+          </div>
+          <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {ancestorItems.map((item) => (
+              <div key={item.remId} style={{ padding: '3px 0', borderBottom: '1px solid rgba(0,0,0,0.06)', fontSize: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600, flexShrink: 0 }}>P{item.priority}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || item.remId}</span>
+                </div>
+                <div style={{ color: 'var(--rn-clr-content-secondary)', fontSize: '11px', paddingLeft: '4px' }}>
+                  ↳ blocked by {item.level === 1 ? 'parent' : 'grandparent'} “{item.ancestorName || item.ancestorRemId}”
+                  {item.ancestorAction === 'added'
+                    ? ' — swapped in'
+                    : item.ancestorAction === 'already-included'
+                      ? ' — already in this document'
+                      : ' — could not be loaded'}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => plugin.widget.closePopup()}
+            style={{ marginTop: '10px', padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', cursor: 'pointer', backgroundColor: '#6b7280', color: 'white' }}
+          >
+            Close
+          </button>
+        </div>
       )}
 
       {skippedItems.length > 0 && (

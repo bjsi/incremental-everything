@@ -169,11 +169,18 @@ export async function updateReviewRemData(
 // short-lived timestamp flag *before* advancing (a fast session write that
 // completes while the sandbox is alive); a persistent QueueLoadCard listener in
 // register/events.ts consumes it and performs the actual refocus once the next
-// card has loaded. This only runs from the IncRem "Next" paths, so plain
-// flashcard ratings never touch the sidebar.
+// card has loaded. Plain flashcard ratings never touch the sidebar.
+//
+// Queue entry (lib/queue_session.ts) routes through here too, for a different
+// reason: see the stall note on the QueueLoadCard listener in register/events.ts.
+// `source` is carried on the flag so that listener can pick a staleness window
+// per caller.
 export async function requestQueueDashboardRefocus(plugin: RNPlugin, source: string) {
   try {
-    await plugin.storage.setSession(pendingQueueDashboardRefocusKey, Date.now());
+    await plugin.storage.setSession(pendingQueueDashboardRefocusKey, {
+      at: Date.now(),
+      source,
+    });
   } catch (e) {
     console.warn(`[QDASH] failed to set refocus flag from "${source}":`, e);
   }

@@ -86,6 +86,8 @@ export const hideDismissedTagSettingId = 'hideDismissedTag';
 export const showPinRingIndicatorsSettingId = 'showPinRingIndicators';
 export const performanceModeId = 'performanceMode';
 export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
+/** Custom acronyms the Text Case Converter keeps uppercase in Title Case. */
+export const titleCaseAcronymsId = 'title-case-acronyms';
 export const enableMasteryDrillId = 'enable-mastery-drill';
 /** Pre-inversion id, kept only so the migration can convert stored values. */
 export const legacySkipMasteryDrillId = 'skip_mastery_drill';
@@ -158,8 +160,47 @@ export const pluginHubWidgetId = 'plugin_hub';
  * to: `{ [kbId]: { acknowledged: string[] } }`.
  */
 export const onboardingTipsStateKey = 'onboarding-tips-state';
+/**
+ * Device-local mirror of the same record, in the same shape.
+ *
+ * Synced storage has lost this plugin's data before (the shield history went
+ * blank when RemNote reworked its storage layer), and an acknowledgement that
+ * evaporates is the one failure the user actually notices: the tip they retired
+ * comes back. The mirror is written on every acknowledgement and unioned into
+ * every read, so a synced value that returns empty — wiped, or simply not
+ * hydrated yet when the sidebar mounts — cannot resurrect a retired tip, and
+ * cannot be written back over the good record either.
+ */
+export const onboardingTipsLocalMirrorKey = 'onboarding-tips-state-local';
 /** Local timestamp until which the tip panel stays quiet after a ✕ dismissal. */
 export const onboardingTipsSnoozeKey = 'onboarding-tips-snooze-until';
+/**
+ * Set once a tip has been answered in this session, in **session** storage.
+ *
+ * "One tip per session" was previously enforced only by the hub component not
+ * re-drawing while it stayed mounted, which is not the same thing: the sidebar
+ * slot remounts as the app is used, and each remount re-ran the draw. With most
+ * of a category acknowledged the pool is small, so those re-draws land on the
+ * same two or three tips and read as a tip you already answered coming back.
+ */
+export const onboardingTipsAnsweredSessionKey = 'onboarding-tips-answered-session';
+/**
+ * The tip drawn in this session, so a remount re-shows THAT tip rather than
+ * drawing another. Without it "one tip per session" only held once the tip was
+ * answered — before that, every remount rolled again.
+ */
+export const onboardingTipsDrawnSessionKey = 'onboarding-tips-drawn-session';
+/**
+ * Local, KB-partitioned record of when each tip was last put on screen:
+ * `{ [kbId]: { [tipId]: epochMs } }`. Feeds the least-recently-shown draw.
+ *
+ * Local rather than synced on purpose. This is pacing, not a decision the user
+ * made — it does not deserve sync traffic on every panel mount, and a tip seen
+ * on the desktop this morning is not one the phone needs to skip tonight.
+ */
+export const onboardingTipsLastShownKey = 'onboarding-tips-last-shown';
+/** Popup widget id for the "All Tips" list behind the tip card's third button. */
+export const onboardingTipsWidgetId = 'onboarding_tips';
 /**
  * The user closed the hub panel. **Session** storage on purpose: closing it is
  * "not now, I need the room", not a preference — it comes back on the next
@@ -228,6 +269,16 @@ export const suppressionReportKey = 'suppression-report';
  *  Ids only — the actionable set is a couple of hundred, far inside the
  *  per-key budget. */
 export const verifiedSuppressedRemsKey = 'verified-suppressed-rems';
+
+/** Session: the anchor Rem the Card Enablement Audit panel opened on. Set by
+ *  the command / document-menu item before the popup mounts, exactly as the
+ *  batch card-priority panel does with its own anchor. */
+export const cardEnablementAnchorKey = 'card-enablement-anchor-rem';
+
+/** Session: the last Card Enablement Audit apply's before-state, so the panel
+ *  can offer an undo after a bulk write. Session rather than synced — an undo
+ *  belongs to the run that is still on screen. */
+export const cardEnablementSnapshotKey = 'card-enablement-last-snapshot';
 export const fsrsCalibrationLastPeriodKey = 'fsrs-calibration-last-period';
 export const studyDashboardLastPeriodKey = 'study-dashboard-last-period';
 /**
@@ -316,6 +367,10 @@ export const autoFocusQueueDashboardId = 'auto-focus-queue-dashboard';
 // can't run after removeCurrentCardFromQueue in the widget, which by then has
 // been torn down. See refocus flow in lib/incremental_rem + register/events.
 export const pendingQueueDashboardRefocusKey = 'pending-queue-dashboard-refocus-at';
+// Session mount marker written by the practiced_queues widget. Read by
+// lib/queue_dashboard as both a "did the tab come up?" acknowledgement and as
+// the canary target for its wedged-channel watchdog.
+export const practicedQueuesVisibleKey = 'practiced_queues_visible';
 export const priorityShieldHistoryKey = 'priority-shield-history-key';
 export const priorityShieldHistoryMenuItemId = 'priority-shield-history-menu-item-id';
 export const documentPriorityShieldHistoryKey = 'document-priority-shield-history-key';
@@ -448,6 +503,12 @@ export const popupDocumentIdKey = 'popup-document-id';
 // iframe dies during the layout reorg, so the scroll must run in main-process.
 export const pendingScrollRequestKey = 'pending-scroll-request';
 
+// SYNCED: set once the plugin has pinned the "Priority Review Queue" tag Rem to
+// the left sidebar, so the pin is offered exactly once per knowledge base. A
+// user who unpins it afterwards keeps it unpinned — see
+// priority_review_document/sidebar_pin.ts.
+export const prqTagSidebarPinnedKey = 'prq-tag-sidebar-pinned';
+
 // Priority Review Graph
 export const priorityGraphPowerupCode = 'priority_review_graph';
 // Hidden slot on the graph Rem holding that graph's data as serialized JSON.
@@ -492,3 +553,7 @@ export const sourceFloatingWidgetId = 'pdf_source_floating';
 export const sourceFloatingTargetKey = 'source-floating-target';
 export const sourceFloatingActiveIdKey = 'source-floating-active-id';
 
+
+// Convert literal \[..\] / \(..\) / **..** left by PDF text-layer extraction
+// into real RemNote rich text (formulas, bold, italic).
+export const convertExtractedMarkupCommandId = 'convert-extracted-markup';

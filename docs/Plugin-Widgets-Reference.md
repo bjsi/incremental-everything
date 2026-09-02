@@ -26,7 +26,7 @@ Displayed immediately below flashcards in the queue, this widget shows the card'
 - **(8) 🔬**: Opens the Flashcard Repetition History popup
 - **(9) Incremental Rem Status Indicator**: An icon displayed on the right border whenever the current card is also an Incremental Rem, providing instant visual feedback of its dual-status.
 
-![Card Info Bar](assets/card-priority-display.png){ width="900" }
+![Card Info Bar](assets/card-info-bar.png){ width="900" }
 
 ![Card Toolbar in the Queue](assets/card-priority-display-full-queue.png){ width="900" }
 
@@ -104,6 +104,7 @@ Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`
 - **Single History** — triggered on an individual IncRem (in the queue via the 📊 button, or in the editor via `Ctrl+Shift+H`). Shows the Rem's full repetition log: date, time spent, scheduled interval, priority at the time of review, and event type markers (📅 reschedule, ⌨️ editor review, etc.). Repetition rows carry the wall-clock time under the date, and the event banners (▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset) show theirs next to it — several lifecycle events on one day stay distinguishable.
   - **📝 Notes & context sub-lines** — entries carrying a [review note](Reviewing-Items-in-the-Queue.md#the-answer-buttons) show it under the row (📝, full text); entries with an automatic **reading-context snapshot** show a compact line like `p.57 of 40–80 · Book.pdf · 🔖 "bookmark…"` — the page you were on **at that rep**, so your reading trajectory across sessions is visible. Event banners (Dismissed, Rescheduled in Editor, …) show their note the same way — a dismissal reason lives right on the dismissal marker.
   - **PDF reading-progress footer** — when the Rem (active *or* dismissed) reads from a PDF with a **page range** set, a footer shows the PDF name, the page range, your current page, the **degree of processing** (`% read`, with a progress bar), and an **estimated remaining time** (extrapolated from the total time spent and the degree of processing reached). The percentage and estimate are omitted for open-ended ranges (`start–∞`), where there's no finite end to measure against.
+  - **🔖 Read-point footer** — when the Rem has a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) set, a footer shows the path from the Rem itself down to the bookmarked descendant (`Chapter › Section › Read point`), with the date it was set. Every segment is clickable and navigates to that Rem. It works for dismissed Rems too, and if the read point has since been moved out of the outline the footer says so and shows its nearest ancestors instead.
   - **➕ Session — recording study done outside RemNote** — see [Recording and correcting records](#recording-and-correcting-records) below.
   - **✏️ / 🗑 per record** — hover any row to edit or delete it; see the same section.
 
@@ -344,8 +345,8 @@ Plots your daily [Priority Shield](Prioritization-&-Sorting.md#priority-shield) 
 
 **Features:**
 
-- **Logical Organization**: Graphs are grouped into **Document-level** (IncRem & Card) and **Knowledge Base-wide** scopes.
-- **Visual Separator**: A horizontal divider clearly distinguishes between Document and KB-wide data for better scanability.
+- **Logical Organization**: Graphs are grouped by scope, **Knowledge Base-wide first** (Card, then IncRem), then **Document-level** (Card, then IncRem) — the widest and most-consulted view opens first, and Cards lead each pair.
+- **Visual Separator**: A horizontal divider clearly distinguishes between KB-wide and Document data for better scanability.
 - **Interactive Drag-to-Zoom**: Click and drag horizontally on any graph to zoom into a specific date range. A **Reset Data Range** button appears in the top-right corner to return to the full view.
 - **Optimize Priorities Zoom**: A dedicated button automatically scales the absolute and relative priority Y-Axes to perfectly frame the visible data in your current zoom window. Highly beneficial for viewing subtle metric changes over time!
 - **Scoped Scaling**: The Y-axis (Universe Size) for each chart automatically scales based on the visible data range, ensuring a clear view of your progress even in the Knowledge Base charts.
@@ -506,6 +507,7 @@ The Rem-type analogue of the PDF/HTML Bookmark popup. It lists the **read-point 
 - Click any entry to **navigate to that descendant** rem.
 - The top entry is the **current reading position** — also reachable via the **🔖 Go to Read Point** button on the [Editor Review Timer](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point) and emphasized (blue box + auto-scroll) in the [in-queue read-only card](Reviewing-Items-in-the-Queue.md#read-point-and-status-emphasis-in-rem-type-cards).
 - Read points are created with the **Set Read Point (Bookmark)** command (`Ctrl+F7`, `srp`).
+- The popup is also reachable **without a command**: the **Read Point History ↗** button in the [Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget)'s Read Point panel opens it for the Rem you are on.
 
 > The same underlying popup, opened on a PDF/HTML highlight, is the **Bookmark popup**; it now also shows the owning Incremental Rem's name under its title.
 
@@ -533,11 +535,20 @@ The plugin's hub, at the bottom of the left sidebar. Header controls: **⌨** ([
 
 Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Review** group of three — the label creates a [Priority Review Document](Priority-Review-Document.md) scoped to the document you currently have open (naming that scope under the button), **👁** opens the **Priority Review Queue** Rem that lists every review document you have built, and **🧹** runs [Clean Priority Review Documents](Priority-Review-Document.md#cleaning-a-review-document).
 
-![The Incremental RemNote panel in the sidebar](assets/panel-hub.png){ width="700" }
+![The Incremental RemNote panel in the sidebar](assets/panel-hub-2.png){ width="400" }
 
-Below the shortcuts it shows **one onboarding tip per session**, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile; the panel also goes quiet for two hours) and **Learn More** (opens the tip's documentation section). Either answer closes the tip area until the next start — it never chains into a second tip.
+Below the shortcuts it shows **one onboarding tip per session**, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile; the panel also goes quiet for two hours), **Learn More** (opens the tip's documentation section) and **All Tips** (opens the full list). Either answer closes the tip area until the next start — it never chains into a second tip, and never swaps the tip for another one mid-session. Tips still in the pile are offered in rotation, least recently seen first, so none repeats until the others have had their turn.
 
 📖 **Full documentation:** [The Incremental RemNote Panel](Getting-Started.md#the-incremental-plugin-panel)
+
+### 6.10.1. All Tips Popup
+**Trigger:** the **All Tips** button on a tip, or the **💡 All tips** link the panel shows when no tip is on screen
+
+The whole tip pile in one list: acknowledged tips first with the date you answered them (newest at the top), then the ones still to come, in the order the panel will offer them. Each row carries its own **Learn More**, and unacknowledged rows carry their own **I Got It** — which retires the tip exactly as the panel's button does.
+
+`↑`/`↓` move, `Home`/`End` jump to either end, `Enter` acknowledges, `Space` opens the documentation, `Esc` closes.
+
+📖 **Full documentation:** [All Tips](Getting-Started.md#all-tips)
 
 ### 6.11. Empty Extra Card Detail Popup
 **Trigger:** `Delete Empty Extra Card Detail Rems` command (quick code `decd`)
@@ -568,6 +579,20 @@ Two stages, like the Empty Extra Card Detail popup and for the same reason: the 
 📖 **Full documentation:** [Cleaning a Review Document](Priority-Review-Document.md#cleaning-a-review-document)
 
 ---
+
+### 6.13. Card Enablement Audit Popup
+**Trigger:** `Audit Card Enablement (tagged / referencing / descendants)` command, or the **Document Menu** (⋯) of any Rem
+
+Finds the Rems in an anchor's orbit that generate no flashcards, and fixes the two states a flag can fix.
+
+- **Scope checkboxes** at the top — tagged / referencing / descendants / expand each match — with a **Rescan** button. Scope changes are explicit, since the walk can cover thousands of Rems.
+- **Verdict chips** with counts, click to show or hide. Opens on the two worth hunting (`dir=none`, `practice off`) and pre-selects exactly the rows a bulk write can actually change.
+- **One row per Rem** — front → back, breadcrumb, **Practice** flag, **Direction**, and `surfaced/records` — clicking the text opens the Rem in a browser tab.
+- **Action bar:** set flashcard direction, switch cards on or off, an optional **card priority** for whatever the run enables, **Apply**, and **Undo last apply** once a run has happened.
+- **Reports what actually happened:** how many Rems changed and how many cards **appeared**, read back from the Rems rather than predicted.
+- **Keyboard-driven:** `↑`/`↓` move, `Space` selects, `A` selects everything shown, `Enter` applies, `Esc` closes — ignored mid-write so a reflex press cannot lose the undo snapshot.
+
+📖 **Full documentation:** [Card Enablement Audit](Utilities.md#card-enablement-audit)
 
 ## 7. Mastery Drill
 

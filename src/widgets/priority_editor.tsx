@@ -12,7 +12,7 @@ import { withQueueMutex } from '../lib/mutex';
 import { PriorityDeltaEntry } from '../lib/quick_priority';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { calculateRelativePercentile, formatDuration } from '../lib/utils';
-import { PriorityBadge } from '../components';
+import { PriorityBadge, ReadPointIcon } from '../components';
 import {
   getActivePdfForIncRem,
   setActivePdfForIncRem,
@@ -28,7 +28,8 @@ import {
   safeRemTextToString,
   PageHistoryEntry,
 } from '../lib/pdfUtils';
-import { openAndScrollToHighlight } from '../lib/remHelpers';
+import { openAndScrollToHighlight, openAndFocusRem } from '../lib/remHelpers';
+import { getReadPointPath, hasRemReadPoint, ReadPointPath } from '../lib/remReadPoint';
 import { getIESetting } from '../lib/settings';
 
 // Move styles outside component to avoid recreation on every render
@@ -44,6 +45,9 @@ const adjustButtonStyle: React.CSSProperties = {
   transition: 'all 0.15s ease',
   textAlign: 'center',
 };
+
+/** Read-point path segments longer than this are ellipsized (full text in the tooltip). */
+const READ_POINT_SEGMENT_CHARS = 28;
 
 export function PriorityEditor() {
   const plugin = usePlugin();
@@ -189,6 +193,12 @@ export function PriorityEditor() {
         getIESetting(plugin, priorityEditorDisplayModeId),
       ]);
 
+      // Read-point indicator. One extra property read, and only for IncRems —
+      // see hasRemReadPoint on why this doesn't go through the full resolve.
+      // Riding this tracker (rather than opening another) keeps it inside the
+      // round-trips this widget already makes per Rem.
+      const hasReadPoint = incRemInfo ? await hasRemReadPoint(rem) : false;
+
       // Calculate relative priorities inline
       const incRemRelativePriority = (incRemInfo && allIncRems && allIncRems.length > 0)
         ? calculateRelativePercentile(allIncRems, rem._id)
@@ -206,6 +216,7 @@ export function PriorityEditor() {
         hasPowerup,
         incRemRelativePriority,
         cardRelativePriority,
+        hasReadPoint,
         allPrioritizedCardInfo: allPrioritizedCardInfo || [],
         displayMode: displayMode || 'all',
       };
@@ -247,8 +258,28 @@ export function PriorityEditor() {
   const hasCardPriorityPowerup = remData?.hasPowerup ?? false;
   const incRemRelativePriority = remData?.incRemRelativePriority ?? null;
   const cardRelativePriority = remData?.cardRelativePriority ?? null;
+  const hasReadPoint = remData?.hasReadPoint ?? false;
   const allPrioritizedCardInfo = remData?.allPrioritizedCardInfo ?? [];
   const displayMode = remData?.displayMode ?? 'all';
+
+  // Read point (the reading position of a rem-type outline), resolved in full:
+  // the path down to it, and the text of every rem along the way. That costs a
+  // rem read per segment plus an ancestor walk, so it runs only when the panel
+  // is EXPANDED and the cheap `hasReadPoint` flag says there is one to resolve.
+  // Collapsed, the badge above draws from that flag alone.
+  const readPoint = useTrackerPlugin(
+    async (rp): Promise<ReadPointPath | null> => {
+      if (!remId || !isExpanded || !hasReadPoint) return null;
+      try {
+        return await getReadPointPath(rp as any, remId);
+      } catch (err) {
+        console.error('[PriorityEditor] Failed to resolve read point:', err);
+        return null;
+      }
+    },
+    [remId, isExpanded, hasReadPoint]
+  ) ?? null;
+
 
   // IMPORTANT: All hooks must be called unconditionally BEFORE any early returns
   // Optimized: Use useMemo to avoid recalculating these conditions on every render
@@ -470,6 +501,16 @@ export function PriorityEditor() {
               </span>
             );
           })()}
+          {/* Read point — existence only. The path and the rem it points at
+              cost a walk to resolve, so they wait for the expanded panel. */}
+          {hasReadPoint && (
+            <span
+              title="Read point set — expand to see where you stopped reading"
+              style={{ display: 'inline-flex', alignItems: 'center', color: '#10b981' }}
+            >
+              <ReadPointIcon size={11} />
+            </span>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -986,6 +1027,97 @@ export function PriorityEditor() {
                   </button>
                 );
               })()}
+            </div>
+          )}
+
+          {/* Read Point Section — the outline counterpart of the PDF panel:
+              where you stopped reading inside this Rem's own descendants. A
+              hybrid IncRem (a PDF source *and* its own outline) shows both,
+              because the two bookmarks point at genuinely different places. */}
+          {readPoint && (
+            <div
+              className="p-3 rounded-lg"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', color: '#10b981' }}>
+                    <ReadPointIcon size={12} />
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>Read Point</span>
+                </div>
+                <span
+                  className="text-[10px]"
+                  style={{ color: 'var(--rn-clr-content-tertiary)', whiteSpace: 'nowrap' }}
+                  title={`Set on ${new Date(readPoint.timestamp).toLocaleString()}`}
+                >
+                  {new Date(readPoint.timestamp).toLocaleDateString()}
+                </span>
+              </div>
+
+              {/* Path from this Rem down to the bookmarked descendant. The Rem
+                  itself is implicit — the panel is attached to it. */}
+              <div className="text-[10px] leading-relaxed" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                {readPoint.path.map((segment, i) => {
+                  const isLast = i === readPoint.path.length - 1;
+                  const id = readPoint.pathIds[i];
+                  return (
+                    <span key={id || i}>
+                      {i > 0 && <span style={{ opacity: 0.6, margin: '0 3px' }}>›</span>}
+                      <span
+                        onClick={() => { if (id) openAndFocusRem(plugin as any, id); }}
+                        title={`${segment}\n\nClick to open this rem`}
+                        style={{
+                          cursor: 'pointer',
+                          fontWeight: isLast ? 600 : 400,
+                          color: isLast ? 'var(--rn-clr-blue, #3b82f6)' : 'inherit',
+                          textDecoration: 'underline',
+                          textDecorationStyle: 'dotted',
+                        }}
+                      >
+                        {segment.length > READ_POINT_SEGMENT_CHARS
+                          ? segment.slice(0, READ_POINT_SEGMENT_CHARS) + '…'
+                          : segment}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+
+              {!readPoint.withinTarget && (
+                <div className="text-[10px] mt-1" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                  ⚠️ No longer inside this Rem — showing its nearest ancestors.
+                </div>
+              )}
+
+              <button
+                onClick={() => openAndFocusRem(plugin as any, readPoint.remId)}
+                className="w-full mt-2 py-1 rounded text-[11px] font-semibold transition-colors"
+                style={{
+                  backgroundColor: 'var(--rn-clr-background-secondary)',
+                  color: 'var(--rn-clr-blue, #3b82f6)',
+                  border: '2px solid var(--rn-clr-blue, #3b82f6)',
+                }}
+                title="Open the bookmarked descendant and put the cursor in it"
+              >
+                <span className="inline-flex items-center justify-center gap-1">
+                  <ReadPointIcon size={11} />
+                  Go to Read Point
+                </span>
+              </button>
+
+              <button
+                onClick={() => plugin.widget.openPopup('pdf_bookmark_popup', { mode: 'rem', incRemId: remId })}
+                className="w-full mt-2 py-1 rounded text-[11px] transition-colors"
+                style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-tertiary)', border: '1px solid var(--rn-clr-border-primary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--rn-clr-content-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--rn-clr-content-tertiary)'; }}
+              >
+                Read Point History ↗
+              </button>
             </div>
           )}
 

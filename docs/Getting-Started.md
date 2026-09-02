@@ -30,7 +30,7 @@ For a deeper understanding, see [What is Incrementalism?](What-is-Incrementalism
 
 Once installed, the plugin adds a small **Incremental RemNote** 🌐 panel at the bottom of the left sidebar. It is the one fixed place to reach the plugin from, and where the onboarding tips live.
 
-![The Incremental RemNote panel in the sidebar: header controls, the Sorting button, the Priority Review group with its eye and broom actions, the scope line, and one onboarding tip](assets/panel-hub.png){ width="700" }
+![The Incremental RemNote panel in the sidebar: header controls, the Sorting button, the Priority Review group with its eye and broom actions, the scope line, and one onboarding tip with its I Got It, Learn More and All Tips buttons](assets/panel-hub-2.png){ width="400" }
 
 **In the header:**
 
@@ -56,13 +56,32 @@ The 👁 button says so if you have no review documents yet: the tag is created 
 
 ### Tips { #tips }
 
-The panel shows **one tip per session**, drawn at random from the tips you have not retired yet. Answer it and the tip area is done until the next time you open RemNote — it will not hand you another one. Each tip has three answers:
+The panel shows **one tip per session**. Answer it and the tip area is done until the next time you open RemNote — it will not hand you another one, and moving around RemNote will not swap it for a different one either. Each tip has four buttons:
 
 - **I Got It** — you know this one. It is never shown again. This is remembered per knowledge base and syncs across your devices.
 - **✕** — not now. The tip stays in the pile and can resurface later; the panel also goes quiet for two hours, so a reload does not immediately produce another one.
 - **Learn More** — opens the documentation section for the feature the tip is about. Tips that are habits rather than features have no such button.
+- **All Tips** — opens the full list. See [All Tips](#all-tips) below.
 
-When you have answered **I Got It** to every tip, the tip area disappears for good and the panel keeps only its shortcuts.
+A tip you have not retired **will** come back on another day — that is what ✕ means. But tips are offered in rotation, least recently seen first, so every other tip still in the pile gets its turn before any one of them repeats. This matters most near the end: with two or three tips left, a random draw would keep landing on the same one.
+
+Tips come in two groups, and the second is not offered until the first is done: **Basics** teaches the daily loop, **Utilities** waits until you have it. So a brand-new user's first tip is about `Alt+X`, not about cycling text case.
+
+When you have answered **I Got It** to every tip, the tip area disappears for good and the panel keeps a small **💡 All tips** link.
+
+### All Tips { #all-tips }
+
+**All Tips** opens the whole pile in one popup — useful for checking what you have already been told, and for reading ahead without waiting a session per tip.
+
+- **Acknowledged** first, most recently answered at the top, each with the date you pressed **I Got It**. Tips you retired before the plugin started recording dates say *date not recorded*.
+- **Not yet acknowledged** below, in the order the panel will offer them.
+
+Each row has its own **Learn More**, and every tip you have not retired has its own **I Got It** — so you can clear tips you already know without waiting for the panel to offer them one at a time. As in the panel, **I Got It** here means the tip is never shown again.
+
+The popup is keyboard-driven: `↑`/`↓` move (`Home`/`End` jump to either end), `Enter` acknowledges the selected tip, `Space` opens its documentation, `Esc` closes.
+
+!!! note "Starting over"
+    There is no undo for **I Got It**. If you want the whole pile back, the **Debug** popup has a *Reset acknowledgements* button under **Onboarding Tips State**, which clears every acknowledgement for the current knowledge base.
 
 ---
 

@@ -12,6 +12,13 @@ import { getCardPriority, setCardPriority } from '../lib/card_priority';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
+import {
+  CardPriorityRemoval,
+  downloadCardPriorityRemoval,
+  removeCardPriorityFromRems,
+  restoreRemovedCardPriorities,
+} from '../lib/card_priority/remove_scoped';
+import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 
 type ScopeMode = 'tagged' | 'referenced' | 'both';
 
@@ -20,6 +27,15 @@ interface RemWithPriority {
   rem: PluginRem;
   name: string;
   hasCardPriority: boolean;
+  /**
+   * The rem physically carries the CardPriority powerup.
+   *
+   * Distinct from `hasCardPriority`, which is true whenever getCardPriority
+   * RESOLVES a value — including the inherited one it computes for an untagged
+   * rem from its nearest prioritised ancestor. Only a tag can be removed, so the
+   * removal flow filters on this and not on the resolved value.
+   */
+  hasCardPriorityTag: boolean;
   hasManualCardPriority: boolean;
   cardPriority: number | null;
   cardPrioritySource: string | null;
@@ -113,6 +129,12 @@ function BatchCardPriority() {
   const [filterPriorityMin, setFilterPriorityMin] = useState(0);
   const [filterPriorityMax, setFilterPriorityMax] = useState(100);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  // removal
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [removal, setRemoval] = useState<CardPriorityRemoval | null>(null);
+  const [recomputeDescendants, setRecomputeDescendants] = useState(true);
+  /** Bumped to re-run the loader after a write, without changing the scope. */
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   // ── derived: filtered list ─────────────────────────────────────────────────
   const displayedRems = useMemo(() => {
@@ -217,6 +239,7 @@ function BatchCardPriority() {
               : '';
             const remText = remBack ? `${remFront} → ${remBack}` : remFront;
 
+            const hasCardPriorityTag = await rem.hasPowerup(CARD_PRIORITY_CODE);
             const cardPriorityInfo = await getCardPriority(plugin, rem);
             const hasCardPriority = cardPriorityInfo !== null;
             const cardPriorityValue = cardPriorityInfo?.priority ?? null;
@@ -248,6 +271,7 @@ function BatchCardPriority() {
               rem,
               name: remText,
               hasCardPriority,
+              hasCardPriorityTag,
               hasManualCardPriority,
               cardPriority: cardPriorityValue,
               cardPrioritySource,
@@ -285,7 +309,7 @@ function BatchCardPriority() {
 
     loadRems();
     return () => { isMounted = false; };
-  }, [anchorRemId, scopeMode, plugin]);
+  }, [anchorRemId, scopeMode, plugin, reloadNonce]);
 
   // ── helpers ────────────────────────────────────────────────────────────────
   const toggleCheck = (remId: string) => {
@@ -404,6 +428,126 @@ function BatchCardPriority() {
       await plugin.storage.setSession('plugin_operation_active', false);
     } finally {
       setIsApplying(false);
+    }
+  };
+
+  // ── remove card priority ───────────────────────────────────────────────────
+  //
+  // The counterpart to the assignment above, on the same selection. Only rems
+  // that physically carry the tag can be stripped — an inherited value that was
+  // never materialised has nothing to remove, and including those would report a
+  // removal count larger than what happened.
+  //
+  // No KB-wide rebuild follows. `removeCardPriorityFromRems` prunes exactly these
+  // rems from the session cache and the persisted copy, which is the whole cache
+  // story; running "Update all inherited Card Priorities" here would re-tag every
+  // card-bearing rem in the knowledge base — the ones just cleared included —
+  // with a freshly derived inherited/default value, i.e. partly undo the removal.
+  // What genuinely goes stale is the DESCENDANTS that were inheriting from these
+  // rems, and a cascade rooted at the removed rems fixes exactly those.
+  const removableRems = displayedRems.filter((r) => r.isChecked && r.hasCardPriorityTag);
+
+  /** Selected rems that sit under another selected rem — see the dialog text. */
+  const nestedRemovals = (() => {
+    const ids = new Set(removableRems.map((r) => r.remId));
+    return removableRems.filter((r) => r.pathIds.some((id) => id !== r.remId && ids.has(id)));
+  })();
+
+  const handleRemovePriority = async () => {
+    if (removableRems.length === 0) {
+      setErrorMessage('None of the selected rems carries a CardPriority tag to remove.');
+      return;
+    }
+
+    const intentional = removableRems.filter(
+      (r) => r.cardPrioritySource === 'manual' || r.cardPrioritySource === 'incremental'
+    );
+    const derived = removableRems.length - intentional.length;
+    const skipped = selectedCount - removableRems.length;
+
+    const confirmed = confirm(
+      `🧹 Remove card priority from ${removableRems.length} rem(s)?\n\n` +
+        `This removes the CardPriority tag and its priority, source and timestamp slots, ` +
+        `and drops the table badge with them.\n\n` +
+        `  • ${intentional.length} manual / incremental priorit(ies) — set by you, or ` +
+        `anchoring inheritance for an Incremental Rem's descendants\n` +
+        `  • ${derived} inherited / default tag(s) the plugin derived on its own\n` +
+        (skipped > 0
+          ? `  • ${skipped} selected rem(s) carry no tag and are left alone\n`
+          : '') +
+        `\nUNDOABLE: the current values are captured first, restorable from this panel and ` +
+        `downloaded as a JSON file.\n\n` +
+        (derived > 0
+          ? `Note: inherited and default tags are DERIVED. While Flashcard Prioritisation is on, ` +
+            `the plugin will recreate them for card-bearing rems the next time it cascades over ` +
+            `them — removing those is a reset, not a permanent state.\n\n`
+          : '') +
+        (nestedRemovals.length > 0 && recomputeDescendants
+          ? `⚠️ ${nestedRemovals.length} of them sit UNDER another selected rem, so the descendant ` +
+            `recompute below will give those an inherited priority again. Untick it to leave ` +
+            `every removal standing.\n\n`
+          : '') +
+        `Proceed?`
+    );
+    if (!confirmed) return;
+
+    setIsRemoving(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const result = await removeCardPriorityFromRems(
+        plugin,
+        removableRems.map((r) => ({ remId: r.remId, text: r.name })),
+        anchorName,
+        (done, total) => setSuccessMessage(`Removing: ${done}/${total}`)
+      );
+      setRemoval(result.removal);
+      const saved = downloadCardPriorityRemoval(result.removal);
+
+      // Descendants that were inheriting from these rems now hold a value with
+      // no source. The cascade recomputes exactly those subtrees; the tracker
+      // skips it by itself when flashcard prioritisation is off.
+      if (recomputeDescendants && result.removed > 0) {
+        await plugin.storage.setSession(
+          'pendingInheritanceCascade',
+          removableRems.map((r) => r.remId)
+        );
+      }
+
+      setSuccessMessage(
+        `✅ Removed card priority from ${result.removed} rem(s).` +
+          (result.failed.length ? ` ${result.failed.length} failed — see console.` : '') +
+          (saved ? ' A backup was downloaded.' : ' The backup download was blocked.')
+      );
+      setReloadNonce((n) => n + 1);
+    } catch (error: any) {
+      console.error('Error removing card priorities:', error);
+      setErrorMessage(`Failed to remove: ${error?.message ?? String(error)}`);
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const handleUndoRemoval = async () => {
+    if (!removal) return;
+    if (!confirm(`Restore the card priority of ${removal.rows.length} rem(s)?`)) return;
+    setIsRemoving(true);
+    setErrorMessage('');
+    try {
+      const res = await restoreRemovedCardPriorities(plugin, removal, (done, total) =>
+        setSuccessMessage(`Restoring: ${done}/${total}`)
+      );
+      setRemoval(null);
+      setSuccessMessage(
+        `✅ Restored ${res.restored} priorit(ies).` +
+          (res.failed.length ? ` ${res.failed.length} failed — see console.` : '')
+      );
+      setReloadNonce((n) => n + 1);
+    } catch (error: any) {
+      console.error('Error restoring card priorities:', error);
+      setErrorMessage(`Failed to restore: ${error?.message ?? String(error)}`);
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -572,6 +716,16 @@ function BatchCardPriority() {
             Use IncRem priority for Incremental Rems (instead of random)
           </label>
         </div>
+        <div style={{ marginTop: '6px', fontSize: '13px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={recomputeDescendants} onChange={(e) => setRecomputeDescendants(e.target.checked)} disabled={isApplying || isRemoving} />
+            After a removal, recompute inherited priorities for descendants
+          </label>
+          <div style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '22px' }}>
+            Cascades from the removed rems only — far cheaper than "Update all inherited Card
+            Priorities", which would re-tag the whole knowledge base.
+          </div>
+        </div>
       </div>
 
 
@@ -639,9 +793,31 @@ function BatchCardPriority() {
           {isApplying ? 'Applying…' : `Apply to ${selectedCount} rem(s)`}
         </button>
         <button
+          onClick={handleRemovePriority}
+          style={{
+            ...s.btn,
+            backgroundColor: '#dc2626',
+            color: 'white',
+            opacity: isApplying || isRemoving || removableRems.length === 0 ? 0.5 : 1,
+          }}
+          disabled={isApplying || isRemoving || removableRems.length === 0}
+          title="Strip the CardPriority tag and its slots from the selected rems that carry one"
+        >
+          {isRemoving ? 'Removing…' : `Remove priority from ${removableRems.length}`}
+        </button>
+        {removal && (
+          <button
+            onClick={handleUndoRemoval}
+            style={{ ...s.btn, backgroundColor: '#f59e0b', color: 'white' }}
+            disabled={isApplying || isRemoving}
+          >
+            Undo removal ({removal.rows.length})
+          </button>
+        )}
+        <button
           onClick={() => plugin.widget.closePopup()}
           style={{ ...s.btn, backgroundColor: '#6b7280', color: 'white' }}
-          disabled={isApplying}
+          disabled={isApplying || isRemoving}
         >
           Cancel
         </button>

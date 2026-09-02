@@ -366,11 +366,13 @@ The info bar includes (from left to right):
 |(2) **Card Shield** | Shield status (if enabled) |
 |(3) **Weighted Shield** | Exponential priority-weighted workload percentage (if enabled) |
 |(4) **Reps & Time** | Total number of reviews (with **lapses** in red parentheses), cumulative review time, **card age**, and **cost** (per year of age/coverage) for this card. Hover over it for an explanatory tooltip. |
-|(5)(6) **D · S · R · SInc · U-Factor** | FSRS Difficulty, Stability (time passed since last review, and the stability a Good rating would leave), Retrievability, Stability Increase and Used-Interval Increase (if enabled) |
-|(7) **🔬** | Opens the Flashcard Repetition History popup |
-|(8) **Incremental Rem Status Indicator** | An icon displayed on the right border whenever the current card is also an Incremental Rem |
+|(5) **D · S · R** | FSRS Difficulty, Stability (time passed since last review, and the stability a Good rating would leave) and Retrievability |
+|(6) **SInc** | Stability Increase — how much stability a Good rating would add |
+|(7) **U-Factor** | Used-Interval Increase, comparing the next interval to the one you just cleared (if enabled) |
+|(8) **🔬** | Opens the Flashcard Repetition History popup |
+|(9) **Incremental Rem Status Indicator** | An icon displayed on the right border whenever the current card is also an Incremental Rem |
 
-![Card Info Bar](assets/card-priority-display.png){ width="900" }
+![Card Info Bar](assets/card-info-bar.png){ width="900" }
 
 ![Card Toolbar in the Queue](assets/card-priority-display-full-queue.png){ width="900" }
 

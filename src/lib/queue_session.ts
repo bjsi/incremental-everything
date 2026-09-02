@@ -7,12 +7,18 @@ import {
 import { safeRemTextToString } from './pdfUtils';
 import { autoFocusQueueDashboardId, fsrsWeightsId, flashcardResponseTimeLimitId } from './consts';
 import { isMobileDevice } from './mobileUtils';
+import { openQueueDashboard } from './queue_dashboard';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
 import { PRACTICED_QUEUES_HISTORY_KEY, rollOverOldSessions } from './queue_aggregates';
 import { computeFSRSState, parseWeightsString } from './fsrs';
 import { getIESetting } from './settings';
 
 const ACTIVE_SESSION_KEY = 'activeQueueSession';
+
+// Delay between queue entry and spawning the right sidebar. Just enough to
+// let RemNote finish building the queue view first; set to 0 to open the
+// sidebar immediately, at the cost of racing that construction.
+const SIDEBAR_SPAWN_DELAY_MS = 400;
 
 // Editor-only IncRem sessions auto-close after this much idle time so a row
 // is recorded for the burst of activity. Cleared/rescheduled on every
@@ -503,33 +509,18 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       const isMobile = await isMobileDevice(plugin);
       const isMasteryDrill = scopeName === 'Mastery Drill';
       if (autoFocus && !isMobile && !isMasteryDrill) {
-        // Handshake-based retry: open the tab, then poll a session-storage flag
-        // the widget sets when it mounts. If RemNote stole focus to the AI Tutor
-        // tab, the flag won't be (re)written for this attempt, so we re-issue.
-        // Bounded by a wall-clock deadline so we can't loop forever.
-        // Fire-and-forget retry: openWidgetInRightSidebar's promise can stall
-        // when RemNote steals focus to its own tab (e.g. AI Tutor on sidebar
-        // spawn), so we don't await it. Poll a flag the widget sets on mount,
-        // and re-issue the open call until the widget acknowledges or we hit
-        // the deadline.
-        const startedAt = Date.now();
-        const deadline = startedAt + 3000;
-        let attempt = 0;
-        const tryOpen = async (): Promise<void> => {
-          attempt++;
-          const a = attempt;
-          plugin.window.openWidgetInRightSidebar('practiced_queues').catch((err) =>
-            console.error(`[PQ-HANDSHAKE] attempt ${a} openWidgetInRightSidebar rejected:`, err)
-          );
-          for (let i = 0; i < 6; i++) {
-            await new Promise(r => setTimeout(r, 150));
-            const ts = await plugin.storage.getSession<number>('practiced_queues_visible');
-            if (ts && ts >= startedAt) return;
-          }
-          if (Date.now() < deadline) return tryOpen();
-          console.warn(`[PQ-HANDSHAKE] gave up after ${a} attempts, t+${Date.now() - startedAt}ms`);
-        };
-        void tryOpen();
+        // The open has to happen here: we are the only thing that spawns the
+        // right sidebar in the queue, so there is nothing else to trigger it.
+        // (Deferring it entirely to QueueLoadCard does not work — the first card
+        // loads before this handler finishes, so the only card load that matters
+        // has already fired by the time we could set a flag.)
+        //
+        // What we can do is keep it off the queue-construction path, where it
+        // races RemNote's own tab-forcing and can wedge the plugin API channel.
+        // A local timer is enough to get out of the way, and unlike an event it
+        // cannot be missed. openQueueDashboard never blocks us and never throws;
+        // it owns the retry and the wedge watchdog. See lib/queue_dashboard.
+        setTimeout(() => openQueueDashboard(plugin, 'QueueEnter'), SIDEBAR_SPAWN_DELAY_MS);
       }
     } catch (error) {
       console.error('ERROR in QueueSession QueueEnter listener:', error);

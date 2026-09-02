@@ -54,6 +54,45 @@ Title Case follows **Chicago/APA style**:
 
 ---
 
+#### Acronyms and initialisms
+
+Words that are uppercase by nature stay that way through Title Case — `arqueação bruta (ab)` becomes **Arqueação Bruta (AB)**, never *(Ab)*. Four signals are used, in this order:
+
+1. **The acronym list.** Common maritime (*GT, NT, AB, TPB, DWT, LOA, IMO, MMSI, SOLAS, MARPOL, STCW, ECDIS, GMDSS…*), institutional (*ONU, UN, ISO, CNPJ, IBGE…*) and technical (*PDF, URL, HTML, API, CSV…*) acronyms are built in. Add your own under **IE Settings → Other → [Title Case Acronyms](Plugin-Settings-Reference.md#other)**, separated by commas or spaces.
+2. **Initialisms and initials.** `u.s.a.` → **U.S.A.**, and a lone initial keeps its capital: `o autor a. silva` → **O Autor A. Silva**. The dotted abbreviations that are conventionally lowercase — *e.g., i.e., cf., a.m., p.m.* — are exempt and behave like the minor words above.
+3. **Roman numerals used as numbers.** `seção ii` → **Seção II**, `capítulo iv` → **Capítulo IV**, `chapter xl` → **Chapter XL**. See [when a numeral counts as a numeral](#when-a-roman-numeral-counts-as-a-numeral) below.
+4. **Capitals already in the text.** A word you wrote with two or more capitals is preserved as typed: `RO-RO`, `P&I`, `COVID-19`, `A/S`. This signal is switched off when the *whole* selection is uppercase, where existing capitals say nothing about which words are acronyms — there, signal 1 does the work, so `ARQUEAÇÃO BRUTA (AB)` still title-cases to **Arqueação Bruta (AB)**.
+
+A trailing plural `s` stays lowercase: **GTs**, not *GTS*.
+
+> **Why the list matters even though capitals are preserved.** Signal 4 reads what is on screen, so it cannot survive the lowercase step of the cycle — once `GT` has become `gt`, only the list knows to bring it back. Domain terms you cycle through all three stages belong in the setting.
+
+##### Examples
+
+> `o navio de 500 gt e a convenção solas`
+> → **O Navio de 500 GT e a Convenção SOLAS**
+
+> `tonelagem de porte bruto (tpb) em nm` *(with `TPB, NM` in the setting)*
+> → **Tonelagem de Porte Bruto (TPB) em NM**
+
+> `SEÇÃO II - DIÁRIO DE NAVEGAÇÃO`
+> → **Seção II - Diário de Navegação**
+
+Acronyms are forced uppercase in the **Title Case** step only. The **UPPERCASE** and **lowercase** steps stay literal, so `Shift+F3` can always take you to a fully lowercase selection.
+
+##### When a Roman numeral counts as a numeral
+
+`VI`, `LI` and `MI` are Portuguese words, `CM`, `ML` and `CC` are units, and every one of them is also a valid Roman numeral — so the numeral has to be recognisable as a number before it is capitalised. Two things make it so:
+
+- **The word before it names a numbered thing** — *seção, capítulo, parte, volume, tomo, livro, título, anexo, artigo, regra, item, fase, classe, figura, tabela, século, guerra, papa, rei*, and their English counterparts (*section, chapter, part, book, annex, article, rule, figure, table, century, war, king, pope…*). This is the only route for a **single letter**, since nothing else distinguishes `Capítulo V` from an ordinary *v*: `anexo vi da marpol` → **Anexo VI da MARPOL**.
+- **The numeral is two letters or longer and is not an ambiguous one** — `II`, `III`, `IV`, `XL`, `XVIII` are taken as numerals anywhere in the text, even as the first word: `ii - diário de navegação` → **II - Diário de Navegação**.
+
+Everything else is left alone, so `eu vi o navio` stays **Eu Vi o Navio** and `o volume em cm e ml` stays **O Volume em Cm e Ml**. If you want one of the ambiguous forms capitalised regardless of context, add it to the **Title Case Acronyms** setting.
+
+> **A word on two-letter entries.** For the same reason, `EU`, `MOB` and `RAM` are deliberately *not* in the built-in list — they would capitalise every Portuguese *eu* and every English *mob* and *ram*. Add them yourself if your notes never use those words.
+
+---
+
 #### Other features
 
 - **Formatting preserved / Formatação preservada:** bold, italic, highlight and all other rich-text styles are kept intact through every transformation.
@@ -912,6 +951,82 @@ The **scan is quick**, even across a whole knowledge base: reading every Rem tak
 
 !!! tip "Leave it running"
     The work lives inside the popup. Closing it mid-delete stops the run — Rems already deleted stay deleted, and running the command again clears the rest.
+
+---
+
+### Card Enablement Audit { #card-enablement-audit }
+
+**`Audit Card Enablement (tagged / referencing / descendants)`** takes one anchor Rem, asks every Rem in its orbit whether it actually produces flashcards, and lets you switch the broken ones back on in bulk.
+
+#### The problem it solves
+
+A Rem can look exactly like a flashcard — a front, a back, a cloze — and generate **nothing**. There are several ways that happens, and RemNote shows none of them in the outline:
+
+* the **flashcard direction** is set to `none`, so neither the forward nor the backward card exists;
+* **Enable Cards** is off on the Rem itself;
+* an ancestor carries **Disable Descendant Cards**;
+* the Rem is a **table** or sits inside one — RemNote ships table rows with cards off;
+* the cards were switched off **one at a time** in the queue.
+
+The one that arrives in bulk is the first. An **Anki import** can land hundreds of Rems at `enablePractice=true, practiceDirection=none` — they read as perfectly ordinary flashcards and are simply never scheduled.
+
+!!! warning "These Rems are invisible to every other tool"
+    A Rem whose direction was set to `none` before any card was made owns **no card records at all**. It therefore produces no rows in the card table, which is what the [Suppressed Cards](Prioritization-&-Sorting.md#suppressed-cards) breakdown is built from — so no amount of filtering there will ever show it. RemNote's own search cannot express the question either, because there is no text to match on.
+
+    This audit works the other way round: it starts from a **set of Rems** and asks each one what it generates. A Rem with no cards at all is a result, not an absence.
+
+#### Choosing what to audit
+
+The anchor is the focused Rem (or the document you ran the command from). Four checkboxes decide the population, and they combine freely:
+
+* **Tagged with it** — every instance of the anchor used as a tag.
+* **Referencing it** — every Rem whose text links to the anchor.
+* **Its descendants** — the anchor itself and everything underneath it.
+* **Expand each match** — add every match's own subtree.
+
+That last one is usually what reaches an imported deck: the tag or the reference sits on the container, while the Rems that own the cards are its children.
+
+#### Reading the results
+
+Each Rem gets one **verdict**, shown as a coloured chip you can click to filter the list. The panel opens showing the two that are worth hunting.
+
+| Verdict | Meaning | Fixable here |
+| --- | --- | --- |
+| `dir=none` | Has card material, practice is on, no direction enabled | ✅ |
+| `practice off` | **Enable Cards** is off on the Rem | ✅ |
+| `table` | The Rem is a table or sits in one | ✅ |
+| `ancestor off` | An ancestor carries **Disable Descendant Cards** | ❌ — untag the ancestor |
+| `paused deck` | Inside a paused deck | ❌ — unpause the deck |
+| `not surfaced` | Nothing surfaces and no Rem-level flag explains it | ❌ — a per-card switch, or the markup is gone |
+| `no material` | No back side, no clozes, no card records | ❌ — not a flashcard |
+| `OK` | Producing cards | — |
+
+Every row shows both the cards currently **surfaced** and the card **records** that exist, as `surfaced/records`. Those two numbers are what separate a Rem whose cards were switched off from one that never had any — `rem.getCards()` alone cannot tell them apart.
+
+The verdicts are ordered by what a fix would actually accomplish, so a Rem under a disabling ancestor is reported as `ancestor off` rather than `dir=none`: setting a direction there writes the flag and still produces nothing.
+
+#### Fixing them
+
+Tick the rows you want — the panel pre-selects exactly the fixable ones in the default filter — pick an action, and apply.
+
+* **Set flashcard direction** → `forward` (the default), `both`, `backward` or `none`.
+* **Switch cards ON** / **Switch cards OFF**.
+
+`↑`/`↓` move, `Space` selects, `A` selects everything shown, `Enter` applies, `Esc` closes.
+
+!!! danger "Enabling cards creates cards"
+    A Rem at `direction=none` that never had a card gets a **brand-new one**, with no repetition history and a due date of *now*. Fixing three hundred imported rows drops three hundred new cards straight into your queue.
+
+    The **card priority** field beside the action exists for this: tick it and every Rem the run enables also gets that priority, so the new cards enter the queue where you chose instead of wherever they would have inherited from. See [Priorities for Flashcards](Priorities-for-Flashcards.md).
+
+After the run the panel reports how many cards **actually appeared** — read back from the Rems, not predicted, since whether a direction change revives an old card record or mints a new one is RemNote's decision.
+
+#### Undoing
+
+The current state of every Rem — its **Enable Cards** flag and its **direction** — is captured *before* the first write, offered as a JSON download, and restorable with **Undo last apply** in the panel.
+
+!!! tip "Try a handful first"
+    Select five rows and apply. The report tells you exactly how many cards that produced, which is the honest way to find out what a run over the whole deck will do to your queue before you commit to it.
 
 ---
 

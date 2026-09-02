@@ -34,6 +34,7 @@ import {
     type ProgressUpdate,
 } from "../lib/authoritative_aggregates";
 import { computeMonthlyShieldCatchUp, MonthlyShieldCatchUp } from "../lib/shield_history";
+import { practicedQueuesVisibleKey } from "../lib/consts";
 import {
     CALIBRATION_PERIOD_LABELS,
     FIXED_FALLBACK,
@@ -465,13 +466,13 @@ function PracticedQueues() {
         migrateAuthoritativeAggregatesToShards(plugin);
     }, [plugin]);
 
-    // Handshake with QueueEnter auto-focus loop in queue_session.ts: it polls
-    // this key to detect whether the tab actually became visible, retrying
-    // openWidgetInRightSidebar if RemNote stole focus to the AI Tutor tab.
+    // Mount marker consumed by lib/queue_dashboard: it is both the "did the tab
+    // actually come up, or did RemNote steal it?" acknowledgement and the target
+    // of the [QDASH] wedged-channel watchdog. Must stay a cheap session write.
     useEffect(() => {
-        plugin.storage.setSession('practiced_queues_visible', Date.now());
+        plugin.storage.setSession(practicedQueuesVisibleKey, Date.now());
         return () => {
-            plugin.storage.setSession('practiced_queues_visible', null);
+            plugin.storage.setSession(practicedQueuesVisibleKey, null);
         };
     }, [plugin]);
 

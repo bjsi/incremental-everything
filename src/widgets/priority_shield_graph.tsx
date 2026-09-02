@@ -707,31 +707,31 @@ function PriorityShieldGraph() {
         </div>
       </div>
 
-      {/* Show document-level charts if we have an effective scope (original or current) */}
-      {effectiveDocScopeId && hasDocData && renderChart(
-        filteredDocChartData,
-        `📄 ${documentName || 'Document'} IncRem Shield`,
-        '#e74c3c', '#f39c12', '#9b59b6'
+      {hasCardKbData && renderChart(
+        filteredCardKbChartData,
+        '🌐 Knowledge Base Card Shield',
+        '#c0392b', '#e67e22', '#2980b9'
       )}
-      {effectiveDocScopeId && hasCardDocData && renderChart(
-        filteredCardDocChartData,
-        `📄 ${documentName || 'Document'} Card Shield`,
-        '#d35400', '#f1c40f', '#16a085'
+      {hasKbData && renderChart(
+        filteredKbChartData,
+        '🌐 Knowledge Base IncRem Shield',
+        '#8884d8', '#82ca9d', '#e91e63'
       )}
 
       {(hasDocData || hasCardDocData) && (hasKbData || hasCardKbData) && (
         <div style={{ height: '2px', backgroundColor: 'var(--rn-clr-border-opaque)', margin: '32px 0' }} />
       )}
 
-      {hasKbData && renderChart(
-        filteredKbChartData,
-        '🌐 Knowledge Base IncRem Shield',
-        '#8884d8', '#82ca9d', '#e91e63'
+      {/* Show document-level charts if we have an effective scope (original or current) */}
+      {effectiveDocScopeId && hasCardDocData && renderChart(
+        filteredCardDocChartData,
+        `📄 ${documentName || 'Document'} Card Shield`,
+        '#d35400', '#f1c40f', '#16a085'
       )}
-      {hasCardKbData && renderChart(
-        filteredCardKbChartData,
-        '🌐 Knowledge Base Card Shield',
-        '#c0392b', '#e67e22', '#2980b9'
+      {effectiveDocScopeId && hasDocData && renderChart(
+        filteredDocChartData,
+        `📄 ${documentName || 'Document'} IncRem Shield`,
+        '#e74c3c', '#f39c12', '#9b59b6'
       )}
 
       <div className="mt-4 text-sm rn-clr-content-secondary text-justify">

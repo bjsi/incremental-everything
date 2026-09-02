@@ -144,6 +144,32 @@ If you previously used tags like `#HighPriority` or `#P1` to organise your cards
 
 ![Batch Card Priority widget](assets/batch-card-assign-priority-taggedrems.png){ width="900" }
 
+#### Removing card priorities in bulk { #removing-card-priorities }
+
+The same panel takes priorities **off** the same selection. Tick the rows and press **Remove priority from N** — red, next to Apply.
+
+Only Rems that **physically carry the CardPriority tag** are counted. A Rem with no tag of its own still *resolves* a priority, inherited from its nearest prioritised ancestor, but there is nothing there to remove — including those would report a removal larger than what happened.
+
+The confirmation splits the selection into `manual` / `incremental` and derived (`inherited` / `default`) tags, and says how many selected Rems carry no tag and are left alone.
+
+**Undoable.** The value, source and timestamp of every Rem are captured before the first write, downloaded as a JSON file, and restorable with **Undo removal** in the panel.
+
+!!! note "Removing a derived tag is a reset, not a permanent state"
+    `inherited` and `default` priorities are **computed** from your document tree. While Flashcard Prioritisation is on, the plugin recreates them for card-bearing Rems the next time it cascades over them. Removing a `manual` or `incremental` priority is the durable case — nothing re-derives those, which is what the undo is really for.
+
+##### Do you need to run "Update all inherited Card Priorities" afterwards?
+
+**No.**
+
+* **The cache is already correct.** The removal drops exactly those Rems from the in-memory index and the saved copy, leaving every other row intact. That is a complete update, not an approximation, so there is nothing for a rebuild to fix.
+* **The sweep is the *rebuild*, not the *refresh*.** [It walks the whole knowledge base and tags every card-bearing Rem that lacks a priority](#manual-full-kb-sweep-update-all-inherited-card-priorities) with a derived value — the Rems you just cleared included.
+* **What does go stale is descendants.** Rems that were inheriting from the ones you cleared now resolve against a priority that no longer exists. The checkbox **After a removal, recompute inherited priorities for descendants** (on by default) cascades from the removed Rems only — seconds instead of minutes — and touches descendants, never the roots, so the removals themselves stand.
+
+!!! warning "Selecting a parent and its child together"
+    If both are selected and the recompute is left on, the child is a descendant of a cascade root and gets an inherited priority back. The dialog counts those and tells you to untick the recompute if you want every removal to stand.
+
+The table badge goes with the priority — unlike the knowledge-base-wide cleanup, which leaves the badge behind and asks you to run **Remove All Priority Band Tags** afterwards.
+
 ### 3. Unified Batch Priority Change
 
 While the tool above is specialized for migrations, the **[Prioritization-&-Sorting#batch-priority-change-increms--flashcards](Prioritization-&-Sorting.md#batch-priority-change-increms-flashcards)** widget provides a unified interface for managing existing priorities across an entire document tree.

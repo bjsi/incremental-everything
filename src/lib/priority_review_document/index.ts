@@ -11,6 +11,7 @@ import { CardPriorityInfo, calculateCardRemPercentilesFromCards } from '../card_
 import { calculateAllPercentiles } from '../utils';
 import { buildComprehensiveScope } from '../scope_helpers';
 import { saveReviewGraphData } from './graph_data';
+import { ensureReviewQueueTagPinnedOnce } from './sidebar_pin';
 import { safeRemTextToString } from '../pdfUtils';
 import * as _ from 'remeda'; // Ensure remeda is imported for uniqBy if available, or use custom
 
@@ -159,6 +160,121 @@ async function isInPausedDocument(rem: PluginRem): Promise<boolean> {
   return false;
 }
 
+export interface SkippedAncestorItem {
+  remId: string;
+  name: string;
+  priority: number;
+  /** The due ancestor that would have been given away. */
+  ancestorRemId: string;
+  ancestorName: string;
+  /** 1 = parent, 2 = grandparent. */
+  level: 1 | 2;
+  /** What happened to the ancestor: pulled in as a replacement, already in the
+   * document, or unreadable (the descendant is still held back either way). */
+  ancestorAction: 'added' | 'already-included' | 'unavailable';
+}
+
+interface AncestorInfo {
+  parentId: RemId | null;
+  hasDueCard: boolean;
+  text: any;
+}
+
+/**
+ * Reads the one thing the spoiler gate needs to know about an ancestor — does it
+ * still owe the queue a card — plus its own parent, so the walk can climb one
+ * more level without a second lookup.
+ *
+ * Memoised per Rem id because siblings share ancestors: on a descriptor tree the
+ * same parent is consulted once per child, and the same grandparent once per
+ * branch, so the cache collapses the fan-out to one read per distinct ancestor.
+ *
+ * `getCards()` (not the priority cache) is the source of truth here on purpose:
+ * a card created since the last cache build is exactly the case that matters
+ * most, and the cache would not know about it. It also returns [] for rems
+ * inside paused documents, which is the answer we want — a paused ancestor is
+ * never going to be practised, so it cannot spoil anything.
+ *
+ * The due predicate matches the queue's spoiler gate in lib/queue_prefetch: a
+ * disabled direction is absent from getCards() entirely, and a never-practised
+ * card carries a real nextRepetitionTime, so a brand-new flashcard on the parent
+ * counts as due. Fails OPEN — a read that throws reports "not due" and the
+ * descendant is kept, rather than being silently withheld.
+ */
+async function readAncestorInfo(
+  plugin: RNPlugin,
+  remId: RemId,
+  now: number,
+  cache: Map<RemId, AncestorInfo>
+): Promise<AncestorInfo> {
+  const cached = cache.get(remId);
+  if (cached) return cached;
+
+  let info: AncestorInfo = { parentId: null, hasDueCard: false, text: undefined };
+  try {
+    const rem = await plugin.rem.findOne(remId);
+    if (rem) {
+      const cards = (await rem.getCards()) || [];
+      info = {
+        parentId: (rem.parent as RemId | undefined) ?? null,
+        hasDueCard: cards.some((c: any) => (c.nextRepetitionTime ?? Infinity) <= now),
+        text: rem.text,
+      };
+    }
+  } catch (e) {
+    console.warn(`[PRD] Ancestor read failed for ${remId}:`, e);
+  }
+
+  cache.set(remId, info);
+  return info;
+}
+
+/**
+ * Finds the ancestor whose answer this card would give away.
+ *
+ * RemNote renders a card's ancestors as context above the question, so
+ * practising a second-level descriptor puts its parent descriptor — answer and
+ * all — on screen before the parent's own card is ever asked. When both are due
+ * and the child happens to be scheduled first, the parent is answered for free;
+ * a mature card with years of stability is graded on a memory it never had to
+ * retrieve. Native RemNote does not prevent this, so the review document does.
+ *
+ * SCOPE: parent and grandparent only, as requested. Deeper ancestors are
+ * displayed too, but the risk falls off sharply with distance — beyond two
+ * levels the context line is usually a section or document title rather than a
+ * descriptor carrying an answer — and every extra level is another read per
+ * candidate.
+ *
+ * Returns the HIGHEST due ancestor, not the nearest: when both parent and
+ * grandparent are due, releasing the grandparent first frees the parent for the
+ * next document, which in turn frees this card — the tree unblocks top-down, one
+ * level per review, instead of stalling on a parent that is itself blocked.
+ */
+async function findDueAncestorSpoiler(
+  plugin: RNPlugin,
+  rem: PluginRem,
+  now: number,
+  cache: Map<RemId, AncestorInfo>
+): Promise<{ remId: RemId; level: 1 | 2; text: any } | null> {
+  const parentId = (rem.parent as RemId | undefined) ?? null;
+  if (!parentId) return null;
+
+  const parent = await readAncestorInfo(plugin, parentId, now, cache);
+
+  if (parent.parentId) {
+    const grandparent = await readAncestorInfo(plugin, parent.parentId, now, cache);
+    if (grandparent.hasDueCard) {
+      return { remId: parent.parentId, level: 2, text: grandparent.text };
+    }
+  }
+
+  if (parent.hasDueCard) {
+    return { remId: parentId, level: 1, text: parent.text };
+  }
+
+  return null;
+}
+
 export interface ReviewDocumentConfig {
   scopeRemId: string | null;  // null = full KB
   itemCount: number;
@@ -175,7 +291,12 @@ export interface ReviewDocumentConfig {
 export async function createPriorityReviewDocument(
   plugin: RNPlugin,
   config: ReviewDocumentConfig
-): Promise<{ doc: PluginRem; actualItemCount: number; skippedPausedItems: SkippedPausedItem[] }> {
+): Promise<{
+  doc: PluginRem;
+  actualItemCount: number;
+  skippedPausedItems: SkippedPausedItem[];
+  skippedAncestorItems: SkippedAncestorItem[];
+}> {
   const { scopeRemId, itemCount, cardRatio, filterPaused, pausedPriorityThreshold } = config;
 
   // 1. Create the review document with rem reference in title
@@ -330,6 +451,17 @@ export async function createPriorityReviewDocument(
   // Build a fast lookup: remId -> sorted card entry, for cluster sibling resolution
   const dueCardByRemId = new Map(sortedCards.map(c => [c.rem._id, c]));
 
+  // Priority of every Rem the cache knows about, scope or not. A substituted
+  // ancestor is usually in `dueCardByRemId` already; this covers the one that is
+  // not — an ancestor sitting just outside a document-scoped selection.
+  const cachedPriorityByRemId = new Map(allCardInfos.map(c => [c.remId, c.priority]));
+
+  // Ancestor-spoiler state. Both are filled lazily inside addCard, so the reads
+  // are bounded by how many cards the document actually pulls, and the cache
+  // collapses the ancestors shared by siblings into one read each.
+  const skippedAncestorItems: SkippedAncestorItem[] = [];
+  const ancestorInfoCache = new Map<RemId, AncestorInfo>();
+
   const addIncRem = async (idx: number) => {
     if (idx >= sortedIncRems.length) return false;
     const item = sortedIncRems[idx];
@@ -376,6 +508,56 @@ export async function createPriorityReviewDocument(
       return true; // advance index without adding to mixedItems
     }
 
+    // Ancestor-spoiler check. A card whose parent or grandparent is itself due
+    // would put that ancestor's answer on screen — as the context line above the
+    // question — before the ancestor's own card is ever asked. RemNote does not
+    // prevent this natively, so the descendant is held back here.
+    //
+    // SWAP, not skip: the blocking ancestor takes the descendant's place in the
+    // document. Dropping the descendant alone would leave the block standing —
+    // the ancestor might not be picked this time, and the same pair would collide
+    // again in the next document. Practising the ancestor now is what frees the
+    // descendant for the next one, so the tree drains top-down instead of
+    // deadlocking. The count is preserved too: one item out, one item in.
+    const spoiler = await findDueAncestorSpoiler(plugin, item.rem, now, ancestorInfoCache);
+    if (spoiler) {
+      let ancestorAction: SkippedAncestorItem['ancestorAction'] = 'already-included';
+
+      if (!addedRemIds.has(spoiler.remId)) {
+        const ancestorRem = await plugin.rem.findOne(spoiler.remId);
+        if (ancestorRem) {
+          const ancestorEntry = dueCardByRemId.get(spoiler.remId);
+          mixedItems.push({
+            rem: ancestorRem,
+            type: 'flashcard',
+            // The ancestor keeps its own priority when we know it. Falling back
+            // to the descendant's is not a guess about the ancestor so much as a
+            // statement that it is worth exactly as much as the item it displaced.
+            priority: ancestorEntry?.priority ?? cachedPriorityByRemId.get(spoiler.remId) ?? item.priority,
+            percentile: cardPercentiles[spoiler.remId] ?? 100,
+          });
+          // Marking it added also stops sortedCards from queueing it twice when
+          // the iteration later reaches its own index.
+          addedRemIds.add(spoiler.remId);
+          ancestorAction = 'added';
+        } else {
+          console.warn(`[PRD] Due ancestor ${spoiler.remId} could not be loaded for substitution.`);
+          ancestorAction = 'unavailable';
+        }
+      }
+
+      skippedAncestorItems.push({
+        remId: item.rem._id,
+        name: await safeRemTextToString(plugin, item.rem.text),
+        priority: item.priority,
+        ancestorRemId: spoiler.remId,
+        ancestorName: await safeRemTextToString(plugin, spoiler.text),
+        level: spoiler.level,
+        ancestorAction,
+      });
+      return true; // advance index without adding the descendant
+    }
+
     // Lookup percentile with debug log if missing
     let percentile = cardPercentiles[item.rem._id];
     if (percentile === undefined) {
@@ -394,6 +576,8 @@ export async function createPriorityReviewDocument(
     // --- Card Cluster expansion ---
     // Check if this rem's direct parent has the Card Cluster powerup.
     // If so, add all sibling rems (same parent) that have due cards.
+    // Siblings need no ancestor-spoiler check of their own: they share this
+    // rem's parent and grandparent, so the check above already answered for them.
     try {
       const parentId = item.rem.parent as RemId | undefined;
       if (parentId) {
@@ -458,12 +642,26 @@ export async function createPriorityReviewDocument(
     }
   }
 
-  // 6. Finalise skipped list and log
+  // 6. Finalise skipped lists and log
   if (skippedPausedItems.length > 0) {
     skippedPausedItems.sort((a, b) => a.priority - b.priority);
     console.log(
       `[PRD] ${skippedPausedItems.length} flashcard rems skipped (paused documents):`,
       skippedPausedItems.map((s) => `P${s.priority} — ${s.name} [${s.remId}]`)
+    );
+  }
+
+  if (skippedAncestorItems.length > 0) {
+    skippedAncestorItems.sort((a, b) => a.priority - b.priority);
+    const substituted = skippedAncestorItems.filter((s) => s.ancestorAction === 'added').length;
+    console.log(
+      `[PRD] ${skippedAncestorItems.length} flashcard rems held back (due ancestor would spoil them), ` +
+        `${substituted} ancestors pulled in as replacements:`,
+      skippedAncestorItems.map(
+        (s) =>
+          `P${s.priority} — ${s.name} [${s.remId}] ← blocked by ` +
+          `${s.level === 1 ? 'parent' : 'grandparent'} "${s.ancestorName}" [${s.ancestorRemId}] (${s.ancestorAction})`
+      )
     );
   }
 
@@ -489,10 +687,15 @@ export async function createPriorityReviewDocument(
     ? `\nSkipped (paused docs): ${skippedPausedItems.length} flashcard rems`
     : '';
 
+  const ancestorLine = skippedAncestorItems.length > 0
+    ? `\nHeld back (due ancestor): ${skippedAncestorItems.length} flashcard rems, ` +
+      `${skippedAncestorItems.filter((s) => s.ancestorAction === 'added').length} ancestors swapped in`
+    : '';
+
   const metadataText = `Scope: ${scopeName}
 Scope Size: ${scopedIncRems.length} IncRems, ${remsWithCards.length} Rems with Cards, ${totalCardsInScope} Cards
 Due: ${dueIncRems.length} IncRems, ${dueCardRemsCount} Rems with Cards, ${dueCardsInScope} Cards
-Selected Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} IncRems, ${mixedItems.filter(i => i.type === 'flashcard').length} Rems with Cards)${skippedLine}
+Selected Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} IncRems, ${mixedItems.filter(i => i.type === 'flashcard').length} Rems with Cards)${skippedLine}${ancestorLine}
 Randomness: IncRem ${incRemRandPct}%, Cards ${cardRandPct}%
 Created: ${timestamp}`;
 
@@ -569,7 +772,19 @@ Created: ${timestamp}`;
 
   // 8. Create portals in the document
   const reviewQueueTag = await findOrCreateTag(plugin, 'Priority Review Queue');
-  if (reviewQueueTag) { await reviewDoc.addTag(reviewQueueTag); }
+  if (reviewQueueTag) {
+    await reviewDoc.addTag(reviewQueueTag);
+    // Also live under the tag Rem, rather than at the top level of the knowledge
+    // base. This changes nothing the user sees — RemNote lists a review document
+    // under its tag as an instance ("All Tagged Bullets") whether or not it is
+    // also a child, and a document queue already gathers a tag's instances with
+    // their descendants — but it keeps the review documents together instead of
+    // scattering one more timestamped top-level document per session.
+    await reviewDoc.setParent(reviewQueueTag);
+    // The tag Rem is the one door to every review document ever built, so it
+    // earns a permanent sidebar slot — offered once, then left to the user.
+    await ensureReviewQueueTagPinnedOnce(plugin, reviewQueueTag);
+  }
 
   for (const item of mixedItems) {
     // Create a regular rem that will contain the portal reference
@@ -594,5 +809,5 @@ Created: ${timestamp}`;
     if (typeTag) { await childRem.addTag(typeTag); }
   }
 
-  return { doc: reviewDoc, actualItemCount: mixedItems.length, skippedPausedItems };
+  return { doc: reviewDoc, actualItemCount: mixedItems.length, skippedPausedItems, skippedAncestorItems };
 }

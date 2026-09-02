@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 
 export async function registerWidgets(plugin: ReactRNPlugin) {
@@ -12,6 +12,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget(pluginHubWidgetId, WidgetLocation.SidebarEnd, {
     dimensions: {
       width: '100%',
+      height: 'auto',
+    },
+  });
+
+  // The whole tip pile, behind the hub's "All Tips" button. Sized for prose:
+  // every tip's one-line body is shown in full, which the 130px sidebar cannot
+  // do. Height is fixed so the list scrolls inside the popup rather than the
+  // popup growing past the window on a knowledge base with every tip unseen.
+  plugin.app.registerWidget(onboardingTipsWidgetId, WidgetLocation.Popup, {
+    dimensions: {
+      width: 620,
       height: 'auto',
     },
   });
@@ -65,6 +76,13 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('batch_card_priority', WidgetLocation.Popup, {
     dimensions: {
       width: 1000,
+      height: 1100,
+    },
+  });
+
+  plugin.app.registerWidget('card_enablement_audit', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1100,
       height: 1100,
     },
   });

@@ -4,13 +4,21 @@ import '../style.css';
 import '../App.css';
 import { IE_DOCS_BASE_URL } from '../lib/settings';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { pluginHubHiddenKey } from '../lib/consts';
+import { onboardingTipsWidgetId, pluginHubHiddenKey } from '../lib/consts';
 import {
   OnboardingTip,
   acknowledgeTip,
+  ONBOARDING_TIPS,
+  backfillLocalMirror,
   getAcknowledgedTipIds,
+  getDrawnTipIdThisSession,
+  getLastShownMap,
+  markTipAnsweredThisSession,
   pickTip,
+  recordTipShown,
+  setDrawnTipIdThisSession,
   snoozeTips,
+  tipAnsweredThisSession,
   tipsAreSnoozed,
 } from '../lib/onboarding_tips';
 
@@ -236,8 +244,19 @@ function IconButton(props: {
  * One tip, with its three answers. `onGotIt` retires it permanently and
  * `onClose` returns it to the pile; either way the tip area is done for this
  * session. `Learn More` is only rendered when the tip names a docs section.
+ *
+ * `All Tips` is the way out of the one-per-session pacing — it opens the whole
+ * pile, answered ones first. The button row WRAPS rather than shrinking: three
+ * labels need ~185px and the sidebar can be dragged to about 130px, so without
+ * wrapping the third button would either overflow the panel or squeeze the
+ * other two down to an ellipsis.
  */
-function TipCard(props: { tip: OnboardingTip; onGotIt: () => void; onClose: () => void }) {
+function TipCard(props: {
+  tip: OnboardingTip;
+  onGotIt: () => void;
+  onClose: () => void;
+  onShowAll: () => void;
+}) {
   const { tip } = props;
   return (
     <div
@@ -268,7 +287,7 @@ function TipCard(props: { tip: OnboardingTip; onGotIt: () => void; onClose: () =
         {tip.body}
       </div>
 
-      <div className="flex gap-1 mt-0.5">
+      <div className="flex gap-1 mt-0.5" style={{ flexWrap: 'wrap' }}>
         <button
           onClick={props.onGotIt}
           // The background must be inline: an inline `background` in the shared
@@ -293,6 +312,14 @@ function TipCard(props: { tip: OnboardingTip; onGotIt: () => void; onClose: () =
             Learn More
           </button>
         )}
+        <button
+          onClick={props.onShowAll}
+          style={{ ...actionButtonStyle, flex: '1 1 0' }}
+          className="hover:opacity-75"
+          title="See every tip — the ones you have acknowledged, with the date, and the ones still to come"
+        >
+          All Tips
+        </button>
       </div>
     </div>
   );
@@ -305,19 +332,58 @@ export function PluginHub() {
   /** null until the first load resolves, so the panel does not flash a tip in. */
   const [tipsReady, setTipsReady] = useState(false);
 
-  // Drawn once per mount rather than on a tracker: a tip that reshuffled every
-  // time synced storage changed would move under the user's cursor.
+  // Drawn on mount rather than on a tracker: a tip that reshuffled every time
+  // synced storage changed would move under the user's cursor.
+  //
+  // "Once per session" is enforced by the session flag, NOT by this effect
+  // running once — RemNote remounts the SidebarEnd slot as the app is used, and
+  // this effect runs again each time. Without the flag every remount re-drew,
+  // which looks like variety while the pile is large and, once a category is
+  // nearly exhausted, like the same handful of tips coming back after they were
+  // answered.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (await tipsAreSnoozed(plugin)) {
+      // Fire and forget: protecting the already-answered tips against a synced
+      // wipe should never hold up painting the panel.
+      backfillLocalMirror(plugin).catch(() => {
+        /* best effort — the synced record is still authoritative */
+      });
+
+      if ((await tipAnsweredThisSession(plugin)) || (await tipsAreSnoozed(plugin))) {
         if (!cancelled) setTipsReady(true);
         return;
       }
+
       const acknowledged = await getAcknowledgedTipIds(plugin);
       if (cancelled) return;
-      setTip(pickTip(acknowledged));
+
+      // A remount re-shows the tip this session already drew, rather than
+      // rolling again: the session is entitled to one tip, and swapping it out
+      // from under the user mid-session is the same complaint as repeating one.
+      // It is re-checked against `acknowledged` because the All Tips popup can
+      // retire it while the panel is up.
+      const drawnId = await getDrawnTipIdThisSession(plugin);
+      if (cancelled) return;
+      const drawn = drawnId
+        ? ONBOARDING_TIPS.find((t) => t.id === drawnId && !acknowledged.includes(t.id))
+        : undefined;
+      if (drawn) {
+        setTip(drawn);
+        setTipsReady(true);
+        return;
+      }
+
+      const next = pickTip(acknowledged, await getLastShownMap(plugin));
+      if (cancelled) return;
+      setTip(next);
       setTipsReady(true);
+      if (next) {
+        // Stamped only on a fresh draw, so a remount cannot push a tip to the
+        // back of the rotation the user never answered.
+        await setDrawnTipIdThisSession(plugin, next.id);
+        await recordTipShown(plugin, next.id);
+      }
     })();
     return () => {
       cancelled = true;
@@ -342,13 +408,26 @@ export function PluginHub() {
     const current = tip;
     if (!current) return;
     await acknowledgeTip(plugin, current.id);
+    await markTipAnsweredThisSession(plugin);
     setTip(null);
   }, [plugin, tip]);
 
   const handleCloseTip = useCallback(async () => {
     await snoozeTips(plugin);
+    await markTipAnsweredThisSession(plugin);
     setTip(null);
   }, [plugin]);
+
+  /**
+   * The tip card is gone once the tip is answered and while the panel is
+   * snoozed, so "All Tips" would be unreachable for the rest of the session
+   * exactly when the user has just been reminded that tips exist. It therefore
+   * also has a standing link below, and both go through here.
+   */
+  const openAllTips = useCallback(
+    () => plugin.widget.openPopup(onboardingTipsWidgetId),
+    [plugin]
+  );
 
   const handleHidePanel = useCallback(async () => {
     await plugin.storage.setSession(pluginHubHiddenKey, true);
@@ -564,7 +643,35 @@ export function PluginHub() {
       )}
 
       {tipsReady && tip && (
-        <TipCard tip={tip} onGotIt={handleGotIt} onClose={handleCloseTip} />
+        <TipCard
+          tip={tip}
+          onGotIt={handleGotIt}
+          onClose={handleCloseTip}
+          onShowAll={openAllTips}
+        />
+      )}
+
+      {/* Standing entry to the pile for every state the tip card is absent in:
+          answered, snoozed, or drained. Text rather than a header icon — the
+          header is already four icons wide at a sidebar width where the panel
+          title has to drop a word to fit. */}
+      {tipsReady && !tip && (
+        <button
+          onClick={openAllTips}
+          className="hover:opacity-75 text-left"
+          style={{
+            fontSize: 11,
+            lineHeight: '14px',
+            color: 'var(--rn-clr-content-tertiary)',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+          }}
+          title="See every tip — the ones you have acknowledged, with the date, and the ones still to come"
+        >
+          💡 All tips
+        </button>
       )}
     </div>
   );

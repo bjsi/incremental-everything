@@ -18,6 +18,12 @@ import { getCardPriority } from '../lib/card_priority';
 import { resolveRawCardPriority, readHiddenSlotRecord, getRawCardPriorityString } from '../lib/card_priority/slot_access';
 import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree, findOrphanedImportedCardPriorities } from '../lib/card_priority/batch';
 import { diagnosePowerupReadPath } from '../lib/powerup_read_diagnostic';
+import {
+  ONBOARDING_TIPS,
+  TipsDiagnostics,
+  readTipsDiagnostics,
+  resetAcknowledgedTips,
+} from '../lib/onboarding_tips';
 import { dumpRawPowerupSlots } from '../lib/raw_slot_dump';
 import { scanKbForDetachedSlots, SlotScanReport } from '../lib/raw_slot_scan';
 import { repairDetachedCardPriorities, testDeleteOrphanProperties, RepairReport } from '../lib/raw_slot_repair';
@@ -801,6 +807,20 @@ function Debug() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [backupList, setBackupList] = useState<null | Array<{ key: string; backedUpAt: number | null; kbId: string | null; dateEntries: number }>>(null);
   const [restoreResult, setRestoreResult] = useState<null | { perKey: Array<{ key: string; added: number; skipped: number }>; source: string }>(null);
+
+  // ── Onboarding tips ──────────────────────────────────────────────────────
+  // Answers one question: why did a tip the user retired come back? The three
+  // ways that can happen are each visible in the report — the id is in one store
+  // and not the other, it sits under a knowledge-base partition that is not the
+  // current one, or it was never written at all.
+  //
+  // Declared here with the rest of the state, NOT next to its handlers further
+  // down: the `if (!debugData)` guard below is an early return, so a hook after
+  // it runs only on the renders that get past it and React counts a different
+  // number of hooks each time ("Rendered more hooks than during the previous
+  // render"). Every hook in this component belongs above that line.
+  const [tipsDiag, setTipsDiag] = useState<TipsDiagnostics | null>(null);
+  const [isReadingTips, setIsReadingTips] = useState(false);
 
   if (!debugData) return null;
 
@@ -4045,6 +4065,26 @@ function Debug() {
     }
   };
 
+  const handleReadTipsState = async () => {
+    setIsReadingTips(true);
+    try {
+      const report = await readTipsDiagnostics(plugin);
+      setTipsDiag(report);
+      console.log('[onboarding-tips] diagnostics:', report);
+    } catch (e) {
+      console.error('[onboarding-tips] probe failed:', e);
+      await plugin.app.toast('Tips probe failed — check console.');
+    } finally {
+      setIsReadingTips(false);
+    }
+  };
+
+  const handleResetTips = async () => {
+    await resetAcknowledgedTips(plugin);
+    setTipsDiag(await readTipsDiagnostics(plugin));
+    await plugin.app.toast('Every tip is unacknowledged again in this knowledge base.');
+  };
+
   const preStyle = { backgroundColor: 'var(--rn-clr-background-secondary)', padding: '8px', borderRadius: '4px', marginTop: '4px', fontSize: '11px', overflowX: 'auto' as 'auto' };
   const smallBtnStyle: CSSProperties = { fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: 'pointer' };
 
@@ -6641,6 +6681,155 @@ function Debug() {
               }}
             />
           </>
+        )}
+      </div>
+
+      {/* Onboarding tips: what is actually stored as "seen".
+          Reads the synced record, the device-local mirror and the
+          unidentified-KB fallback bucket without writing to any of them. */}
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Onboarding Tips State
+          <span style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={handleReadTipsState}
+              disabled={isReadingTips}
+              style={{ ...smallBtnStyle, cursor: isReadingTips ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+              title="Read the synced record, the local mirror and the fallback bucket for the acknowledged tips (read-only)"
+            >
+              {isReadingTips ? 'Reading…' : 'Read state'}
+            </button>
+            {tipsDiag && (
+              <button onClick={() => copyTextFallback(JSON.stringify(tipsDiag, null, 2))} style={smallBtnStyle}>
+                Copy
+              </button>
+            )}
+          </span>
+        </h2>
+        <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+          Why did a tip you pressed <em>I Got It</em> on come back? Either its id is missing from a store,
+          or it landed under a knowledge-base partition that is not the current one.
+        </div>
+
+        {tipsDiag && (
+          <div style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
+            <div style={{ lineHeight: 1.6 }}>
+              Current KB:{' '}
+              <code style={{ color: tipsDiag.kbResolved ? undefined : '#ef4444' }}>{tipsDiag.kbId}</code>{' '}
+              {!tipsDiag.kbResolved && (
+                <strong style={{ color: '#ef4444' }}>
+                  — getCurrentKnowledgeBaseData() came back empty, so writes land in the fallback bucket
+                </strong>
+              )}
+            </div>
+            <div style={{ lineHeight: 1.6 }}>
+              Acknowledged: <strong>{tipsDiag.rows.length}</strong> · remaining in the pile:{' '}
+              <strong>{tipsDiag.remaining}</strong> of {ONBOARDING_TIPS.length}
+            </div>
+            <div style={{ lineHeight: 1.6 }}>
+              Panel snoozed:{' '}
+              {tipsDiag.snoozedUntil > Date.now()
+                ? <strong>{`until ${new Date(tipsDiag.snoozedUntil).toLocaleString()}`}</strong>
+                : 'no'}
+            </div>
+
+            {/* Partition counts side by side: an acknowledgement that went to the
+                wrong knowledge base shows up as a non-current row holding ids. */}
+            <div style={{ marginTop: '8px', fontWeight: 600 }}>Partitions</div>
+            {(['synced', 'local'] as const).map((scope) => {
+              const parts = scope === 'synced' ? tipsDiag.syncedPartitions : tipsDiag.localPartitions;
+              return (
+                <div key={scope} style={{ paddingLeft: '6px', lineHeight: 1.6 }}>
+                  <code>{scope}</code>:{' '}
+                  {parts.length === 0 ? (
+                    <span style={{ color: '#d97706' }}>(empty — nothing stored)</span>
+                  ) : (
+                    parts.map((pt) => (
+                      <span key={pt.kbId} style={{ marginRight: '8px' }}>
+                        <code style={{ color: pt.isCurrent ? '#16a34a' : '#d97706' }}>
+                          {pt.kbId === 'default' ? 'default (fallback)' : pt.kbId.slice(0, 8)}
+                        </code>
+                        {' '}×{pt.count}{pt.isCurrent ? ' ←current' : ''}
+                      </span>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+
+            {/* What the next session will be offered, and why. The pool is the
+                rotation's own view: oldest first, so the top row is next. */}
+            <div style={{ marginTop: '8px', fontWeight: 600 }}>
+              Rotation{' '}
+              <span style={{ fontWeight: 400, color: 'var(--rn-clr-content-tertiary)' }}>
+                (next up first)
+              </span>
+            </div>
+            <div style={{ paddingLeft: '6px', lineHeight: 1.6 }}>
+              This session: {tipsDiag.answeredThisSession
+                ? <strong>answered — no further tip until restart</strong>
+                : tipsDiag.drawnThisSession
+                  ? <>showing <code>{tipsDiag.drawnThisSession}</code></>
+                  : 'nothing drawn yet'}
+            </div>
+            {tipsDiag.rotation.length === 0 ? (
+              <div style={{ paddingLeft: '6px', color: 'var(--rn-clr-content-tertiary)' }}>
+                (pile drained — no tip left to offer)
+              </div>
+            ) : (
+              <div style={{ maxHeight: '160px', overflowY: 'auto', paddingLeft: '6px' }}>
+                {tipsDiag.rotation.map((r, i) => (
+                  <div key={r.id} style={{ lineHeight: 1.6 }}>
+                    <span style={{ color: i === 0 ? '#16a34a' : 'var(--rn-clr-content-tertiary)' }}>
+                      {i === 0 ? '→' : '·'}
+                    </span>{' '}
+                    <code>{r.id}</code>{' '}
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                      {r.lastShown === null
+                        ? '(never shown)'
+                        : `last shown ${new Date(r.lastShown).toLocaleString()}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: '8px', fontWeight: 600 }}>Acknowledged tips</div>
+            {tipsDiag.rows.length === 0 ? (
+              <div style={{ paddingLeft: '6px', color: 'var(--rn-clr-content-tertiary)' }}>
+                (none — every tip is still in the pile)
+              </div>
+            ) : (
+              <div style={{ maxHeight: '240px', overflowY: 'auto', paddingLeft: '6px' }}>
+                {tipsDiag.rows.map((r) => (
+                  <div key={r.id} style={{ lineHeight: 1.6 }}>
+                    <code style={{ color: r.known ? undefined : '#d97706' }}>{r.id}</code>
+                    {!r.known && <span style={{ color: '#d97706' }}> (stale id — no such tip)</span>}
+                    {' → '}
+                    <strong>{r.at === null ? 'no date recorded' : new Date(r.at).toLocaleString()}</strong>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                      {' '}[
+                      <span style={{ color: r.inSynced ? '#16a34a' : '#ef4444' }}>synced {r.inSynced ? '✓' : '✗'}</span>
+                      {' · '}
+                      <span style={{ color: r.inLocal ? '#16a34a' : '#ef4444' }}>local {r.inLocal ? '✓' : '✗'}</span>
+                      {r.fromFallbackOnly && <span style={{ color: '#d97706' }}> · fallback bucket only</span>}
+                      ]
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>
+              <button
+                onClick={handleResetTips}
+                style={{ ...smallBtnStyle, borderColor: '#ef4444', color: '#ef4444' }}
+                title="Clear every acknowledgement for this knowledge base, in both stores, and end the snooze"
+              >
+                Reset acknowledgements
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

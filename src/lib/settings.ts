@@ -63,6 +63,7 @@ import {
   fsrsRequestedRetentionId,
   remnoteEnvironmentId,
   flashcardResponseTimeLimitId,
+  titleCaseAcronymsId,
   enableMasteryDrillId,
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
@@ -131,6 +132,7 @@ export interface IESettings {
   // Misc
   [remnoteEnvironmentId]: 'beta' | 'www';
   [flashcardResponseTimeLimitId]: number;
+  [titleCaseAcronymsId]: string;
 
   // Mastery Drill
   [enableMasteryDrillId]: boolean;
@@ -192,6 +194,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
 
   [remnoteEnvironmentId]: 'www',
   [flashcardResponseTimeLimitId]: 180,
+  [titleCaseAcronymsId]: '',
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
@@ -822,6 +825,22 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     description:
       'Answers taking longer than this (because you walked away, say) are counted only up to this ' +
       'limit in Practiced Queues statistics. Matches RemNote\'s own setting of the same name.',
+  },
+  [titleCaseAcronymsId]: {
+    kind: 'string',
+    group: 'misc',
+    wide: true,
+    placeholder: 'GT, AB, TPB, NORMAM',
+    title: 'Title Case Acronyms',
+    description:
+      'Extra acronyms the Text Case Converter (shift+F3) keeps fully uppercase when it applies ' +
+      'Title Case: "arqueação bruta (ab)" becomes "Arqueação Bruta (AB)". Separate them with ' +
+      'commas or spaces.\n\n' +
+      'Words already written in capitals are preserved without being listed here; the list is ' +
+      'what restores them after a pass through lowercase. Common maritime, institutional and ' +
+      'technical acronyms (GT, IMO, SOLAS, PDF…) are built in. Entries win over the ' +
+      'article/preposition rules, so a two-letter entry that is also a word — "SE", "NO" — will ' +
+      'capitalise every occurrence of it.',
   },
 };
 

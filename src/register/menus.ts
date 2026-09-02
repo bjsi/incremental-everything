@@ -11,6 +11,7 @@ import {
   noIncRemTimerKey,
   pageRangeWidgetId,
   incRemDisabledDeviceKey,
+  cardEnablementAnchorKey,
 } from '../lib/consts';
 import { safeRemTextToString, getActivePdfForIncRem, getAllPDFsInRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
@@ -145,6 +146,21 @@ export async function registerMenus(plugin: ReactRNPlugin) {
       await plugin.storage.setSession('batchCardPriorityTagRem', rem._id);
 
       await plugin.widget.openPopup('batch_card_priority');
+    },
+  });
+
+  plugin.app.registerMenuItem({
+    id: 'card_enablement_audit_menuitem',
+    location: PluginCommandMenuLocation.DocumentMenu,
+    name: 'Audit Card Enablement (tagged / referencing / descendants)',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) {
+        await plugin.app.toast('Could not find the rem');
+        return;
+      }
+      await plugin.storage.setSession(cardEnablementAnchorKey, rem._id);
+      await plugin.widget.openPopup('card_enablement_audit');
     },
   });
 
