@@ -18,6 +18,13 @@
 
 import { RNPlugin, QueueInteractionScore } from '@remnote/plugin-sdk';
 import { computeFSRSStatesPerReview, forgettingCurve, resolveWeights } from './fsrs';
+import {
+  S0Breakdown,
+  S0GradeAcc,
+  addS0Observation,
+  finalizeS0,
+  makeS0Accs,
+} from './fsrs_initial_stability';
 
 // --- Bucket layout --------------------------------------------------------
 
@@ -37,6 +44,22 @@ function stabilityBucket(days: number): number {
     if (days <= S_BUCKET_BOUNDS_DAYS[i]) return i;
   }
   return S_BUCKET_BOUNDS_DAYS.length;
+}
+
+/**
+ * Calendar-day index helpers for the S₀ slice. fsrs-optimizer measures the
+ * first interval in whole days (`real_days.diff()`) and discards `delta_t == 0`
+ * rows, so "same day" must mean same calendar day, not "under 24h elapsed".
+ * Rounding the millisecond difference absorbs DST shifts.
+ */
+function startOfLocalDay(ms: number): number {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function dayDiff(fromMs: number, toMs: number): number {
+  return Math.round((startOfLocalDay(toMs) - startOfLocalDay(fromMs)) / 86400000);
 }
 
 function rBucket(predR: number): number {
@@ -98,6 +121,10 @@ export interface FSRSCalibrationBreakdown {
   gridCRowTotals: CellStats[];  // length 20
   gridCColTotals: CellStats[];  // length 5
   gridCOverall: CellStats;
+
+  // Grid D: the w0–w3 slice — first grade of each lifetime paired with the
+  // outcome of the first review on a later day. See `fsrs_initial_stability.ts`.
+  initialStability: S0Breakdown;
 
   totalCards: number;
   ignorePreReset: boolean;
@@ -163,6 +190,11 @@ export async function computeFSRSCalibrationBreakdown(
   const accC: CellAcc[][] = Array.from({ length: R_BUCKET_COUNT }, () =>
     Array.from({ length: S_BUCKET_COUNT }, makeAcc),
   );
+  const s0Accs: S0GradeAcc[] = makeS0Accs();
+  // Pooled recall over every rep that had a prior rep, used as the Laplace
+  // pseudo-observation in the S₀ fit (the optimizer's `average_recall`).
+  let globalReps = 0;
+  let globalRetained = 0;
 
   const N = allCards.length;
   const YIELD_EVERY = 1500;
@@ -194,6 +226,14 @@ export async function computeFSRSCalibrationBreakdown(
     let lastGradeableIdx: number | null = null;
     let lastLastGradeableIdx: number | null = null;
     let lastPredR: number | null = null;
+    // S₀ tracking: the first gradeable rep of the current lifetime, and whether
+    // its outcome (the first gradeable rep on a LATER calendar day) is still
+    // outstanding. `s0Intermediate` counts the same-day learning steps in
+    // between — those are dropped from the interval, exactly as the optimizer
+    // drops `delta_t == 0` rows, but they do move FSRS's own belief.
+    let lifetimeFirstIdx: number | null = null;
+    let s0Pending = false;
+    let s0Intermediate = 0;
 
     for (let i = 0; i < effective.length; i++) {
       const h = effective[i];
@@ -201,14 +241,61 @@ export async function computeFSRSCalibrationBreakdown(
         lastGradeableIdx = null;
         lastLastGradeableIdx = null;
         lastPredR = null;
+        lifetimeFirstIdx = null;
+        s0Pending = false;
+        s0Intermediate = 0;
         continue;
       }
       if (!isGradeable(h.score)) continue;
+
+      // ----- Grid D: initial stability (w0–w3) -----
+      // Runs before the early-continue below because it is the one analysis
+      // that *wants* the first rep of the lifetime.
+      if (lifetimeFirstIdx === null) {
+        lifetimeFirstIdx = i;
+        s0Pending = true;
+        s0Intermediate = 0;
+      } else if (s0Pending) {
+        const dt = dayDiff(effective[lifetimeFirstIdx].date, h.date);
+        if (dt < 1) {
+          // Same-day learning step — not a memory test; skip and keep waiting.
+          s0Intermediate++;
+        } else {
+          if (h.date >= startMs && h.date < endMs) {
+            // The retrievability FSRS *actually* held at this rep. Where the
+            // card was still in a learning state FSRS records no r, so fall
+            // back to the curve from the immediately preceding rep's stability
+            // — same convention as Grid A.
+            let actualPredR: number | null = steps[i]?.r ?? null;
+            if (actualPredR === null && lastGradeableIdx !== null) {
+              const prevS = steps[lastGradeableIdx]?.s ?? 0;
+              const elapsed = (h.date - effective[lastGradeableIdx].date) / (1000 * 60 * 60 * 24);
+              if (prevS > 0 && elapsed >= 0) {
+                actualPredR = forgettingCurve(elapsed, prevS, DECAY, FACTOR);
+              }
+            }
+            addS0Observation(
+              s0Accs,
+              gradeRow(effective[lifetimeFirstIdx].score),
+              dt,
+              h.score !== QueueInteractionScore.AGAIN,
+              s0Intermediate > 0,
+              actualPredR !== null && Number.isFinite(actualPredR) ? actualPredR : null,
+            );
+          }
+          s0Pending = false;
+        }
+      }
 
       // First gradeable rep of the lifetime: nothing to predict from.
       if (lastGradeableIdx === null) {
         lastGradeableIdx = i;
         continue;
+      }
+
+      if (h.date >= startMs && h.date < endMs) {
+        globalReps++;
+        if (h.score !== QueueInteractionScore.AGAIN) globalRetained++;
       }
 
       // Compute predR for THIS rep on every iteration (not only when it falls
@@ -334,6 +421,13 @@ export async function computeFSRSCalibrationBreakdown(
     gridCRowTotals: c.rowTotals,
     gridCColTotals: c.colTotals,
     gridCOverall: c.overall,
+
+    initialStability: finalizeS0(
+      s0Accs,
+      w,
+      globalReps > 0 ? globalRetained / globalReps : NaN,
+    ),
+
     totalCards: N,
     ignorePreReset,
     period: period.id,

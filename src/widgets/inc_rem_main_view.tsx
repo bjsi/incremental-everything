@@ -295,7 +295,7 @@ export function IncRemMainView() {
     pendingPriorityChanges.current[remId] = newPriority;
 
     // Persist to powerup property
-    await setIncRemPriority(plugin, rem, newPriority);
+    await setIncRemPriority(plugin, rem, newPriority, { event: 'editor' });
 
     // Update the cache
     const incRemInfo = await getIncrementalRemFromRem(plugin, rem);

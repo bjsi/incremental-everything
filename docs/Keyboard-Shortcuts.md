@@ -59,7 +59,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Opens the main view popup showing all Incremental Rems with filtering and sorting. | Global |
-| `Ctrl` + `Shift` + `H` | [Open IncRem Repetition History](Getting-Started.md#repetition-history-statistics) | Opens the **Single History** view for individual items or **Aggregated History** view for folders with incremental descendants. | Editor and Queue |
+| `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Routes to the right view: **Single History** for an Incremental Rem, **[Flashcard History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)** (all of the Rem's cards) for a flashcard, **Aggregated History** for a folder with incremental descendants. A Rem that is both offers a button across. | Editor and Queue |
 | `Ctrl` + `Shift` + `I` | [Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities) | Adds/removes the `#ignore` tag on the focused Rem **or a multi-rem selection** (run from the Omnibar). Ignored rems are shrunk and dimmed (full opacity on hover/focus) and the tag chip is hidden — used during IR to mark already-read snippets that don't deserve becoming Incremental. | Editor Only |
 
 ### Editing Utilities
@@ -67,7 +67,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
 | `Shift` + `F8` | [Bulletize Inline Selected Text](Utilities.md#bulletize-inline-selected-text) | Toggles a `• ` prefix on each line of a multi-line selection **within a single rem**. Restores bullets that a PDF highlight flattened into soft-wrapped text; a collapsed cursor bulletizes the whole rem. *(Uses `Shift+F8` because `Opt+Shift+8` types `°` on macOS and `Ctrl+Opt+Shift+8` is RemNote's blue-highlight shortcut.)* | Editor Only |
-| `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open) | Floating picker that finds Rems RemNote's `[[` search can't surface (all-common-word names). Enter/click inserts a reference at the cursor (cloze-aware, accent-insensitive); Ctrl/Cmd+Enter inserts it as a pin (no text); Opt/Alt+Enter inserts the Rem's text then a pin ("Text with Pin", preserving formatting/images); Shift+Enter/Shift+click opens the Rem in a new pane. | Editor Only |
+| `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open) | Floating picker that finds Rems RemNote's `[[` search can't surface (all-common-word names). Enter/click inserts a reference at the cursor (cloze-aware, accent-insensitive); Ctrl/Cmd+Enter inserts it as a pin (no text); Opt/Alt+Enter inserts the Rem's text then a pin ("Text with Pin", preserving formatting/images); Shift+Enter/Shift+click opens the Rem in a new pane; Ctrl/Cmd+Shift+Enter appends a pin at the end of the Rem while keeping the selected text (linking a card to its source). | Editor Only |
 | `Shift` + `F3` | [Text Case Converter](Utilities.md#text-case-converter) | Cycles the selection through **Title Case** → **UPPERCASE** → **lowercase**, auto-detecting the current case. Rich-text safe; also works on multi-rem selections. | Editor Only |
 
 > **No default shortcut (run by quick code or from the Omnibar).** The list-from-PDF-highlight commands ship **unbound** to avoid conflicts — invoke them by quick code: **`inl`** ([Inlinize Detected List](Utilities.md#inlinize-detected-list-inl)), **`brl`** ([Break Inline List Into Children](Utilities.md#break-inline-list-into-children-brl)), and **`rlr`** ([Restore List Rem](Utilities.md#restore-list-rem-rlr)). They act on the **focused rem** (no selection needed). Assign your own bindings in RemNote's keyboard-shortcut settings if you use them often.
@@ -134,7 +134,7 @@ Function keys carry the utilities whose natural letter combination was already t
 
 | Shortcut | Command | Context |
 | :--- | :--- | :--- |
-| `Ctrl` + `Shift` + `H` | [Open IncRem Repetition History](Getting-Started.md#repetition-history-statistics) | Editor and Queue |
+| `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Editor and Queue |
 | `Ctrl` + `Shift` + `I` | [Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities) | Editor |
 | `Ctrl` + `Shift` + `J` | [Execute Repetition / Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor) | Editor and Queue |
 | `Ctrl` + `Shift` + `F1` | [Copy Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Editor |
@@ -174,6 +174,7 @@ These commands ship **without** a shortcut, so nothing collides with your own bi
 | Command | Quick code |
 | :--- | :--- |
 | Batch Priority Change (IncRems & Flashcards) | — (Command Palette / Document Menu) |
+| [Transfer Incremental Data to Parent Rem](Create-Incremental-Rem-from-PDF-Highlights.md#transfer-to-parent) | `ttp` |
 | [Inlinize Detected List](Utilities.md#inlinize-detected-list-inl) | `inl` |
 | [Break Inline List Into Children](Utilities.md#break-inline-list-into-children-brl) | `brl` |
 | [Restore List Rem](Utilities.md#restore-list-rem-rlr) | `rlr` |
@@ -202,6 +203,7 @@ These keys are active **while a plugin popup or floating window is open** — th
 | | `Ctrl`/`Cmd` + `Enter` | Insert as a **pin** (no text) |
 | | `Alt` + `Enter` | Insert the Rem's **text, then a pin** |
 | | `Shift` + `Enter` | Open the Rem in a new pane |
+| | `Ctrl`/`Cmd` + `Shift` + `Enter` | Append a **pin at the end of the Rem**, keeping selected text |
 | | `Esc` | Close the picker |
 | [Image Scan popup](Utilities.md#filter-a-document-by-images) | `↑` / `↓` | Move between the two scopes (this Rem / whole knowledge base) |
 | | `Enter` | Run the selected scope — or, on the report, close the popup |

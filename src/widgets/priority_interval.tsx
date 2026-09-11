@@ -12,6 +12,7 @@ import {
     defaultPriorityId,
     initialIntervalId,
     pendingIntervalBatchSaveKey,
+    creationFoldRemIdsKey,
 } from '../lib/consts';
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
@@ -40,6 +41,18 @@ function PriorityInterval() {
         if (!isBatchMode) return null;
         return await plugin.storage.getSession<string[]>('batchPriorityIntervalRemIds');
     }, [isBatchMode]);
+
+    // Fresh-creation fold list: rem ids made Incremental moments ago (set by the
+    // creation flows via markRemsAsFreshlyCreated). Read ONCE on mount and cleared
+    // immediately, so escaping this popup can't leave a stale flag that would make a
+    // later Opt+P reschedule silently rewrite the creation marker.
+    const creationFoldRemIds = useRunAsync(async () => {
+        const ids = await plugin.storage.getSession<string[]>(creationFoldRemIdsKey);
+        if (ids && ids.length > 0) {
+            await plugin.storage.setSession(creationFoldRemIdsKey, null);
+        }
+        return ids || [];
+    }, []);
 
     // Data from DB
     const data = useTrackerPlugin(async (rp) => {
@@ -181,11 +194,18 @@ function PriorityInterval() {
 
             if (remIdsToUpdate.length === 0) return;
 
+            // Ids whose 'madeIncremental' marker this save should be folded into
+            // instead of appending a 'rescheduledInEditor' entry beside it.
+            const foldRemIds = (creationFoldRemIds || []).filter((id) =>
+                remIdsToUpdate.includes(id)
+            );
+
             // Write the job — one await, then close immediately.
             await plugin.storage.setSession(pendingIntervalBatchSaveKey, {
                 remIds: remIdsToUpdate,
                 priority: effectivePriority,
                 interval: effectiveInterval,
+                foldRemIds,
             });
 
             // Clean up batch session storage
@@ -197,7 +217,7 @@ function PriorityInterval() {
         } finally {
             isSaving.current = false;
         }
-    }, [data, priorityVal, intervalVal, plugin, isBatchMode, batchRemIds]);
+    }, [data, priorityVal, intervalVal, plugin, isBatchMode, batchRemIds, creationFoldRemIds]);
 
     if (!data) {
         return <div className="h-20 flex items-center justify-center text-sm">Loading...</div>;

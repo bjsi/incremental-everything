@@ -393,7 +393,7 @@ function BatchCardPriority() {
             // band. It also writes lastUpdated as an epoch number — the raw path wrote
             // an ISO string, which getCardPriority's `parseInt(lastUpdated) || now`
             // silently read back as the year (2026 ms after 1970).
-            await setCardPriority(plugin, remData.rem, priority, 'manual');
+            await setCardPriority(plugin, remData.rem, priority, 'manual', false, { event: 'batch' });
             await updateCardPriorityCache(plugin, remData.remId);
 
             // Show progress

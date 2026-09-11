@@ -1126,7 +1126,9 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                   const incRemForPriority = cachedIncRem || await getIncrementalRemFromRem(plugin, rem);
                   if (incRemForPriority) {
                     console.log('[GlobalRemChanged] In-queue card creation on IncRem, applying cardPriority:', data.remId);
-                    await setCardPriority(plugin, rem, incRemForPriority.priority, 'incremental');
+                    await setCardPriority(plugin, rem, incRemForPriority.priority, 'incremental', false, {
+                      event: 'incremental',
+                    });
                   }
                 }
               }
@@ -1259,6 +1261,21 @@ export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
  * drill presentation), update finalDrillIds accordingly.
  *
  * Gated on finalDrillActive so this only runs inside the mastery drill, not the regular queue.
+ *
+ * KNOWN LIMITATION — cluster siblings barely reach the drill at all.
+ * prevDrillCardId comes from QueueLoadCard, which inside a cluster reports the ANCHOR and never
+ * advances to the visible sibling (measured 2026-09-05: across a 4-sibling table cluster,
+ * RemNote's own `queueController.currentCard.cardId` stayed pinned to the anchor while the
+ * cluster component's `state.currentCompoundCardIdToTest` advanced each time). The observed
+ * end-to-end behaviour, in a document sub-queue:
+ *   • rate the first sibling Good and later siblings Again/Hard → nothing is added to the drill;
+ *   • rate the first sibling and others Again/Hard → only the first sibling is added.
+ * So the drill effectively tracks the anchor of a cluster and nothing else. The
+ * clusterVisibleCardId bridge above (GlobalRemChanged path) does not close this gap in practice.
+ *
+ * Left unfixed deliberately: clusters are a rare shape in a drill-eligible set, and the failure
+ * mode is an under-populated drill, never a wrong rating or lost history. The matching gap on the
+ * action side (Remove from Drill etc. hitting the anchor) is documented in widgets/mastery_drill.tsx.
  */
 function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
   let prevDrillCardId: string | undefined;

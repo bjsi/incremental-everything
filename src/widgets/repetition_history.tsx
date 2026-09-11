@@ -22,6 +22,7 @@ import {
 } from '../lib/history_edit';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
 import { MAX_NOTE_LENGTH } from '../lib/history_notes';
+import { priorityEventIcon, priorityEventLabel } from '../lib/priority_history';
 
 interface PdfPageInfo {
     pdfName: string;
@@ -248,6 +249,23 @@ function combineDateTime(dateStr: string, timeStr: string): number {
     return new Date(`${dateStr}T${timeStr || '00:00'}`).getTime();
 }
 
+/**
+ * Display cap for the source-rem name on a 'transferred' marker. The transfer
+ * itself caps what it STORES (TRANSFERRED_NAME_MAX_CHARS in
+ * lib/incremental_rem/transfer.ts); this caps what is RENDERED, so an entry
+ * written before that cap existed — or one whose name is a full paragraph of
+ * extracted prose — still reads as one line instead of overflowing the popup.
+ */
+const TRANSFERRED_NAME_DISPLAY_MAX = 60;
+
+function displayTransferredFrom(rep: IncrementalRep): string {
+    const name = rep.context?.transferredFromName;
+    if (!name) return 'another Rem';
+    return name.length > TRANSFERRED_NAME_DISPLAY_MAX
+        ? name.slice(0, TRANSFERRED_NAME_DISPLAY_MAX).trimEnd() + '…'
+        : name;
+}
+
 /** Human label for an entry, used in the delete confirmation. */
 function describeEntry(rep: IncrementalRep): string {
     const when = dayjs(rep.date).format('MMM D, YYYY HH:mm');
@@ -258,8 +276,12 @@ function describeEntry(rep: IncrementalRep): string {
         case 'rescheduledInQueue': return `Rescheduled in Queue — ${when}`;
         case 'manualDateReset': return `Manual Date Reset — ${when}`;
         case 'executeRepetition': return `Editor review — ${when}`;
+        case 'priorityChange':
+            return `Priority change (${priorityEventLabel(rep.priorityEvent)}) — ${when}`;
         case 'importedRep': return `Imported flashcard review — ${when}`;
         case 'externalRep': return `External session — ${when}`;
+        case 'transferred':
+            return `Transferred from "${displayTransferredFrom(rep)}" — ${when}`;
         default: return `Review — ${when}`;
     }
 }
@@ -704,6 +726,12 @@ function RepetitionHistoryPopup() {
             // inside the rem's own outline, shown as a path from this rem down.
             const readPointInfo = await loadReadPointInfo(plugin, remId);
 
+            // A rem can be BOTH incremental and a flashcard source. When it is,
+            // this popup owns the header (that is the routing rule in
+            // register/commands.ts) and offers a way across to the card
+            // histories rather than making the user guess which popup has them.
+            const cardCount = (await rem.getCards()).length;
+
             // First try to get incremental rem info
             const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
 
@@ -719,6 +747,7 @@ function RepetitionHistoryPopup() {
                     dismissedDate: null,
                     pdfPageInfo,
                     readPointInfo,
+                    cardCount,
                     error: null
                 };
             }
@@ -738,6 +767,7 @@ function RepetitionHistoryPopup() {
                     dismissedDate: dismissedInfo.dismissedDate,
                     pdfPageInfo,
                     readPointInfo,
+                    cardCount,
                     error: null
                 };
             }
@@ -753,6 +783,7 @@ function RepetitionHistoryPopup() {
                 dismissedDate: null,
                 pdfPageInfo,
                 readPointInfo,
+                cardCount,
                 error: null
             };
         } catch (error) {
@@ -762,7 +793,7 @@ function RepetitionHistoryPopup() {
     }, [refreshKey]);
 
     const containerStyle: React.CSSProperties = {
-        width: '440px',
+        width: '500px',
         maxHeight: '850px',
         backgroundColor: 'var(--rn-clr-background-primary)',
         borderRadius: '12px',
@@ -788,12 +819,19 @@ function RepetitionHistoryPopup() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        // The title row can carry up to two switcher buttons ("Show Aggregated"
+        // and, on a rem that also has cards, "Cards History"). At 500px that is
+        // one line for the common case and a clean second line for the rem that
+        // is both incremental and a flashcard source, rather than a squeezed row.
+        gap: '8px',
+        flexWrap: 'wrap',
     };
 
     const headerTitleStyle: React.CSSProperties = {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
+        flexWrap: 'wrap',
     };
 
     const remNameStyle: React.CSSProperties = {
@@ -902,6 +940,7 @@ function RepetitionHistoryPopup() {
             readPointInfo?: ReadPointPath | null;
             isIncremental?: boolean;
         };
+    const cardCount = (data as any).cardCount as number | undefined;
     const isIncremental = (data as any).isIncremental === true;
     // History can only be amended where it is actually stored: on the Incremental
     // powerup, or on the Dismissed powerup of a dismissed rem.
@@ -1011,6 +1050,37 @@ function RepetitionHistoryPopup() {
                         >
                             Show Aggregated
                         </button>
+                        {!!cardCount && cardCount > 0 && remId && (
+                            <button
+                                onClick={async () => {
+                                    // Open only — NEVER close first. closePopup
+                                    // destroys this widget's sandbox immediately,
+                                    // so the await after it never resumes and the
+                                    // openPopup call is simply never made (the
+                                    // same teardown hazard the Dismiss button in
+                                    // answer_buttons.tsx documents). Opening a
+                                    // popup replaces the current one regardless,
+                                    // which is what "Show Aggregated" above relies
+                                    // on too.
+                                    await plugin.widget.openPopup('flashcard_repetition_history', { remId });
+                                }}
+                                style={{
+                                    marginLeft: '6px',
+                                    fontSize: '11px',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--rn-clr-border-primary)',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    color: 'var(--rn-clr-content-secondary)',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
+                                }}
+                                title={`This Rem also has ${cardCount} flashcard${cardCount === 1 ? '' : 's'} — show their repetition and priority history`}
+                            >
+                                🃏 Cards History
+                            </button>
+                        )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                         {canEditHistory && (
@@ -1101,8 +1171,24 @@ function RepetitionHistoryPopup() {
                     {sortedHistory.map(({ rep, storedIndex }, index) => {
                         const hovered = hoveredIndex === index;
 
+                        // A review — a queue rep, an editor 'Execute Repetition', a queue
+                        // reschedule, an imported flashcard rep or a hand-added external
+                        // session. Same predicate the Study Dashboard totals use, so the
+                        // rule stays "if it counted as study, you can correct it"; every
+                        // other event type renders as a banner and is read-only.
+                        const canEditEntry = canEditHistory && repCountsForStats(rep.eventType);
+
                         // Edit / delete affordances, revealed on hover. Their space is
                         // reserved even while hidden so rows don't shift under the cursor.
+                        //
+                        // Only REVIEW entries get them (see `canEditEntry` below): the
+                        // dialog behind these buttons edits a date, an end time and a
+                        // duration, which is meaningful for something that was studied and
+                        // meaningless for a marker. Worse, the markers are exactly the
+                        // entries other code reads positionally — the scheduler counts reps
+                        // after the last 'madeIncremental', a 'transferred' marker records
+                        // where a history came from — so offering to hand-edit them invites
+                        // silently rewriting an interval progression or a provenance record.
                         const actions = (
                             <span
                                 style={{
@@ -1176,7 +1262,10 @@ function RepetitionHistoryPopup() {
                             wrap(
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <div style={{ ...bannerBaseStyle, ...accent }}>{body}</div>
-                                    {canEditHistory && <span style={{ flex: '0 0 44px' }}>{actions}</span>}
+                                    {/* Empty gutter, not the row actions: markers are read-only
+                                        (see `canEditEntry`). Kept so a banner ends where the rows'
+                                        action column starts instead of jutting past them. */}
+                                    {canEditHistory && <span style={{ flex: '0 0 44px' }} />}
                                 </div>
                             );
 
@@ -1185,6 +1274,7 @@ function RepetitionHistoryPopup() {
                                 { backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' },
                                 <>
                                     ▶ Made Incremental — {bannerWhen}
+                                    {rep.interval !== undefined && ` → ${rep.interval}d`}
                                     {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </>
                             );
@@ -1194,6 +1284,37 @@ function RepetitionHistoryPopup() {
                             return banner(
                                 { backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' },
                                 <>⏸ Dismissed — {bannerWhen}</>
+                            );
+                        }
+
+                        // Transferred from another rem — the history above this marker
+                        // was studied on the rem it names, not on this one. Rendered as
+                        // a banner (like Made Incremental) because it is a seam in the
+                        // history, not a review: no time, no interval, no early/late.
+                        if (rep.eventType === 'transferred') {
+                            const stored = rep.context?.transferredFromName;
+                            const from = displayTransferredFrom(rep);
+                            return banner(
+                                {
+                                    backgroundColor: 'rgba(20, 184, 166, 0.1)',
+                                    color: '#14b8a6',
+                                    // The shared banner style is a centred flex row that never
+                                    // wraps, which suits fixed labels ("Dismissed — <date>") but
+                                    // not this one: its length depends on a rem's text, and a
+                                    // nowrap flex item wider than the row overflows BOTH edges of
+                                    // the popup. Block + normal wrapping lets it run to a second
+                                    // line instead, and overflowWrap breaks a single long token
+                                    // (a URL, an unspaced string) rather than letting it stick out.
+                                    display: 'block',
+                                    textAlign: 'center',
+                                    whiteSpace: 'normal',
+                                    overflowWrap: 'anywhere',
+                                    lineHeight: 1.35,
+                                },
+                                <span title={stored ? `Everything above this line was reviewed on "${stored}"` : undefined}>
+                                    🔀 Transferred from "{from}" — {bannerWhen}
+                                    {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
+                                </span>
                             );
                         }
 
@@ -1218,6 +1339,41 @@ function RepetitionHistoryPopup() {
                                     {rep.interval !== undefined && ` → ${rep.interval}d`}
                                     {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </>
+                            );
+                        }
+
+                        // Priority-only change — the Alt+P popup, Quick Priority,
+                        // an inline edit. Rendered as a banner rather than a rep
+                        // row because it is a marker: it has no review time, no
+                        // interval and no early/late, and the grid columns would
+                        // all read "—".
+                        if (rep.eventType === 'priorityChange') {
+                            const from = rep.previousPriority;
+                            const to = rep.priority;
+                            const eventName = priorityEventLabel(rep.priorityEvent);
+                            const move =
+                                from !== undefined && to !== undefined
+                                    ? `${from} → ${to}`
+                                    : to !== undefined
+                                    ? `set to ${to}`
+                                    : 'changed';
+                            // The banner clips at one line (bannerBaseStyle is
+                            // nowrap + overflow hidden), so the "more/less
+                            // important" reading of the direction lives in the
+                            // tooltip rather than eating the width the date needs.
+                            return banner(
+                                { backgroundColor: 'rgba(14, 165, 233, 0.1)', color: '#0ea5e9' },
+                                <span
+                                    title={
+                                        from !== undefined && to !== undefined && from !== to
+                                            ? `${eventName}: priority ${move} — ${to > from ? 'less' : 'more'} important`
+                                            : eventName
+                                    }
+                                >
+                                    {priorityEventIcon(rep.priorityEvent)} Priority {move}
+                                    <span style={{ opacity: 0.8, margin: '0 5px' }}>·</span>
+                                    {eventName} — {bannerWhen}
+                                </span>
                             );
                         }
 
@@ -1254,7 +1410,7 @@ function RepetitionHistoryPopup() {
                                 }}>
                                     {formatEarlyLate(rep)}
                                 </span>
-                                {canEditHistory ? actions : <span />}
+                                {canEditEntry ? actions : <span />}
                             </div>
                         );
                     })}

@@ -130,7 +130,7 @@ function PageRangeWidget() {
 
     const rem = await plugin.rem.findOne(remId);
     if (rem) {
-      await setIncRemPriority(plugin, rem, priority);
+      await setIncRemPriority(plugin, rem, priority, { event: 'editor' });
 
       // Update the incremental rem cache for other widgets
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);

@@ -227,7 +227,7 @@ export async function repairDetachedCardPriorities(
 
       if (dryRun) continue;
 
-      await setCardPriority(plugin, rem, storedValue, source, true);
+      await setCardPriority(plugin, rem, storedValue, source, true, { event: 'repair' });
 
       // Restore the original timestamp, but only when it is plausibly a
       // millisecond value. Some Rems carry a lastUpdated of `2025` — the year —

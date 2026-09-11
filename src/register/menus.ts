@@ -15,6 +15,7 @@ import {
 } from '../lib/consts';
 import { safeRemTextToString, getActivePdfForIncRem, getAllPDFsInRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
+import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import { createRemFromHighlight } from '../lib/highlightActions';
 
 export async function registerMenus(plugin: ReactRNPlugin) {
@@ -74,6 +75,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         await plugin.app.toast('✅ Tagged as Incremental Rem');
         // Clear stale session storage to prevent race condition with widget context
         await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+        await markRemsAsFreshlyCreated(plugin, [rem._id]);
         await plugin.widget.openPopup('priority_interval', {
           remId: rem._id,
         });

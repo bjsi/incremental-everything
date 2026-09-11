@@ -568,7 +568,9 @@ function BatchPriority() {
 
         if (remData.hasIncRem && remData.newIncPriority !== null) {
           console.log(`   - Updating IncRem ${i + 1}/${toUpdate.length}: ${remData.name} to priority ${remData.newIncPriority}`);
-          await setIncRemPriority(plugin, remData.rem, remData.newIncPriority);
+          await setIncRemPriority(plugin, remData.rem, remData.newIncPriority, {
+            event: 'batch',
+          });
         }
 
         if (remData.hasCardPriority && remData.newCardPriority !== null) {
@@ -576,7 +578,9 @@ function BatchPriority() {
           const source = (remData.cardPrioritySource === 'incremental' || remData.cardPrioritySource === 'manual')
             ? remData.cardPrioritySource
             : 'manual';
-          await setCardPriority(plugin, remData.rem, remData.newCardPriority, source as any);
+          await setCardPriority(plugin, remData.rem, remData.newCardPriority, source as any, false, {
+            event: 'batch',
+          });
         }
 
         // Only update the progress bar every 10% (or on the last item) to avoid re-renders

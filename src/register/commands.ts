@@ -10,6 +10,7 @@ import {
   QueueInteractionScore,
 } from '@remnote/plugin-sdk';
 import { convertRemTree } from '../lib/markup_to_richtext';
+import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import {
   powerupCode,
   currentIncRemKey,
@@ -48,6 +49,10 @@ import {
   planPreserveHistoryAndRemove,
   executePreserveHistoryAndRemove,
 } from '../lib/history_transfer';
+import {
+  planTransferIncRemToParent,
+  executeTransferIncRemToParent,
+} from '../lib/incremental_rem/transfer';
 import { resolvePowerupSlotDiagnostic } from '../lib/powerup_slot_compat';
 import { dumpRawPowerupSlots } from '../lib/raw_slot_dump';
 import { togglePdfHighlightBorders } from '../lib/ui_helpers';
@@ -326,6 +331,95 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
 
+  // Transfer Incremental data to the parent Rem.
+  //
+  // For when the wrong Rem in a hierarchy ended up being the Incremental one —
+  // typically an extract created under an outline header, where the header is
+  // what you actually want to schedule. Everything moves (priority, next-rep
+  // date, the full history, reading state); nothing is recreated, so the interval
+  // progression survives. The move is recorded as a 'transferred' marker at the
+  // end of the destination's history, naming where it came from.
+  await plugin.app.registerCommand({
+    id: 'transfer-increm-to-parent',
+    name: 'Transfer Incremental Data to Parent Rem',
+    description:
+      "Moves this Incremental Rem's priority, next-repetition date, full repetition history and reading state onto its parent Rem, and stops the Rem itself from being Incremental.",
+    quickCode: 'ttp',
+    action: async () => {
+      // Resolve the target in BOTH contexts, exactly as 'Preserve history & remove'
+      // does: the focused rem in the editor, the active card/IncRem in the queue.
+      let source: PluginRem | undefined;
+      const url = await plugin.window.getURL();
+      const isQueue = !!(url && url.includes('/flashcards'));
+      if (isQueue) {
+        const currentQueueItem = await plugin.queue.getCurrentCard();
+        let remId = currentQueueItem?.remId;
+        if (!remId) {
+          remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+        }
+        source = remId ? (await plugin.rem.findOne(remId)) || undefined : undefined;
+      } else {
+        source = await plugin.focus.getFocusedRem();
+      }
+
+      if (!source) {
+        await plugin.app.toast(
+          isQueue
+            ? 'No active card or Incremental Rem in the queue.'
+            : 'No focused rem — place your cursor in the Incremental Rem first.'
+        );
+        return;
+      }
+
+      const outcome = await planTransferIncRemToParent(plugin, source);
+      if (!outcome.ok) {
+        await plugin.app.toast(outcome.message);
+        return;
+      }
+
+      const timeStr = formatDuration(Math.round(outcome.totalReviewSeconds)) || '0s';
+      const ok = confirm(
+        `🔀 Transfer Incremental data to parent\n\n` +
+          `From: "${outcome.sourceName}"\n` +
+          `To:   "${outcome.destinationName}"\n\n` +
+          `• ${outcome.history.length} history entr(ies) move across` +
+          (outcome.repCount > 0 ? ` (${outcome.repCount} review(s), ≈ ${timeStr})` : '') +
+          `\n` +
+          (outcome.priority !== null
+            ? `• Priority ${outcome.priority} and the next-repetition date move too\n`
+            : `• Next-repetition date moves (priority could not be read — it will not be written)\n`) +
+          (outcome.hasReadingState ? `• Reading state (pages / read points) moves too\n` : '') +
+          (outcome.destinationDismissedReps > 0
+            ? `• ${outcome.destinationDismissedReps} dismissed entr(ies) already on the parent are revived and kept\n`
+            : '') +
+          `\n"${outcome.sourceName}" stops being an Incremental Rem. Its text and children are untouched.\n\nContinue?`
+      );
+      if (!ok) {
+        await plugin.app.toast('Cancelled.');
+        return;
+      }
+
+      // In the queue, the source is what is on screen. Advance off it in the same
+      // tick its powerup is removed (executeTransferIncRemToParent does that), and
+      // flag the dashboard refocus BEFORE the destructive call, like Dismiss does.
+      const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+      const advanceQueue = isQueue && currentIncRemId === source._id;
+      if (advanceQueue) {
+        await requestQueueDashboardRefocus(plugin, 'transfer-to-parent-command');
+      }
+
+      try {
+        await executeTransferIncRemToParent(plugin, outcome, { advanceQueue });
+        await plugin.app.toast(
+          `✅ Incremental data moved to "${outcome.destinationName}".`
+        );
+      } catch (e) {
+        console.error('[TransferIncRem] Error:', e);
+        await plugin.app.toast('❌ Error during the transfer — see console.');
+      }
+    },
+  });
+
   // Isolation probe for the RemNote runtime deprecation of
   // plugin.powerup.getPowerupSlotByCode. Runs as a command (not a widget) so it
   // executes even though the Debug widget can no longer mount — its data-load
@@ -401,6 +495,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         const remIds = result.map(r => r._id);
         if (remIds.length === 0) return;
         await plugin.storage.setSession('batchPriorityIntervalRemIds', remIds);
+        // Fold the popup's save into each rem's fresh 'madeIncremental' marker.
+        await markRemsAsFreshlyCreated(plugin, remIds);
         await plugin.widget.openPopup('priority_interval', {
           remId: remIds[0], // First rem as reference for defaults
           batchMode: true,
@@ -408,6 +504,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       } else {
         // Single rem
         await plugin.storage.setSession('batchPriorityIntervalRemIds', null);
+        await markRemsAsFreshlyCreated(plugin, [result._id]);
         await plugin.widget.openPopup('priority_interval', {
           remId: result._id,
         });
@@ -824,7 +921,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
         // Apply the auto-priority computed at the top (before the new cloze existed,
         // so the existing-cloze count was correct).
-        await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual');
+        await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual', false, { event: 'cloze' });
         await updateCardPriorityCache(plugin, clozeRem._id, true, {
           remId: clozeRem._id,
           priority: autoPriority.priority,
@@ -1519,7 +1616,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Clean Priority Review Documents',
     description:
       'Finds the entries in your Priority Review Documents whose Rem no longer has anything due — reviewed flashcards and incremental Rems — and removes them after you confirm, per document.',
-    quickCode: 'cprd',
+    quickCode: 'clean',
     action: async () => {
       await plugin.widget.openPopup('prd_cleanup_popup');
     },
@@ -2499,11 +2596,39 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      const hasIncrementalPowerup = await rem.hasPowerup(powerupCode);
-      const hasDismissedPowerup = await rem.hasPowerup(dismissedPowerupCode);
+      const [hasIncrementalPowerup, hasDismissedPowerup, cards] = await Promise.all([
+        rem.hasPowerup(powerupCode),
+        rem.hasPowerup(dismissedPowerupCode),
+        rem.getCards(),
+      ]);
+      const hasCards = (cards?.length ?? 0) > 0;
 
-      // If we are in the queue reviewing a regular flashcard (not an Incremental Rem)
-      if (isQueue && !hasIncrementalPowerup) {
+      // Routing, in the order the two histories matter to the user:
+      //
+      //   1. An ACTIVE Incremental Rem always opens its own history, cards or
+      //      not. When it also has cards, that popup carries a "🃏 Cards
+      //      History" button across — one popup at a time, but both reachable.
+      //   2. Any rem with cards opens the flashcard history — the popup shows
+      //      every card of the rem, and `cardId` (set only when the queue was
+      //      showing one) just says which section to open first. Reaching here
+      //      in the editor is new: this used to be a queue-only route, so the
+      //      shortcut on an ordinary flashcard in the outline said "no
+      //      repetition history" and showed nothing. A dismissed rem with cards
+      //      lands here too — the card in front of you is what the shortcut is
+      //      about, and that popup links back to the preserved history.
+      //   3. A dismissed rem with no cards keeps its preserved history.
+      //   4. Otherwise fall through to the aggregated view over descendants.
+      //
+      // Both single-rem popups cross-link, so a rem that qualifies for two of
+      // these routes is never a dead end whichever one it takes.
+      if (hasIncrementalPowerup) {
+        await plugin.widget.openPopup('repetition_history', {
+          remId: remId,
+        });
+        return;
+      }
+
+      if (hasCards) {
         await plugin.widget.openPopup('flashcard_repetition_history', {
           remId: remId,
           cardId: cardId,
@@ -2511,8 +2636,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      if (hasIncrementalPowerup || hasDismissedPowerup) {
-        // If it is directly an incremental/dismissed rem, open the single history widget
+      if (hasDismissedPowerup) {
         await plugin.widget.openPopup('repetition_history', {
           remId: remId,
         });
@@ -2542,7 +2666,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      await plugin.app.toast('This Rem has no repetition history (not Incremental/Dismissed and no such descendants).');
+      await plugin.app.toast('This Rem has no repetition history (no flashcards, not Incremental/Dismissed, and no such descendants).');
     },
   });
 

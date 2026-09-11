@@ -39,6 +39,7 @@ import {
   SOURCE_SLOT,
   LAST_UPDATED_SLOT,
 } from '../lib/card_priority/types';
+import { PRIORITY_HISTORY_SLOT } from '../lib/priority_history';
 
 // Re-export for backwards compatibility
 export { initIncrementalRem };
@@ -171,6 +172,19 @@ export async function registerPluginPowerups(
           name: 'Last Updated',
           propertyType: PropertyType.NUMBER,  // Timestamp
           hidden: true,
+        },
+        {
+          // Every priority this rem has held, with the source and the gesture
+          // that set it, as serialized JSON — see lib/priority_history.ts.
+          // Machine state written only by setCardPriority, so hidden AND
+          // programmatic-only: a hand edit here would be a JSON array typed
+          // into a property row, and the point of the slot is that the record
+          // is trustworthy.
+          code: PRIORITY_HISTORY_SLOT,
+          name: 'Priority History',
+          propertyType: PropertyType.TEXT,
+          hidden: true,
+          onlyProgrammaticModifying: true,
         }
       ],
     },

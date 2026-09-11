@@ -251,6 +251,7 @@ function PriorityLight() {
                     cardPriority: sendCard ? (cardVal ?? data.defaults.card) : null,
                     cardSource: 'manual',
                     triggerCascade: true,
+                    event: 'popup',
                 }).catch(console.error);
                 plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
             }
@@ -297,6 +298,7 @@ function PriorityLight() {
                 cardSource: 'manual',
                 needsAddPowerup: cardChanged && !data.hasCardPowerup,
                 triggerCascade: incChanged || cardChanged,
+                event: 'popup',
             }).catch(console.error);
         }
 

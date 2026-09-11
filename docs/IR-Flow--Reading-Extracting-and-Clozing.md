@@ -88,13 +88,27 @@ When reading a long Incremental Rem (a chapter, article, or section), you isolat
    - Creates a **child Rem** containing the selected text.
    - Highlights the original selection in **blue** in the parent Rem and inserts a **reference pin** (↗) next to it — clicking the pin navigates to the new child.
    - Adds a **back-reference pin** at the end of the child Rem pointing back to the parent, maintaining full traceability.
-   - If the parent Rem was itself extracted from a **PDF highlight**, the child inherits a direct pin to the original PDF source as well.
+   - Inherits the parent's **source pins** — see [Source pins are inherited](#source-pins) below.
    - **Hides the parent Rem from queue display** so its original slot is suppressed — the children take over. The mechanism depends on what's installed: if the **Remove from Queue** powerup is registered (via the [Hide-in-Queue integration](Utilities.md#queue-display-utilities) setting *or* the standalone Hide in Queue plugin), it's applied to the parent directly (survives extract relocation cleanly); otherwise the **Remove Parent** powerup is applied to the extract itself as a fallback (works for normal review, but if you later move the extract under a different parent, that new parent will be hidden too — see [Create Extract behavior](Utilities.md#create-extract-source-rem-hiding-behavior)).
    - Initializes the new Rem as an **Incremental Rem** (with `Alt+X`: inherited or default priority; with `Alt+Shift+X`: opens the Priority popup).
 
 This process is called **"shredding"** a document: you pass through it incrementally, pulling out what matters and leaving the rest behind.
 
 ![Extract Selection Demo](assets/extract-selected-text.gif)
+
+### Source Pins Are Inherited { #source-pins }
+
+Every extract ends with a back-reference pin to its parent, so after two or three rounds of shredding the passage you are reviewing sits several hops away from the page it came from. To keep the way back short, an extract also copies every pin its parent held to an **original reading source** — a PDF highlight or a web highlight — so the bridge to the source survives each level of sub-extraction instead of thinning out one hop per round.
+
+What counts as a source is decided by the highlight's own built-in RemNote powerup, not by the `pdfextract` tag this plugin adds. That matters because the tag is only applied by the [Create Incremental Rem toolbar](Create-Incremental-Rem-from-PDF-Highlights.md): a highlight you made incremental any other way — RemNote's native extraction, `Alt+X` pressed straight on the highlight, a pin you built by hand — carries no tag, yet its pin is inherited just the same. The tag still qualifies on its own, so nothing that used to be inherited stops being inherited.
+
+Three details worth knowing:
+
+- **All source pins are carried, not just the first.** A Rem that cites two highlights passes both down.
+- **Web highlights count too**, alongside PDF ones.
+- **Both sides of a card are scanned**, so a pin sitting on the back of a Rem is inherited as readily as one on the front.
+
+Ancestry pins are deliberately left out. Since the parent of any extract is itself an Incremental Rem, inheriting *those* would make each extract accumulate its whole chain of ancestors; only pins pointing at a terminal reading source travel down.
 
 ---
 

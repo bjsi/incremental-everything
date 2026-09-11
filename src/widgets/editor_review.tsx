@@ -55,7 +55,8 @@ async function handleEditorReview(
   const incRem = await getIncrementalRemFromRem(plugin, rem);
   if (!incRem) return null;
 
-  await setIncRemPriority(plugin, rem, newPriority);
+  // recordHistory: false — the rep entry appended below carries this priority.
+  await setIncRemPriority(plugin, rem, newPriority, { recordHistory: false });
 
   const computedNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
   const newNextRepDate = overrideNextRepDate ?? computedNextRepDate;

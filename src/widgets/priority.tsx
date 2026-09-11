@@ -811,6 +811,7 @@ function Priority() {
       cardSource: 'manual',
       needsAddPowerup: !hasCardPriorityPowerup,
       triggerCascade: false,
+      event: 'popup',
     }).catch(console.error);
   }, [rem, cardInfo, hasCardPriorityPowerup, saveCardPriority, plugin]);
 
@@ -845,6 +846,7 @@ function Priority() {
           cardPriority: sendCard ? cardP : null,
           cardSource: 'manual',
           triggerCascade: true,
+          event: 'popup',
         }).catch(console.error);
       }
       plugin.storage.setSession(batchPriorityTargetRemIdsKey, null).catch(console.error);
@@ -875,6 +877,7 @@ function Priority() {
         cardSource: 'manual',
         needsAddPowerup: cardChanged && !hasCardPriorityPowerup,
         triggerCascade: incChanged || cardChanged,
+        event: 'popup',
       }).catch(console.error);
     }
 

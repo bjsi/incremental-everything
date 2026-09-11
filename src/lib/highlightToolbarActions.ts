@@ -13,6 +13,7 @@ import {
   setIncrementalReadingPosition,
 } from './pdfUtils';
 import { initIncrementalRem } from '../register/powerups';
+import { markRemsAsFreshlyCreated } from './incRemHelpers';
 
 async function resolveContextRemId(
   plugin: ReactRNPlugin,
@@ -141,6 +142,7 @@ export async function handleToggleIncremental(
   }
 
   await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+  await markRemsAsFreshlyCreated(plugin, [rem._id]);
   await plugin.widget.openPopup('priority_interval', { remId: rem._id });
   return true;
 }

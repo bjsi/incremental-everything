@@ -13,9 +13,26 @@ import {
   videoExtractEndSlotCode,
 } from '../consts';
 
+/**
+ * Options for {@link remToActionItemType}.
+ */
+export interface ActionItemTypeOptions {
+  /**
+   * Resolve quietly: a highlight whose source document can no longer be found
+   * returns null instead of toasting.
+   *
+   * The toasts exist for the interactive path — you pressed something and it
+   * could not open — but this function is also used to LABEL rems in lists (the
+   * type badges), where a scan of a few dozen rows would fire a toast per broken
+   * highlight, about rems nobody asked to open.
+   */
+  silent?: boolean;
+}
+
 export const remToActionItemType = async (
   plugin: RNPlugin,
-  rem: PluginRem
+  rem: PluginRem,
+  options?: ActionItemTypeOptions
 ): Promise<RemAndType | null> => {
   // Check if this rem has a tag reference to "extractviewer"
   try {
@@ -71,7 +88,9 @@ export const remToActionItemType = async (
     )?._id;
     const pdf = await plugin.rem.findOne(pdfId);
     if (!pdf) {
-      await plugin.app.toast('PDF not found for extract. Skipping.');
+      if (!options?.silent) {
+        await plugin.app.toast('PDF not found for extract. Skipping.');
+      }
       return null;
     } else {
       return { extract: rem, type: 'pdf-highlight', rem: pdf };
@@ -87,7 +106,9 @@ export const remToActionItemType = async (
     )?._id;
     const htmlRem = await plugin.rem.findOne(html);
     if (!htmlRem) {
-      await plugin.app.toast('HTML not found for extract. Skipping.');
+      if (!options?.silent) {
+        await plugin.app.toast('HTML not found for extract. Skipping.');
+      }
       return null;
     } else {
       return { extract: rem, type: 'html-highlight', rem: htmlRem };
@@ -157,7 +178,7 @@ export const remToActionItemType = async (
 
         if (preferredSources.length === 1) {
           selectedSource = preferredSources[0];
-        } else if (preferredSources.length > 1) {
+        } else if (preferredSources.length > 1 && !options?.silent) {
           await plugin.app.toast('Multiple sources have the #preferthispdf tag. Opening in standard Rem view.');
         }
       }
@@ -183,7 +204,7 @@ export const remToActionItemType = async (
       });
 
       if (isLink && url && url.includes('youtube')) {
-        const data = await remToActionItemType(plugin, selectedSource);
+        const data = await remToActionItemType(plugin, selectedSource, options);
         if (data) {
           return {
             ...data,
@@ -191,7 +212,7 @@ export const remToActionItemType = async (
           };
         }
       } else {
-        const data = await remToActionItemType(plugin, selectedSource);
+        const data = await remToActionItemType(plugin, selectedSource, options);
         console.log('[action_items] ⚠️ Non-YouTube source resolved to:', {
           type: data?.type,
           returnedRemId: data?.rem?._id,

@@ -25,6 +25,7 @@ import {
   SuppressedRemEntry,
   SuppressionReport,
   UNSCHEDULED_CAUSE_LABELS,
+  UNSCHEDULED_CAUSE_REMEDY,
   UNSCHEDULED_CAUSE_SHORT,
   UnscheduledCause,
   buildSuppressionReport,
@@ -76,6 +77,9 @@ function causeColor(cause: UnscheduledCause, empty: boolean): string | undefined
   if (cause === 'paused-document') return '#0ea5e9';
   if (cause === 'cards-disabled-table') return 'var(--rn-clr-content-secondary)';
   if (cause === ACTIONABLE_CAUSE) return '#a855f7';
+  // Same pink the Card Enablement Audit uses for a switched-off cloze, so the
+  // one cause no plugin can undo reads the same in both views.
+  if (cause === 'card-disabled-individually') return '#db2777';
   return 'var(--rn-clr-content-primary)';
 }
 
@@ -653,6 +657,12 @@ export function SuppressedCardsView() {
   }
   const verifiedCardsTotal = Array.from(verifiedCardsByBucket.values()).reduce((a, b) => a + b, 0);
 
+  // Cards held off by RemNote's disabled-cloze list. Surfaced on its own below
+  // the matrix because it is the only cause with no route back through this
+  // plugin, and the obvious guess — re-enabling the Rem — leaves it untouched.
+  const offCardCards =
+    summary.causes.find((c) => c.cause === 'card-disabled-individually')?.cards ?? 0;
+
   return (
     <div style={{ paddingTop: '4px' }}>
       <div
@@ -702,7 +712,11 @@ export function SuppressedCardsView() {
 
       <div style={{ marginBottom: '10px', fontSize: '11px', lineHeight: 1.7 }}>
         {summary.causes.map((c) => (
-          <div key={c.cause} style={{ color: 'var(--rn-clr-content-secondary)' }}>
+          <div
+            key={c.cause}
+            title={UNSCHEDULED_CAUSE_REMEDY[c.cause]}
+            style={{ color: 'var(--rn-clr-content-secondary)' }}
+          >
             · {c.label}: <strong style={{ color: causeColor(c.cause, false) }}>
               {c.cards.toLocaleString()}
             </strong>{' '}
@@ -721,7 +735,11 @@ export function SuppressedCardsView() {
               <th style={head}>Cards</th>
               <th style={head}>Suppressed</th>
               {summary.causes.map((c) => (
-                <th key={c.cause} style={head} title={c.label}>
+                <th
+                  key={c.cause}
+                  style={head}
+                  title={`${c.label}\n\n${UNSCHEDULED_CAUSE_REMEDY[c.cause]}`}
+                >
                   {UNSCHEDULED_CAUSE_SHORT[c.cause]}
                 </th>
               ))}
@@ -830,10 +848,36 @@ export function SuppressedCardsView() {
         <strong>▸</strong> opens the Rems behind a count. Only{' '}
         <em>{UNSCHEDULED_CAUSE_LABELS[ACTIONABLE_CAUSE]}</em> is offered, because it is the only
         cause undone by a per-Rem switch: a paused deck is unpaused on the deck, an inherited tag
-        is removed from the ancestor, and a deleted cloze is not a switch at all. Re-enabling
-        makes those cards due immediately — work through the high-priority buckets first rather
-        than selecting everything at once.
+        is removed from the ancestor, a deleted cloze is not a switch at all, and a switched-off
+        cloze is a list only RemNote itself can write. Re-enabling makes those cards due
+        immediately — work through the high-priority buckets first rather than selecting
+        everything at once.
       </div>
+
+      {offCardCards > 0 && (
+        <div
+          style={{
+            marginTop: '8px',
+            padding: '6px 10px',
+            borderRadius: '4px',
+            background: 'var(--rn-clr-background-secondary)',
+            borderLeft: '3px solid #db2777',
+            fontSize: '10.5px',
+            color: 'var(--rn-clr-content-secondary)',
+            lineHeight: 1.6,
+          }}
+        >
+          <strong style={{ color: '#db2777' }}>
+            {offCardCards.toLocaleString()} card(s) under “{UNSCHEDULED_CAUSE_SHORT['card-disabled-individually']}”
+          </strong>{' '}
+          were switched off one at a time — in the queue, or in bulk by RemNote’s{' '}
+          <em>/Disable All Cloze Cards</em>, which is the same list written all at once. RemNote
+          keeps it on the Rem and exposes it to no plugin, so nothing here can undo it, and{' '}
+          <strong>switching cards back on for the Rem does not clear it either</strong>. Open the
+          Rem and run <em>/Enable All Cloze Cards</em>, or click the greyed cloze and choose
+          “Enable this card”.
+        </div>
+      )}
 
       {drill && (
         <RemPicker

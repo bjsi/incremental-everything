@@ -408,7 +408,8 @@ function EditorReviewTimer() {
     try {
       // Update priority if changed
       if (timerData.priority !== undefined && timerData.priority !== null) {
-        await setIncRemPriority(plugin, rem, timerData.priority);
+        // recordHistory: false — the rep entry written below carries this priority.
+        await setIncRemPriority(plugin, rem, timerData.priority, { recordHistory: false });
       }
 
       // Calculate review time in seconds
@@ -555,7 +556,8 @@ function EditorReviewTimer() {
     try {
       // Update priority if changed
       if (timerData.priority !== undefined && timerData.priority !== null) {
-        await setIncRemPriority(plugin, currentRem, timerData.priority);
+        // recordHistory: false — the rep entry written below carries this priority.
+        await setIncRemPriority(plugin, currentRem, timerData.priority, { recordHistory: false });
       }
 
       // Calculate review time and sync PDF page

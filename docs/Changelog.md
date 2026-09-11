@@ -2,6 +2,163 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.87 - September 11th, 2026
+
+### 🐛 Fixed - the queue priority badge was missing in RemNote's Beautiful queue variant
+
+**Queue Toolbar Priority**: The badge (and the *No Inc Rem* countdown) now shows in the Beautiful variant too, in the card's top-right corner, without shifting the card's layout.
+
+![The Beautiful queue variant with the P15 priority badge in the card's top-right corner, above the breadcrumbs](assets/beautiful-queue.png){ width="900" }
+
+📖 [In the Beautiful queue variant](Plugin-Widgets-Reference.md#beautiful-queue-variant)
+
+## v1.0.83 - September 9th, 2026
+
+### 🐛 Fixed - sub-extracts inherited only one source pin, and none from web highlights
+
+An extract copies its parent's pin back to the original highlight so the way to the source stays short as you shred; it now carries **every** such pin rather than only the first, recognises **web** highlights alongside PDF ones, and looks on both sides of a card instead of the front alone.
+
+📖 [Source pins are inherited](IR-Flow--Reading-Extracting-and-Clozing.md#source-pins)
+
+## v1.0.82 - September 7th, 2026
+
+### ⚡ Improved - Find Rem marks results that hold an image
+
+A 🖼️ now sits before the name of any result carrying an image, so a figure Rem is distinguishable from the prose that discusses it — captions and the sentences citing them are often worded almost identically.
+
+📖 [Spotting figures](Utilities.md#spotting-figures)
+
+### 🐛 Fixed - Find Rem could not find `Figure 6.4` when you typed `Fig. 6.4`
+
+The `Figure` = `Fig` = `Fig.` folding was only ever applied to *matching and ranking*, never to what the picker asked RemNote's index for. So the Rem had to be retrieved by the word `fig` alone, which in a knowledge base full of figures returns thousands of results and is truncated long before the one you wanted — the alternate spelling of the **whole query** is now searched for as well.
+
+📖 [Why it finds Rems the normal search can't](Utilities.md#why-it-finds-rems-the-normal-search-cant)
+
+## v1.0.81 - September 6th, 2026
+
+### ✨ New - the FSRS Calibration tab now audits your initial stability (w0–w3)
+
+`w0`–`w3` are the stability FSRS assigns from the very first grade a card ever gets, and they are the only parameters not learned by the main training loop — [fsrs-optimizer](https://github.com/open-spaced-repetition/fsrs-optimizer) derives them in a separate pass over one narrow slice of history: each card's first grade paired with the outcome of the first review on a later calendar day. It then prints four bare numbers and tells you nothing about how well-founded they are.
+
+A new **D · Initial stability** panel reproduces that pass over your knowledge base and adds what the optimizer leaves out. Alongside the faithful refit it reports an **unregularised maximum-likelihood estimate with a 95% profile-likelihood interval**, a second fit with the optimizer's outlier removal switched off, and per-grade **coverage** — the share of reps actually observed at or beyond the fitted stability. A verdict badge turns that into a reading: *calibrated*, *S₀ too low / too high*, *thin data*, *extrapolating*, or **unidentified** — the last meaning the likelihood keeps improving all the way to the bound because your reviews never ran long enough to watch that grade be forgotten, so the fitted value is a floor rather than an estimate.
+
+Below it, the vector the optimizer would hand to its training loop, with any **monotonicity repair** spelled out — the rule that forces Again ≤ Hard ≤ Good ≤ Easy overwrites the value backed by fewer reps rather than averaging, which is worth seeing rather than inheriting silently. Then one **empirical forgetting curve per grade**: log-spaced interval buckets with observed retention, a **Wilson 95% interval**, what your current weight predicts, the deviation, and which rows the outlier filter discarded before fitting.
+
+The two places the fit and your scheduler disagree are labelled rather than blended: the refit runs at the optimizer's hard-wired `−0.1542` decay because its initialisation pass never sees `w20`, while the *predicted R* column uses yours; and where same-day learning steps sat between the first grade and the outcome, each grade's header states what share that covers and what FSRS actually predicted across them.
+
+> [!TIP]
+> When this panel disagrees with a number fsrs-optimizer produced, check whether the optimizer's value falls inside the 95% interval before changing anything — very often both sit inside the range the data supports, and the disagreement is about confidence, not about the number. Match the windows too: the optimizer's `revlog_start_date` filters whole *cards*, this tab filters *reps* by the period picker, and the weights the optimizer prints are post-training rather than the initialisation output the panel reproduces.
+
+📖 [FSRS Calibration → Initial stability](Prioritization-&-Sorting.md#initial-stability)
+
+### ⚡ Improved - the calibration grids no longer show five rows of dashes
+
+Grids **A** and **B** listed a predicted-R row every 5 percentage points down to 0%, but a scheduler aiming at 90% almost never lets a card fall below ~60%, so the bottom of both tables was permanently empty. Those rows are now folded into a single **0–60%** row, taking each grid from 13 rows to 9.
+
+The cut is fixed rather than "hide whatever is empty today", so the row layout stays identical when you switch periods and two runs can be read side by side — and any reps that do land in the folded range are shown in the merged row rather than dropped.
+
+📖 [FSRS Calibration](Prioritization-&-Sorting.md#fsrs-calibration)
+
+## v1.0.80 - September 5th, 2026
+
+### ✨ New - hand an Incremental Rem's data to its parent
+
+**Transfer Incremental Data to Parent Rem** (`quick: ttp`) moves the priority, the next-repetition date, the full repetition history and the reading state up one level — for when an extract ended up under the outline heading that should have been the incremental item — so the interval progression carries on instead of restarting, and a **🔀 Transferred from …** marker records where the reviews were actually done.
+
+📖 [Transferring an Incremental Rem to its Parent](Create-Incremental-Rem-from-PDF-Highlights.md#transfer-to-parent)
+
+### ✨ New - the audit now spots Rems whose clozes are switched off
+
+**Card Enablement Audit**: added the `clozes off` and `some clozes off` verdicts, so a Rem silenced by RemNote's *Disable All Cloze Cards* is no longer filed under *not surfaced*. Nothing here can undo it — RemNote does not expose that list to plugins, and switching cards back on does not clear it — so the panel says so and points you at RemNote's own `/Enable All Cloze Cards`, in the Suppressed Cards breakdown and the enablement probe too.
+
+📖 [Card Enablement Audit](Utilities.md#card-enablement-audit) · [Suppressed cards](Prioritization-&-Sorting.md#suppressed-cards)
+
+### ⚡ Improved - the Incremental History sidebar says what kind of item each entry is
+
+Every row now carries an item-type badge — 📄 PDF, 🖍️ PDF Extract, 🌐 Web, ▶️ YouTube, 📝 Rem — the same labels the IncRem List uses.
+
+📖 [Incremental Rem History](Plugin-Widgets-Reference.md#221-incremental-rem-history)
+
+### ♻️ Changed - ✏️ / 🗑 in the repetition history are now offered on reviews only
+
+Event banners (Made Incremental, Dismissed, Priority change, Transferred…) are markers the plugin reads by position, not records of study time, so they are no longer hand-editable.
+
+📖 [Recording and correcting records](Plugin-Widgets-Reference.md#recording-and-correcting-records)
+
+### ♻️ Changed - the quick code for *Clean Priority Review Documents* is now `clean`
+
+It was `cprd`.
+
+📖 [Cleaning a review document](Priority-Review-Document.md#cleaning-a-review-document)
+
+## v1.0.79 - September 5th, 2026
+
+### 🐛 Fixed - cards removed from the Mastery Drill came back in the same session
+
+*Remove from Drill* took the card out of the drill list, and the card still reappeared later in the same session — as did cards taken out by *Edit Later* or by rating them *Good* — because RemNote's embedded queue keeps the card list it was handed when the drill opened: each time it runs out of cards it clears its own bookkeeping and reloads that original list, undoing every removal since. The drill now notices a card that has left the list, skips it the moment it is presented again, and rebuilds the embedded queue from the current list when a whole reloaded batch is stale. Cards inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters) are a documented exception, now written up on the drill's page: RemNote reports only the cluster anchor to plugins, so sibling ratings mostly never reach the drill and the per-card toolbar actions act on the anchor.
+
+📖 [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill) · [Card Cluster limitation](History-Queue-Dashboard-and-Mastery-Drill.md#how-it-works)
+
+## v1.0.77 - September 4th, 2026
+
+### ✨ New - every priority change is now on the record
+
+Both priorities keep a history of what they have been, with the gesture behind each change: a flashcard Rem gets a **🎚 Card Priority History** at the bottom of its history popup, and an Incremental Rem files a **🎚 Priority change** marker for the gestures that used to leave no trace at all (`Alt+P`, `Ctrl+Opt+↑/↓`, inline edits). A burst from the same gesture inside a minute collapses into one entry.
+
+📖 [Priority history](Priorities-for-Flashcards.md#priority-history) · [Event Markers](Repetition-History-and-Statistics.md#event-markers)
+
+### ✨ New - `Ctrl+Shift+H` shows flashcard history too, one section per card
+
+The shortcut now opens the card history for any Rem with flashcards — **in the editor as well as the queue** — showing every card of the Rem in a collapsible section named the way RemNote's own panel names it (`Cloze (a [Carena])`, `Forward Card`), with per-card and Rem-wide totals for repetitions, lapses, time and retention. A Rem that is both incremental and a flashcard source gets a button across to the other history.
+
+📖 [Flashcard Repetition History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)
+
+![Flashcard Repetition History Popup](assets/flashcard-rep-history-2.png){ width="900" }
+
+### ✨ New - record a flashcard review you did away from RemNote's Queue
+
+The card history popup gains **➕ Repetition**: the four grade buttons, each showing the interval FSRS projects it would buy — Again included, so you can see what a lapse costs before pressing it. The repetition is dated now and cannot be backdated, which the panel states; it is the flashcard counterpart of the IncRem popup's ➕ Session. Again's figure is where FSRS *resumes* after any relearning steps your scheduler adds, which is why it differs from the `1 hour` RemNote's own Forgot button shows. Sample use case: while in the Editor, you realize you forgot the answer of a card that has a large interval and is not yet due. Tell it to RemNote, so that it can be rescheduled appropriately.
+
+📖 [Flashcard Repetition History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)
+
+### ⚡ Improved - Inlinize reads `.1` `.2` `.3` sub-paragraph markers
+
+The IMO/UN drafting style is now recognised as one marker, so the line break lands before the dot instead of leaving a stray `.` at the end of the previous item.
+
+📖 [Inlinize Detected List](Utilities.md#inlinize-detected-list-inl)
+
+### ⚡ Improved - the flashcard history table compares your schedule against FSRS
+
+Each review now shows **two** target dates in tinted column groups — what RemNote **Scheduled**, and the **FSRS Optimum** (the previous review's date plus the stability computed then) — each with its own delay, so you can see at a glance whether a card is being reviewed sooner than the memory model needs or later. Delays are written compactly (`+3d`, `−2w`, `+1.4y`) and the `pluginData` column is gone, which is what makes the whole table fit without scrolling sideways.
+
+📖 [Flashcard Repetition History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)
+
+### 🐛 Fixed - the retention % in the Practiced Queues log was always grey
+
+Every other surface colours it — the Sessions Summary, the live session card, the Study Dashboard — but the logged session cards printed `(92%)` in plain grey, so a session you had to work for looked the same as one you sailed through. A session that answered no cards at all (`0 / 0`) now shows its placeholder `100%` in grey rather than green, since there is no retention there to be pleased about.
+
+📖 [Retention colours](Colour-Coding-Reference.md#retention)
+
+## v1.0.76 - September 3rd, 2026
+
+### ✨ New - link a flashcard to its source without disturbing the card
+
+**Ctrl/Cmd+Shift+Enter** in the Find Rem picker appends a **pin at the end of the Rem** and leaves your selected text alone — so, mid-queue, you can select part of a card, press `Alt+Shift+F`, and pin the highlight it came from for next time.
+
+📖 [Pin a source at the end of a Rem](Utilities.md#pin-a-source-at-the-end-of-a-rem)
+
+### ⚡ Improved - making a Rem incremental leaves one history entry, not two
+
+Setting a priority right after creation (Alt+Shift+X, the highlight toolbar's **Create IncRem**, **Toggle Incremental**) no longer files a *Rescheduled in Editor* event beside the ▶ Made Incremental marker: the priority and interval you choose are written into the marker itself, which now also records the interval on the plain Alt+X path. Rescheduling later still counts as its own event.
+
+📖 [Event Markers](Repetition-History-and-Statistics.md#event-markers)
+
+### ⚡ Improved - Find Rem marks PDF highlights with their own badge
+
+A highlight carries the same `DEFAULT_TYPE` as any plain Rem, so the picker's type badge couldn't tell one apart from your own note of the same sentence — highlights now show an amber **PDF HIGHLIGHT** badge instead.
+
+📖 [Spotting PDF highlights](Utilities.md#spotting-pdf-highlights)
+
 ## v1.0.75 - September 2nd, 2026
 
 ### ✨ New - where you stopped reading an outline, shown next to where you stopped in a PDF
@@ -701,7 +858,7 @@ The history rows for repetitions have always shown the wall-clock time under the
 
 That made a day with several lifecycle events unreadable: made incremental → dismissed → made incremental again → dismissed, all stacked as "Aug 13, 2026" with no way to tell the order apart from their position. Each banner now carries its time next to the date, after a separator dot: `⏸ Dismissed — Aug 13, 2026 · 09:44`.
 
-📖 [Event Markers](Getting-Started.md#event-markers)
+📖 [Event Markers](Repetition-History-and-Statistics.md#event-markers)
 
 ### 📚 Docs - the Keyboard Shortcuts page now also lists every binding by key
 
@@ -3729,7 +3886,7 @@ We have overhauled the Randomness sliders in the **Sorting Criteria** widget to 
     *   **Parallelized Data Fetching:** Descendant data is now aggressively fetched concurrently in background chunks rather than one-by-one.
 *   **Open Rem Navigation:** Added a subtle `↗` link icon to the far right of every row in the hierarchy tree. While clicking anywhere on the row safely expands/collapses the branch, clicking this icon instantly teleports you to that specific Rem in the editor and closes the widget out of your way.
 
-📖 **Full documentation:** See the [Getting-Started#2-aggregated-history-view](Getting-Started.md#2-aggregated-history-view) section in the Getting Started guide.
+📖 **Full documentation:** See [Aggregated History View](Repetition-History-and-Statistics.md#2-aggregated-history-view).
 
 ---
 ## v0.2.126 - March 5th, 2026
@@ -4423,7 +4580,7 @@ The plugin now **differentiates reschedule and repetition events** based on thei
 
 - **Review actions** ([Next](Reviewing-Items-in-the-Queue.md#next), [Reschedule in queue](Reviewing-Items-in-the-Queue.md#reschedule), [Execute Repetition command](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) in editor) count for interval calculation because you engaged with and reviewed the content
 - **Administrative adjustments** (Ctrl+J in editor, manual date edits) don't count — they change the schedule without confirming a review took place
-- The **[Repetition History widget](Getting-Started.md#repetition-history-statistics)** displays visual indicators for each event type (📅 for queue reschedules, ⌨️ for editor command reviews, colored markers for administrative events)
+- The **[Repetition History widget](Repetition-History-and-Statistics.md)** displays visual indicators for each event type (📅 for queue reschedules, ⌨️ for editor command reviews, colored markers for administrative events)
 
 See [Reviewing Items in the Queue#reschedule-event-types](Reviewing-Items-in-the-Queue.md#technical-note-reschedule-event-types) for the complete event type reference.
 

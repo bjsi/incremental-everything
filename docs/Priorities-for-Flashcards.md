@@ -113,6 +113,44 @@ From v1.0.51 the migration clears the value as well as the row, so new runs leav
 
 They are inert, and the plugin no longer reads them: the priority read now settles the retirement question before it consults that slot, rather than consulting it and preferring the hidden value afterwards. The difference matters for a Rem whose priority was cleared after the migration — without it, a frozen number could have been served in place of the inherited one.
 
+## Priority history { #priority-history }
+
+Every priority a flashcard Rem has held is kept, with **when** it changed, **what it changed to**, the **source** recorded alongside it, and the **gesture that caused it**. It lives in its own hidden `Priority History` slot on the `cardPriority` powerup — machine-written only, so it is a record you can trust rather than a row you can edit.
+
+Read it at the bottom of the **[Flashcard Repetition History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)** popup (`Ctrl+Shift+H` on the Rem). It is Rem-level, not per-card: the powerup tags the Rem, and every card it generates shares the value.
+
+### What gets recorded
+
+| Event | What did it |
+|---|---|
+| 🏷 Initial assignment | The Rem was tagged and given its first priority |
+| ⌨️ Priority popup | [`Alt+P`](Prioritization-&-Sorting.md#main-priority-popup) or [`Ctrl+Opt+P`](Prioritization-&-Sorting.md#light-priority-popup), single Rem or a multi-selection |
+| ⚡ Quick priority change | [`Ctrl+Opt+↑/↓`](Prioritization-&-Sorting.md#quick-priority-shortcuts) and the [Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget)'s ± buttons |
+| ✏️ Inline edit | A priority typed into a list view or a history sidebar |
+| 📦 Batch priority | The [batch tools](#3-unified-batch-priority-change) |
+| ♾ From Incremental Rem | Adopted from the Rem's own Incremental priority |
+| ⬇ Inherited from ancestor | Taken from the closest ancestor carrying a priority |
+| 🌊 Inheritance cascade | An ancestor's change re-applied downwards |
+| • Default priority | Nothing else applied, so the configured default was used |
+| 🎯 Mastery drill · 🃏 Card enablement · ✂️ Cloze split · 📥 Import · 🛠 Slot repair | The tool named |
+
+Every writer goes through one function, so a gesture that changes a priority cannot avoid being recorded.
+
+### Two rules keep it small
+
+The history lives *inside* the Rem, and a Rem that outgrows RemNote's per-document sync ceiling stops syncing — so it is deliberately terse.
+
+* **A restatement is not a change.** A cascade or a startup rebuild that writes back the same value and source it wrote last time records nothing.
+* **A burst is one decision.** Successive changes from the *same* gesture within **one minute** collapse into a single entry carrying the value you settled on. Walking a priority from 80 to 30 by holding `Ctrl+Opt+↓` leaves one row, not eight. Coalescing keys on the gesture, so a quick change seconds after the initial tagging still appends — it never swallows a different kind of change that happened to land in the same minute.
+
+At 150 entries the oldest are dropped, but the **first is always kept**: it is the origin of the priority and the one row nothing else can reconstruct.
+
+### It starts from now
+
+There is no way to recover changes made before this existed — a priority slot holds a number, not the story of how it got there. A Rem you have had for years opens on an empty history until the next time its priority moves.
+
+---
+
 ## Setting & Managing Priorities
 
 ### 1. The Unified Priority Widget ([`Alt+P`](Keyboard-Shortcuts.md#priority-commands))

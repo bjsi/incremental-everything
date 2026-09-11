@@ -307,6 +307,7 @@ export function PriorityEditor() {
         hasIncPowerup: true,
         hasCards: hasCards,
         hasCardPriorityPowerup: hasCardPriorityPowerup,
+        event: 'editor',
       });
       await plugin.storage.setSession(pendingPriorityDeltaQueueKey, existing);
     }).catch((err) => console.error('[PriorityEditor] Failed to queue inc delta:', err));
@@ -324,6 +325,7 @@ export function PriorityEditor() {
         hasIncPowerup: !!incRemInfo,
         hasCards: hasCards,
         hasCardPriorityPowerup: hasCardPriorityPowerup,
+        event: 'editor',
       });
       await plugin.storage.setSession(pendingPriorityDeltaQueueKey, existing);
     }).catch((err) => console.error('[PriorityEditor] Failed to queue card delta:', err));

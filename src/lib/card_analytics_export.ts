@@ -83,6 +83,63 @@ export function collectClozeTexts(richText: any): string[] {
 }
 
 /**
+ * The cloze id a card record was generated from, or `null` for a forward /
+ * backward card.
+ *
+ * Cloze cards carry their id in `card.type.clozeId`; direction cards report a
+ * plain string type. Stringified because the field arrives as a number while
+ * `collectClozeIds` reads the text markup as strings — comparing the two raw
+ * silently never matches.
+ */
+export function clozeIdOfCard(card: any): string | null {
+  const t = card?.type;
+  if (t && typeof t === 'object' && 'clozeId' in t) return String(t.clozeId);
+  return null;
+}
+
+/**
+ * Which of a Rem's clozes are switched off — derived, because the flag itself
+ * is unreadable.
+ *
+ * RemNote stores disabled clozes in the Rem document's `dci` field: an array of
+ * cloze ids, written per cloze by "Enable this card" in the queue and en masse
+ * by the `/Disable All Cloze Cards` command. There is no separate "all clozes
+ * off" state — Disable All simply fills `dci` with every cloze id in the text —
+ * and `isClozeIdEnabled(id)` is just `!dci.includes(id)`.
+ *
+ * `dci` never reaches a plugin. The SDK's Rem serializer copies a fixed field
+ * list (`_id`, `parent`, `children`, `type`, `text`, `backText`, timestamps) and
+ * drops the rest, the host's rem bridge exposes no cloze accessor, and its
+ * `getCards` handler is hardcoded to `includeDisabled: false`. So the state is
+ * reconstructed from the two things that DO cross the bridge: the card table
+ * still holds a record for a disabled cloze, and `rem.getCards()` omits it.
+ *
+ * A cloze counts as disabled only when its id is still in the text AND owns a
+ * card record AND that record is absent from `getCards()`. The markup test
+ * keeps an edited-away cloze out; requiring a record keeps out a cloze whose
+ * card was never generated. Rem-wide causes (practice off, a disabling
+ * ancestor, a paused deck) suppress every card at once and must be ruled out by
+ * the caller BEFORE reading this — they would otherwise make every cloze on the
+ * Rem look individually switched off.
+ */
+export function derivedDisabledClozeIds(
+  textClozeIds: Iterable<string>,
+  cardRecords: any[],
+  surfacedCards: any[],
+): string[] {
+  const inText = new Set(textClozeIds);
+  const surfacedIds = new Set(surfacedCards.map((c: any) => c?._id));
+  const disabled = new Set<string>();
+  for (const card of cardRecords) {
+    const clozeId = clozeIdOfCard(card);
+    if (!clozeId || !inText.has(clozeId)) continue;
+    if (surfacedIds.has(card?._id)) continue;
+    disabled.add(clozeId);
+  }
+  return Array.from(disabled);
+}
+
+/**
  * Does the Rem still define the markup this card was generated from?
  *
  * - cloze card: its cloze id must still appear in the Rem's text.
@@ -215,11 +272,43 @@ export const UNSCHEDULED_CAUSE_LABELS: Record<UnscheduledCause, string> = {
   'cards-disabled-table':
     'Part of a table — RemNote ships table rows and cells with cards off',
   'direction-disabled': 'This direction is switched off on the Rem',
-  'card-disabled-individually': 'This single card switched off (markup still present)',
+  'card-disabled-individually': 'Switched off card by card (markup still present)',
   'markup-removed': 'The cloze / back side this card came from is gone',
   'not-surfaced-unknown': 'Not surfaced — cause undetermined',
   'rem-missing': 'Owning Rem not found',
   unresolved: 'Not resolved (outside the Rem-context cap)',
+};
+
+/**
+ * What the USER can do about each cause — and, where nothing this plugin owns
+ * can do it, who can.
+ *
+ * The distinction matters most for `card-disabled-individually`. That cause is
+ * RemNote's `dci` list (see `derivedDisabledClozeIds`), which no plugin can
+ * write: the rem bridge has no cloze accessor and no generic document write, so
+ * `setEnablePractice` / `setPracticeDirection` — the only enablement levers a
+ * plugin has — leave it untouched. RemNote's own "Enable Cards" command has the
+ * same blind spot: it writes `forget: false` and nothing else, so a Rem whose
+ * clozes are all disabled stays cardless after it. The way back is RemNote's
+ * own `/Enable All Cloze Cards`, or clicking a greyed cloze and choosing
+ * "Enable this card".
+ */
+export const UNSCHEDULED_CAUSE_REMEDY: Record<UnscheduledCause, string> = {
+  'paused-document': 'Set the deck\u2019s Study Priority to something other than Paused.',
+  'cards-disabled-ancestor':
+    'Remove \u201cDisable Descendant Cards\u201d from the ancestor that carries it.',
+  'cards-disabled-rem':
+    'Switch cards back on for the Rem \u2014 the Card Enablement Audit does this in bulk.',
+  'cards-disabled-table':
+    'Table rows ship with cards off. Enable them per Rem only if you meant the table to be practised.',
+  'direction-disabled':
+    'Set the practice direction on the Rem \u2014 the Card Enablement Audit does this in bulk.',
+  'card-disabled-individually':
+    'Only RemNote can undo this: run /Enable All Cloze Cards on the Rem, or click the greyed cloze and choose \u201cEnable this card\u201d. No plugin can write the disabled-cloze list.',
+  'markup-removed': 'Nothing to re-enable \u2014 the cloze or back side is gone. Delete the card record or restore the markup.',
+  'not-surfaced-unknown': 'Cause undetermined. Run the single-Rem enablement probe on one of these Rems.',
+  'rem-missing': 'The owning Rem is gone; the card record is an orphan.',
+  unresolved: 'Outside the Rem-context cap \u2014 narrow the scope and recompute.',
 };
 
 /**
@@ -843,6 +932,25 @@ export interface RemEnablementProbe {
   disableCardsOwn: boolean;
   /** Cloze ids the Rem's text currently defines. */
   clozeIds: string[];
+  /**
+   * Cloze ids proven to sit in RemNote's `dci` (disabled) list — derived, since
+   * the field itself never reaches a plugin. See `derivedDisabledClozeIds`.
+   */
+  disabledClozeIds: string[];
+  /**
+   * Every cloze the Rem defines is switched off. This is the state
+   * `/Disable All Cloze Cards` leaves behind — it is not a distinct flag, just
+   * a full `dci` list, which is why nothing else here distinguishes it.
+   */
+  allClozesDisabled: boolean;
+  /**
+   * A Rem-wide cause (practice off, a disabling ancestor, a paused deck, a
+   * table) is also suppressing this Rem's cards, so `disabledClozeIds` above
+   * cannot be trusted: those causes drop EVERY card from `rem.getCards()`, which
+   * makes every cloze look individually switched off. When this is true the list
+   * is a lower bound at best — clear the Rem-wide cause and probe again.
+   */
+  clozeReadingMaskedByRemWideCause: boolean;
   hasBackText: boolean;
   /** The Rem is a table, or sits inside one — tables ship with cards off. */
   isTableOwn: boolean;
@@ -904,6 +1012,11 @@ export async function probeRemCardEnablement(
   const owned = (allCards || []).filter((c: any) => c.remId === remId);
   const clozeIds = Array.from(collectClozeIds(rem.text));
   const hasBackText = Array.isArray(rem.backText) && rem.backText.length > 0;
+  // Reported raw, without ruling out the Rem-wide causes first: this is a
+  // diagnostic dump, and seeing "every cloze looks off" NEXT TO a disabling
+  // ancestor is exactly the comparison the probe exists to make. The audit's
+  // verdict, which has to pick one cause, does gate it.
+  const disabledClozeIds = derivedDisabledClozeIds(clozeIds, owned, viaGetCards);
 
   const ancestors: RemEnablementProbe['ancestors'] = [];
   let cursor = await rem.getParentRem();
@@ -958,16 +1071,21 @@ export async function probeRemCardEnablement(
     cardsViaGetAll: owned.length,
     disableCardsOwn: !!disableCardsOwn,
     clozeIds,
+    disabledClozeIds,
+    allClozesDisabled: clozeIds.length > 0 && disabledClozeIds.length === clozeIds.length,
+    clozeReadingMaskedByRemWideCause:
+      enablePractice === false ||
+      !!disableCardsOwn ||
+      !!isTableOwn ||
+      ancestors.some((a) => a.disableCards || a.isTable || a.deckStatus === 'Paused'),
     hasBackText,
     isTableOwn: !!isTableOwn,
     inTable: ancestors.some((a) => a.isTable),
     rawCardKeys: owned.length > 0 ? Object.keys(owned[0]) : [],
     ancestors,
     cards: owned.map((c: any) => {
-      const cardType =
-        c.type && typeof c.type === 'object' && 'clozeId' in c.type ? 'cloze' : String(c.type);
-      const clozeId =
-        c.type && typeof c.type === 'object' && 'clozeId' in c.type ? String(c.type.clozeId) : null;
+      const clozeId = clozeIdOfCard(c);
+      const cardType = clozeId ? 'cloze' : String(c.type);
       return {
         cardId: c._id,
         type: clozeId ? `cloze:${clozeId}` : cardType,

@@ -9,6 +9,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { sanitizeRichTextForSetText } from './richTextSanitize';
 import { syncPriorityBand } from './priority_bands';
+import { markRemsAsFreshlyCreated } from './incRemHelpers';
 import {
   parentSelectorWidgetId,
   powerupCode,
@@ -149,6 +150,9 @@ export const showPriorityPopupForRem = async (
   remId: RemId
 ): Promise<void> => {
   await plugin.storage.setSession('priorityPopupTargetRemId', remId);
+  // Every caller reaches here right after making the rem Incremental, so the
+  // popup's save folds into the fresh 'madeIncremental' marker.
+  await markRemsAsFreshlyCreated(plugin, [remId]);
   await plugin.widget.openPopup('priority_interval');
 };
 

@@ -190,7 +190,7 @@ Happy learning! 📚✨
         * Making a Rem incremental (slash command, shortcuts, menu).
         * Reviewing Incremental Rems in the queue (answer buttons overview).
         * Dismissing and re-activating Rems (with history preservation).
-        * Using the [Repetition History widget](Getting-Started.md#repetition-history-statistics).
+        * Using the [Repetition History widget](Repetition-History-and-Statistics.md).
         * Setting priorities basics.
 
 * **2. The Philosophy: [What is Incrementalism?](What-is-Incrementalism%3F.md)**

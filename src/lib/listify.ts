@@ -27,9 +27,9 @@ import {
   ReactRNPlugin,
   RichTextInterface,
   PluginRem,
-  BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import { BULLET_PREFIX, rtPlainStr } from './bulletize';
+import { partitionSourcePins } from './source_pins';
 
 // ---------------------------------------------------------------------------
 // Detection (pure, string-only — unit-testable without the SDK)
@@ -95,12 +95,20 @@ const matchMarkerAt = (
   // Reject a token that is the tail of a dotted path (e.g. the "1" in "1.1" or
   // the "a" in "1.a"): those are handled by the compound detector, not here.
   if (S[pos - 1] === '.' && /[\da-zA-Z]/.test(S[pos - 2] || '')) return null;
+  // Reject the digit of a leading-dot marker (".1"): the marker starts one char
+  // earlier, at the dot, and is matched there instead (see 'decimal' below).
+  if (S[pos - 1] === '.' && /\d/.test(S[pos]) && isSep(S[pos - 2])) return null;
   const rest = S.slice(pos);
 
   if (kind === 'decimal') {
-    const m = /^(\d+)/.exec(rest);
+    // Sub-paragraph markers carry a LEADING dot (".1 Deep water… .2 Wind…" —
+    // IMO/UN drafting style). The dot belongs to the marker, so match from the
+    // dot itself; otherwise the split lands on the digit and strands a lone "."
+    // at the end of the previous item.
+    const dotLead = S[pos] === '.' && /\d/.test(S[pos + 1] || '') ? 1 : 0;
+    const m = /^(\d+)/.exec(rest.slice(dotLead));
     if (!m) return null;
-    const tokenEnd = pos + m[1].length;
+    const tokenEnd = pos + dotLead + m[1].length;
     // A decimal marker may carry no delimiter at all (sample: "1 Aumentar"), so
     // require token + optional delimiter + whitespace + a letter (item start).
     const dm = /^([.\-)–]?)\s+(\p{L})/u.exec(S.slice(tokenEnd));
@@ -517,55 +525,6 @@ interface ListBreakSnapshot {
 
 export const snapshotKey = (remId: string) => `listBreakSnapshot:${remId}`;
 
-// Split a rich text into any PDF-highlight pin references it contains and the
-// remaining nodes. A pin is a reference node (`i: 'q'`) whose target rem is a
-// PDF Highlight. The #pdfextract tag also qualifies but is NOT required — a
-// highlight pasted straight into notes (text + pin) has no such tag, yet its
-// target still carries the PDFHighlight powerup, so it's covered too. Pins are
-// zero-width in the plain-char projection, so removing them here doesn't
-// disturb any line/offset math.
-const partitionPdfHighlightPins = async (
-  plugin: ReactRNPlugin,
-  richText: RichTextInterface
-): Promise<{ pins: any[]; rest: RichTextInterface }> => {
-  let pdfExtractTagRem: PluginRem | undefined;
-  try {
-    pdfExtractTagRem =
-      (await plugin.rem.findByName(['pdfextract'], null)) || undefined;
-  } catch (e) {
-    // ignore — tag rem may not exist
-  }
-
-  const pins: any[] = [];
-  const rest: any[] = [];
-  for (const item of richText) {
-    if (
-      typeof item === 'object' &&
-      item !== null &&
-      (item as any).i === 'q' &&
-      (item as any)._id
-    ) {
-      const ref = await plugin.rem.findOne((item as any)._id);
-      if (ref) {
-        const isPdfHighlight = await ref.hasPowerup(
-          BuiltInPowerupCodes.PDFHighlight
-        );
-        let hasTag = false;
-        if (pdfExtractTagRem) {
-          const tags = await ref.getTagRems();
-          hasTag = tags.some((t) => t._id === pdfExtractTagRem!._id);
-        }
-        if (isPdfHighlight || hasTag) {
-          pins.push({ ...(item as any), pin: true });
-          continue;
-        }
-      }
-    }
-    rest.push(item);
-  }
-  return { pins, rest };
-};
-
 // Peel off the trailing run of zero-width nodes (images, non-PDF references…)
 // dangling after the last non-whitespace text character — in the IR flow an
 // extracted highlight often ends with a soft "\n" followed by an image and pin
@@ -628,7 +587,7 @@ export const breakInlineListToChildren = async (
   // the remaining trailing zero-width run: other references also join the
   // caput; trailing images become their own child items appended after the
   // list (see below).
-  const { pins, rest } = await partitionPdfHighlightPins(plugin, originalText);
+  const { pins, rest } = await partitionSourcePins(plugin, originalText);
   const { body, trailingImages, trailingRest } = peelTrailingNonText(rest);
   const segments = splitOnNewlines(body);
 

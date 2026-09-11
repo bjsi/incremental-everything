@@ -164,7 +164,7 @@ circunstâncias, o número de pessoal qualificado… 2 Deixar claro em que situa
 "chamar o Comandante ao passadiço". 3 O Oficial de quarto… 11 Garantir que…
 ```
 
-There are no line breaks to bulletize — the only structure is in the **markers**: **enumerators** (`1`, `2`, `3`… / `a)` `b)` / `i.` `ii.`), **depth/compound numbers** (`1.1`, `1.2`… or mixed `1.a`, `1.b`…), or **inline bullet/dash glyphs** (`•`, `-`, `*`) that a highlight ran together onto one line. These commands detect that structure and rebuild the list, first inline (for review) and then as proper child rems, with a full undo.
+There are no line breaks to bulletize — the only structure is in the **markers**: **enumerators** (`1`, `2`, `3`… / `a)` `b)` / `i.` `ii.` / `.1` `.2` `.3`), **depth/compound numbers** (`1.1`, `1.2`… or mixed `1.a`, `1.b`…), or **inline bullet/dash glyphs** (`•`, `-`, `*`) that a highlight ran together onto one line. These commands detect that structure and rebuild the list, first inline (for review) and then as proper child rems, with a full undo.
 
 Unlike Bulletize, all three act on the **focused rem** — just click into the rem, no text selection required.
 
@@ -188,6 +188,7 @@ As seguintes medidas podem contribuir para evitá-las:
 ```
 
 - **Enumerated lists keep their number:** `1 Aumentar` → `• 1 Aumentar`.
+- **Sub-paragraph markers keep their leading dot:** the `.1` `.2` `.3` style used by IMO/UN and other legal drafting is read as one marker, so the break lands **before the dot** (`• .1 Deep unrestricted water…`) instead of stranding a lone `.` at the end of the previous item. A number glued to a word (`footnote.1`) is not a marker.
 - **Bullet/dash lists have their marker normalized:** an existing `•`, `-` or `*` is **replaced** by a single `• ` (so `- calado` and `* item` both become `• …`) — no duplicate bullet is added.
 
 The text before the first marker becomes the **caput** (title line); the whitespace before each marker is collapsed into the `• ` prefix. This stays a **single rem** and is fully `Ctrl+Z`-able — it's the review checkpoint before the destructive step. If no list is detected, a toast says so and nothing changes.
@@ -428,21 +429,34 @@ A floating picker that finds a Rem **by name even when RemNote's own reference s
 
 Run **`Find Rem (insert reference / open in pane)`** (quick code `fir`) or press **`Opt+Shift+F` / `Alt+Shift+F`**. A compact box opens **at your cursor**.
 
-- **Type a name** → results appear as you type, with the best matches floated to the top (an `EXACT` badge marks an exact-name match; an `ALIAS` badge marks a match found through one of the Rem's [aliases](#find-by-alias)). Each row shows the Rem's **type badge**, its **back text** (the definition side of a Concept↔definition card), and a short **breadcrumb** (`root / … / parent`) so you can tell which document it lives in when names collide.
+- **Type a name** → results appear as you type, with the best matches floated to the top (an `EXACT` badge marks an exact-name match; an `ALIAS` badge marks a match found through one of the Rem's [aliases](#find-by-alias)). Each row shows the Rem's **type badge** (see [Spotting PDF highlights](#spotting-pdf-highlights)), a 🖼️ icon when it holds an image (see [Spotting figures](#spotting-figures)), its **back text** (the definition side of a Concept↔definition card), and a short **breadcrumb** (`root / … / parent`) so you can tell which document it lives in when names collide.
 - **Enter** or **click** → inserts a reference to the selected Rem at your cursor.
 - **Ctrl+Enter / Cmd+Enter** or **Ctrl/Cmd+click** → inserts the reference as a **pin** (the link chip *without* the referenced text). See [Insert as a pin](#insert-as-a-pin) below.
 - **Opt+Enter / Alt+Enter** or **Opt/Alt+click** → inserts the Rem's **text followed by a pin** — the readable text plus a link chip (RemNote's paste "Text with Pin"). See [Insert text with a pin](#insert-text-with-a-pin) below.
 - **Shift+Enter** or **Shift+click** → opens the selected Rem in a **new pane** beside your current one (without inserting anything).
+- **Ctrl/Cmd+Shift+Enter** or **Ctrl/Cmd+Shift+click** → appends a **pin at the end of the Rem you are editing, keeping your selected text**. See [Pin a source at the end of a Rem](#pin-a-source-at-the-end-of-a-rem) below.
 - **↑/↓** navigate · **Esc** closes.
 - **Concepts only** checkbox narrows results to Concept-type Rems.
 
 The Rem you triggered the picker from is **excluded from results** — a Rem can't reference itself.
+
+#### Spotting PDF highlights
+
+A PDF highlight carries the same `DEFAULT_TYPE` as any plain Rem, so the type badge alone couldn't tell a highlight apart from your own note of the same sentence — a common collision, since a note is often worded exactly like the passage it came from. Highlights are badged **`PDF HIGHLIGHT`** in amber instead, so you can see at a glance which result is the source passage and which is your note, and reference the one you meant.
+
+#### Spotting figures
+
+A result whose Rem holds an **image** is marked with a 🖼️ before its name. An image contributes no searchable text, so a figure Rem is identified only by its caption — and captions are often near-identical to the prose that discusses them (`Figure 6.4: Definitions used on turning circle` beside a highlight reading *"… consists of (Fig. 6.4)"*). The icon tells you which row is the actual figure.
+
+This reads the Rem's own text directly, so it is accurate whether or not you have ever run [Tag Rems With Images](#filter-a-document-by-images) — it does not depend on the **HasImage** tag being present or up to date.
 
 #### Why it finds Rems the normal search can't
 
 RemNote's reference search builds its candidate list **per token, with a cap**. When *every* word in a Rem's name is high-frequency in your knowledge base (e.g. `Navegação Interior`, `mar territorial` — where both `navegação`/`interior` and `mar`/`territorial` appear in hundreds of Rems), the exact-name Concept never makes any token's candidate cut, so typing its full name returns a flood of partial matches but **not the Rem itself**. This is a property of the search ranking — not a corruption of the Rem — so "Reload Search Cache", retyping the name, or changing its type do **not** fix it. (You can confirm all of this on a specific Rem with the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** tool in the Debug Widget.)
 
 This picker sidesteps the limitation: it searches **each word of your query separately**, unions the results, keeps only the Rems whose name contains **all** your words, and floats exact-name matches to the top. Because a distinctive word (e.g. `interior`) *does* return the Rem, it reliably surfaces — then ranking puts the exact match first.
+
+It also asks for the **whole query as a phrase**, which is the one thing that pulls back a small, precise set instead of a truncated flood. RemNote only looks for an exact run of adjacent words when the phrase it is handed is at least two words long, and it matches those words literally apart from the last one. That matters for names built from common words plus a number: a query like `fig. 6.4` seeds the word `fig`, which in a knowledge base full of figures returns thousands of Rems and is cut back long before yours is reached — whereas the phrase `figure 6.4` matches only the handful of Rems that actually contain those two words side by side. Since the literal spelling decides whether the phrase matches, both spellings are asked for (see [`Figure` = `Fig` = `Fig.`](#accent-insensitive-selection-aware)).
 
 ![Find Rem — surfacing a Rem that RemNote's own `[[` reference search can't find](assets/find-rem-finds-rems-normal-search-cannot.gif)
 
@@ -480,6 +494,23 @@ It brings across the source's **full rich text**, not just a plain label:
 
 Alias matches use the alias Rem's text; the trailing pin still links to the owning Rem.
 
+#### Pin a source at the end of a Rem
+
+The other three modes all insert **at your cursor**, and — like RemNote's own `[[` — a text selection is **consumed**: the words you highlighted are replaced by the reference. That is wrong for one very common move: *linking a flashcard back to where it came from*. There, the selected text is the card, and the reference belongs at the **end** of the line, out of the way.
+
+Press **Ctrl/Cmd+Shift+Enter** (or **Ctrl/Cmd+Shift+click** a result) to do exactly that: a **pin is appended at the end of the Rem**, and your **selected text is left untouched**. The pin lands at the end of the field the selection is in, so highlighting something on a card's back appends to the back, not the front. When the selection sits inside a cloze, the pin stays *outside* it — a pin at the end of the line is a source marker, not part of the answer.
+
+![Find Rem — searching with the selected text of a card](assets/find-rem-selected-text.png)
+
+**The queue flow this is built for.** You are reviewing a card and want to check where it came from — say the PDF highlight behind it:
+
+1. **Peek at the source** while the card is in front of you.
+2. **Select part of the card's text** — the phrase you would search for.
+3. Press **`Alt+Shift+F`**. The picker opens with that text already in the search box, so the source Rem (its `PDF HIGHLIGHT` badge makes it easy to spot — see [Spotting PDF highlights](#spotting-pdf-highlights)) is usually the first result.
+4. Press **`Ctrl/Cmd+Shift+Enter`**.
+
+The card keeps reading exactly as before, and now carries a small chip at the end that takes you straight back to the highlight next time the card comes up — no re-searching, no broken wording.
+
 #### Cloze-aware insertion
 
 Both RemNote's native `[[` and this picker would normally **break a cloze deletion** if you inserted a reference inside it — the new reference would land *outside* the cloze. This picker is **cloze-aware**: when your cursor (or selected text) sits inside a cloze, the inserted reference is stamped with that cloze's id, so it stays **inside** the cloze instead of splitting it.
@@ -489,7 +520,7 @@ Both RemNote's native `[[` and this picker would normally **break a cloze deleti
 #### Accent-insensitive & selection-aware
 
 - **Accent/diacritic-insensitive:** typing `navegacao interior` matches `Navegação Interior`.
-- **`Figure` = `Fig` = `Fig.`:** figure abbreviations are treated interchangeably, so typing `fig 4.3` lists a Rem named `Figure 4.3`, and typing `figure 4.3` finds one named `Fig. 4.3` or `Fig 4.3`. Any capitalisation works and the trailing dot is optional. It's folded the same way accents are — the standalone word `fig`/`fig.` is canonicalised to `figure` in both your query and each Rem's name (and alias) before matching, so an exact match still ranks first with its `EXACT` badge. Only the whole word is affected: `figs`, `configure`, etc. are left alone.
+- **`Figure` = `Fig` = `Fig.`:** figure abbreviations are treated interchangeably, so typing `fig 4.3` lists a Rem named `Figure 4.3`, and typing `figure 4.3` finds one named `Fig. 4.3` or `Fig 4.3`. Any capitalisation works and the trailing dot is optional. It's folded the same way accents are — the standalone word `fig`/`fig.` is canonicalised to `figure` in both your query and each Rem's name (and alias) before matching, so an exact match still ranks first with its `EXACT` badge. Only the whole word is affected: `figs`, `configure`, etc. are left alone. The **search itself** is run in both spellings too, not just the matching: `fig. 6.4` is looked up as `fig. 6.4` *and* as `figure 6.4`, because RemNote's phrase lookup matches the words literally and would otherwise never return `Figure 6.4: …` for a query written `Fig.` (see [Why it finds Rems the normal search can't](#why-it-finds-rems-the-normal-search-cant)).
 - **Selected text seeds the search:** if you select text before invoking, the box opens pre-filled with it (and selected, so you can refine or overwrite). On insert, the selected text is **replaced** by the reference — exactly like RemNote's `[[` behaviour where selected text becomes the link.
 
 > The reference is inserted into the editor that was focused when you opened the picker. In the rare case RemNote has no active editor caret at insertion time, the picker copies the reference to your clipboard instead and tells you to paste it.
@@ -510,6 +541,8 @@ This all happens before the box appears, so you never see it jump.
 Opens the **PDF or web article behind a reference pin** *without leaving the queue*. Built for the moment in review when a flashcard (or any Rem) carries a pin to a PDF highlight and you want to glance at the surrounding source — clicking the pin directly **navigates away and tears down the queue** (you lose your position and the ability to rate the card). This shows the source on top of (or beside) the queue instead, so you read it and dismiss it without interrupting the session.
 
 It comes in **two variants** — a centered **modal popup** and a non-blocking **floating window** — that share the same reader; pick whichever fits the moment.
+
+![PDF Source shown in floating widget](assets/source-floating-widget.png){ width="900" }
 
 #### Two ways to open it
 
@@ -558,6 +591,8 @@ The floating variant is designed so the source sits **beside** your card while y
 - **Closes itself when you advance the card,** so a previous card's source never lingers over the next one.
 - **Esc closes it** — without closing the queue. The plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it; Esc closes the float instead. (When focus is inside the PDF itself, the browser handles Esc within the reader; use the `✕` button there.)
 - **Not user-resizable.** RemNote floating widgets have a fixed registered size; the window opens at ≈48% of the screen width on the right.
+
+![PDF Source shown in floating widget](assets/source-floating-widget.png){ width="900" }
 
 #### Recommended use cases
 
@@ -966,7 +1001,7 @@ A Rem can look exactly like a flashcard — a front, a back, a cloze — and gen
 * **Enable Cards** is off on the Rem itself;
 * an ancestor carries **Disable Descendant Cards**;
 * the Rem is a **table** or sits inside one — RemNote ships table rows with cards off;
-* the cards were switched off **one at a time** in the queue.
+* its **clozes** were switched off — one at a time in the queue, or all at once with RemNote's `/Disable All Cloze Cards`.
 
 The one that arrives in bulk is the first. An **Anki import** can land hundreds of Rems at `enablePractice=true, practiceDirection=none` — they read as perfectly ordinary flashcards and are simply never scheduled.
 
@@ -997,13 +1032,24 @@ Each Rem gets one **verdict**, shown as a coloured chip you can click to filter 
 | `table` | The Rem is a table or sits in one | ✅ |
 | `ancestor off` | An ancestor carries **Disable Descendant Cards** | ❌ — untag the ancestor |
 | `paused deck` | Inside a paused deck | ❌ — unpause the deck |
-| `not surfaced` | Nothing surfaces and no Rem-level flag explains it | ❌ — a per-card switch, or the markup is gone |
+| `clozes off` | Every cloze on the Rem is switched off, so it produces nothing | ❌ — see below |
+| `some clozes off` | Still producing cards, but some of its clozes are switched off | ❌ — see below |
+| `not surfaced` | Nothing surfaces and no Rem-level flag explains it | ❌ — the markup is probably gone |
 | `no material` | No back side, no clozes, no card records | ❌ — not a flashcard |
 | `OK` | Producing cards | — |
 
 Every row shows both the cards currently **surfaced** and the card **records** that exist, as `surfaced/records`. Those two numbers are what separate a Rem whose cards were switched off from one that never had any — `rem.getCards()` alone cannot tell them apart.
 
 The verdicts are ordered by what a fix would actually accomplish, so a Rem under a disabling ancestor is reported as `ancestor off` rather than `dir=none`: setting a direction there writes the flag and still produces nothing.
+
+!!! warning "Switched-off clozes can only be undone inside RemNote"
+    RemNote keeps a Rem's disabled clozes in a list on the Rem itself, and it exposes that list to **no plugin** — it cannot be read or written from here. The audit works it out indirectly, from the card records that exist but never surface, and reports it as `clozes off` / `some clozes off` with a count in the `surfaced/records` column (`0/1 · 1c (1 off)`).
+
+    **Switching cards ON will not bring them back.** That writes the *Enable Cards* flag and leaves the cloze list untouched, so the Rem still produces nothing — and RemNote's own `/Enable Cards` command behaves exactly the same way. This catches people out, which is why the panel says so on screen rather than offering a button.
+
+    Click the row to open the Rem, then run RemNote's **`/Enable All Cloze Cards`** there — or click a greyed-out cloze and choose **Enable this card** for just one.
+
+    A Rem is only given one of these verdicts once everything else has been ruled out. A disabling ancestor or a paused deck hides *every* card on a Rem, which would make each of its clozes look individually switched off; those Rems are reported by their real cause instead.
 
 #### Fixing them
 
@@ -1023,7 +1069,7 @@ After the run the panel reports how many cards **actually appeared** — read ba
 
 #### Undoing
 
-The current state of every Rem — its **Enable Cards** flag and its **direction** — is captured *before* the first write, offered as a JSON download, and restorable with **Undo last apply** in the panel.
+The current state of every Rem — its **Enable Cards** flag and its **direction** — is captured *before* the first write, offered as a JSON download, and restorable with **Undo last apply** in the panel. (Those two flags are the only things the panel ever writes, so they are the only things there is anything to undo.)
 
 !!! tip "Try a handful first"
     Select five rows and apply. The report tells you exactly how many cards that produced, which is the honest way to find out what a run over the whole deck will do to your queue before you commit to it.

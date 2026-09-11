@@ -35,7 +35,7 @@
 
 import { BuiltInPowerupCodes, RNPlugin } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from '../pdfUtils';
-import { collectClozeIds } from '../card_analytics_export';
+import { collectClozeIds, derivedDisabledClozeIds } from '../card_analytics_export';
 
 /** Which populations the audit draws from. Freely combinable. */
 export interface AuditScope {
@@ -81,6 +81,14 @@ export type EnablementVerdict =
   | 'disabled-by-ancestor'
   /** Inside a paused deck. Cards exist and keep their due dates; the queue skips them. */
   | 'in-paused-deck'
+  /**
+   * Every cloze the Rem defines is switched off in RemNote's own disabled-cloze
+   * list, and the Rem surfaces nothing. This is what `/Disable All Cloze Cards`
+   * leaves behind. No plugin can undo it — see VERDICT_REMEDY.
+   */
+  | 'clozes-disabled'
+  /** The Rem still produces cards, but some of its clozes are switched off. */
+  | 'clozes-partly-disabled'
   /** Card material or records exist, nothing surfaces, and no Rem-level flag explains it. */
   | 'not-surfaced'
   /** No back side, no clozes, no card records — there is nothing here to enable. */
@@ -93,6 +101,8 @@ export const VERDICT_LABELS: Record<EnablementVerdict, string> = {
   'in-table': 'In a table (cards off by default)',
   'disabled-by-ancestor': 'Disabled by an ancestor',
   'in-paused-deck': 'Inside a paused deck',
+  'clozes-disabled': 'All its clozes are switched off',
+  'clozes-partly-disabled': 'Producing cards, but some clozes are switched off',
   'not-surfaced': 'Not surfaced — no Rem-level cause',
   'no-card-material': 'No card material',
 };
@@ -104,8 +114,35 @@ export const VERDICT_SHORT: Record<EnablementVerdict, string> = {
   'in-table': 'table',
   'disabled-by-ancestor': 'ancestor off',
   'in-paused-deck': 'paused deck',
+  'clozes-disabled': 'clozes off',
+  'clozes-partly-disabled': 'some clozes off',
   'not-surfaced': 'not surfaced',
   'no-card-material': 'no material',
+};
+
+/**
+ * What the user has to do about each verdict, in the second person, for the
+ * verdicts this panel cannot fix itself.
+ *
+ * `clozes-disabled` is the one that has to be said out loud. RemNote keeps
+ * disabled clozes in the Rem document's `dci` array, and that field is
+ * unreachable from a plugin in both directions: the SDK's Rem serializer drops
+ * it, and the host's rem bridge exposes no cloze accessor and no generic
+ * document write. Worse, the obvious guess is wrong — switching cards ON for
+ * the Rem writes `forget: false` and leaves `dci` exactly as it was, so the Rem
+ * still produces nothing. RemNote's own `/Enable Cards` has the same blind
+ * spot. Only `/Enable All Cloze Cards` clears the list.
+ */
+export const VERDICT_REMEDY: Partial<Record<EnablementVerdict, string>> = {
+  'disabled-by-ancestor':
+    'Remove “Disable Descendant Cards” from the ancestor — this panel does not touch ancestors.',
+  'in-paused-deck': 'Set that deck’s Study Priority to something other than Paused.',
+  'clozes-disabled':
+    'This panel cannot fix it, and neither can switching cards ON — that leaves the disabled-cloze list untouched. Open the Rem in RemNote and run /Enable All Cloze Cards.',
+  'clozes-partly-disabled':
+    'Only if you want those clozes back: open the Rem in RemNote and run /Enable All Cloze Cards, or click a greyed cloze and choose “Enable this card”.',
+  'not-surfaced':
+    'Cause undetermined. Run “Probe Card Enablement” on this Rem from the debug widget.',
 };
 
 /**
@@ -148,6 +185,13 @@ export interface EnablementRow {
   records: number;
   /** Cloze ids the text currently defines. */
   clozeCount: number;
+  /**
+   * Cloze ids proven to be switched off in RemNote's disabled-cloze list.
+   * Derived — the list itself is unreadable from a plugin. Only populated once
+   * the Rem-wide causes have been ruled out, so it is never an artefact of a
+   * disabling ancestor or a paused deck.
+   */
+  disabledClozeIds: string[];
   hasBackText: boolean;
   isTableOwn: boolean;
   inTable: boolean;
@@ -468,6 +512,8 @@ export function emptyCounts(): Record<EnablementVerdict, number> {
     'in-table': 0,
     'disabled-by-ancestor': 0,
     'in-paused-deck': 0,
+    'clozes-disabled': 0,
+    'clozes-partly-disabled': 0,
     'not-surfaced': 0,
     'no-card-material': 0,
   };
@@ -495,7 +541,25 @@ async function probeOne(
   const hasBackText = Array.isArray(rem.backText) && rem.backText.length > 0;
   const backText = hasBackText ? await remTextFast(plugin, rem.backText) : '';
   const clozeIds = collectClozeIds(rem.text);
-  const records = cardsByRem.get(rem._id)?.length ?? 0;
+  const cardRecords = cardsByRem.get(rem._id) ?? [];
+  const records = cardRecords.length;
+
+  // A cloze can only be called individually switched off once everything that
+  // silences the WHOLE Rem is ruled out — otherwise a disabling ancestor, a
+  // paused deck or an Enable-Cards toggle makes every cloze on the Rem look
+  // hand-disabled, and the audit would send the user to /Enable All Cloze Cards
+  // for a problem that command cannot touch. Order matters here: this mirrors
+  // the guard clauses in classifyRow, which is what consumes the result.
+  const remWideCauseRulesItOut =
+    !!chain.disablingAncestorId ||
+    !!chain.pausedAncestorId ||
+    enablePractice === false ||
+    !!disableCardsOwn ||
+    !!isTableOwn ||
+    chain.inTable;
+  const disabledClozeIds = remWideCauseRulesItOut
+    ? []
+    : derivedDisabledClozeIds(clozeIds, cardRecords, surfacedCards);
 
   const row: EnablementRow = {
     remId: rem._id,
@@ -508,6 +572,7 @@ async function probeOne(
     surfaced: surfacedCards.length,
     records,
     clozeCount: clozeIds.size,
+    disabledClozeIds,
     hasBackText,
     isTableOwn: !!isTableOwn,
     inTable: chain.inTable,
@@ -553,9 +618,22 @@ export function classifyRow(row: EnablementRow): EnablementVerdict {
   if (row.practiceDirection === 'none') return 'direction-none';
 
   if (row.surfaced > 0) {
-    return row.pausedAncestorId ? 'in-paused-deck' : 'ok';
+    if (row.pausedAncestorId) return 'in-paused-deck';
+    // Cards ARE reaching the queue, so this is not a fault — just a fact the
+    // user cannot otherwise see, and one no other tool reports.
+    return row.disabledClozeIds.length > 0 ? 'clozes-partly-disabled' : 'ok';
   }
 
   if (row.pausedAncestorId) return 'in-paused-deck';
+
+  // Nothing surfaces and every cloze the text defines is switched off: the
+  // state `/Disable All Cloze Cards` leaves behind. Claimed only when the
+  // clozes account for ALL of it — a Rem that also has a back side whose
+  // forward card is missing for some other reason stays `not-surfaced`, since
+  // enabling the clozes would not explain that card.
+  const clozesExplainEverything =
+    row.clozeCount > 0 && row.disabledClozeIds.length === row.clozeCount && !row.hasBackText;
+  if (clozesExplainEverything) return 'clozes-disabled';
+
   return 'not-surfaced';
 }

@@ -24,6 +24,7 @@ import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { formatDuration, tryParseJson } from '../lib/utils';
 import { Period, resolvePeriod, parseDateInput, formatDateForDisplay } from '../lib/period';
 import { resolveRemTextSegments } from '../lib/richTextRemRefs';
+import { retentionColorHex, retentionPercent } from '../lib/retention';
 import { RemText, RemTextSegments } from '../components';
 import {
     StudyTimelineCharts,
@@ -1443,12 +1444,6 @@ function formatMs(ms: number): string {
     return formatDuration(Math.round(ms / 1000)) || '0s';
 }
 
-function retentionColor(rate: number): string {
-    if (rate >= 90) return '#16a34a';
-    if (rate < 80) return '#ef4444';
-    return '#ca8a04';
-}
-
 /**
  * Unit the Speed columns render in, shared with the Practiced Queues summary
  * table and the Graphs tab's Speed chart through one device-local key — one
@@ -1528,7 +1523,9 @@ function SummaryCard({ summary }: { summary: SummaryStats }) {
         totalIncDism > 0 ? Math.round((summary.dismTaggedCount / totalIncDism) * 100) : 0;
 
     const remembered = Math.max(0, summary.cardReps - summary.cardForgot);
-    const retention = summary.cardReps > 0 ? (remembered / summary.cardReps) * 100 : 0;
+    // 0 when nothing was answered; the cell is guarded on cardReps > 0 and shows
+    // '-' in that case, so the fallback is never rendered.
+    const retention = retentionPercent(remembered, summary.cardReps) ?? 0;
 
     const headerStyle: React.CSSProperties = {
         display: 'grid',
@@ -1602,7 +1599,7 @@ function SummaryCard({ summary }: { summary: SummaryStats }) {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                     {summary.cardReps > 0 ? (
-                        <span style={{ color: retentionColor(retention), fontWeight: 600 }}>
+                        <span style={{ color: retentionColorHex(retention), fontWeight: 600 }}>
                             {retention.toFixed(0)}%
                         </span>
                     ) : (
@@ -1694,7 +1691,7 @@ function HierarchyRow({
     const a = node.aggr;
     const totalTimeMs = a.cardTimeMs + a.incRemTimeSec * 1000;
     const remembered = Math.max(0, a.cardReps - a.cardForgot);
-    const retention = a.cardReps > 0 ? (remembered / a.cardReps) * 100 : 0;
+    const retention = retentionPercent(remembered, a.cardReps) ?? 0;
     const isStructural = !node.selfData;
 
     // Subtle per-level shading so the eye can follow the hierarchy. Uses a neutral
@@ -1816,7 +1813,7 @@ function HierarchyRow({
             </div>
             <div style={{ textAlign: 'right' }}>
                 {a.cardReps > 0 ? (
-                    <span style={{ color: retentionColor(retention), fontWeight: 600 }}>
+                    <span style={{ color: retentionColorHex(retention), fontWeight: 600 }}>
                         {retention.toFixed(0)}%
                     </span>
                 ) : (

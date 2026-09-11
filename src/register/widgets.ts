@@ -2,6 +2,42 @@ import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sd
 import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 
+/* RemNote wraps each location widget as
+     div.fade-in-first-load.rn-queue__widget-below-top-bar > div > iframe
+   inside .rn-queue, which carries .queue-beautiful-box only in the Beautiful
+   variant. Registering anything at QueueBelowTopBar also drops RemNote's own
+   h-2 spacer there (it renders only when the location is empty), so the wrapper
+   keeps that 0.5rem in both variants. The hidden iframe is also how the widget
+   learns it is in Compact mode (useHostShown in queue_beautiful_bar.tsx).
+
+   In Beautiful the wrapper leaves the flow and overlays the box's top-right
+   corner: the box already opens with 40px of blank space (that 0.5rem spacer +
+   the card content's pt-8) above the breadcrumbs, and the ~36px badge row fits
+   inside it. In flow it stacked on top of that blank space instead. The spacer
+   moves to the next sibling so the card sits exactly where RemNote puts it.
+   The width cap keeps the transparent iframe from swallowing clicks across the
+   whole strip when the card content scrolls under it. */
+const QUEUE_BEAUTIFUL_BAR_CSS = `
+  .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) {
+    min-height: 0.5rem;
+    flex-shrink: 0;
+  }
+  .rn-queue:not(.queue-beautiful-box) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"] {
+    display: none;
+  }
+  .queue-beautiful-box > .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: min(360px, 60%);
+    min-height: 0;
+    z-index: 5;
+  }
+  .queue-beautiful-box > .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) + * {
+    margin-top: 0.5rem;
+  }
+`;
+
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
 
@@ -163,6 +199,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Beautiful queue variant: it renders no QueueToolbar, so the two widgets
+  // above never mount. This one carries both at QueueBelowTopBar (top of the
+  // card box), which both variants render — the CSS below hides it in Compact.
+  plugin.app.registerWidget('queue_beautiful_bar', WidgetLocation.QueueBelowTopBar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+  await plugin.app.registerCSS('queue-beautiful-bar', QUEUE_BEAUTIFUL_BAR_CSS);
+
   plugin.app.registerWidget('review_document_creator', WidgetLocation.Popup, {
     dimensions: {
       width: 500,
@@ -317,10 +364,10 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // Repetition history popup for Answer Buttons
   plugin.app.registerWidget('repetition_history', WidgetLocation.Popup, {
     dimensions: {
-      // 440px (was 380) so the header fits Show Aggregated + Add session + close
-      // on one line, and the history grid keeps its column widths beside the
-      // per-row edit/delete actions.
-      width: '440px',
+      // 500px (was 440, was 380) so the header fits Show Aggregated + Cards
+      // History + Add session + close, and the history grid keeps its column
+      // widths beside the per-row edit/delete actions.
+      width: '500px',
       height: 'auto',
     },
   });

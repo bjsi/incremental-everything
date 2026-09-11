@@ -167,7 +167,9 @@ export async function applyEnablement(
         try {
           const rem: any = await plugin.rem.findOne(touched[i]);
           if (rem) {
-            await setCardPriority(plugin, rem, opts.cardPriority, 'manual');
+            await setCardPriority(plugin, rem, opts.cardPriority, 'manual', false, {
+              event: 'enablement',
+            });
             await updateCardPriorityCache(plugin, touched[i]);
           }
         } catch (e) {

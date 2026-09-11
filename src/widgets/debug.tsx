@@ -2363,17 +2363,41 @@ function Debug() {
         `   cards: ${report.cardsViaGetAll} in the card table, ${report.cardsViaGetCards} surfaced by rem.getCards()\n` +
         `   DisableCards on this rem: ${report.disableCardsOwn}\n` +
         `   cloze ids in the rem text: ${report.clozeIds.length ? report.clozeIds.join(', ') : '(none)'}, hasBackText=${report.hasBackText}\n` +
+        `   disabled cloze ids (derived): ${report.disabledClozeIds.length ? report.disabledClozeIds.join(', ') : '(none)'}` +
+        (report.clozeReadingMaskedByRemWideCause
+          ? ' — NOT CONCLUSIVE: a Rem-wide cause below is hiding every card, so this list is a lower bound'
+          : report.allClozesDisabled
+            ? ' — ALL of them, i.e. the state /Disable All Cloze Cards leaves behind'
+            : '') +
+        `\n` +
         `   isTable=${report.isTableOwn}, inTable=${report.inTable}\n` +
         `   raw card fields: ${report.rawCardKeys.join(', ')}\n` +
         `   disabling ancestor: ${disablingAncestor ? `${disablingAncestor.remId} — ${disablingAncestor.text}` : 'none'}\n` +
         `   paused deck ancestor: ${pausedAncestor ? `${pausedAncestor.remId} — ${pausedAncestor.text}` : 'none'}`
     );
+    if (report.disabledClozeIds.length > 0 && !report.clozeReadingMaskedByRemWideCause) {
+      // Said in full every time it fires: this is the one state in the probe
+      // that no button in this plugin can undo, and the natural next move —
+      // switching cards back on for the Rem — writes `forget: false` and leaves
+      // the disabled-cloze list exactly as it was.
+      console.log(
+        `   ⚠️ RemNote stores these in the Rem's \`dci\` field, which plugins can neither read ` +
+          `nor write (the SDK's Rem serializer drops it; the rem bridge has no cloze accessor). ` +
+          `The list above is DERIVED: a card record exists for the cloze, the markup is still in ` +
+          `the text, and rem.getCards() omits it. Switching cards ON for this Rem will NOT clear ` +
+          `it — run /Enable All Cloze Cards inside RemNote, or click the greyed cloze and choose ` +
+          `"Enable this card".`
+      );
+    }
     console.table(report.cards);
     console.table(report.ancestors);
     await plugin.app.toast(
       `${report.cardsViaGetAll} card record(s), ${report.cardsViaGetCards} surfaced. ` +
         `enablePractice=${report.enablePractice}, direction=${report.practiceDirection}` +
         (disablingAncestor ? ', disabled by ancestor' : '') +
+        (report.disabledClozeIds.length && !report.clozeReadingMaskedByRemWideCause
+          ? `. ${report.allClozesDisabled ? 'ALL' : report.disabledClozeIds.length} cloze(s) switched off — only /Enable All Cloze Cards undoes that`
+          : '') +
         '. See console.'
     );
   };

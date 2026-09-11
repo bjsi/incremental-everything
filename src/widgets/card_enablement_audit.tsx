@@ -24,6 +24,7 @@ import {
   PracticeDirection,
   ScanProgress,
   VERDICT_LABELS,
+  VERDICT_REMEDY,
   VERDICT_SHORT,
   auditCardEnablement,
   emptyCounts,
@@ -44,9 +45,11 @@ const VERDICT_ORDER: EnablementVerdict[] = [
   'direction-none',
   'practice-off',
   'in-table',
+  'clozes-disabled',
   'not-surfaced',
   'disabled-by-ancestor',
   'in-paused-deck',
+  'clozes-partly-disabled',
   'ok',
   'no-card-material',
 ];
@@ -55,6 +58,8 @@ const VERDICT_COLOR: Record<EnablementVerdict, string> = {
   'direction-none': '#DC2626',
   'practice-off': '#EA580C',
   'in-table': '#CA8A04',
+  'clozes-disabled': '#DB2777',
+  'clozes-partly-disabled': '#9D174D',
   'not-surfaced': '#9333EA',
   'disabled-by-ancestor': '#0891B2',
   'in-paused-deck': '#2563EB',
@@ -62,7 +67,10 @@ const VERDICT_COLOR: Record<EnablementVerdict, string> = {
   'no-card-material': '#6B7280',
 };
 
-const GRID = '28px minmax(0, 1fr) 64px 78px 92px 132px';
+/** Verdicts whose only cure is a command inside RemNote itself. */
+const CLOZE_VERDICTS: EnablementVerdict[] = ['clozes-disabled', 'clozes-partly-disabled'];
+
+const GRID = '28px minmax(0, 1fr) 64px 78px 108px 132px';
 
 const subtle: React.CSSProperties = {
   color: 'var(--rn-clr-content-secondary)',
@@ -168,6 +176,13 @@ function CardEnablementAudit() {
 
   const counts = result?.counts ?? emptyCounts();
 
+  // Rems held off by RemNote's disabled-cloze list. Called out on its own
+  // because it is the one finding here with no button: the list is unreadable
+  // AND unwritable from a plugin, and the obvious remedy — "Switch cards ON" —
+  // silently does nothing to it.
+  const clozeOffCount = counts['clozes-disabled'];
+  const clozePartCount = counts['clozes-partly-disabled'];
+
   const visibleRows = useMemo(() => {
     const rows = (result?.rows ?? []).filter((r) => filter.has(r.verdict));
     return rows.sort((a, b) => {
@@ -238,11 +253,17 @@ function CardEnablementAudit() {
       return;
     }
     const enabling = action.kind === 'set-practice' ? action.enabled : action.direction !== 'none';
+    const selectedClozeOff = selectedRows.filter((r) => CLOZE_VERDICTS.includes(r.verdict)).length;
     const warn =
       selectedUnfixable.length > 0
         ? `\n\n${selectedUnfixable.length} of them are disabled by something this panel does not ` +
           `change (an ancestor, a paused deck, or a per-card switch). Writing the flag will not ` +
-          `make those produce cards.`
+          `make those produce cards.` +
+          (selectedClozeOff > 0
+            ? `\n\n${selectedClozeOff} of those have their clozes switched off in RemNote's own ` +
+              `disabled-cloze list. No plugin can write that list, and switching cards ON does ` +
+              `NOT clear it — run /Enable All Cloze Cards on those Rems inside RemNote instead.`
+            : '')
         : '';
     const flood = enabling
       ? `\n\nThis can create up to ~${selectedRows.length * (direction === 'both' && actionKind === 'direction' ? 2 : 1)} new cards, all due immediately.`
@@ -484,6 +505,24 @@ function CardEnablementAudit() {
             </span>
           </div>
 
+          {(clozeOffCount > 0 || clozePartCount > 0) && (
+            <div
+              className="text-xs p-2 rounded"
+              style={{ background: '#FCE7F3', color: '#9D174D', lineHeight: 1.5 }}
+            >
+              <strong>
+                {clozeOffCount > 0
+                  ? `${clozeOffCount} Rem(s) produce nothing because every cloze on them is switched off`
+                  : `${clozePartCount} Rem(s) have some clozes switched off`}
+              </strong>
+              {clozeOffCount > 0 && clozePartCount > 0 && `, and ${clozePartCount} more have some of them off`}
+              . RemNote keeps that list on the Rem itself, and no plugin can read or write it — this
+              panel infers it from the card records. <strong>Switching cards ON will not clear it.</strong>{' '}
+              Click a row below to open the Rem, then run <code>/Enable All Cloze Cards</code> there —
+              or click a greyed cloze and choose “Enable this card”.
+            </div>
+          )}
+
           <div style={{ ...panel, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <div
               className="text-xs"
@@ -609,7 +648,7 @@ function CardEnablementAudit() {
               <div className="text-xs" style={{ color: '#B45309' }}>
                 {selectedUnfixable.length} selected Rem(s) are held off by something these two
                 switches do not change — an ancestor’s “Disable Descendant Cards”, a paused deck,
-                or a per-card switch. Writing the flag will not make them produce cards.
+                or a switched-off cloze. Writing the flag will not make them produce cards.
               </div>
             )}
 
@@ -704,12 +743,22 @@ function Row({
       <div style={{ padding: '4px 6px', ...subtle }}>
         {row.surfaced}/{row.records}
         {row.clozeCount > 0 ? ` · ${row.clozeCount}c` : ''}
+        {row.disabledClozeIds.length > 0 && (
+          <span
+            title={`${row.disabledClozeIds.length} of this Rem's ${row.clozeCount} cloze(s) are switched off in RemNote's disabled-cloze list`}
+            style={{ color: '#DB2777', fontWeight: 600 }}
+          >
+            {' '}
+            ({row.disabledClozeIds.length} off)
+          </span>
+        )}
       </div>
       <div style={{ padding: '4px 6px' }}>
         <span
           title={
             VERDICT_LABELS[row.verdict] +
-            (row.disablingAncestorText ? ` — ${row.disablingAncestorText}` : '')
+            (row.disablingAncestorText ? ` — ${row.disablingAncestorText}` : '') +
+            (VERDICT_REMEDY[row.verdict] ? `\n\n${VERDICT_REMEDY[row.verdict]}` : '')
           }
           style={{
             color: VERDICT_COLOR[row.verdict],

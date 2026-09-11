@@ -20,6 +20,28 @@ import {
   priorityShieldGraphPrefsKey,
 } from '../lib/consts';
 import dayjs from 'dayjs';
+import { IE_DOCS_BASE_URL } from '../lib/settings';
+
+const DOCS_PATH = 'Prioritization-%26-Sorting/#priority-shield-history';
+
+/**
+ * Opens the docs section for this graph. `window.open` is blocked in some
+ * embedded contexts, so fall back to a synthesised anchor click — same helper
+ * shape as the IE Settings popup.
+ */
+const openDocs = () => {
+  const url = `${IE_DOCS_BASE_URL}${DOCS_PATH}`;
+  const opened = window.open(url, '_blank');
+  if (!opened || opened.closed) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => document.body.removeChild(link), 100);
+  }
+};
 
 interface ShieldHistoryEntry {
   absolute: number | null;
@@ -675,6 +697,22 @@ function PriorityShieldGraph() {
     <div className="p-4 flex flex-col" style={{ width: '1030px' }}>
       <div className="flex flex-col items-center mb-6 relative">
         <h3 className="text-lg font-bold">Priority Shield History</h3>
+        <button
+          onClick={openDocs}
+          title="Open the documentation for Priority Shield History"
+          className="rounded-full w-6 h-6 flex items-center justify-center hover:opacity-75"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            border: '1px solid var(--rn-clr-border-opaque, rgba(128,128,128,0.3))',
+            color: 'var(--rn-clr-content-secondary)',
+            background: 'transparent',
+            cursor: 'pointer',
+          }}
+        >
+          ?
+        </button>
         <div className="flex items-center gap-4 mt-2 text-sm flex-wrap justify-center" style={{ color: 'var(--rn-clr-content-secondary)' }}>
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
             <input

@@ -112,6 +112,52 @@ Verified in both directions on the same card: with the cloze present the probe r
 `collectClozeIds()` and `markupStillPresent()` in
 [`src/lib/card_analytics_export.ts`](src/lib/card_analytics_export.ts) implement this.
 
+#### Where RemNote actually keeps it: `dci`
+
+Read out of the desktop bundle (`/Applications/RemNote.app/Contents/Resources/app.asar`), not
+inferred. Disabled clozes live in one field on the **Rem** document — `DISABLED_CLOZE_IDS`,
+serialized as `dci`, a plain array of cloze ids:
+
+```js
+isClozeIdEnabled(e) { return !this['dci']?.includes(e) }
+
+isCardTypeEnabledAndRemEnabled(e) {
+  return !this.isEntireRemCardsDisabled() &&
+    (e === FORWARD  ? !this[DISABLE_FORWARD_CARD]
+     : e === BACKWARD ? this[ENABLE_BACK_SR]
+     : this.isClozeIdEnabled(e))          // ← clozes
+}
+```
+
+Three consequences, each of which cost us a wrong assumption at some point:
+
+1. **There is no "all clozes disabled" state.** RemNote's `/Disable All Cloze Cards` command is
+   `update({ dci: clozeIdentifiersInText(text) })` and `/Enable All Cloze Cards` is
+   `update({ dci: [] })`. Disabling every cloze and disabling one cloze are the same state at
+   different lengths, which is why nothing new shows up on a Rem the user ran Disable All on.
+2. **`dci` is orthogonal to `forget`.** RemNote's own `/Enable Cards` is `update({ forget: false })`
+   and touches nothing else, and the plugin bridge's `setEnablePractice` is literally
+   `update({ forget: !enabled })`. So a Rem whose clozes are all in `dci` **stays cardless after
+   being switched back on**, from our UI or RemNote's.
+3. **No plugin can read or write it.** The SDK's Rem serializer copies a fixed field list
+   (`_id`, `parent`, `children`, `type`, `text`, `backText`, `createdAt`, `updatedAt`,
+   `localUpdatedAt`) and drops everything else; the host's rem bridge is a closed registry of
+   named handlers with no cloze accessor and no generic document write; and its `getCards`
+   handler is hardcoded to `getCards({ ignorePausing: false })` — there is no `includeDisabled`
+   escape hatch. MCP `read_docs_raw` does not expose it either.
+
+So the state is **derived**, by `derivedDisabledClozeIds()` in
+[`src/lib/card_analytics_export.ts`](src/lib/card_analytics_export.ts): a cloze id is in `dci`
+when it is still in the text **and** owns a card record **and** that record is absent from
+`rem.getCards()`. The markup test excludes an edited-away cloze; requiring a record excludes a
+cloze whose card was never generated. Every Rem-wide cause (practice off, a disabling ancestor,
+a paused deck, a table) must be ruled out first — each of them drops *all* the Rem's cards from
+`getCards()` and would otherwise make every cloze look hand-disabled.
+
+The audit reports this as the `clozes-disabled` verdict (all of them, nothing surfacing) or
+`clozes-partly-disabled` (still producing cards, some clozes off). Neither is actionable from
+the plugin; both carry the remedy text in `VERDICT_REMEDY`.
+
 ## Paused decks are a SECOND axis, orthogonal to `nextRepetitionTime`
 
 Every other state on this page ends with `nextRepetitionTime === null`. Pausing does not.
@@ -169,6 +215,9 @@ someone made, and the only one of the two worth a user's attention).
   own Rem; that does not make it an orphan.
 - **`taggedRem()` on built-in powerups** — membership is not enumerable for RemNote built-ins;
   probe with `hasPowerup` from the Rem's side instead.
+- **Enabling a Rem to bring back its clozes.** `setEnablePractice(true)` writes `forget` and
+  nothing else, so it leaves `dci` intact and the Rem keeps producing nothing. Reporting a
+  switched-off cloze as something this plugin can fix is the actual bug to avoid here.
 
 ## Classification order
 
@@ -189,6 +238,23 @@ The ancestor walk must **fold bottom-up**: memoize per node the facts of the cha
 node upward*, or a tag found near the leaf leaks onto the ancestors above it, and a cache hit
 higher up erases a tag already found below it. Nearest Deck wins for pause (an active sub-deck
 under a paused one is not paused); Disable-Cards ORs upward.
+
+### The Rem-driven order is separate
+
+`classifyRow()` in `src/lib/card_enablement/scan.ts` answers the same question one Rem at a time
+(the audit), and its order is not the same list — a Rem with no card material is the majority
+case and is dismissed first, and the two cloze verdicts sit at the end because they can only be
+claimed once every Rem-wide cause is gone:
+
+1. `no-card-material` — no back side, no clozes, no records
+2. `disabled-by-ancestor`
+3. `in-table` (before the deliberate switch-off: table rows ship with cards off)
+4. `practice-off` — the Rem's own toggle or its own Disable-Cards tag
+5. `direction-none`
+6. surfacing at all ⇒ `in-paused-deck` / `clozes-partly-disabled` / `ok`
+7. `in-paused-deck`
+8. `clozes-disabled` — every cloze in `dci` and no back side to explain anything else
+9. `not-surfaced` — nothing above decided it
 
 ## One population: deferred work still counts
 
@@ -281,5 +347,10 @@ card does not un-practise it.
 - Ancestor-level: remove the Disable Descendant Cards powerup from the ancestor — **this flips
   the entire subtree at once**, so it needs an explicit confirmation and a count of what it will
   affect.
-- Single cloze card: no SDK write is known for re-enabling one card; it is done in the queue UI.
+- Single cloze card, or every cloze at once: **impossible from a plugin** — see `dci` above. Not
+  "no write is known": the field is absent from the SDK's Rem serializer and from the host's rem
+  bridge in both directions. Nor does `setEnablePractice(true)` help, since that writes only
+  `forget`. The user has to run RemNote's own `/Enable All Cloze Cards` on the Rem, or click the
+  greyed cloze and choose "Enable this card". Every surface that can report this state must say
+  so rather than offering a button.
 - Note that re-enabling in bulk makes every affected card due immediately.

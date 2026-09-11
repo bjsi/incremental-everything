@@ -461,6 +461,14 @@ export const pendingIntervalBatchSaveKey = 'pendingIntervalBatchSave';
 // in the index widget also means the writes survive popup teardown and can be wrapped
 // in the plugin_operation_active / incRemBatchActive suppression flags.
 export const pendingIncRemCreateTailKey = 'pendingIncRemCreateTail';
+// Rem ids that were made Incremental moments ago and whose priority popup is about
+// to open (extract-with-priority, Toggle Incremental, the PDF/HTML/video highlight
+// "Create IncRem" flows). The popup reads this list once on mount, clears it, and
+// echoes the matching ids back in its save job as `foldRemIds` — telling the tracker
+// to fold the chosen priority/interval INTO the 'madeIncremental' marker rather than
+// appending a separate 'rescheduledInEditor' entry. Cleared on mount so a later
+// reschedule of the same rem (Opt+P, Ctrl+J) is still recorded as its own event.
+export const creationFoldRemIdsKey = 'creationFoldRemIds';
 // Delta queue for quick increase/decrease priority commands.
 // Each keypress APPENDS a delta entry here; the tracker drains them all atomically.
 // This prevents the last-write-wins race that plagued the single-slot pendingPrioritySaveKey approach.

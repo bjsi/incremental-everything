@@ -268,6 +268,14 @@ Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused s
 - Cards stay in the drill until you rate them **Good** or **Easy** inside the Mastery Drill.
 - A periodic notification widget appears in the Left Sidebar when ≥ 10 cards are pending, with a motivational phrase and a direct *Start Drill* button.
 
+!!! warning "Known limitation — [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters)"
+    Inside a cluster, RemNote reports only the **cluster anchor** to plugins: the visible sibling advances on screen, but the card identity the plugin receives stays on the first one. The Mastery Drill inherits two consequences from that, both verified by measurement:
+
+    - **Sibling ratings mostly don't reach the drill.** Rate the first sibling *Good* and later siblings *Forgot*/*Hard* and nothing is added; rate several siblings *Forgot*/*Hard* and only the first one is added. In practice the drill tracks the anchor of a cluster and nothing else.
+    - **The per-card toolbar actions target the anchor.** On siblings 2 and beyond, *Remove from Drill*, *Edit Later*, *Go to Rem*, *Edit Current* and the priority badge act on the anchor rather than on the card you are looking at.
+
+    This is a limitation of what RemNote exposes, not something the plugin can work around, and it is left as-is: clusters rarely reach a drill queue, and the failure mode is an under-populated drill — never a wrong rating, and never a lost repetition. Everything outside clusters is unaffected.
+
 ### Why Use It
 
 Use the Mastery Drill to review only items you struggled with recently, ensuring you master them before they fall back into the scheduled queue. Working in a difficult-only mode puts your brain on an emergency alertness level — you approach repetitions differently when recall failure is expected, which is often enough to finally wrap your mind around harder material.

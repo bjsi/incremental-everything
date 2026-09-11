@@ -69,13 +69,20 @@ export interface FSRSState {
     nextD: { again: number; hard: number; good: number; easy: number };
     /** Stability Increase ratio (nextS / currentS) for each recall grade */
     sInc: { hard: number; good: number; easy: number };
-    /** Stability in days after grading with each recall grade */
-    nextS: { hard: number; good: number; easy: number };
     /**
-     * Interval in days each recall grade would schedule, at `requestedRetention`.
+     * Stability in days after grading.
+     *
+     * `again` is included even though it is not a recall grade and therefore has
+     * no `sInc`: a lapse does not multiply stability, it replaces it, via the
+     * post-lapse formula. It is here because anything offering the four answer
+     * buttons has to be able to say what Again would cost.
+     */
+    nextS: { again: number; hard: number; good: number; easy: number };
+    /**
+     * Interval in days each grade would schedule, at `requestedRetention`.
      * Equals `nextS` only when the requested retention is the 90% FSRS default.
      */
-    nextInterval: { hard: number; good: number; easy: number };
+    nextInterval: { again: number; hard: number; good: number; easy: number };
     /**
      * U-Factor (Used-Interval Increase) ratio for each recall grade:
      * nextInterval / usedInterval, where usedInterval is the actual elapsed
@@ -340,7 +347,17 @@ export function computeFSRSState(
         easy: computeSInc(RATINGS.easy),
     };
 
+    // Again is computed directly rather than as a multiple of finalS: a lapse
+    // takes the post-FORGET path, which is not a ratio applied to the current
+    // stability (that is what `sInc` is, and why Again has none). In the
+    // short-term states the same short-term formula covers all four ratings.
+    const nextSAgain =
+        state === 'learning' || state === 'relearning'
+            ? nextShortTermStability(w, finalS, RATINGS.again, is21w)
+            : nextForgetStability(w, finalD, finalS, r);
+
     const nextS = {
+        again: nextSAgain,
         hard: finalS * sInc.hard,
         good: finalS * sInc.good,
         easy: finalS * sInc.easy,
@@ -350,6 +367,7 @@ export function computeFSRSState(
     // retention the scheduler shortens (or lengthens) it by this factor.
     const intervalFactor = intervalFactorForRetention(requestedRetention, DECAY_VAL, FACTOR_VAL);
     const nextInterval = {
+        again: nextS.again * intervalFactor,
         hard: nextS.hard * intervalFactor,
         good: nextS.good * intervalFactor,
         easy: nextS.easy * intervalFactor,

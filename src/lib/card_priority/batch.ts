@@ -14,6 +14,7 @@ import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { isPowerupPropertySafe } from '../powerupSlotFilter';
 import { CardPriorityInfo, PrioritySource } from './types';
 import { clearRawCardPriority, getRawCardPriorityString } from './slot_access';
+import { clearCardPriorityHistory } from '../priority_history';
 import { calculateNewPriority, setCardPriority } from './index';
 import { loadPersistedCardPriorities } from './persistence';
 import * as _ from 'remeda';
@@ -158,6 +159,11 @@ export async function stripCardPriorityTag(rem: PluginRem, plugin?: RNPlugin): P
     await clearRawCardPriority(rem, plugin);
     await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
     await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
+    // The priority history goes with the tag for the same reason the value
+    // does: it describes a priority this rem no longer has, and leaving it
+    // behind would have a re-tagged rem open its history popup on a previous
+    // life's changes.
+    await clearCardPriorityHistory(rem);
   } catch (e) {
     console.log(`Warning: Could not clear slots for rem ${rem._id}:`, e);
   }
@@ -1108,6 +1114,7 @@ export async function removeCardPriorityFromRem(plugin: RNPlugin, rem: PluginRem
       await clearRawCardPriority(rem); // both priority slots, visible and hidden
       await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
       await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
+      await clearCardPriorityHistory(rem);
     } catch (e) {}
     
     console.log(`[CardPriority Cleanup] SUCCESS. Removed powerup and ${removedSlotsCount} slots: [${removedChildIds.join(', ')}]`);

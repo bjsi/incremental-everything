@@ -41,8 +41,11 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Dismiss Incremental Rem](Getting-Started.md#dismissing-an-incremental-rem-dismiss-button)** (`Ctrl+D`) — `quick: dis`
   Equivalent to clicking the "[Dismiss](Reviewing-Items-in-the-Queue.md#dismiss)" button. Removes the Incremental and transfers its history to the Dismissed powerup.
 
-- **[Open Repetition History](Getting-Started.md#repetition-history-statistics)** (`Ctrl+Shift+H`) — `quick: his`
-  Displays a comprehensive history popup. For Incremental Rems, opens the [IncRem Repetition History](Getting-Started.md#repetition-history-statistics). For regular flashcards, opens the [Flashcard Repetition History](Reviewing-Items-in-the-Queue.md#flashcard-repetition-history).
+- **[Transfer Incremental Data to Parent Rem](Create-Incremental-Rem-from-PDF-Highlights.md#transfer-to-parent)** — `quick: ttp`
+  Hands everything that makes this Rem incremental to its **parent**: priority, next-repetition date, the date it was first made incremental, the **whole repetition history** and the PDF/read-point reading state. The data is *moved*, not recreated, so the interval progression continues instead of restarting; the source Rem stops being incremental and its text, children and flashcards are left alone. Use it when an extract ended up under the outline heading that should have been the incremental item. A **🔀 Transferred from …** marker closes the moved history, naming where it came from. Works in the editor (focused Rem) and in the queue (item under review), and asks for confirmation first, naming both Rems and counting what moves. It refuses when the parent is **already** an Incremental Rem — dismiss it first (`Ctrl+D`), and the transfer will revive and keep that dismissed history — or when the Rem is top-level.
+
+- **[Open Repetition History](Repetition-History-and-Statistics.md)** (`Ctrl+Shift+H`) — `quick: his` — [routes](Plugin-Widgets-Reference.md#how-ctrlshifth-routes) to the IncRem, flashcard or aggregated view
+  Displays a comprehensive history popup. For Incremental Rems, opens the [IncRem Repetition History](Repetition-History-and-Statistics.md). For regular flashcards, opens the [Flashcard Repetition History](Reviewing-Items-in-the-Queue.md#flashcard-repetition-history).
 
 - **[Open Study Dashboard](Study-Dashboard.md)** — `quick: sdb`
   Opens the [Study Dashboard](Study-Dashboard.md): a filterable summary of Incremental, Dismissed, and Flashcard activity (Global or Document scope, with multiple period presets and a custom date range), plus an expandable hierarchy of every rem with activity showing total time, reps, retention, and speed, and a [Graphs tab](Study-Dashboard.md#graphs-tab) plotting reviews, time, retention, speed and the answer-grade split per day, week, month or year. Auto-detects the focused rem in the editor or the current card in the queue to use as the Document-mode root; falls back to Global mode otherwise.
@@ -112,7 +115,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Create Priority Review Document](Priority-Review-Document.md)** (`Opt+Shift+R` / `Alt+Shift+R`) — `quick: prd`
   Generate a custom document that compiles your absolute highest priority Rems mixed with standard Flashcards for subset review.
 
-- **[Clean Priority Review Documents](Priority-Review-Document.md#cleaning-a-review-document)** — `quick: cprd`
+- **[Clean Priority Review Documents](Priority-Review-Document.md#cleaning-a-review-document)** — `quick: clean`
   Scans every Priority Review Document, finds the entries whose Rem no longer has anything due — reviewed flashcards and Incremental Rems — and removes them after you confirm, per document. Documents with **no flashcards left due** are deleted outright, since incremental Rems reach your queue through the sorting criteria without needing a review document. Entries you have written notes under, and documents holding them, are never touched. Also on the **🧹** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
 
 - **[Open Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)** — `quick: sort`
@@ -361,8 +364,8 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
   Takes one anchor Rem, asks every Rem in its orbit whether it actually generates flashcards, and switches the broken ones back on in bulk.
 
   - **Four combinable scopes:** Rems **tagged with** the anchor, Rems **referencing** it, its **descendants**, and *expand each match* to add every match's own subtree — the one that reaches an imported deck, where the tag sits on the container and the cards belong to its children.
-  - **One verdict per Rem,** as clickable filter chips: `dir=none`, `practice off`, `table`, `ancestor off`, `paused deck`, `not surfaced`, `no material`, `OK`. Each row shows the cards currently **surfaced** and the card **records** that exist, which is what separates a Rem whose cards were switched off from one that never had any.
-  - **Two bulk fixes:** set the **flashcard direction** (`forward` by default, or `both` / `backward` / `none`), and switch **Enable Cards** on or off. Rows a switch cannot fix — a disabling ancestor, a paused deck, a per-card disable — are labelled as such rather than offered a button that would change the flag and nothing else.
+  - **One verdict per Rem,** as clickable filter chips: `dir=none`, `practice off`, `table`, `ancestor off`, `paused deck`, `clozes off`, `some clozes off`, `not surfaced`, `no material`, `OK`. Each row shows the cards currently **surfaced** and the card **records** that exist, which is what separates a Rem whose cards were switched off from one that never had any.
+  - **Two bulk fixes:** set the **flashcard direction** (`forward` by default, or `both` / `backward` / `none`), and switch **Enable Cards** on or off. Rows a switch cannot fix — a disabling ancestor, a paused deck, a switched-off cloze — are labelled as such rather than offered a button that would change the flag and nothing else.
   - **Undoable:** every Rem's prior flag and direction is captured before the first write, downloaded as JSON, and restorable from the panel.
   - **Optional card priority** on whatever the run enables, so the new cards enter the queue where you chose.
 

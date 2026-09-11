@@ -13,9 +13,28 @@ import { safeRemTextToString } from "../lib/pdfUtils";
 import { PriorityBadge } from "../components";
 import { InlinePriorityEditor } from "../components/InlineEditors";
 import { getIncrementalRemFromRem, IncrementalRem } from "../lib/incremental_rem";
+import { ActionItemType } from "../lib/incremental_rem/types";
+import { determineIncRemType } from "../lib/incRemHelpers";
+import { TypeBadge } from "../components";
 import { allIncrementalRemKey, pendingPrioritySaveKey } from "../lib/consts";
 
 const NUM_TO_LOAD_IN_BATCH = 30;
+
+/**
+ * Resolved item types (PDF, Web Extract, Rem…), keyed by rem id, for the whole
+ * lifetime of this sidebar.
+ *
+ * Module-level rather than component state because the list re-filters on every
+ * keystroke in the search box: without it, typing would re-resolve the type of
+ * every row it reveals. A rem's type changes only if its sources do, which is
+ * rare enough that a stale entry until the sidebar reloads is the right trade.
+ * `null` records "asked, and there is no type" (deleted rem, unresolvable
+ * source) so it is not asked again.
+ */
+const typeCache = new Map<string, ActionItemType | null>();
+
+/** How many rows are resolved before the list is re-rendered with what is known. */
+const TYPE_FLUSH_EVERY = 5;
 
 function IncrementalHistory() {
     const plugin = usePlugin();
@@ -35,6 +54,13 @@ function IncrementalHistory() {
 
     // KB-wide priority percentile map for IncRem priority badges
     const [percentileMap, setPercentileMap] = useState<Record<string, number>>({});
+
+    // Item type per rem id, filled in progressively by the resolver below.
+    const [typeMap, setTypeMap] = useState<Record<string, ActionItemType>>(() =>
+        Object.fromEntries(
+            [...typeCache.entries()].filter(([, t]) => !!t) as [string, ActionItemType][]
+        )
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -197,6 +223,67 @@ function IncrementalHistory() {
         filteredData.length - NUM_TO_LOAD_IN_BATCH * numLoaded
     );
 
+    const visibleData = React.useMemo(
+        () => filteredData.slice(0, NUM_TO_LOAD_IN_BATCH * numLoaded),
+        [filteredData, numLoaded]
+    );
+    const visibleIdsKey = visibleData.map((d) => d.remId).join(',');
+
+    // Resolve the item type of the rows on screen — ONE AT A TIME.
+    //
+    // determineIncRemType is not a cheap read: per rem it probes several powerups,
+    // resolves sources (and the source's own type), and walks up to 20 ancestors
+    // looking for a PDF. Firing that from each row's own effect would put thirty of
+    // those walks on the bridge at once, which is precisely the pattern that makes
+    // the priority-editor badges stall the editor. Sequential, cached and limited to
+    // visible rows keeps it to a trickle of reads that finish while you are reading
+    // the first entry.
+    useEffect(() => {
+        let cancelled = false;
+
+        async function resolveTypes() {
+            const pending = [...new Set(visibleData.map((d) => d.remId))].filter(
+                (id) => !typeCache.has(id)
+            );
+            if (pending.length === 0) return;
+
+            let batch: Record<string, ActionItemType> = {};
+            const flush = () => {
+                if (Object.keys(batch).length === 0) return;
+                const staged = batch;
+                batch = {};
+                setTypeMap((prev) => ({ ...prev, ...staged }));
+            };
+
+            for (let i = 0; i < pending.length; i++) {
+                if (cancelled) return;
+                const remId = pending[i];
+                let resolved: ActionItemType | null = null;
+                try {
+                    const rem = await plugin.rem.findOne(remId);
+                    // silent: a history row is a label, not a request to open anything —
+                    // a highlight whose PDF was deleted must not toast at the user.
+                    resolved = rem ? await determineIncRemType(plugin, rem, { silent: true }) : null;
+                } catch (e) {
+                    console.error('[IncrementalHistory] Could not resolve item type', remId, e);
+                }
+                typeCache.set(remId, resolved);
+                if (resolved) batch[remId] = resolved;
+
+                // Re-render in batches: a setState per row would re-render the whole
+                // list (and every RemViewer in it) thirty times.
+                if ((i + 1) % TYPE_FLUSH_EVERY === 0 && !cancelled) flush();
+            }
+
+            if (!cancelled) flush();
+        }
+
+        resolveTypes();
+        return () => {
+            cancelled = true;
+        };
+    }, [plugin, visibleIdsKey]);
+
     return (
         <div
             className="h-full w-full overflow-y-auto rn-clr-background-primary"
@@ -230,7 +317,7 @@ function IncrementalHistory() {
                     Study or create Incremental Rems to see your history here.
                 </div>
             )}
-            {filteredData.slice(0, NUM_TO_LOAD_IN_BATCH * numLoaded).map((data) => (
+            {visibleData.map((data) => (
                 <HistoryItem
                     data={data}
                     remId={data.remId}
@@ -239,6 +326,7 @@ function IncrementalHistory() {
                     toggleOpen={() => toggleOpen(data.key)}
                     closeIndex={() => closeIndex(data.key)}
                     percentile={percentileMap[data.remId]}
+                    incRemType={typeMap[data.remId]}
                 />
             ))}
             {numUnloaded > 0 && (
@@ -289,6 +377,7 @@ function HistoryItem({
     toggleOpen,
     closeIndex,
     percentile,
+    incRemType,
 }: {
     data: IncrementalHistoryData;
     remId: string;
@@ -296,6 +385,8 @@ function HistoryItem({
     toggleOpen: () => void;
     closeIndex: () => void;
     percentile?: number;
+    /** Resolved by the parent (see typeCache); undefined until it arrives. */
+    incRemType?: ActionItemType;
 }) {
     const plugin = usePlugin();
 
@@ -330,6 +421,7 @@ function HistoryItem({
             cardSource: 'manual',
             needsAddPowerup: false,
             triggerCascade: true,
+            event: 'editor',
         }).catch(console.error);
 
         // Optimistically reflect the change in the badge.
@@ -369,11 +461,17 @@ function HistoryItem({
                     />
                 </div>
                 <div className="flex-grow min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
+                    {/* flex-wrap: with two event badges, a type badge and a priority
+                        badge this row can outgrow a narrow sidebar — wrapping keeps the
+                        priority badge readable instead of squeezing the labels. */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                         <EventBadge eventType={data.eventType} />
                         {data.eventType === 'reviewed' && data.wasDismissed && (
                             <EventBadge eventType="dismissed" />
                         )}
+                        {/* What kind of item this is (PDF, Web Extract, Rem…). Absent
+                            while it resolves, and for rems that no longer exist. */}
+                        <TypeBadge type={incRemType} mini />
                         {incPriority !== null && (
                             <span
                                 onClick={(e) => {

@@ -729,6 +729,7 @@ Two results are worth knowing in advance:
 
 *   **`enablePractice=false` with `practiceDirection=forward`** is normal. RemNote's UI shows *Flashcard Direction: None* for a Rem with practice off, but the stored direction is untouched — so the direction never proves a card is disabled.
 *   **`inTable=true`** means the Rem is a table row or cell. Those ship with cards off and are not an oversight.
+*   **`disabled cloze ids (derived)`** lists the clozes RemNote has switched off. It says *derived* because RemNote keeps that list on the Rem and exposes it to no plugin — the probe works it out from the cards that exist but never surface. When another cause is already hiding every card on the Rem it says **NOT CONCLUSIVE** instead, since that would make every cloze look switched off. To undo it, run RemNote's `/Enable All Cloze Cards` on the Rem; switching cards back on does not clear it.
 
 ### Card ownership probe
 

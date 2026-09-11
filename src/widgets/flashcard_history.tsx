@@ -361,6 +361,7 @@ function HistoryItem({
             cardSource: 'manual',
             needsAddPowerup: !hasPowerup,
             triggerCascade: true,
+            event: 'editor',
         }).catch(console.error);
 
         // Optimistically reflect the change in the badge.

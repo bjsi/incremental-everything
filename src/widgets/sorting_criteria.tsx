@@ -17,6 +17,28 @@ import {
 import { useState, useEffect } from 'react';
 import { noIncRemTimerKey } from '../lib/consts';
 import { formatCountdown } from '../lib/utils';
+import { IE_DOCS_BASE_URL } from '../lib/settings';
+
+const DOCS_PATH = 'Prioritization-%26-Sorting/#sorting-criteria';
+
+/**
+ * Opens the docs section for this popup. `window.open` is blocked in some
+ * embedded contexts, so fall back to a synthesised anchor click — same helper
+ * shape as the IE Settings popup.
+ */
+const openDocs = () => {
+  const url = `${IE_DOCS_BASE_URL}${DOCS_PATH}`;
+  const opened = window.open(url, '_blank');
+  if (!opened || opened.closed) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => document.body.removeChild(link), 100);
+  }
+};
 
 const MAX_CARDS = 25;
 const ONLY_INC_VALUE = 0;
@@ -208,7 +230,22 @@ export function SortingCriteria() {
         </div>
       )}
 
-      <div className="text-2xl font-bold">Sorting Criteria</div>
+      <div className="flex items-center justify-between">
+        <div className="text-2xl font-bold">Sorting Criteria</div>
+        <button
+          onClick={openDocs}
+          title="Open the documentation for Sorting Criteria"
+          className="rounded-full w-6 h-6 flex items-center justify-center hover:opacity-75"
+          style={{
+            border: '1px solid var(--rn-clr-border-opaque, rgba(128,128,128,0.3))',
+            color: 'var(--rn-clr-content-secondary)',
+            background: 'transparent',
+            cursor: 'pointer',
+          }}
+        >
+          ?
+        </button>
+      </div>
       {currentKbName && (
         <div className="rn-clr-content-secondary text-sm italic mt-[-8px]">
           Knowledge Base: {currentKbName}

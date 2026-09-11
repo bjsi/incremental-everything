@@ -689,6 +689,12 @@ async function stampMetadata(plugin: RNPlugin, doc: PrdDocReport, removed: numbe
     const metadata = children.find((c) => flattenRichText(c.text).startsWith('Scope: '));
     if (!metadata) return;
 
+    const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+    const dueIncRems = doc.dueEntries.length - doc.dueFlashcards;
+    // Unjudged INC entries are kept, so they are part of what the document still
+    // holds — but calling them "due" would be a guess (see incCacheUnavailable).
+    const unchecked = doc.unknownEntries.length;
+
     const stamp =
       `\nCleaned ${new Date().toLocaleString('en-US', {
         year: 'numeric',
@@ -696,8 +702,10 @@ async function stampMetadata(plugin: RNPlugin, doc: PrdDocReport, removed: numbe
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-      })}: removed ${removed} reviewed ${removed === 1 ? 'entry' : 'entries'}, ` +
-      `${doc.dueFlashcards} flashcard${doc.dueFlashcards === 1 ? '' : 's'} still due`;
+      })}: removed ${plural(removed, 'reviewed entry', 'reviewed entries')}, ` +
+      `${plural(doc.dueFlashcards, 'flashcard', 'flashcards')} and ` +
+      `${plural(dueIncRems, 'Incremental Rem', 'Incremental Rems')} still due` +
+      (unchecked ? `, ${plural(unchecked, 'Incremental Rem', 'Incremental Rems')} not checked` : '');
 
     await metadata.setText([flattenRichText(metadata.text) + stamp]);
   } catch (e) {

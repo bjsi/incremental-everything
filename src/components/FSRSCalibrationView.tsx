@@ -20,6 +20,7 @@ import {
   computeFSRSCalibrationBreakdown,
   rBucketLabel,
 } from '../lib/fsrs_calibration';
+import { FSRSInitialStabilityPanel } from './FSRSInitialStabilityPanel';
 import { fsrsCalibrationLastPeriodKey, fsrsWeightsId } from '../lib/consts';
 import { parseWeightsString } from '../lib/fsrs';
 import { Period, resolvePeriod } from '../lib/period';
@@ -28,7 +29,7 @@ import { getIESetting } from '../lib/settings';
 
 // --- Cell merge helper ----------------------------------------------------
 // Used to fuse the (mostly empty) bottom-pR buckets of Grids A and B into a
-// single "0-40%" row. Reconstructs the underlying acc from each CellStats
+// single low-pR row. Reconstructs the underlying acc from each CellStats
 // (reps × retention/pR → retainedCount / sumPredR), sums, then re-derives.
 
 function mergeCells(cells: CellStats[]): CellStats {
@@ -49,8 +50,17 @@ function mergeCells(cells: CellStats[]): CellStats {
 
 // Number of pR rows shown individually at the top, before the merged bottom
 // bucket. The remaining (R_BUCKET_COUNT - INDIVIDUAL_TOP_ROWS) buckets get
-// folded into the "0-40%" row.
-const INDIVIDUAL_TOP_ROWS = 12; // 95-100% down to 40-45%
+// folded into one low-pR row.
+//
+// Held at a FIXED cut rather than "merge whatever is currently empty": the row
+// layout then stays identical across period changes, so two runs of the tab can
+// be read side by side. 8 keeps every bucket that realistically carries reps
+// (a scheduler targeting 90% rarely lets a card fall below ~60% predicted R)
+// and folds the rest, which would otherwise be five rows of em-dashes.
+const INDIVIDUAL_TOP_ROWS = 8; // 95-100% down to 60-65%
+
+/** Label for the folded row — derived so it cannot drift from the cut above. */
+const MERGED_ROW_LABEL = `0–${(R_BUCKET_COUNT - INDIVIDUAL_TOP_ROWS) * (100 / R_BUCKET_COUNT)}%`;
 
 // --- Formatting ----------------------------------------------------------
 
@@ -485,9 +495,9 @@ export function FSRSCalibrationView() {
 
   // Grids A and B (the pR-rowed grids) render rows in DESCENDING order of
   // predicted retrievability. The top INDIVIDUAL_TOP_ROWS buckets are shown
-  // one per row (95-100% down to 40-45%); the remaining low-pR buckets are
-  // folded into a single "0-40%" row because they're almost always empty
-  // and otherwise just waste vertical space.
+  // one per row (95-100% down to 60-65%); the remaining low-pR buckets are
+  // folded into a single MERGED_ROW_LABEL row because they're almost always
+  // empty and otherwise just waste vertical space.
   const topRowIndices = React.useMemo(
     () =>
       Array.from({ length: INDIVIDUAL_TOP_ROWS }, (_, k) => R_BUCKET_COUNT - 1 - k),
@@ -502,7 +512,7 @@ export function FSRSCalibrationView() {
     [],
   );
   const rRowLabelsDesc = React.useMemo(
-    () => [...topRowIndices.map((i) => rBucketLabel(i)), '0–40%'],
+    () => [...topRowIndices.map((i) => rBucketLabel(i)), MERGED_ROW_LABEL],
     [topRowIndices],
   );
 
@@ -685,6 +695,8 @@ export function FSRSCalibrationView() {
             colTotals={data.gridBColTotals}
             overall={data.gridBOverall}
           />
+
+          <FSRSInitialStabilityPanel data={data.initialStability} />
         </>
       )}
     </div>

@@ -387,7 +387,7 @@ The info bar includes (from left to right):
 
 Clicking the 🔬 button (or pressing `Ctrl+Shift+H`) opens a detailed popup showing the card's full review history — similar to RemNote's built-in Practice History. You can close this popup anytime by pressing `Esc`.
 
-![Flashcard Repetition History](assets/flashcard-rep-history.png){ width="900" }
+![Flashcard Repetition History](assets/flashcard-rep-history-2.png){ width="900" }
 
 **Header & Summary Information:**
 

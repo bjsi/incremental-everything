@@ -37,7 +37,9 @@ async function handleRescheduleAndPriorityUpdate(
     const incRem = await getIncrementalRemFromRem(plugin, rem);
     if (!incRem) return;
 
-    await setIncRemPriority(plugin, rem, newPriority);
+    // recordHistory: false — the reschedule entry appended below already carries
+    // this priority, and it is written from a snapshot taken before this call.
+    await setIncRemPriority(plugin, rem, newPriority, { recordHistory: false });
 
     const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
 

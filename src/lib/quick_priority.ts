@@ -10,6 +10,7 @@ import {
     getCurrentIncrementalRem,
 } from './incremental_rem';
 import { getIESetting } from './settings';
+import { PriorityChangeEvent } from './priority_history';
 
 // Module-level promise chain used as a mutex for the session-storage append.
 // All concurrent invocations of handleQuickPriorityChange chain onto this
@@ -29,6 +30,13 @@ export interface PriorityDeltaEntry {
     hasIncPowerup: boolean;
     hasCards: boolean;
     hasCardPriorityPowerup: boolean;
+    /**
+     * Which gesture queued this delta, recorded in both priority histories.
+     * The keyboard shortcut and the Priority Editor's ± buttons share this queue
+     * but are different gestures, so each names itself rather than inheriting a
+     * default from the drain side.
+     */
+    event?: PriorityChangeEvent;
 }
 
 export async function handleQuickPriorityChange(
@@ -125,6 +133,7 @@ export async function handleQuickPriorityChange(
             hasIncPowerup,
             hasCards,
             hasCardPriorityPowerup,
+            event: 'quick',
         };
         existing.push(entry);
         await plugin.storage.setSession(pendingPriorityDeltaQueueKey, existing);

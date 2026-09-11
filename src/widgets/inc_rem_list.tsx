@@ -194,7 +194,7 @@ export function IncRemList() {
 
     pendingPriorityChanges.current[remId] = newPriority;
 
-    await setIncRemPriority(plugin, rem, newPriority);
+    await setIncRemPriority(plugin, rem, newPriority, { event: 'editor' });
 
     // Update the cache
     const incRemInfo = await getIncrementalRemFromRem(plugin, rem);

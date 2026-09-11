@@ -34,7 +34,9 @@ export const handleCardPriorityInheritance = async (
             return;
         }
 
-        await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
+        await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental', false, {
+            event: 'incremental',
+        });
     } catch (error) {
         // Silently handle errors
     }

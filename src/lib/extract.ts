@@ -6,7 +6,6 @@
 // keyboard shortcuts (live selection) and the Cmd+/ Omnibar (cached selection).
 
 import {
-  BuiltInPowerupCodes,
   PluginRem,
   ReactRNPlugin,
   RICH_TEXT_FORMATTING,
@@ -20,6 +19,7 @@ import {
   REMOVE_FROM_QUEUE_POWERUP_CODE,
 } from '../register/queue_display_powerups';
 import { getEffectiveSelection } from './editor_selection';
+import { collectSourcePins } from './source_pins';
 
 export const createExtract = async (
   plugin: ReactRNPlugin,
@@ -112,52 +112,20 @@ export const createExtract = async (
     const extractRem = await plugin.rem.createRem();
     if (!extractRem) return;
 
-    // Look for a reference pin to the original PDF Highlight in the parent
-    let pdfExtractPin: any = null;
-    if (rem.text) {
-      let pdfExtractTagRem: PluginRem | undefined;
-      try {
-        pdfExtractTagRem =
-          (await plugin.rem.findByName(['pdfextract'], null)) || undefined;
-      } catch (e) {
-        // ignore
-      }
-
-      for (const item of rem.text) {
-        if (
-          typeof item === 'object' &&
-          item !== null &&
-          item.i === 'q' &&
-          item._id
-        ) {
-          const referencedRem = await plugin.rem.findOne(item._id);
-          if (referencedRem) {
-            const isPdfHighlight = await referencedRem.hasPowerup(
-              BuiltInPowerupCodes.PDFHighlight
-            );
-            let hasTag = false;
-            if (pdfExtractTagRem) {
-              const tags = await referencedRem.getTagRems();
-              hasTag = tags.some((t) => t._id === pdfExtractTagRem!._id);
-            }
-
-            if (isPdfHighlight || hasTag) {
-              // Copy the exact pin
-              pdfExtractPin = { ...item, pin: true };
-              break;
-            }
-          }
-        }
-      }
-    }
+    // Carry every reference pin the parent holds to an original reading source
+    // (PDF/web highlight), so the bridge back to the source survives each level
+    // of sub-extraction. Both sections are scanned: a pin can live on the back
+    // of a card just as well as on its front. See lib/source_pins.ts for why
+    // the criterion is keyed on the built-in highlight powerups.
+    const sourcePins = await collectSourcePins(plugin, [rem.text, rem.backText]);
 
     const newText: any[] = [
       ...selection.richText,
       { i: 'q', _id: rem._id, pin: true },
     ];
 
-    if (pdfExtractPin) {
-      newText.push(' ', pdfExtractPin);
+    for (const sourcePin of sourcePins) {
+      newText.push(' ', sourcePin);
     }
 
     await extractRem.setText(newText);

@@ -132,6 +132,8 @@ These shortcuts allow you to adjust priorities on the fly without breaking your 
 
 The step in which priorities will increase or decrease can be configured in the settings.
 
+**They leave a record.** A quick change is written to the item's history — a 🎚 [priority change marker](Repetition-History-and-Statistics.md#event-markers) for an Incremental Rem, an entry in the [priority history](Priorities-for-Flashcards.md#priority-history) for a flashcard. Holding the key to walk a priority from 80 down to 30 files **one** entry showing where it landed, not eight.
+
 **When to use:** During review sessions when you want to adjust an item's priority up or down in a predefined step without stopping.
 
 ![Quick Priority in the Editor](assets/quick-priority-editor.gif){ width="600" }
@@ -544,7 +546,7 @@ In this example, the 22.3% of items you've processed happen to be disproportiona
 
 The **Weighted Shield value** (⚖️ %) shown in the shield header is precisely this "Weight processed" figure — making it a far more meaningful measure of your learning efficiency than a simple count of items reviewed.
 
-**Card Priority × Memory Analytics Tab:**
+#### Card Priority × Memory Analytics { #card-memory-analytics }
 
 When both Incremental Rems and Cards groups are present, the wide popup exposes a second tab — **Card Priority × Memory Analytics** — that replays FSRS over every card in your knowledge base and aggregates per priority-percentile bucket. Each bucket holds an equal number of cards (deciles by inherited Rem priority, so a Rem with multiple cards contributes one entry per card), plus a consolidated **All KB** row at the bottom for comparison.
 
@@ -589,14 +591,71 @@ Press **Compute** and the tab reports a bucket × cause matrix — the same deci
 | **Cards switched off on the Rem itself** | The *Enable Cards* toggle is off on that Rem. **The one worth investigating.** |
 | **Disabled by an ancestor's "Disable Descendant Cards"** | A tag on an ancestor silences the whole subtree. |
 | **This direction is switched off on the Rem** | A forward or backward card was disabled from the queue. |
-| **This single card switched off** | One cloze disabled from the queue; its markup is still in the text. |
+| **Switched off card by card** | A cloze switched off — one at a time in the queue, or all at once with RemNote's `/Disable All Cloze Cards`. The markup is still in the text. **Only RemNote can undo it:** run `/Enable All Cloze Cards` on the Rem, or click the greyed cloze and choose *Enable this card*. Switching cards back on for the Rem does *not* clear it. |
 | **The cloze / back side this card came from is gone** | The Rem was reworded, or a cloze split or deleted, and the card record outlived its markup. |
 
 Click the number in the **off-rem** column of any bucket to open the Rems behind it. Each entry shows `front → back` with clozes marked, its ancestor breadcrumb, its priority and card count, and — where relevant — a **📚 IncRem** badge, which means practice is *expected* to be off until you decide the card is ready. Tick the ones that should be practised again and press **Re-enable**; their cards become due immediately. **↗** opens a Rem in a new browser tab, leaving the list where it was.
 
+Hovering any cause — in the list above the table or in its column header — shows what to do about it. The one with no route back through the plugin, *switched off card by card*, also gets a note of its own under the table whenever it counts anything.
+
 Anything you have looked at can be marked **✓ checked**, which is remembered across devices, shown as a count next to each bucket's off-rem number, and can be filtered out of the list — so working through a few hundred Rems over several sittings picks up where you left off.
 
 **Paused decks must be scanned before they can be counted.** Pausing a deck does not clear its cards' `nextRepetitionTime`, so without the scan those cards read as *due* everywhere. Press **⏸ Scan paused decks** in the analytics tab (one pass over the knowledge base, then cached) and the `Paused` column fills in; until then the status bar says so in as many words rather than showing a confident zero.
+
+#### FSRS Calibration { #fsrs-calibration }
+
+The **🎯 FSRS Calibration** tab asks a different question from the analytics table: not *how much work sits where*, but *is FSRS telling you the truth about your memory?* It replays FSRS over every card and compares what the model **predicted** against what actually **happened**, sliced four ways. Everything obeys the same time-period filter and **Ignore reps before last RESET** toggle as the other tabs, and it uses the weights you have set in the plugin's FSRS settings — so it scores *your* scheduler, not the defaults.
+
+Three grids compare observed retention against predicted retrievability:
+
+*   **A — Predicted R × Prior stability.** Was FSRS right about how likely you were to remember this?
+*   **B — Previous rep's predicted R × its prior stability → current R-dev.** Did passing an *overdue* rep hand the card too much stability for the next interval?
+*   **C — Previous grade × the stability that existed before it.** Does pressing Hard or Easy move the next outcome the way FSRS predicts?
+
+Each cell reports `n` reps, observed **Retention**, average **pR**, and **R-dev = Retention − pR** in percentage points — negative (red) means FSRS over-predicted, positive (blue) means you recall better than expected. Grids A and B exclude the ≤ 1 month prior-stability column, where short-term learning reps would otherwise swamp every total. Their predicted-R rows run high to low and stop at **60–65%**; everything below is folded into a single **0–60%** row, because a scheduler aiming at 90% almost never lets a card fall that far and five rows of dashes cost more than they tell you. The fold is a fixed cut, not "hide whatever is empty today", so the row layout stays comparable when you change the period — and if reps ever do land down there, the merged row shows them rather than hiding them.
+
+##### D — Initial stability (w0–w3) { #initial-stability }
+
+**w0–w3** are the stability, in days, that FSRS assigns from the very first grade a card ever gets — one value per button. They are the only parameters *not* learned by the main training loop: [fsrs-optimizer](https://github.com/open-spaced-repetition/fsrs-optimizer) derives them in a separate pass that looks at exactly one slice of your history — each card's first grade paired with the outcome of the **first review on a later calendar day**. Same-day learning steps are skipped, exactly as the optimizer drops its `delta_t == 0` rows. This panel reproduces that pass over your knowledge base, and then shows you what the optimizer does not.
+
+A card is measured **once per lifetime**: a RESET starts a fresh first exposure, so a card you have reset twice contributes twice.
+
+The summary table gives four estimates per grade, which are deliberately not the same number:
+
+| Column | What it is |
+| --- | --- |
+| **Current w** | The value your weights actually carry (floored at 0.1, as FSRS does). |
+| **Refit S₀** | The faithful reproduction of the optimizer's pass: observations grouped by exact interval, the rarest and longest groups discarded by the optimizer's outlier filter, each group's rate Laplace-smoothed one pseudo-observation toward your average recall, an L1 pull toward the stock value of `abs(S − default) / 16`, clamped to 100 days. |
+| **MLE [95% CI]** | The same fit with the L1 pull and the 100-day ceiling removed, plus a **profile-likelihood interval**. This is what the data alone supports. |
+| **Unfiltered** | The MLE refit *without* the outlier removal. |
+
+The **verdict badge** turns those into a reading:
+
+| Badge | Meaning |
+| --- | --- |
+| **calibrated** | The refit lands within 25% of the weight you are using. |
+| **S₀ too low** / **S₀ too high** | Your data wants a substantially longer / shorter first interval for this grade. |
+| **thin data** | Under 200 first exposures. The optimizer caps its solver iterations at the rep count, so on data this thin it barely moves off the stock default — and neither should you. |
+| **extrapolating** | Fewer than 5% of reps were observed at or beyond the fitted stability, so the curve is being extended past the evidence that constrains it. |
+| **unidentified** | The likelihood keeps improving all the way to the upper bound: your reviews never ran long enough to watch this grade be forgotten. The fitted value is a **floor, not an estimate**. |
+
+> [!TIP]
+> **The interval matters more than the point estimate.** The optimizer reports w0–w3 as four bare numbers and says nothing about how well-founded they are. A grade with a handful of first exposures on a curve that has no observations past two weeks is *not identified*, and the honest response is to leave the stock value alone rather than adopt a confident-looking fit. When the panel disagrees with a number the optimizer produced, check whether the optimizer's value falls inside the 95% interval — very often both are inside the range the data supports, and there is no contradiction to resolve.
+
+Below the summary, **w0–w3 this collection implies** shows the vector the optimizer would hand to its training loop, after the monotonicity repair that forces Again ≤ Hard ≤ Good ≤ Easy — a rule that **overwrites the value backed by fewer reps rather than averaging the two**, so any repair it applies is spelled out in full. Training then moves these further, held only by an L2 prior with standard deviations of 6.43 / 9.66 / 17.58 / 27.85 — a very loose leash.
+
+Finally, one **empirical forgetting curve** per grade: log-spaced interval buckets (the mass sits at 1–2 days while the long tail, which is what actually pins S₀ down, is thin) with observed retention, a **Wilson 95% interval**, the R your current weight predicts, the deviation, and the R the refit predicts. Rows marked ✕ were removed wholesale by the outlier filter before fitting, ◐ partially.
+
+> [!NOTE]
+> **Read the CI column before believing any deviation.** A −8pp miss with a ±2pp interval is real; the same miss with a ±15pp interval is noise.
+
+Two mismatches are worth knowing about, both surfaced in the panel rather than hidden:
+
+*   **Decay.** The fit runs at the optimizer's hard-wired `−0.1542`, because its initialisation pass never sees `w20`. The *Pred R (current)* column uses **your** decay. Those are two different curve families, so both are labelled rather than mixed.
+*   **Same-day steps.** Where learning steps sat between the first grade and the outcome, FSRS's own prediction has already moved off the raw `w[G]` curve. Each grade's header states what share of its outcomes that covers, and what FSRS actually predicted across them.
+
+> [!NOTE]
+> **Comparing against a fsrs-optimizer run.** Match the windows first. The optimizer's `revlog_start_date` filters whole *cards* and is recorded in the `.fsrs_optimizer` file next to its output; this tab filters *reps* by the period picker. Set the period to **All** to reproduce an unfiltered run. Remember too that the weights the optimizer prints are **post-training**, not the initialisation output this panel reproduces — the two differ by however far gradient descent moved them.
 
 #### Queue Selection Odds
 

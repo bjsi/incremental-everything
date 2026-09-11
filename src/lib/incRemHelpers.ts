@@ -1,7 +1,8 @@
 import { BuiltInPowerupCodes, RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { ActionItemType, IncrementalRem } from './incremental_rem/types';
-import { remToActionItemType } from './incremental_rem/action_items';
+import { remToActionItemType, ActionItemTypeOptions } from './incremental_rem/action_items';
 import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
+import { creationFoldRemIdsKey } from './consts';
 
 /**
  * Extract plain text from RemNote rich text format.
@@ -30,9 +31,13 @@ export function extractText(text: unknown): string {
  * Determine the type of an incremental rem (pdf, pdf-note, rem, etc).
  * Checks parent hierarchy to detect if it's a note under a PDF.
  */
-export async function determineIncRemType(plugin: RNPlugin, rem: any): Promise<ActionItemType> {
+export async function determineIncRemType(
+  plugin: RNPlugin,
+  rem: any,
+  options?: ActionItemTypeOptions
+): Promise<ActionItemType> {
   try {
-    const actionItem = await remToActionItemType(plugin, rem);
+    const actionItem = await remToActionItemType(plugin, rem, options);
     if (!actionItem) return 'unknown';
 
     let type: ActionItemType = actionItem.type;
@@ -243,4 +248,24 @@ export async function getBreadcrumbText(
   } catch (error) {
     return '';
   }
+}
+
+
+/**
+ * Flag Rems that were made Incremental moments ago, right before opening the
+ * priority popup for them.
+ *
+ * Without this, the creation flows produce TWO history entries for one user
+ * action: the 'madeIncremental' marker written by initIncrementalRem (carrying
+ * the default/inherited priority), then a 'rescheduledInEditor' entry when the
+ * popup saves the priority and interval the user actually chose. The popup reads
+ * this list once on mount and echoes the ids back to the tracker, which then
+ * rewrites the marker in place instead of appending — one entry, the chosen
+ * priority, no phantom reschedule.
+ *
+ * Call this immediately before plugin.widget.openPopup('priority_interval', ...).
+ */
+export async function markRemsAsFreshlyCreated(plugin: RNPlugin, remIds: string[]) {
+  if (!remIds || remIds.length === 0) return;
+  await plugin.storage.setSession(creationFoldRemIdsKey, remIds);
 }

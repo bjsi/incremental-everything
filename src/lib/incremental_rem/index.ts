@@ -30,6 +30,7 @@ import { mergeHistoryFromDismissed } from '../dismissed';
 import { registerRemsAsPdfKnown, registerRemsAsHtmlKnown, isHtmlSource } from '../pdfUtils';
 import { syncPriorityBand } from '../priority_bands';
 import { getIESetting } from '../settings';
+import { PriorityChangeEvent, PRIORITY_HISTORY_COALESCE_MS } from '../priority_history';
 
 type ReviewOverrideOptions = {
   /**
@@ -42,6 +43,34 @@ type ReviewOverrideOptions = {
    */
   overrideIntervalDays?: number;
 };
+
+export interface SetIncRemPriorityOptions {
+  /**
+   * Which gesture changed the priority — see lib/priority_history.ts. Recorded
+   * on the 'priorityChange' history entry this write appends.
+   */
+  event?: PriorityChangeEvent;
+  /**
+   * Suppress the 'priorityChange' history entry.
+   *
+   * Pass `recordHistory: false` from any caller that writes its OWN history
+   * entry carrying this priority — the reschedule popup, the editor review and
+   * its timer, the Priority & Interval batch save. Two reasons, and the second
+   * is the dangerous one:
+   *
+   *   1. Duplication. Their entry already says "rescheduled to 5d at priority
+   *      45"; a bare 'priorityChange' beside it says the same thing twice.
+   *   2. Clobbering. Those callers snapshot `incRem.history` BEFORE calling
+   *      here and later write `[...snapshot, theirEntry]` back. An entry
+   *      appended here in between is inside the write they are about to
+   *      overwrite, so it would vanish — silently, and only sometimes.
+   *
+   * Defaults to TRUE, so a call site added later is recorded unless it opts
+   * out. That is the direction that fails safely: a duplicate row is visible
+   * and fixable, a missing one is not.
+   */
+  recordHistory?: boolean;
+}
 
 /**
  * THE write path for an Incremental Rem's priority. Use this instead of calling
@@ -69,17 +98,147 @@ type ReviewOverrideOptions = {
  * import() emits a chunk the RemNote index sandbox evaluates as a classic script,
  * which dies on `import.meta` (see the note atop register/tracker.ts).
  * priority_bands imports only consts + card_priority/types, so there is no cycle.
+ *
+ * Since the priority history landed, it is also where a priority-only change is
+ * RECORDED — a 'priorityChange' entry in the rem's own History slot. The same
+ * argument applies: the Alt+P popup, Quick Priority and the inline list editors
+ * each used to change a priority and leave no trace of it whatsoever, and one
+ * chokepoint is the only way that stays true for the next writer. See
+ * {@link SetIncRemPriorityOptions.recordHistory} for the callers that opt out
+ * because they write a richer entry of their own.
  */
 export async function setIncRemPriority(
   plugin: RNPlugin,
   rem: PluginRem,
-  priority: number
+  priority: number,
+  options?: SetIncRemPriorityOptions
 ): Promise<void> {
+  const recordHistory = options?.recordHistory !== false;
+
+  // The state being replaced, read BEFORE the write so the entry can show the
+  // transition rather than just the destination.
+  //
+  // Two direct slot reads rather than a getIncrementalRemFromRem: this runs on
+  // every priority write, a batch tool doing hundreds in a row included, and
+  // that helper resolves the Next Rep Date's Daily Doc reference — an extra rem
+  // lookup per call for a number this entry does not need (the nextRepMs stamp
+  // already in the history is the same one). Both are `.catch`ed: a rem whose
+  // slots do not resolve still gets its priority written, it just gets a
+  // history entry with no "from" value.
+  const before = recordHistory
+    ? await Promise.all([
+        rem.getPowerupProperty(powerupCode, prioritySlotCode).catch(() => null),
+        rem.getPowerupProperty(powerupCode, repHistorySlotCode).catch(() => null),
+      ])
+    : null;
+
   await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+
+  if (before) {
+    const parsed = parseInt(String(before[0] ?? '').trim(), 10);
+    const previousPriority = Number.isNaN(parsed) ? undefined : parsed;
+    if (previousPriority !== priority) {
+      const history = tryParseJson(before[1]);
+      await appendIncRemPriorityChange(
+        rem,
+        Array.isArray(history) ? history : [],
+        previousPriority,
+        priority,
+        options?.event ?? 'other'
+      );
+    }
+  }
+
   try {
     await syncPriorityBand(plugin, rem);
   } catch (err) {
     console.error('[IncRem] band sync failed', err);
+  }
+}
+
+/**
+ * Appends a 'priorityChange' marker to an Incremental Rem's history.
+ *
+ * Writes the History slot DIRECTLY rather than going through
+ * `updateSRSDataForRem`: that helper also rewrites the Next Rep Date slot and
+ * raises the `plugin_updating_srs_data` guard, neither of which belongs to a
+ * change that touches only the priority. What it does borrow from that helper
+ * is the nextRepMs invariant — the LAST entry must carry the most recent
+ * next-rep stamp, because `getIncrementalRemFromRem` falls back to it when the
+ * Daily Doc reference does not round-trip. Appending an unstamped entry would
+ * quietly strip that fallback, so the stamp is carried forward, and it doubles
+ * as this entry's `scheduled` value.
+ *
+ * Coalesces on the same terms as the card-priority history: a second change
+ * from the SAME gesture within PRIORITY_HISTORY_COALESCE_MS replaces the first
+ * rather than appending, so holding Ctrl+Opt+↓ leaves one row showing the
+ * priority it settled on — with `previousPriority` still pointing at where the
+ * burst started, which is the number the user actually wants to see.
+ *
+ * Does NOT touch the session cache. Callers that need it refreshed already
+ * re-read the rem and call updateIncrementalRemCache (that is how they pick up
+ * the new priority); the ones that patch the cache in place instead — the batch
+ * tools — leave its `history` a beat behind, which nothing reads for scheduling
+ * or selection, and the history popups read the rem directly.
+ *
+ * Never throws: the priority write has already succeeded by the time this runs.
+ */
+async function appendIncRemPriorityChange(
+  rem: PluginRem,
+  history: IncrementalRep[],
+  previousPriority: number | undefined,
+  priority: number,
+  event: PriorityChangeEvent
+): Promise<void> {
+  try {
+    const last = history[history.length - 1];
+
+    let lastStamp: number | undefined;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (typeof history[i]?.nextRepMs === 'number') {
+        lastStamp = history[i].nextRepMs;
+        break;
+      }
+    }
+
+    const now = Date.now();
+
+    // A priority chosen moments after the rem was made Incremental belongs IN
+    // the creation marker, not beside it — the same rule the Priority & Interval
+    // batch save applies when it folds a save into 'madeIncremental'. Without
+    // this, the ordinary "make incremental → pick a priority" flow leaves a
+    // default-priority marker followed by a phantom priority change.
+    if (
+      last?.eventType === 'madeIncremental' &&
+      now - last.date <= PRIORITY_HISTORY_COALESCE_MS
+    ) {
+      const folded = [...history.slice(0, -1), { ...last, priority }];
+      await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(folded)]);
+      return;
+    }
+
+    const coalesce =
+      last?.eventType === 'priorityChange' &&
+      last.priorityEvent === event &&
+      now - last.date <= PRIORITY_HISTORY_COALESCE_MS;
+
+    const entry: IncrementalRep = {
+      date: now,
+      scheduled: lastStamp ?? now,
+      priority,
+      // Keep the burst's ORIGINAL starting priority when collapsing into the
+      // entry we are replacing.
+      previousPriority: coalesce ? last.previousPriority ?? last.priority : previousPriority,
+      eventType: 'priorityChange',
+      priorityEvent: event,
+      nextRepMs: lastStamp,
+    };
+
+    const newHistory = coalesce ? [...history.slice(0, -1), entry] : [...history, entry];
+
+    await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(newHistory)]);
+  } catch (err) {
+    console.error('[IncRem] failed to record a priority change in history', err);
   }
 }
 
@@ -452,7 +611,7 @@ export const getIncrementalRemFromRem = async (
  * it fire-and-forget so opening a popup right after extraction isn't blocked by
  * getSources + per-source powerup probes.
  */
-async function registerInKnownHostIndexes(plugin: ReactRNPlugin, rem: PluginRem) {
+export async function registerInKnownHostIndexes(plugin: ReactRNPlugin, rem: PluginRem) {
   try {
     const sources = await rem.getSources();
     const allSources = [rem, ...sources];
@@ -542,6 +701,11 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         scheduled: Date.now(),
         eventType: 'madeIncremental' as const,
         priority: Number(initialPriority), // Record priority at time of creation
+        // Interval used at creation (the Initial Interval setting, or whatever the
+        // priority popup folds in over it). Display/diagnostic only — no scheduling
+        // code reads `interval` off a history entry — but it keeps the Opt+X marker
+        // as informative as the Opt+Shift+X one.
+        interval: initialInterval,
         // Reliable fallback for the next-rep date when this rem's Daily Doc reference
         // can't be resolved on read (covers rems made incremental without a reschedule,
         // e.g. the plain "make incremental" command, especially with initialInterval 0).

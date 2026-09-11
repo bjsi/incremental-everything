@@ -49,7 +49,9 @@ const openDocs = (path: string) => {
 
 const CATEGORY_LABELS: Record<(typeof TIP_CATEGORY_ORDER)[number], string> = {
   basics: 'Basics',
+  statistics: 'Statistics',
   utilities: 'Utilities',
+  advanced: 'Advanced',
 };
 
 const formatDate = (at: number) =>

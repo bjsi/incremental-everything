@@ -1,7 +1,8 @@
-import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType, RICH_TEXT_FORMATTING } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType, RICH_TEXT_FORMATTING, BuiltInPowerupCodes, MoveUnit } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { resolveRemTextForBreadcrumb, buildAncestorBreadcrumb } from '../lib/richTextRemRefs';
 import { sanitizeRichTextForSetText } from '../lib/richTextSanitize';
+import { remHasImage } from '../lib/image_scan';
 
 // Report each step of the alias-id resolution as a toast. Off by default: the
 // picker's console lives in its own widget iframe, so toasts are the only
@@ -96,6 +97,12 @@ const fold = (s: string) =>
 // "u" — so already-canonical text is left alone.
 const canonFig = (s: string) => s.replace(/\bfig\b\.?/g, 'figure');
 
+// The opposite spelling. Only used to seed the backend search: RemNote reaches a
+// rem written "Fig. 6.4" through the phrase "fig 6.4" and never through
+// "figure 6.4" (see the phrase-seed comment in runSearch), so both spellings of
+// the whole query have to be asked for.
+const shortFig = (s: string) => s.replace(/\bfigure\b/g, 'fig');
+
 interface Candidate {
   id: string;
   name: string;
@@ -105,6 +112,17 @@ interface Candidate {
   score: number; // lower is better
   backText: string;
   breadcrumb: string;
+  // True when the rem is a PDF highlight. Its RemType is DEFAULT_TYPE like any
+  // plain rem, so the badge would say nothing about what it actually is —
+  // resolved in Phase 2 (bounded to the rows we show) and shown as its own badge.
+  isPdfHighlight?: boolean;
+  // True when the rem carries an image in its own text or back text — the same
+  // predicate the HasImage powerup is applied by ("Tag Rems With Images"), read
+  // straight off the rich text instead of through the tag: it costs nothing (no
+  // extra lookup, unlike the PDF-highlight probe above) and it is right even for
+  // rems that have never been scanned, or whose image was added or removed since
+  // they were.
+  hasImage?: boolean;
   // Set when the rem matched via one of its aliases rather than its primary
   // name. `aliasText` is what we display and insert; `aliasId` stamps the
   // reference so it renders the alias text and links back to this rem.
@@ -141,6 +159,9 @@ function ReferenceFinder() {
   const [selected, setSelected] = useState(0);
   const [conceptsOnly, setConceptsOnly] = useState(false);
   const [searching, setSearching] = useState(false);
+  // True when the picker was opened over selected text. Gates the "pin at end"
+  // hint in the footer so the key list stays short in the ordinary case.
+  const [openedFromSelection, setOpenedFromSelection] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const reqIdRef = useRef(0);
   // The rem the picker was triggered from, captured by the command before focus
@@ -196,6 +217,10 @@ function ReferenceFinder() {
       const init = await plugin.storage.getSession<string>('reference-finder-initial-query');
       await plugin.storage.setSession('reference-finder-initial-query', '');
       if (typeof init === 'string' && init.trim()) {
+        // A seeded query means the command found selected text, which is exactly
+        // when "pin at end" is worth offering — it's the mode that leaves that
+        // selection alone.
+        setOpenedFromSelection(true);
         setQuery(init.trim());
         requestAnimationFrame(() => inputRef.current?.select());
       }
@@ -350,11 +375,34 @@ function ReferenceFinder() {
             )
           )
         );
-        // Search the full query plus each token (longest first, capped to 4) so
-        // a buried exact-name rem is retrieved via its most distinctive token.
+        // Seed with the WHOLE query as a phrase, in both figure spellings, before
+        // any single token. This is the seed that matters, because of how
+        // RemNote's search actually retrieves candidates (SQLite FTS5):
+        //   • it splits the query on every non-letter/digit character, so
+        //     "Fig. 6.4" becomes the tokens [fig, ., 6, ., 4];
+        //   • it then keeps only the tokens longer than two characters and ORs
+        //     them as prefix matches — here just `"fig"*`, since "6" and "4" are
+        //     dropped. That pool ("every rem containing a word starting with
+        //     fig") is truncated to the top-ranked thousand, and this picker then
+        //     keeps the best 50 by cost. In a knowledge base full of figures the
+        //     one you want does not survive that cut, however well it would have
+        //     scored once retrieved.
+        //   • the ONE branch that isolates a rem instead of truncating a huge
+        //     pool is an exact adjacent-phrase match on the whole query
+        //     (`"figure 6.4"*`, capped at 100 rows) — and it only runs when the
+        //     phrase is at least 3 characters and 2 tokens.
+        // FTS prefix-matches only the LAST word of a phrase, so the phrase
+        // "fig 6.4" does not match a rem named "Figure 6.4" and vice-versa. Both
+        // spellings therefore have to be asked for; canonFig alone was only ever
+        // applied to matching and scoring, never to what we asked the index for,
+        // which is why "Fig. 6.4" could not find "Figure 6.4: …".
+        const phrases = Array.from(new Set<string>([q, canonFig(q), shortFig(q)]));
+        // …then each token (longest first) so a buried exact-name rem is still
+        // reachable via its most distinctive token. Capped so a query stays a
+        // bounded number of backend searches per keystroke.
         const queries = Array.from(
-          new Set<string>([raw.trim(), ...[...searchTokens].sort((a, b) => b.length - a.length).slice(0, 4)])
-        );
+          new Set<string>([...phrases, ...[...searchTokens].sort((a, b) => b.length - a.length)])
+        ).slice(0, 5);
 
         const seen = new Map<string, any>();
         for (const qq of queries) {
@@ -456,9 +504,14 @@ function ReferenceFinder() {
             }
           } catch { /* ignore */ }
           const breadcrumb = await buildBreadcrumb(s.r);
+          // Built-in powerup membership isn't enumerable, so probe it directly.
+          const isPdfHighlight = await s.r
+            .hasPowerup(BuiltInPowerupCodes.PDFHighlight)
+            .catch(() => false);
           candidates.push({
             id: s.id, name: s.name, normName: s.normName, type: s.type,
-            times: s.times, score: s.score, backText, breadcrumb,
+            times: s.times, score: s.score, backText, breadcrumb, isPdfHighlight,
+            hasImage: remHasImage(s.r),
             aliasId: s.aliasId, aliasText: s.aliasText, aliasKeys: s.aliasKeys,
             aliasRichText: s.aliasRichText,
           });
@@ -485,7 +538,7 @@ function ReferenceFinder() {
   }, [floatingWidgetId, plugin]);
 
   const pick = useCallback(
-    async (picked: Candidate | undefined, mode: 'ref' | 'pin' | 'textPin' = 'ref') => {
+    async (picked: Candidate | undefined, mode: 'ref' | 'pin' | 'textPin' | 'pinEnd' = 'ref') => {
       if (!picked) return;
       let cand: Candidate = picked;
 
@@ -497,6 +550,9 @@ function ReferenceFinder() {
       let sawSelection = false;
       let insertErr: any = null;
       let targetRemId: string | undefined;
+      // Set when 'pinEnd' could not trust the caret after moving it (see below);
+      // the pin is then appended by rewriting the rem's text instead.
+      let caretLeftTheRem = false;
       try {
         const sel = await plugin.editor.getSelection();
         if (sel) {
@@ -535,9 +591,12 @@ function ReferenceFinder() {
             (sel as any).range &&
             (sel as any).range.start !== (sel as any).range.end;
           try {
-            const ts = await plugin.editor.getSelectedText();
+            // 'pinEnd' appends past the end of the text, so it must NOT inherit a
+            // cloze id — that would drag the pin inside a cloze that happens to
+            // sit at the end of the rem.
+            const ts = mode === 'pinEnd' ? undefined : await plugin.editor.getSelectedText();
             clozeId = findClozeId(ts?.richText);
-            if (!clozeId && sel.type === SelectionType.Text && (sel as any).remId) {
+            if (mode !== 'pinEnd' && !clozeId && sel.type === SelectionType.Text && (sel as any).remId) {
               const rem = await plugin.rem.findOne((sel as any).remId);
               const offset = (sel as any).range?.start ?? 0;
               clozeId = clozeIdAtOffset(rem?.text, offset);
@@ -545,8 +604,29 @@ function ReferenceFinder() {
           } catch { /* best-effort cloze detection */ }
 
           // If text is selected, replace it with the reference (mimics RemNote's
-          // [[ ]] behaviour where the selected text becomes the link).
-          if (hasTextRange) {
+          // [[ ]] behaviour where the selected text becomes the link) — except in
+          // 'pinEnd', whose whole point is to KEEP the selected text and hang the
+          // pin off the end of the rem. There, collapse to the end of the selection
+          // and walk the caret to the end of the line: that keeps us inside the
+          // field the selection was in, so a back-side selection appends to the
+          // back rather than the front.
+          if (mode === 'pinEnd') {
+            await plugin.editor.collapseSelection('end');
+            await plugin.editor.moveCaret(1, MoveUnit.LINE);
+            // Guard: MoveUnit.LINE is "to the end of the line" for us, but if it
+            // ever behaves as "one line down" the caret would now sit in the NEXT
+            // rem — and the pin would be appended to a rem the user never picked.
+            // Confirm we're still in the same rem; if not, append through setText
+            // below instead of inserting at a caret we no longer trust.
+            try {
+              const afterMove = await plugin.editor.getSelection();
+              if (!afterMove || (afterMove as any).remId !== targetRemId) {
+                caretLeftTheRem = true;
+              }
+            } catch {
+              caretLeftTheRem = true;
+            }
+          } else if (hasTextRange) {
             await plugin.editor.delete();
           }
           // Build the rich text to insert:
@@ -637,11 +717,24 @@ function ReferenceFinder() {
             // id isn't touched by the sanitizer.
             const sanitizedSource = sanitizeRichTextForSetText(sourceParts as any);
             toInsert = [...(sanitizedSource as any[]), ' ', makeRef(true)];
+          } else if (mode === 'pinEnd') {
+            // A space keeps the chip off the last word.
+            toInsert = [' ', makeRef(true)];
           } else {
             toInsert = [makeRef(mode === 'pin')];
           }
           try {
-            await plugin.editor.insertRichText(toInsert);
+            if (mode === 'pinEnd' && caretLeftTheRem) {
+              // Caret-free path: append the pin to the rem's own text. Deterministic
+              // (no dependence on where the caret ended up) and it keeps the selected
+              // text untouched, which is the whole point of this mode.
+              const targetRem = targetRemId ? await plugin.rem.findOne(targetRemId) : undefined;
+              if (!targetRem) throw new Error('pin at end: lost the rem the picker was opened from');
+              const existing: any[] = Array.isArray(targetRem.text) ? (targetRem.text as any[]) : [];
+              await targetRem.setText([...existing, ...toInsert] as any);
+            } else {
+              await plugin.editor.insertRichText(toInsert);
+            }
             inserted = true;
           } catch (insErr) {
             // insertRichText can reject some node types inline (images/audio/latex
@@ -818,10 +911,13 @@ function ReferenceFinder() {
       setSelected((s) => Math.max(s - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // Ctrl/Cmd+Shift+Enter appends a PIN at the END of the rem, leaving any
+      // selected text in place — tested first, since it also carries Shift;
       // Shift+Enter opens the rem in a new pane; Ctrl/Cmd+Enter inserts a PIN
       // (reference without its text); Opt/Alt+Enter inserts the text followed by
       // a pin ("Text with Pin"); plain Enter inserts a normal reference.
-      if (e.shiftKey) open(results[selected]);
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey) pick(results[selected], 'pinEnd');
+      else if (e.shiftKey) open(results[selected]);
       else if (e.altKey) pick(results[selected], 'textPin');
       else pick(results[selected], e.ctrlKey || e.metaKey ? 'pin' : 'ref');
     } else if (e.key === 'Escape') {
@@ -896,7 +992,13 @@ function ReferenceFinder() {
               onMouseEnter={() => setSelected(i)}
               title="Click: insert reference · Ctrl/Cmd+click: insert pin (no text) · Opt/Alt+click: text then pin · Shift+click: open in new pane"
               onClick={(e) =>
-                e.shiftKey ? open(r) : e.altKey ? pick(r, 'textPin') : pick(r, e.ctrlKey || e.metaKey ? 'pin' : 'ref')
+                (e.ctrlKey || e.metaKey) && e.shiftKey
+                  ? pick(r, 'pinEnd')
+                  : e.shiftKey
+                  ? open(r)
+                  : e.altKey
+                  ? pick(r, 'textPin')
+                  : pick(r, e.ctrlKey || e.metaKey ? 'pin' : 'ref')
               }
               style={{
                 display: 'flex',
@@ -916,15 +1018,35 @@ function ReferenceFinder() {
                   fontWeight: 700,
                   padding: '1px 5px',
                   borderRadius: '4px',
-                  backgroundColor: r.type === RemType.CONCEPT ? '#16a34a' : 'var(--rn-clr-background-tertiary)',
-                  color: r.type === RemType.CONCEPT ? 'white' : 'var(--rn-clr-content-secondary)',
+                  backgroundColor: r.isPdfHighlight
+                    ? '#d97706'
+                    : r.type === RemType.CONCEPT
+                    ? '#16a34a'
+                    : 'var(--rn-clr-background-tertiary)',
+                  color:
+                    r.isPdfHighlight || r.type === RemType.CONCEPT
+                      ? 'white'
+                      : 'var(--rn-clr-content-secondary)',
                   whiteSpace: 'nowrap',
                 }}
               >
-                {typeLabel(r.type)}
+                {r.isPdfHighlight ? 'PDF HIGHLIGHT' : typeLabel(r.type)}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {/* Images carry no searchable text, so nothing else in the row
+                      hints that a result is a figure. Sits to the LEFT of the
+                      name rather than in the badge gutter, which would go ragged
+                      if only some rows widened it. */}
+                  {r.hasImage && (
+                    <span
+                      title="Contains an image"
+                      aria-label="Contains an image"
+                      style={{ flexShrink: 0, fontSize: '11px', lineHeight: 1 }}
+                    >
+                      🖼️
+                    </span>
+                  )}
                   <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {(r.aliasText || r.name) || '(empty)'}
                   </span>
@@ -1006,6 +1128,33 @@ function ReferenceFinder() {
             {s.label}
           </span>
         ))}
+        {/* Only offered when the picker was opened over selected text: this is the
+            mode that keeps that text and hangs the pin off the end of the rem.
+            Clickable as well as typed — the click lands in this iframe, so the
+            editor's selection survives it. */}
+        {openedFromSelection && (
+          <span
+            role="button"
+            tabIndex={-1}
+            onMouseDown={(e) => e.preventDefault()} /* keep editor focus/selection */
+            onClick={() => pick(results[selected], 'pinEnd')}
+            title="Insert a pin at the end of the Rem, keeping the selected text"
+            style={{
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              backgroundColor: 'var(--rn-clr-background-tertiary)',
+              color: 'var(--rn-clr-content-secondary)',
+            }}
+          >
+            📌{' '}
+            <strong style={{ color: 'var(--rn-clr-content-secondary)', fontWeight: 600 }}>
+              Ctrl/Cmd+Shift+Enter
+            </strong>{' '}
+            pin at end (keep text)
+          </span>
+        )}
       </div>
     </div>
   );

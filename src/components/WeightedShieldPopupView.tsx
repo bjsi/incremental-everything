@@ -8,6 +8,7 @@ import { CardMemoryAnalyticsView } from './CardMemoryAnalyticsView';
 import { SuppressedCardsView } from './SuppressedCardsView';
 import { FSRSCalibrationView } from './FSRSCalibrationView';
 import { OddsUniverse, SelectionOddsPanel } from './SelectionOddsPanel';
+import { IE_DOCS_BASE_URL } from '../lib/settings';
 
 interface MonthlyBests {
   kbIncRem: number | null;
@@ -416,6 +417,55 @@ function BreakdownSection({
 
 type TabId = 'shield' | 'cardMemory' | 'suppressed' | 'fsrsCalibration';
 
+/** Docs section for each tab, relative to IE_DOCS_BASE_URL. */
+const TAB_DOCS_PATHS: Record<TabId, string> = {
+  shield: 'Prioritization-%26-Sorting/#weighted-shield',
+  cardMemory: 'Prioritization-%26-Sorting/#card-memory-analytics',
+  suppressed: 'Prioritization-%26-Sorting/#suppressed-cards',
+  fsrsCalibration: 'Prioritization-%26-Sorting/#fsrs-calibration',
+};
+
+/**
+ * Opens a docs section. `window.open` is blocked in some embedded contexts, so
+ * fall back to a synthesised anchor click — same helper shape as the IE
+ * Settings popup.
+ */
+const openDocs = (path: string) => {
+  const url = `${IE_DOCS_BASE_URL}${path}`;
+  const opened = window.open(url, '_blank');
+  if (!opened || opened.closed) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => document.body.removeChild(link), 100);
+  }
+};
+
+const DocsButton = ({ tab }: { tab: TabId }) => (
+  <button
+    type="button"
+    onClick={() => openDocs(TAB_DOCS_PATHS[tab])}
+    title="Open the documentation for this view"
+    className="rounded-full w-6 h-6 flex items-center justify-center hover:opacity-75"
+    style={{
+      marginLeft: 'auto',
+      alignSelf: 'center',
+      flexShrink: 0,
+      border: '1px solid var(--rn-clr-border-opaque, rgba(128,128,128,0.3))',
+      color: 'var(--rn-clr-content-secondary)',
+      background: 'transparent',
+      cursor: 'pointer',
+      fontSize: '13px',
+      fontWeight: 400,
+    }}
+  >
+    ?
+  </button>
+);
+
 export function WeightedShieldPopup() {
   const plugin = usePlugin();
 
@@ -544,6 +594,7 @@ export function WeightedShieldPopup() {
           <button type="button" role="tab" aria-selected={tab === 'fsrsCalibration'} style={tabBtnStyle(tab === 'fsrsCalibration')} onClick={() => setTab('fsrsCalibration')}>
             🎯 FSRS Calibration
           </button>
+          <DocsButton tab={tab} />
         </div>
       )}
 
@@ -566,6 +617,7 @@ export function WeightedShieldPopup() {
               gap: '8px',
             }}>
               <span>⚖️ Weighted Shield Breakdown</span>
+              <DocsButton tab="shield" />
             </div>
           )}
 

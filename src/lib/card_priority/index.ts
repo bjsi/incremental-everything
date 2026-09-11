@@ -25,6 +25,11 @@ import {
 } from './slot_access';
 import * as _ from 'remeda';
 import { getIESetting } from '../settings';
+import {
+  PriorityChangeEvent,
+  defaultEventForSource,
+  recordCardPriorityChange,
+} from '../priority_history';
 
 /**
  * Whether a CardPriority tag may be written, given the source being recorded.
@@ -209,15 +214,39 @@ export async function getCardPriorityValue(
   return await getIESetting(plugin, defaultCardPriorityId);
 }
 
+export interface SetCardPriorityOptions {
+  /**
+   * What caused this change, for the rem's priority history. Defaults to the
+   * source-derived event ('incremental' / 'inherited' / 'default'), which is
+   * exactly right for the automatic writers; every deliberate gesture — the
+   * popup, Quick Priority, the batch tools — passes its own.
+   */
+  event?: PriorityChangeEvent;
+  /**
+   * Skip the history append entirely.
+   *
+   * For writers that are restating a value rather than changing it and would
+   * otherwise pay a read per rem for a row that {@link foldPriorityHistory}
+   * would discard anyway. Not a way to hide a real change.
+   */
+  skipHistory?: boolean;
+}
+
 /**
- * Set card priority
+ * Set card priority.
+ *
+ * Also the single place a CardPriority change is RECORDED. Every writer already
+ * had to come through here (that is what makes the band sync below reliable),
+ * so the history slot gets the same guarantee for free: no call site can change
+ * a priority without leaving a trace of what changed it.
  */
 export async function setCardPriority(
   plugin: RNPlugin,
   rem: PluginRem,
   priority: number,
   source: PrioritySource,
-  knownHasPowerup: boolean = false
+  knownHasPowerup: boolean = false,
+  options?: SetCardPriorityOptions
 ): Promise<void> {
   // Single enforcement point for the source rule — see mayWriteCardPrioritySource.
   // Refusing here rather than at each call site means a new writer cannot forget,
@@ -244,6 +273,29 @@ export async function setCardPriority(
     rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]),
     rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()])
   ]);
+
+  // Record what just happened. Deliberately AFTER the value write and not folded
+  // into the Promise.all above: it reads the existing history first, and a
+  // failure here must not be able to take the priority write down with it
+  // (recordCardPriorityChange swallows its own errors for the same reason).
+  //
+  // `hadPowerup: hasPowerup` is what keeps the KB-wide inherited/default index
+  // cheap — a rem being tagged for the first time cannot have a history, so the
+  // append skips its read and writes a single-entry array.
+  if (!options?.skipHistory) {
+    await recordCardPriorityChange(rem, {
+      priority,
+      source,
+      // An unnamed write onto a rem that was not tagged a moment ago IS the
+      // initial tagging; an unnamed write onto an already-tagged rem is
+      // described by its source. A caller that named its gesture keeps it
+      // either way — the popup labels the oldest row as the origin regardless,
+      // so nothing is lost by recording that the origin was, say, the Alt+P
+      // popup rather than a bare tag.
+      event: options?.event ?? (hasPowerup ? defaultEventForSource(source) : 'tagged'),
+      hadPowerup: hasPowerup,
+    });
+  }
 
   // Keep the table-cell badge in step. Static import: a dynamic import() here
   // emits a chunk the RemNote index sandbox cannot evaluate ("Cannot use
@@ -701,7 +753,9 @@ export async function recalculateTreeInheritanceBatch(
         const targetSource = closerAncestor ? 'inherited' : 'default';
 
         if (!cardInfo || cardInfo.priority !== targetPriority || cardInfo.source !== targetSource) {
-          await setCardPriority(plugin, descendant, targetPriority, targetSource);
+          await setCardPriority(plugin, descendant, targetPriority, targetSource, false, {
+            event: 'cascade',
+          });
           // We let the caller flush the cache updates
           await updateCardPriorityCache(plugin, descendant._id);
           updatedCount++;

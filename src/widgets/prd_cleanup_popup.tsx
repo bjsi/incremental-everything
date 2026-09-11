@@ -13,6 +13,28 @@ import {
   scanPriorityReviewDocuments,
   UNDELETABLE_REASON_LABELS,
 } from '../lib/priority_review_document/clean';
+import { IE_DOCS_BASE_URL } from '../lib/settings';
+
+const DOCS_PATH = 'Priority-Review-Document/#cleaning-a-review-document';
+
+/**
+ * Opens the docs section for this command. `window.open` is blocked in some
+ * embedded contexts, so fall back to a synthesised anchor click — same helper
+ * shape as the IE Settings popup.
+ */
+const openDocs = () => {
+  const url = `${IE_DOCS_BASE_URL}${DOCS_PATH}`;
+  const opened = window.open(url, '_blank');
+  if (!opened || opened.closed) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => document.body.removeChild(link), 100);
+  }
+};
 
 type Phase = 'scanning' | 'review' | 'cleaning' | 'done' | 'error';
 
@@ -231,9 +253,26 @@ export function PrdCleanupPopup() {
   };
 
   const header = (
-    <div className="flex items-center gap-2">
-      <span style={{ fontSize: 18 }}>🧹</span>
-      <span className="font-semibold text-base">Clean Priority Review Documents</span>
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span style={{ fontSize: 18 }}>🧹</span>
+        <span className="font-semibold text-base">Clean Priority Review Documents</span>
+      </div>
+      <button
+        onClick={openDocs}
+        // Never take focus: the container owns the keys.
+        onMouseDown={(e) => e.preventDefault()}
+        title="Open the documentation for this command"
+        className="rounded-full w-6 h-6 flex items-center justify-center hover:opacity-75"
+        style={{
+          border: '1px solid var(--rn-clr-border-opaque, rgba(128,128,128,0.3))',
+          color: 'var(--rn-clr-content-secondary)',
+          background: 'transparent',
+          cursor: 'pointer',
+        }}
+      >
+        ?
+      </button>
     </div>
   );
 

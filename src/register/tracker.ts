@@ -1,5 +1,6 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache, writeIncRemCaches } from '../lib/incremental_rem/cache';
+import { PriorityChangeEvent } from '../lib/priority_history';
 import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
@@ -273,6 +274,12 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       cardSource: string;
       needsAddPowerup?: boolean;
       triggerCascade: boolean;
+      /**
+       * Which gesture produced this job, for the priority histories — see
+       * lib/priority_history.ts. Every producer of this key is a popup, so it
+       * defaults to 'popup' rather than 'other'.
+       */
+      event?: PriorityChangeEvent;
     }>(pendingPrioritySaveKey);
 
     if (!job || prioritySaveRunning) return;
@@ -319,7 +326,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
           ]);
 
           if (job.incPriority !== null && hasIncPowerup) {
-            await setIncRemPriority(plugin as any, rem, job.incPriority);
+            await setIncRemPriority(plugin as any, rem, job.incPriority, {
+              event: job.event ?? 'popup',
+            });
             const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
             if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
             cascadeRemIds.push(remId);
@@ -336,7 +345,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
             if (!hasCardPowerup) {
               await rem.addPowerup('cardPriority');
             }
-            await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true);
+            await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true, {
+              event: job.event ?? 'popup',
+            });
             updateCardPriorityCache(plugin as any, rem._id, true, {
               remId: rem._id,
               priority: job.cardPriority,
@@ -381,7 +392,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       if (job.incPriority !== null) {
         const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
         const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
-        await setIncRemPriority(plugin as any, rem, job.incPriority);
+        await setIncRemPriority(plugin as any, rem, job.incPriority, {
+          event: job.event ?? 'popup',
+        });
         const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
         if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
         console.log(`[Tracker] IncRem priority written: ${job.incPriority}`);
@@ -393,7 +406,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
           await rem.addPowerup('cardPriority');
         }
         const { setCardPriority } = await import('../lib/card_priority');
-        await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true);
+        await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true, {
+          event: job.event ?? 'popup',
+        });
         const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
         updateCardPriorityCache(plugin as any, rem._id, true, {
           remId: rem._id,
@@ -430,6 +445,13 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       remIds: string[];
       priority: number;
       interval: number;
+      /**
+       * Rems made Incremental moments ago, whose priority popup this save is
+       * closing. For these the chosen priority/interval is folded INTO the
+       * 'madeIncremental' marker rather than appended as a separate
+       * 'rescheduledInEditor' entry — one user action, one history entry.
+       */
+      foldRemIds?: string[];
     }>(pendingIntervalBatchSaveKey);
 
     if (!job || intervalBatchSaveRunning) return;
@@ -453,8 +475,11 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         const rem = await plugin.rem.findOne(remId);
         if (!rem) { console.warn('[Tracker] intervalBatchSave: rem not found', remId); continue; }
 
-        // 1. Write priority powerup property
-        await setIncRemPriority(plugin as any, rem, job.priority);
+        // 1. Write priority powerup property.
+        // recordHistory: false — this path writes the whole history array itself
+        // below (either a 'rescheduledInEditor' entry or a fold into the
+        // 'madeIncremental' marker), from a snapshot taken after this call.
+        await setIncRemPriority(plugin as any, rem, job.priority, { recordHistory: false });
 
         // 2. Compute and write SRS schedule
         const incRem = await getIncrementalRemFromRem(plugin as any, rem);
@@ -467,19 +492,42 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         const wasEarly = daysDifference < 0;
         const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
 
-        const newHistory = [
-          ...(incRem.history || []),
-          {
-            date: actualDate,
-            scheduled: scheduledDate,
-            interval: job.interval,
-            wasEarly,
-            daysEarlyOrLate,
-            reviewTimeSeconds: undefined as number | undefined,
-            priority: job.priority,
-            eventType: 'rescheduledInEditor' as const,
-          },
-        ];
+        const history = incRem.history || [];
+        const lastEntry = history[history.length - 1];
+
+        // Fold into the creation marker when this save is the tail of a
+        // "make incremental → choose priority" action and nothing has happened to
+        // the rem since. The marker keeps its own date (when the rem was made
+        // incremental) and gains the values the user just picked, so the history
+        // shows a single 'madeIncremental' entry carrying the real priority
+        // instead of a default-priority marker plus a phantom reschedule.
+        const foldIntoCreationMarker =
+          job.foldRemIds?.includes(remId) === true &&
+          lastEntry?.eventType === 'madeIncremental';
+
+        const newHistory = foldIntoCreationMarker
+          ? [
+              ...history.slice(0, -1),
+              {
+                ...lastEntry,
+                interval: job.interval,
+                priority: job.priority,
+                nextRepMs: newNextRepDate,
+              },
+            ]
+          : [
+              ...history,
+              {
+                date: actualDate,
+                scheduled: scheduledDate,
+                interval: job.interval,
+                wasEarly,
+                daysEarlyOrLate,
+                reviewTimeSeconds: undefined as number | undefined,
+                priority: job.priority,
+                eventType: 'rescheduledInEditor' as const,
+              },
+            ];
 
         await updateSRSDataForRem(plugin as any, remId, newNextRepDate, newHistory);
 
@@ -657,6 +705,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       const byRem = new Map<string, {
         incDelta: number; cardDelta: number;
         hasIncPowerup: boolean; hasCards: boolean; hasCardPriorityPowerup: boolean;
+        event?: PriorityChangeEvent;
       }>();
       for (const entry of snapshot) {
         const existing = byRem.get(entry.remId);
@@ -670,6 +719,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
             hasIncPowerup: entry.hasIncPowerup,
             hasCards: entry.hasCards,
             hasCardPriorityPowerup: entry.hasCardPriorityPowerup,
+            // The deltas for one rem are summed into a single write, so the
+            // history records one gesture: the first one queued for it.
+            event: entry.event,
           });
         }
       }
@@ -694,7 +746,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
             const oldP = incRemInfo.priority;
             const newP = Math.max(0, Math.min(100, oldP + agg.incDelta));
             if (oldP !== newP) {
-              await setIncRemPriority(plugin as any, rem, newP);
+              await setIncRemPriority(plugin as any, rem, newP, {
+                event: agg.event ?? 'quick',
+              });
               const updated = await getIncrementalRemFromRem(plugin as any, rem);
               if (updated) await updateIncrementalRemCache(plugin as any, updated);
               messages.push(`IncRem ${oldP} → ${newP}`);
@@ -711,7 +765,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
           const newP = Math.max(0, Math.min(100, oldP + agg.cardDelta));
           if (oldP !== newP) {
             if (!agg.hasCardPriorityPowerup) await rem.addPowerup('cardPriority');
-            await setCardPriority(plugin as any, rem, newP, 'manual', true);
+            await setCardPriority(plugin as any, rem, newP, 'manual', true, {
+              event: agg.event ?? 'quick',
+            });
             updateCardPriorityCache(plugin as any, rem._id, true, {
               remId: rem._id, priority: newP, source: 'manual',
             } as any);

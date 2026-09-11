@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   renderWidget,
   useSyncedStorageState,
@@ -149,6 +149,131 @@ function FinalDrill() {
     };
   }, [finalDrillIdsRaw, plugin, oldItemThreshold, minDelayMinutes]);
 
+  // --- Resurrection guard ---------------------------------------------------------------
+  // RemNote's embedded <Queue> snapshots `cardIds` when its controller is built (QueueMain does
+  // `useState(() => new QueueController(..., {...props}, ...))`), so later prop updates never
+  // reach it. Worse: when that queue runs dry it clears its internal `usedCards` set and reloads
+  // the ORIGINAL snapshot. That is why a card taken out with "Remove from Drill" (or Edit Later,
+  // or rated Good) reappears later in the same session no matter how many times you remove it —
+  // removeCurrentCardFromQueue does drop it from the live queue, but the reload puts it back.
+  //
+  // The snapshot cannot be updated in place, so instead:
+  //   1. we freeze the list ourselves (queueCardIds) so our copy matches the controller's exactly;
+  //   2. anything in that snapshot which has since left the drill list is "stale" and gets skipped
+  //      the moment RemNote presents it again;
+  //   3. if the whole reloaded snapshot is stale, skipping alone would loop forever, so after a
+  //      few consecutive skips we remount the embed (queueEpoch) — remounting is the only way to
+  //      hand the controller a fresh card list. That fires QueueEnter again, so queue_session.ts
+  //      closes the drill session and opens a new one; that is expected, not a leak.
+  //
+  // Stale is derived as "snapshot minus live list" rather than "not in the live list" on purpose:
+  // a cluster anchor that was never in the drill list is never in the snapshot either, so it can
+  // never be skipped by mistake. See the Card Cluster note on removeCurrentFromDrill below.
+  const MAX_CONSECUTIVE_SKIPS = 3;
+  // Traces one line per card load. Off by default: the two paths that act (skip, rebuild) log
+  // unconditionally, so a resurrection still leaves a record without this. Flip it to true to
+  // watch the guard's bookkeeping on every card — stale/snapshot/live counts — when validating
+  // a change to it.
+  const DRILL_GUARD_DEBUG = false;
+  const [queueCardIds, setQueueCardIds] = useState<string[] | null>(null);
+  const [queueEpoch, setQueueEpoch] = useState(0);
+  const consecutiveSkipsRef = useRef(0);
+  const lastSkippedIdRef = useRef<string | null>(null);
+
+  // Seed (and after a rebuild, re-seed) the frozen list the embedded Queue is mounted with.
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (filteredIds.length === 0) {
+      if (queueCardIds !== null) setQueueCardIds(null);
+      return;
+    }
+    if (queueCardIds === null) setQueueCardIds(filteredIds);
+  }, [isLoaded, filteredIds, queueCardIds]);
+
+  const staleQueueIds = useMemo(() => {
+    if (!queueCardIds) return new Set<string>();
+    const live = new Set(filteredIds);
+    return new Set(queueCardIds.filter((id) => !live.has(id)));
+  }, [queueCardIds, filteredIds]);
+
+  // Read through a ref, so the guard below evaluates staleness once per card load rather than
+  // re-running whenever the list changes. That distinction matters: a card you just rated Good
+  // leaves the list while it is still the current card, and re-evaluating then would skip
+  // whatever card the queue had already moved on to.
+  const staleQueueIdsRef = useRef(staleQueueIds);
+  useEffect(() => {
+    staleQueueIdsRef.current = staleQueueIds;
+  }, [staleQueueIds]);
+
+  // Same reason: the guard must not re-run when the list changes, so it reads the count through
+  // a ref rather than closing over it.
+  const filteredIdsRef = useRef(filteredIds);
+  useEffect(() => {
+    filteredIdsRef.current = filteredIds;
+  }, [filteredIds]);
+
+  const currentDrillCardId = useTrackerPlugin(
+    async (rp) => (await rp.storage.getSession<string>('finalDrillCurrentCardId')) ?? null,
+    []
+  );
+
+  useEffect(() => {
+    if (!currentDrillCardId || !queueCardIds) {
+      if (DRILL_GUARD_DEBUG && currentDrillCardId) {
+        console.log(`[MasteryDrill] guard: card ${currentDrillCardId} loaded while the queue is being rebuilt — standing by.`);
+      }
+      return;
+    }
+
+    if (DRILL_GUARD_DEBUG) {
+      console.log(
+        `[MasteryDrill] guard: card ${currentDrillCardId} loaded — stale=${staleQueueIdsRef.current.has(currentDrillCardId)}, snapshot=${queueCardIds.length}, live=${filteredIdsRef.current.length}, staleInSnapshot=${staleQueueIdsRef.current.size}`
+      );
+    }
+
+    if (!staleQueueIdsRef.current.has(currentDrillCardId)) {
+      consecutiveSkipsRef.current = 0;
+      lastSkippedIdRef.current = null;
+      return;
+    }
+    if (lastSkippedIdRef.current === currentDrillCardId) return;
+    lastSkippedIdRef.current = currentDrillCardId;
+
+    consecutiveSkipsRef.current += 1;
+    const skips = consecutiveSkipsRef.current;
+
+    if (skips > MAX_CONSECUTIVE_SKIPS) {
+      console.log(
+        `[MasteryDrill] ${MAX_CONSECUTIVE_SKIPS} stale cards in a row — the embedded queue reloaded its original card list. Rebuilding it from the current drill list (${filteredIdsRef.current.length} card${filteredIdsRef.current.length !== 1 ? 's' : ''}).`
+      );
+      consecutiveSkipsRef.current = 0;
+      lastSkippedIdRef.current = null;
+      setQueueCardIds(null);
+      setQueueEpoch((e) => e + 1);
+      return;
+    }
+
+    (async () => {
+      try {
+        // Confirm against RemNote's live controller before acting: if the queue has already moved
+        // past this card, removeCurrentCardFromQueue would drop an unrelated (unseen) card.
+        const live = await plugin.queue.getCurrentCard();
+        if (live?._id !== currentDrillCardId) {
+          if (DRILL_GUARD_DEBUG) {
+            console.log(`[MasteryDrill] guard: queue already moved past ${currentDrillCardId} (now ${live?._id ?? 'none'}) — not skipping.`);
+          }
+          return;
+        }
+        console.log(
+          `[MasteryDrill] Card ${currentDrillCardId} is no longer in the drill but was presented again — skipping it (${skips}/${MAX_CONSECUTIVE_SKIPS}).`
+        );
+        await plugin.queue.removeCurrentCardFromQueue(false);
+      } catch (error) {
+        console.error('[MasteryDrill] Failed to skip a stale card:', error);
+      }
+    })();
+  }, [currentDrillCardId, queueCardIds, plugin]);
+
   const clearOldItems = async () => {
     const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
     const currentKbId = currentKb._id;
@@ -249,6 +374,25 @@ function FinalDrill() {
     setEditLaterMessage('');
   };
 
+  // KNOWN LIMITATION — Card Clusters.
+  // Every per-card toolbar action above (Go to Rem, Edit Later, Edit Current, the priority
+  // badge) and this one resolve the target through `finalDrillCurrentCardId`, which
+  // queue_session.ts writes from QueueLoadCard. Inside a cluster that id is the cluster
+  // ANCHOR and never advances to the visible sibling, so on siblings 2..n these actions act
+  // on the wrong card: Remove from Drill drops the anchor's id (usually not even in the drill
+  // list) while the sibling stays, and the card keeps coming back.
+  //
+  // Measured 2026-09-05 against RemNote's own queue controller, in a document sub-queue with a
+  // 4-sibling table cluster: `window.queueController.currentCard.cardId` (what
+  // plugin.queue.getCurrentCard() resolves, and what QueueLoadCard broadcasts) stayed pinned to
+  // the anchor for all four siblings, while the cluster component's own
+  // `state.currentCompoundCardIdToTest` advanced each time. So getCurrentCard() is NOT a way out.
+  // The `clusterVisibleCardId` bridge (card_info_bar.tsx) does not exist here either — that
+  // widget is not mounted inside the drill popup. See registerDrillCardRatingListener in
+  // register/events.ts for the matching gap on the recording side.
+  //
+  // Left unfixed deliberately: clusters reaching the drill is already rare (see events.ts), and
+  // the cost of a wrong-card action is one stale card in the list, not data loss.
   const removeCurrentFromDrill = async () => {
     const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
     if (!cardId) {
@@ -774,7 +918,7 @@ function FinalDrill() {
               onChange={setEditingPriority}
               onSave={async () => {
                 const rem = await plugin.rem.findOne(currentCardData.remId);
-                if (rem) await setCardPriority(plugin, rem, editingPriority, 'manual');
+                if (rem) await setCardPriority(plugin, rem, editingPriority, 'manual', false, { event: 'drill' });
                 setEditingPriority(null);
               }}
               onCancel={() => setEditingPriority(null)}
@@ -819,8 +963,10 @@ function FinalDrill() {
           setTimeout(() => containerRef.current?.focus(), 50);
         }}
       >
-        {isLoaded ? (
-          <Queue cardIds={filteredIds} width="100%" height="auto" />
+        {isLoaded && queueCardIds ? (
+          // key={queueEpoch}: the only way to give the controller a card list it will actually
+          // read is to remount the embed. See the resurrection guard above.
+          <Queue key={queueEpoch} cardIds={queueCardIds} width="100%" height="auto" />
         ) : (
           <div className="h-full w-full flex items-center justify-center" style={{ color: 'var(--rn-clr-content-secondary)' }}>
             Loading…

@@ -33,14 +33,38 @@ import {
  * with the date they were answered.
  */
 /**
- * Which pile a tip belongs to. The order of this list is the order the piles are
- * drawn in — see {@link pickTip}. It is not decoration: a tip is drawn at random,
- * so without staging, adding a dozen utility tips would make it more likely than
- * not that a brand-new user's first tip is about cycling text case rather than
- * about Alt+X.
+ * Which pile a tip belongs to, in LISTING order — how the All Tips popup groups
+ * and sorts them. What gets *drawn* first is a separate question, answered by
+ * {@link TIP_DRAW_STAGES}.
  */
-export const TIP_CATEGORY_ORDER = ['basics', 'utilities'] as const;
+export const TIP_CATEGORY_ORDER = ['basics', 'statistics', 'utilities', 'advanced'] as const;
 export type TipCategory = (typeof TIP_CATEGORY_ORDER)[number];
+
+/**
+ * The order the piles are OFFERED in — see {@link pickTip}. Each stage is drawn
+ * from as one pool, and a stage is exhausted before the next is offered.
+ *
+ * It is not decoration. A tip is drawn at random within its stage, so without
+ * staging, adding a dozen utility tips would make it more likely than not that a
+ * brand-new user's first tip is about cycling text case rather than about Alt+X.
+ *
+ * Only `basics` earns a stage of its own at the front: it is the daily loop, and
+ * nothing else is worth learning before it. Beyond that the distinction stops
+ * mattering to the user — someone who knows the loop has no reason to be shown
+ * every statistics tip before any utility one — so those two share a stage and
+ * rotate together. They stay separate CATEGORIES because the All Tips popup
+ * labels by them, which is a listing concern, not a pacing one.
+ *
+ * `advanced` is the far end: offered only once EVERYTHING else has been
+ * acknowledged. It is currently empty, which costs nothing — a stage with no
+ * unanswered tips is skipped, so until something is put in it the rotation ends
+ * where it did before.
+ */
+export const TIP_DRAW_STAGES: readonly (readonly TipCategory[])[] = [
+  ['basics'],
+  ['statistics', 'utilities'],
+  ['advanced'],
+];
 
 export interface OnboardingTip {
   /**
@@ -50,19 +74,36 @@ export interface OnboardingTip {
    */
   id: string;
   /**
-   * Which pile this belongs to. Everything in an earlier category is exhausted
-   * before a later one is offered, so `basics` teaches the daily loop and
-   * `utilities` waits until it has been learnt. New feature tips go at the END
+   * Which pile this belongs to. `basics` is exhausted before anything else is
+   * offered, so it teaches the daily loop first; `statistics` and `utilities`
+   * then rotate together; `advanced` waits until every other tip has been
+   * acknowledged — see {@link TIP_DRAW_STAGES}. New feature tips go at the END
    * of their category.
    */
   category: TipCategory;
-  /** Three or four words. The sidebar column is ~130px at its narrowest. */
+  /**
+   * Three or four words. The sidebar column is ~130px at its narrowest.
+   *
+   * NAME THE FEATURE here. A title built around the keystroke alone leaves the
+   * user unable to say what they were just told about, or to search for it.
+   */
   title: string;
   /**
    * ONE line of prose — roughly 90 characters, hard ceiling 110. This renders in
    * a sidebar the user can drag down to about 130px wide, where 90 characters
    * already wrap to four lines. A tip is a hook, not an explanation: the
    * explanation is what `docsPath` is for.
+   *
+   * Two rules for what those characters are spent on:
+   *
+   * 1. **Repeat the feature's name**, capitalised, alongside the shortcut. The
+   *    shortcut is how to reach it; the name is what lets the user recognise it
+   *    again, in the docs or in conversation.
+   * 2. **Where RemNote has its own version of the feature, say what this ADDS.**
+   *    RemNote already has a Practice History, so "opens the history" reads as a
+   *    duplicate of something the user already has. Naming the difference —
+   *    FSRS stats, lapses, retention, per-card sections — is what makes the tip
+   *    worth acting on.
    */
   body: string;
   /**
@@ -175,13 +216,6 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     docsPath: 'Keyboard-Shortcuts/',
   },
   {
-    id: 'study-dashboard',
-    category: 'basics',
-    title: 'Where did the time go?',
-    body: 'The Study Dashboard breaks your reviews down by document and period.',
-    docsPath: 'Study-Dashboard/',
-  },
-  {
     id: 'settings-live-here',
     category: 'basics',
     title: 'Settings, all in one place',
@@ -196,8 +230,30 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     docsPath: 'Priority-Review-Document/#the-priority-review-queue-in-your-sidebar',
   },
 
-  // --- Utilities -------------------------------------------------------
   // Drawn only once every `basics` tip has been acknowledged.
+  // --- Statistics -------------------------------------------------------
+  {
+    id: 'study-dashboard',
+    category: 'statistics',
+    title: 'Where did the time go?',
+    body: 'The Study Dashboard breaks your reviews down by document and period.',
+    docsPath: 'Study-Dashboard/',
+  },
+  {
+    id: 'flashcard-history-per-card',
+    category: 'statistics',
+    title: 'Flashcard Repetition History',
+    body: 'Ctrl+Shift+H: History per card, plus FSRS stats, retention, priority history and more.',
+    docsPath: 'Plugin-Widgets-Reference/#211-flashcard-repetition-history',
+  },
+  {
+    id: 'repetition-history-either-kind',
+    category: 'statistics',
+    title: 'Repetition History, either kind',
+    body: 'Ctrl+Shift+H opens the Repetition History of whatever you are on — IncRem or flashcard.',
+    docsPath: 'Plugin-Widgets-Reference/#how-ctrlshifth-routes',
+  },
+  // --- Utilities -------------------------------------------------------
   {
     id: 'filter-images',
     category: 'utilities',
@@ -302,6 +358,31 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     title: 'Drop the parent entirely',
     body: '“rp” removes the parent from both sides of the card. Alt+Z gets it automatically.',
     docsPath: 'Utilities/#remove-parent-rp-new',
+  },
+  {
+    id: 'pin-source-at-end',
+    category: 'utilities',
+    title: 'Link cards to sources',
+    body: 'Select text, Alt+Shift+F, then Ctrl/Cmd+Shift+Enter: a pin to the source, text intact.',
+    docsPath: 'Utilities/#pin-a-source-at-the-end-of-a-rem',
+  },
+
+  // --- Advanced ---------------------------------------------------------
+  // Drawn only once EVERY other tip has been acknowledged — the last stage in
+  // TIP_DRAW_STAGES.
+  {
+    id: 'add-repetition-outside-queue',
+    category: 'advanced',
+    title: 'Add a Repetition',
+    body: 'Ctrl+Shift+H → ➕ Repetition logs a card you tested outside the queue, FSRS interval per grade.',
+    docsPath: 'Plugin-Widgets-Reference/#211-flashcard-repetition-history',
+  },
+  {
+    id: 'transfer-increm-to-parent',
+    category: 'advanced',
+    title: 'Transfer to Parent Rem',
+    body: '“ttp” — Transfer Incremental Data to Parent hands priority, history and schedule to the parent.',
+    docsPath: 'Create-Incremental-Rem-from-PDF-Highlights/#transfer-to-parent',
   },
 ];
 
@@ -675,15 +756,17 @@ export async function readTipsDiagnostics(plugin: RNPlugin): Promise<TipsDiagnos
     }))
     .sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 
-  // Only the category actually being offered: a utilities tip cannot be drawn
-  // while a basics tip is unanswered, so listing it would misreport what comes
-  // next. Same staging rule as pickTip.
+  // Only the stage actually being offered: a utilities tip cannot be drawn while
+  // a basics tip is unanswered, so listing it would misreport what comes next.
+  // Same staging rule as pickTip — and it must read the same STAGES, not the
+  // listing order, or the rotation would show only statistics while the draw was
+  // pooling statistics with utilities.
   const lastShown = await getLastShownMap(plugin);
-  const activeCategory = TIP_CATEGORY_ORDER.find((c) =>
-    ONBOARDING_TIPS.some((t) => t.category === c && !(t.id in map))
+  const activeStage = TIP_DRAW_STAGES.find((stage) =>
+    ONBOARDING_TIPS.some((t) => stage.includes(t.category) && !(t.id in map))
   );
   const rotation = ONBOARDING_TIPS.filter(
-    (t) => t.category === activeCategory && !(t.id in map)
+    (t) => !!activeStage && activeStage.includes(t.category) && !(t.id in map)
   )
     .map((t) => ({ id: t.id, category: t.category, lastShown: lastShown[t.id] ?? null }))
     .sort((a, b) => (a.lastShown ?? -Infinity) - (b.lastShown ?? -Infinity));
@@ -708,22 +791,23 @@ export async function readTipsDiagnostics(plugin: RNPlugin): Promise<TipsDiagnos
  *
  * Two rules, in order.
  *
- * **Categories are exhausted IN ORDER.** No `utilities` tip is offered while a
+ * **Stages are exhausted IN ORDER.** Nothing outside `basics` is offered while a
  * `basics` tip is still unacknowledged. Without that staging the pile is a flat
  * lottery, and adding the twelve utility tips would have made it more likely
  * than not that a new user's first tip was about cycling text case rather than
  * about Alt+X — the list order alone would not have prevented it, since nothing
- * consulted the order.
+ * consulted the order. A stage may hold several categories, which then rotate as
+ * one pool; see {@link TIP_DRAW_STAGES} for why only `basics` stands alone.
  *
- * **Within a category, least recently shown wins.** Never-shown tips come first
+ * **Within a stage, least recently shown wins.** Never-shown tips come first
  * (random among them, so the pile is not walked in list order), and only once
  * they run out does the oldest previously-shown tip come round again. This is
  * what stops a tip repeating while others wait: a plain random draw has no
- * memory, so as a category empties out the survivors recur constantly — with
- * three tips left, the same one lands twice running about a third of the time,
- * which reads as the panel having forgotten it was already answered. Rotating
- * instead makes a repeat impossible until every other tip in the category has
- * had its turn.
+ * memory, so as a stage empties out the survivors recur constantly — with three
+ * tips left, the same one lands twice running about a third of the time, which
+ * reads as the panel having forgotten it was already answered. Rotating instead
+ * makes a repeat impossible until every other tip in the stage has had its
+ * turn.
  *
  * Ties are broken at random rather than by list order, so the rotation does not
  * harden into a fixed cycle the first time through.
@@ -737,8 +821,10 @@ export function pickTip(
 ): OnboardingTip | null {
   const answered = new Set(acknowledged);
 
-  for (const category of TIP_CATEGORY_ORDER) {
-    const pool = ONBOARDING_TIPS.filter((t) => t.category === category && !answered.has(t.id));
+  for (const stage of TIP_DRAW_STAGES) {
+    const pool = ONBOARDING_TIPS.filter(
+      (t) => stage.includes(t.category) && !answered.has(t.id)
+    );
     if (pool.length === 0) continue;
 
     // `Infinity` is not a sentinel that needs special-casing anywhere below: a
