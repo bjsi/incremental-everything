@@ -127,9 +127,15 @@ async function verifyTopMissedByPriorityLevel<T extends PriorityItem>(
 function filterUnreviewedDue<T extends PriorityItem>(
   items: T[],
   isDue: (item: T) => boolean,
-  seenIds: string[]
+  seenIds: string[],
+  excludeRemIds?: ReadonlySet<string>
 ): T[] {
-  return items.filter(item => isDue(item) && !seenIds.includes(item.remId));
+  // Cooling Rems (see priority_review_document/cooling.ts) are ineligible to set
+  // the shield: a Rem whose sibling you just reviewed must not pin the value at
+  // its priority no matter how much else you clear.
+  return items.filter(
+    item => isDue(item) && !seenIds.includes(item.remId) && !excludeRemIds?.has(item.remId)
+  );
 }
 
 /**
@@ -366,7 +372,8 @@ export async function saveKBShield<T extends PriorityItem>(
   storageKey: string,
   label: string,
   computeWeighted: boolean = false,
-  verifyOptions?: VerifyOptions<T>
+  verifyOptions?: VerifyOptions<T>,
+  excludeRemIds?: ReadonlySet<string>
 ): Promise<void> {
   if (allItems.length === 0) {
     console.log(`[QueueExit] No ${label} items found, skipping KB shield save`);
@@ -378,7 +385,7 @@ export async function saveKBShield<T extends PriorityItem>(
   const dismissedCount = dismissedRems.length;
 
   const today = dayjs().format('YYYY-MM-DD');
-  const unreviewedDue = filterUnreviewedDue(allItems, isDue, seenIds);
+  const unreviewedDue = filterUnreviewedDue(allItems, isDue, seenIds, excludeRemIds);
   const status = await calculateShieldStatus(plugin, allItems, unreviewedDue, isDue, seenIds, dismissedCount, computeWeighted, verifyOptions);
 
   await saveKBShieldHistory(plugin, storageKey, status, today);
@@ -408,7 +415,8 @@ export async function saveDocumentShield<T extends PriorityItem>(
   historyKey: string,
   label: string,
   computeWeighted: boolean = false,
-  verifyOptions?: VerifyOptions<T>
+  verifyOptions?: VerifyOptions<T>,
+  excludeRemIds?: ReadonlySet<string>
 ): Promise<void> {
   if (!scopeRemIds || scopeRemIds.length === 0) {
     console.log(`[QueueExit] No scope RemIds found, skipping ${label} document shield save`);
@@ -421,7 +429,7 @@ export async function saveDocumentShield<T extends PriorityItem>(
   const scopedItems = allItems.filter(item => scopeSet.has(item.remId));
   console.log(`[QueueExit] Found ${scopedItems.length} ${label} items in priority calculation scope`);
 
-  const unreviewedDueInScope = filterUnreviewedDue(scopedItems, isDue, seenIds);
+  const unreviewedDueInScope = filterUnreviewedDue(scopedItems, isDue, seenIds, excludeRemIds);
   console.log(`[QueueExit] Found ${unreviewedDueInScope.length} due ${label} items in priority calculation scope`);
 
   const dismissedPowerup = await plugin.powerup.getPowerupByCode(dismissedPowerupCode);

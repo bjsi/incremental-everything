@@ -53,6 +53,10 @@ Two behaviours are worth knowing:
 * **Normal queue only.** *Practice All* and *In Order* are unaffected. In those modes every card in scope is going to be shown regardless of its due date, so every dual-type Rem would qualify as a spoiler at once and nothing would ever release them.
 * **New cards behind a daily limit.** If the card holding an extract back is a new one that your daily new-card limit has not reached yet, the extract stays held until the end of the session, then is released. It still gets reviewed — just later than its priority would normally place it.
 
+### Across sessions: cooling
+
+This hold is within a session. Its counterpart across days is **cooling** in the [Priority Queue](Priority-Review-Document.md#cooling-spoiler-protection-across-sessions): a flashcard Rem whose answer was shown by a recent review — another card of the same Rem, a sibling `Alt+Z` cloze, the parent extract, or a descendant's context line — is kept out of the Priority Queue for a window that grows with the card's interval, and cannot set the Priority Shield meanwhile.
+
 ### Turning it off
 
 **Hold Back Spoiler IncRems** in the IE Settings popup, under *Queue*. On by default. Switching it off restores the previous behaviour, where an extract and the cards it spoils appear in whatever order the queue produces.

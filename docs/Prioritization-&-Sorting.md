@@ -347,13 +347,13 @@ Presets are scoped to the active Knowledge Base, just like the settings themselv
 ###  1) Incremental Rem Randomness
 
   *  This slider adjusts how strictly the queue follows your priority settings.
-  *  **`20%` (Default):** Most of the queue follows strict priority order, while a slice is randomized via the priority-weighted lottery — dedicating part of every session to surfacing lower-priority "golden nuggets" without disturbing your high-priority core.
+  *  **`20%` (Default):** one position in five, anywhere in the ranked list, is handed to the priority-weighted lottery; the other four keep their strict-priority item. Part of every session goes to surfacing lower-priority "golden nuggets".
   *  **`0%`:** The queue is sorted strictly by priority. Your highest-priority (lowest number) items will always appear first.
-  *  **`100%` (Max):** Every due incremental item is eligible to be reshuffled — but **not uniformly**. Higher-priority items remain far more likely to surface first, following the [Priority-Weighted Lottery](#how-randomness-works-the-priority-weighted-lottery) described below.
-  *  Increasing randomness can be useful for discovering older, lower-priority items you might otherwise not see — without letting them crowd out the items closest to your [Priority Shield](#priority-shield).
+  *  **`100%` (Max):** Every position is a lottery position — but the refill is **not uniform**. Higher-priority items remain far more likely to surface first, following the [Priority-Weighted Lottery](#how-randomness-works-the-priority-weighted-lottery) described below.
+  *  Increasing randomness is useful for discovering older, lower-priority items you might otherwise not see. It does **not** protect the head of the list: see [what it does not guarantee](#what-it-does-not-guarantee).
 
 > [!NOTE]
-> Randomness is no longer a blind shuffle. The portion of the queue it randomizes is filled by a **priority-weighted draw**, so the items it pulls forward are still biased toward higher priority. See [How Randomness Works: The Priority-Weighted Lottery](#how-randomness-works-the-priority-weighted-lottery). Because of this, **higher slider values are now safe** — they explore deeper into your collection while keeping the priority gradient intact.
+> Randomness is not a blind shuffle. The positions it randomizes are refilled by a **priority-weighted draw**, so the items it pulls forward are still biased toward higher priority. See [How Randomness Works: The Priority-Weighted Lottery](#how-randomness-works-the-priority-weighted-lottery).
 
 > [!NOTE]
 > **Slider feel:** the slider is intentionally non-linear (the displayed percentage is the *actual* fraction randomized). It eases in so you get fine control over small values near the left, while the middle of the slider reaches a meaningful ~25%. Drag further right for more aggressive exploration.
@@ -365,8 +365,8 @@ The default is **20%** — a moderate amount of randomness now that it's priorit
 
 ###  2) Flashcard Randomness
 
-- Similar purposes of the Incremental Rem Randomness, but this setting is used solely to the creation of [Priority Review Document](Priority-Review-Document.md)s. It does not affect the regular RemNote flashcard queue (it cannot be managed by a plugin). If you want review your high priority flashcards first, you MUST create a [Priority Review Document](Priority-Review-Document.md) and enter the queue in that document.
-- Like the Incremental Rem slider, the randomness it adds is **priority-weighted**, not uniform — see [How Randomness Works: The Priority-Weighted Lottery](#how-randomness-works-the-priority-weighted-lottery). The new weighting takes effect on **newly generated** Priority Review Documents.
+- Same engine as the Incremental Rem Randomness, but this setting is used solely when the [Priority Queue](Priority-Review-Document.md) is refilled. It does not affect the regular RemNote flashcard queue (a plugin cannot order it). If you want to review your high-priority flashcards first, you MUST practise the [Priority Queue](Priority-Review-Document.md) document.
+- Like the Incremental Rem slider, the randomness it adds is **priority-weighted**, not uniform — see [How Randomness Works: The Priority-Weighted Lottery](#how-randomness-works-the-priority-weighted-lottery). Because a Priority Queue fill is small and drawn once, the [shield slice](Priority-Review-Document.md#the-shield-slice) protects the first positions of each fill from it.
 
 
 ### 3) Flashcard Ratio
@@ -431,8 +431,27 @@ The flat tail becomes a **smooth, decaying gradient**. With the default settings
 
 So a 2nd-quartile item now genuinely outdraws a 3rd-quartile item, which outdraws a 4th — exactly the decreasing-effort profile prioritization is meant to produce — while your deep, low-priority material still resurfaces now and then.
 
+#### What it does not guarantee { #what-it-does-not-guarantee }
+
+The table above describes who **fills** a lottery position. It says nothing about the item that was **displaced** from it, and that is the half that matters for your top priorities.
+
+The lottery positions are chosen **uniformly along the whole ranked list**, head included — the slider is not a cutoff below which things get shuffled. So at 40% randomness the *first* position is a lottery position four times in ten, exactly like the ten-thousandth. When it is, the most important due item goes into the pool with thousands of others, and since thousands of them carry nearly the same weight, the item that wins the first position is almost never the one that held it. The displaced item lands far down the list.
+
+Measured with the real function on a 32,000-card due list, looking at the first 25 positions of one draw:
+
+| Randomness | Top item among the first 25 | All of the top 5 among the first 25 |
+| :---: | :---: | :---: |
+| 20% | 80% of draws | 34% |
+| 40% | 59% of draws | 6% |
+| 55% | 46% of draws | 2% |
+
+Whether that matters depends on how often the draw is repeated:
+
+* In the **live queue**, the Incremental Rem injection redraws the lottery on every rebuild, which happens after each item served. A top IncRem displaced in one draw is back at the front a few items later. The disturbance is real but brief.
+* In a **Priority Queue fill** the draw is made once and frozen until the next refresh. With a 25-item fill, 40% randomness becomes a 40% chance that the most important due item is simply absent from the whole session. That is what the [shield slice](Priority-Review-Document.md#the-shield-slice) is for: it keeps the first positions of each fill out of the lottery.
+
 > [!NOTE]
-> **Where it applies:** the live queue's Incremental Rem injection (Incremental Rem Randomness) **and** the [Priority Review Document](Priority-Review-Document.md) for both IncRems and flashcards (Flashcard Randomness). In-order review mode is left untouched, since it follows document order rather than priority. Priority Review Documents adopt the new weighting on **newly generated** documents.
+> **Where it applies:** the live queue's Incremental Rem injection (Incremental Rem Randomness) **and** every [Priority Queue](Priority-Review-Document.md) refill, for both IncRems and flashcards (Flashcard Randomness). In-order review mode is left untouched, since it follows document order rather than priority.
 
 > [!TIP]
 > **Advanced — tuning the steepness.** The decay constant `k` (default `2.3026 = ln 10`, the 10× curve) is configurable in synced storage under `weightSelectionK`. A **larger** `k` favors high priority more aggressively (low-priority items appear more rarely); a **smaller** `k` flattens the curve toward the old uniform behavior. Most users never need to touch it — the default mirrors the Weighted Shield exactly, so the analytics and the queue tell one consistent story.

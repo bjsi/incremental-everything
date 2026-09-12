@@ -65,6 +65,7 @@ import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { safeRemTextToString, getIncrementalReadingPosition, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
 import { getHoveredReference } from './events';
+import { practicePriorityQueue, findPriorityQueueDoc, isQueueOpen } from '../lib/priority_review_document/queue_doc';
 import { flashcardHistorySpec, clearHistoryShard } from '../lib/history_shards';
 import { transferToDismissed } from '../lib/dismissed';
 import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
@@ -1585,12 +1586,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  // Register command to create priority review document
+  // The Priority Queue popup — the persistent, per-scope review document.
   plugin.app.registerCommand({
     id: 'create-priority-review',
-    name: 'Create Priority Review Document',
+    name: 'Priority Queue',
+    description:
+      'Open the Priority Queue: a persistent review document topped up with your highest-priority due items and drained as you review them, with the Cooling list.',
     keyboardShortcut: 'opt+shift+r',
-    quickCode: 'prd',
+    quickCode: 'prq',
     action: async () => {
       const focused = await plugin.focus.getFocusedRem();
 
@@ -1599,7 +1602,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         scopeName: focused ? await safeRemTextToString(plugin, focused.text) : 'Full KB',
       });
 
-      await plugin.widget.openPopup('review_document_creator');
+      await plugin.widget.openPopup('priority_queue_popup');
     },
   });
 
@@ -1619,6 +1622,26 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'clean',
     action: async () => {
       await plugin.widget.openPopup('prd_cleanup_popup');
+    },
+  });
+
+  // Straight to Practice on the full-KB Priority Queue, for the keyboard.
+  plugin.app.registerCommand({
+    id: 'practice-priority-queue-kb',
+    name: 'Practice Priority Queue (Full Knowledge Base)',
+    description: 'Opens the queue on the full-KB Priority Queue document — the same route as its Practice button.',
+    quickCode: 'prqgo',
+    action: async () => {
+      if (await isQueueOpen(plugin)) {
+        await plugin.app.toast('A queue is already open.');
+        return;
+      }
+      const info = await findPriorityQueueDoc(plugin, null);
+      if (!info) {
+        await plugin.app.toast('No Priority Queue yet — open the Priority Queue popup (quick code prq) and press Build.');
+        return;
+      }
+      await practicePriorityQueue(plugin, info.doc);
     },
   });
 

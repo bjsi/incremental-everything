@@ -2,6 +2,28 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.88 - September 12th, 2026
+
+### ✨ New - the Priority Queue: one persistent review document per scope, refilled in bursts and drained as you review
+
+The timestamped Priority Review Document snapshot is gone. In its place, **one Priority Queue document per scope** (your whole knowledge base, or any document) that the plugin keeps **topped up to a fill target** — 25 items by default — with your highest-priority due flashcards and Incremental Rems, and **drains** of everything you have reviewed. **Refresh** does both, and runs on its own a couple of seconds after you leave the queue, so the document is ready before the next Practice. Small fills are the point: RemNote serves a document's cards in random order, so the only way to make the most important card come *first* is to hold few cards, all of them the top of your ranking.
+
+Everything lives in the new **Priority Queue popup** (`Alt+Shift+R`, quick code `prq`, the document and queue menus, or the panel button — whose group now ends in a **▶** that opens the queue on the full-KB Priority Queue): the scope, what the document holds and what a refresh would drain, the **card shield now and after this document**, the fill target, the actions — Refresh, Drain, Refill, ▶ Practice (which opens the queue on the document directly), Open — and the Cooling list. Nothing runs while a queue is open.
+
+**Cooling** is spoiler protection across sessions. A flashcard Rem whose answer was shown by a recent review — another card of the same Rem, a sibling `Alt+Z` cloze or the parent extract, one of its own clozes, or a descendant's context line — stays out of the Priority Queue for a window that grows with the card's interval (one day for a new card, fifteen for a card with a year or more), and **cannot set the Priority Shield** meanwhile, so a Rem whose sibling you just reviewed no longer pins the shield at its priority however much else you clear. Nothing is stored: the set is recomputed from your card data at every refresh and queue exit. The **Cooling** tab lists every cooling Rem with its reason and return date, and lets you release, extend or exempt it.
+
+The **shield slice** keeps the first positions of each fill (20% by default, configurable, 0 to switch off) out of the randomness lottery, so every fill carries the most important due items whatever your randomness setting draws.
+
+📖 [Priority Queue](Priority-Review-Document.md)
+
+![The Priority Queue popup: scope, status card, fill target and shield slice, and the action buttons](assets/priority-queue-popup.png){ width="640" }
+
+### 📝 Docs - what randomness does, and does not, guarantee
+
+The Sorting Criteria page said randomness left your high-priority core undisturbed. It does not: the lottery marks positions uniformly along the whole list, head included, so at 40% the most important due item is out of the first 25 positions in four draws out of ten. The page now says so, with measurements, and explains why that is brief in the live queue and why the Priority Queue's shield slice exists.
+
+📖 [What it does not guarantee](Prioritization-&-Sorting.md#what-it-does-not-guarantee)
+
 ## v1.0.87 - September 11th, 2026
 
 ### 🐛 Fixed - the queue priority badge was missing in RemNote's Beautiful queue variant

@@ -565,3 +565,45 @@ export const sourceFloatingActiveIdKey = 'source-floating-active-id';
 // Convert literal \[..\] / \(..\) / **..** left by PDF text-layer extraction
 // into real RemNote rich text (formulas, bold, italic).
 export const convertExtractedMarkupCommandId = 'convert-extracted-markup';
+
+// --- Priority Queue cooling (lib/priority_review_document/cooling*.ts) ---
+// The cooling SET is never stored: it is a function of card data, recomputed on
+// every refresh. Two keys support it:
+//  - a SYNCED, per-KB record of the user's overrides (release now / extend /
+//    never cool) — the only cooling state that is a decision rather than a
+//    derivation. Shard per KB as `<prefix>_<kbId>`, like the history shards.
+//  - a SESSION cache of the last computed verdicts, read by the shields so a
+//    cooling Rem cannot set the Priority Shield, and by the Cooling list.
+export const coolingOverridesKeyPrefix = 'prq-cooling-overrides';
+export const coolingCacheKey = 'prq-cooling-cache';
+
+// --- Priority Queue document (lib/priority_review_document/queue_doc.ts) ---
+// A PERSISTENT review document, one per scope, refilled in bursts and drained
+// as its entries are reviewed — as opposed to the timestamped snapshot the
+// creator popup builds. Same `Priority Review Queue` tag and same title shape
+// (so queue-enter detection and scope parsing are unchanged); this powerup is
+// what tells the two apart, and its hidden slots hold the document's config.
+export const priorityQueuePowerupCode = 'priority_queue_doc';
+/** The scope Rem id, or `kb` for the whole knowledge base. */
+export const priorityQueueScopeSlotCode = 'scope';
+/** How many items a refill tops the document up to. */
+export const priorityQueueBurstSlotCode = 'burst';
+/** Timestamp (ms) of the last refresh. */
+export const priorityQueueLastRefreshSlotCode = 'lastRefresh';
+/** Share (0–1) of each burst filled strictly by priority before the lottery. */
+export const priorityQueueShieldSliceSlotCode = 'shieldSlice';
+export const PRIORITY_QUEUE_KB_SCOPE = 'kb';
+export const PRIORITY_QUEUE_DEFAULT_BURST = 25;
+/** Default share of each burst filled strictly by priority, before the lottery — the "shield slice". */
+export const PRIORITY_QUEUE_SHIELD_SLICE = 0.2;
+export const PRIORITY_QUEUE_SHIELD_SLICE_MAX = 0.5;
+export const PRIORITY_QUEUE_BURST_MIN = 5;
+export const PRIORITY_QUEUE_BURST_MAX = 200;
+// Queue setting: refresh the Priority Queue document you just practised when
+// the session ends, so it is ready before the next Practice.
+export const autoRefreshPriorityQueueId = 'auto-refresh-priority-queue';
+// Cooling window parameters (lib/priority_review_document/cooling.ts):
+//   days = clamp( ceil( interval × fraction ), min, max )
+export const coolingIntervalPercentId = 'cooling-interval-percent';
+export const coolingMinDaysId = 'cooling-min-days';
+export const coolingMaxDaysId = 'cooling-max-days';

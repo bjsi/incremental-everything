@@ -26,6 +26,7 @@ import {
   flashcardHistoryTextLimit,
   remHistoryTextLimit,
   enableMasteryDrillId,
+  autoRefreshPriorityQueueId,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -45,6 +46,8 @@ import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { transferToDismissed } from '../lib/dismissed';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../lib/priority_review_document';
+import { CoolingScanner } from '../lib/priority_review_document/cooling_gather';
+import { isPriorityQueueDoc, refreshPriorityQueue } from '../lib/priority_review_document/queue_doc';
 import {
   calculateAllPercentiles,
   getPerformanceMode,
@@ -226,6 +229,38 @@ export function registerQueueExitListener(
         dueThreshold: startOfToday,
       };
 
+      // Cooling, judged NOW rather than read from the last refresh: the siblings
+      // reviewed in this very session are the ones that make the top unreviewed
+      // due Rems ineligible, and only a fresh scan knows about them. The shield
+      // is a minimum, so only the head of the ranking can move it — the top
+      // overdue Rems by priority, KB-wide and in the document scope, are enough
+      // and cost about a second. Published to the cache so the next session's
+      // live shield starts from the same knowledge.
+      let coolingRemIds: ReadonlySet<string> = new Set();
+      if (shouldSaveCard) {
+        try {
+          const seenSet = new Set(seenCardIds);
+          const overdueByPriority = allCardInfos
+            .filter((info) => (info.dueCardsOverdue ?? 0) > 0 && !info.paused && !seenSet.has(info.remId))
+            .sort((a, b) => a.priority - b.priority);
+          const headIds = overdueByPriority.slice(0, 150).map((info) => info.remId);
+          const scopeIdSet = priorityCalcScopeRemIds ? new Set(priorityCalcScopeRemIds) : null;
+          const scopeHeadIds = scopeIdSet
+            ? overdueByPriority.filter((info) => scopeIdSet.has(info.remId)).slice(0, 100).map((info) => info.remId)
+            : [];
+          const scanner = new CoolingScanner(plugin, {
+            scopeRemId: originalScopeId ?? null,
+            priorityByRemId: new Map(overdueByPriority.map((info) => [info.remId, info.priority])),
+          });
+          await scanner.scan([...headIds, ...scopeHeadIds]);
+          await scanner.publish();
+          coolingRemIds = scanner.coolingIds();
+          console.log(`[QueueExit] Cooling scan: ${coolingRemIds.size} of ${scanner.checkedIds.size} top overdue Rems are cooling and will not set the shield.`);
+        } catch (e) {
+          console.warn('[QueueExit] Cooling scan failed; the shield is saved without the exclusion:', e);
+        }
+      }
+
       if (shouldSaveCard) {
         await saveKBShield(
           plugin,
@@ -235,7 +270,8 @@ export function registerQueueExitListener(
           cardPriorityShieldHistoryKey,
           'Card',
           displayWeighted,
-          cardVerifyOptions
+          cardVerifyOptions,
+          coolingRemIds
         );
       } else {
         console.warn('[QueueExit] Skipping KB Card shield save because cache was incomplete');
@@ -314,7 +350,8 @@ export function registerQueueExitListener(
             historyKey,
             'Card',
             displayWeighted,
-            cardVerifyOptions
+            cardVerifyOptions,
+            coolingRemIds
           );
         } else if (shouldSaveCard) {
           console.warn(
@@ -332,8 +369,38 @@ export function registerQueueExitListener(
     await resetQueueSession(plugin);
     resetSessionItemCounter();
 
-    // console.log('Session state reset complete');
+    // The Priority Queue document you just practised is drained of what you
+    // reviewed and topped back up, so it is ready before the next Practice.
+    // Off the exit path: the delay keeps the bridge free for RemNote's own
+    // teardown, and the guard is skipped because this IS the moment the queue
+    // closes — the URL may still read /flashcards for a beat.
+    void schedulePriorityQueueAutoRefresh(plugin, subQueueId);
   });
+}
+
+async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, subQueueId: RemId | null | undefined) {
+  try {
+    if (!subQueueId) return;
+    if (!(await getIESetting(plugin, autoRefreshPriorityQueueId))) return;
+    const doc = await plugin.rem.findOne(subQueueId);
+    if (!doc || !(await isPriorityQueueDoc(doc))) return;
+    setTimeout(async () => {
+      try {
+        const result = await refreshPriorityQueue(plugin, {
+          scopeRemId: await extractOriginalScopeFromPriorityReview(doc) ?? null,
+          skipQueueGuard: true,
+        });
+        await plugin.app.toast(
+          `Priority Queue refreshed: ${result.holding.total} items ready ` +
+            `(drained ${result.drained.reviewed + result.drained.cooling + result.drained.missing}, added ${result.added.total}).`
+        );
+      } catch (e) {
+        console.error('[Priority Queue] Auto-refresh after the session failed:', e);
+      }
+    }, 2500);
+  } catch (e) {
+    console.error('[Priority Queue] Auto-refresh scheduling failed:', e);
+  }
 }
 
 /**

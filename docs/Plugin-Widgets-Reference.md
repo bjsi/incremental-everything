@@ -295,7 +295,7 @@ A combined popup that appears automatically when a new Incremental Rem is create
 
 **Access:** Three-dot menu in the top-right corner of the queue (or using the `Sorting Criteria` command)
 
-Controls three aspects of your queue algorithm: **IncRem Randomness** (how strictly the queue follows priority order), **Flashcard Randomness** (used for [Priority Review Documents](Priority-Review-Document.md)), and **Flashcard Ratio** (the balance between flashcards and IncRems per session).
+Controls three aspects of your queue algorithm: **IncRem Randomness** (how strictly the queue follows priority order), **Flashcard Randomness** (used when the [Priority Queue](Priority-Review-Document.md) is refilled), and **Flashcard Ratio** (the balance between flashcards and IncRems per session).
 
 ![Screenshot of the ](assets/sorting-criteria.png){ width="350" }
 
@@ -375,7 +375,7 @@ Visualize how your items are distributed across the priority scale. Two views ar
 
 ![Knowledge Base Priority Graph](assets/priority-graph-KB.png){ width="800" }
 
-These graphs are also embedded at the top of generated [Priority Review Documents](Priority-Review-Document.md), so you can verify the effect of your randomness settings.
+The same graph sits at the top of every [Priority Queue](Priority-Review-Document.md#the-status-block-and-the-graph) document and is regenerated at every refresh, so you can verify the effect of your randomness and shield-slice settings on each fill.
 
 ![Priority Review Doc Graph](assets/priority-review-doc-graph.png){ width="800" }
 
@@ -576,7 +576,7 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 
 The plugin's hub, at the bottom of the left sidebar. Header controls: **⌨** ([Keyboard Shortcuts](Keyboard-Shortcuts.md)), **⚙** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation, **✕** hides the panel for the session — it returns on the next start, and the **Show Incremental RemNote Panel** command brings it back sooner.
 
-Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Review** group of three — the label creates a [Priority Review Document](Priority-Review-Document.md) scoped to the document you currently have open (naming that scope under the button), **👁** opens the **Priority Review Queue** Rem that lists every review document you have built, and **🧹** runs [Clean Priority Review Documents](Priority-Review-Document.md#cleaning-a-review-document).
+Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Queue** group of three — the label opens the [Priority Queue popup](#614-priority-queue-popup) with the document you currently have open as the offered scope (naming it under the button), **👁** opens the **Priority Review Queue** Rem that lists every Priority Queue document, and **▶** opens the queue on the full-KB Priority Queue, building it first if needed.
 
 ![The Incremental RemNote panel in the sidebar](assets/panel-hub-2.png){ width="400" }
 
@@ -619,7 +619,7 @@ Two stages, like the Empty Extra Card Detail popup and for the same reason: the 
 - **The report stays on screen**: how many entries were removed, which documents were deleted (and how many still-due incremental entries went with them), and which have no flashcards due but were kept.
 - **The console holds the full readout**: a table per document with every entry's status, kind, name and Rem ID, which is the quickest way to see what a review document is still carrying.
 
-📖 **Full documentation:** [Cleaning a Review Document](Priority-Review-Document.md#cleaning-a-review-document)
+📖 **Full documentation:** [Cleaning up leftovers](Priority-Review-Document.md#cleaning-up-leftovers)
 
 ---
 
@@ -637,6 +637,21 @@ Finds the Rems in an anchor's orbit that generate no flashcards, and fixes the t
 - **Keyboard-driven:** `↑`/`↓` move, `Space` selects, `A` selects everything shown, `Enter` applies, `Esc` closes — ignored mid-write so a reflex press cannot lose the undo snapshot.
 
 📖 **Full documentation:** [Card Enablement Audit](Utilities.md#card-enablement-audit)
+
+### 6.14. Priority Queue Popup
+**Trigger:** `Priority Queue` command (quick code `prq`, `Alt+Shift+R`), the **Document Menu** (⋯) of any document, the queue's ⋮ menu, or the **Priority Queue** button of the panel
+
+The front door to the persistent review document, one per scope.
+
+- **Scope** — the document you came from, or the whole knowledge base. A review document is never offered.
+- **Status card** — what the document holds, what is still due, what a refresh would drain (and how much of it is cooling), the last refresh, and the **card shield now → after this document** for that scope, cooling Rems excluded.
+- **Fill target** (25 / 50 / 100 or any number) and **shield slice** (% of each fill filled strictly by priority; 0 follows the Sorting Criteria exactly), both stored on the document.
+- **Build / Refresh**, **Drain**, **Refill**, **▶ Practice** (the same route as the document's Practice button), **Open document**, **Cooling**, **Sorting…** — none of which runs while a queue is open.
+- **Result panels** after an action: the Rems left out as cooling, held back by a due ancestor (and what happened to the ancestor), or skipped as paused, each with its priority.
+- **Cooling tab** — every Rem currently cooling with its reason, the day it returns and its window; **Release**, **+7d**, **Never** per row; **Rescan** for the top 200 due.
+- **Keyboard-driven:** `←`/`→` move the selection ring, `Enter` activates, `Esc` closes; in the Cooling tab `↑`/`↓` choose, `R`/`E`/`N` act, `Enter` opens the Rem.
+
+📖 **Full documentation:** [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup)
 
 ## 7. Mastery Drill
 

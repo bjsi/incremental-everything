@@ -349,7 +349,7 @@ export function PrdCleanupPopup() {
               <span className="font-bold" style={{ color: removable ? '#dc2626' : undefined }}>
                 {removable}
               </span>{' '}
-              reviewed · {doc.totalEntries} entries
+              {doc.coolingEntries > 0 ? `reviewed or cooling (${doc.coolingEntries} cooling)` : 'reviewed'} · {doc.totalEntries} entries
               {doc.createdAt ? ` · built ${formatDate(doc.createdAt)}` : ''}
             </div>
             {doc.keptEntries.length > 0 && (

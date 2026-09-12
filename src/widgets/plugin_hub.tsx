@@ -4,6 +4,14 @@ import '../style.css';
 import '../App.css';
 import { IE_DOCS_BASE_URL } from '../lib/settings';
 import { safeRemTextToString } from '../lib/pdfUtils';
+// Static on purpose: a dynamic import here produced a split chunk that the
+// plugin sandbox cannot fetch (ChunkLoadError on the dayjs vendor chunk).
+import {
+  findPriorityQueueDoc,
+  isQueueOpen,
+  practicePriorityQueue,
+  refreshPriorityQueue,
+} from '../lib/priority_review_document/queue_doc';
 import { onboardingTipsWidgetId, pluginHubHiddenKey } from '../lib/consts';
 import {
   OnboardingTip,
@@ -444,7 +452,7 @@ export function PluginHub() {
    * the document the focused pane has open, then the first open pane. A missing
    * scope is not an error: the creator still offers the whole knowledge base.
    */
-  const openReviewDocumentCreator = useCallback(async () => {
+  const resolveScope = useCallback(async (): Promise<{ scopeRemId: string | null; scopeName: string }> => {
     let scopeRemId: string | undefined;
 
     const focused = await plugin.focus.getFocusedRem();
@@ -461,12 +469,41 @@ export function PluginHub() {
 
     const scopeRem = scopeRemId ? await plugin.rem.findOne(scopeRemId) : undefined;
     const scopeName = scopeRem ? await safeRemTextToString(plugin, scopeRem.text) : 'Full KB';
+    return { scopeRemId: scopeRem?._id ?? null, scopeName };
+  }, [plugin]);
 
-    await plugin.storage.setSession('reviewDocContext', {
-      scopeRemId: scopeRem?._id ?? null,
-      scopeName,
-    });
-    await plugin.widget.openPopup('review_document_creator');
+  const openReviewDocumentCreator = useCallback(async () => {
+    await plugin.storage.setSession('reviewDocContext', await resolveScope());
+    await plugin.widget.openPopup('priority_queue_popup');
+  }, [plugin, resolveScope]);
+
+  /**
+   * ▶ — straight into the queue on the full-KB Priority Queue, building the
+   * document first when there is none yet. Always the knowledge base, whatever
+   * is open: the daily driver, and the same thing the `prqgo` command does.
+   * Document-scoped queues are practised from the popup.
+   */
+  const practiceKbQueue = useCallback(async () => {
+    try {
+      if (await isQueueOpen(plugin)) {
+        await plugin.app.toast('A queue is already open.');
+        return;
+      }
+      let doc = (await findPriorityQueueDoc(plugin, null))?.doc ?? null;
+      if (!doc) {
+        await plugin.app.toast('Building the Priority Queue for the whole knowledge base…');
+        const result = await refreshPriorityQueue(plugin, { scopeRemId: null });
+        doc = result.doc;
+        if (!doc) {
+          await plugin.app.toast('Could not build the Priority Queue — see the console.');
+          return;
+        }
+      }
+      await practicePriorityQueue(plugin, doc);
+    } catch (e) {
+      console.error('[Hub] Practice Priority Queue failed:', e);
+      await plugin.app.toast('Could not open the Priority Queue — see the console.');
+    }
   }, [plugin]);
 
   /**
@@ -486,16 +523,11 @@ export function PluginHub() {
     const tagRem = await plugin.rem.findByName(['Priority Review Queue'], null);
     if (!tagRem) {
       await plugin.app.toast(
-        'No Priority Review Documents yet — create one with the button to the left.'
+        'No Priority Queue yet — build one with the button to the left.'
       );
       return;
     }
     await plugin.window.openRem(tagRem);
-  }, [plugin]);
-
-  /** The "Clean Priority Review Documents" command, as a button. */
-  const openPrdCleanup = useCallback(async () => {
-    await plugin.widget.openPopup('prd_cleanup_popup');
   }, [plugin]);
 
   /**
@@ -606,11 +638,11 @@ export function PluginHub() {
             className="hover:opacity-75"
             title={
               scopeName
-                ? `Create a Priority Review Document scoped to "${scopeName}"`
-                : 'Create a Priority Review Document'
+                ? `Priority Queue — refresh, practise and inspect the queue for "${scopeName}" or the whole knowledge base`
+                : 'Priority Queue — refresh, practise and inspect your persistent priority review document'
             }
           >
-            Priority Review
+            Priority Queue
           </button>
           <button
             onClick={openPriorityReviewQueue}
@@ -622,13 +654,13 @@ export function PluginHub() {
             👁
           </button>
           <button
-            onClick={openPrdCleanup}
+            onClick={practiceKbQueue}
             style={segmentIconStyle}
             className="hover:opacity-75"
-            title="Clean Priority Review Documents — remove the entries whose Rem no longer has anything due"
-            aria-label="Clean Priority Review Documents"
+            title="Practice the Priority Queue for the whole knowledge base — builds it first if there is none yet"
+            aria-label="Practice the Priority Queue"
           >
-            🧹
+            ▶
           </button>
         </div>
       </div>

@@ -11,6 +11,8 @@ import {
   RemType,
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { scanCooling } from '../lib/priority_review_document/cooling_gather';
+import { CoolingVerdict } from '../lib/priority_review_document/cooling';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep, IncrementalRem } from '../lib/incremental_rem/types';
 import { isPowerupPropertySafe } from '../lib/powerupSlotFilter';
@@ -2254,6 +2256,74 @@ function Debug() {
   // checked against real rems instead of assumed: disable one direction of a
   // two-way card, or make a fresh never-practiced one, and read off what
   // actually comes back.
+  // --- Priority Queue cooling probes (lib/priority_review_document/cooling*) ---
+  const coolingIso = (ms: number) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
+  const coolingDaysAgo = (ms: number) => ((Date.now() - ms) / 86_400_000).toFixed(1);
+  const describeVerdictReasons = (v: CoolingVerdict) =>
+    v.reasons.map((r) => `${r.relation} ← "${(r.sourceLabel ?? r.sourceRemId).slice(0, 40)}" ${coolingDaysAgo(r.seenAt)}d ago`).join(' | ') ||
+    (v.extendedUntil ? 'extended by user' : '');
+
+  /** Dry run over the focused rem: every seen event the rule looked at, then the verdict. */
+  const handleProbeCooling = async () => {
+    if (!rem) { await plugin.app.toast('No rem found!'); return; }
+    const result = await scanCooling(plugin, [rem._id], { includeCandidates: true, dryRun: true });
+    const candidate = result.candidates?.[0];
+    if (!candidate) {
+      console.log(`[Cooling probe] ${rem._id} owes no due card right now, so it cannot be cooling.`);
+      await plugin.app.toast('This rem has no due card — nothing to cool. See console.');
+      return;
+    }
+    console.group(`[Cooling probe] "${candidate.label ?? rem._id}"`);
+    console.log('Due cards (what would be spoiled):', candidate.dueCards.map((c) => `${c.cardId} interval ${c.intervalDays.toFixed(1)}d`));
+    console.table(
+      candidate.seen.map((e) => ({
+        relation: e.relation,
+        source: (e.sourceLabel ?? '').slice(0, 60),
+        sourceRemId: e.sourceRemId,
+        cardId: e.cardId ?? '(IncRem read)',
+        seenAt: coolingIso(e.seenAt),
+        daysAgo: coolingDaysAgo(e.seenAt),
+        stillDue: e.stillDue,
+      }))
+    );
+    const v = result.verdicts[0];
+    if (v) {
+      console.log(`COOLING until ${coolingIso(v.until)} — window ${v.windowDays}d from a ${v.intervalDays.toFixed(0)}d interval. Reasons: ${describeVerdictReasons(v)}`);
+    } else {
+      console.log('NOT cooling: no seen event inside the window (or it is still due / released / never-cool).');
+    }
+    console.groupEnd();
+    await plugin.app.toast(v ? `Cooling until ${coolingIso(v.until)} — see console` : 'Not cooling — see console');
+  };
+
+  /** Real scan over the 200 highest-priority rems with due cards; publishes the cache the shields read. */
+  const handleCoolingScanTopDue = async () => {
+    const infos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+    const top = infos
+      .filter((i) => (i.dueCards ?? 0) > 0 && !i.paused)
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, 200);
+    if (top.length === 0) { await plugin.app.toast('Card priority cache is empty or nothing is due.'); return; }
+    const result = await scanCooling(plugin, top.map((t) => t.remId), {
+      priorityByRemId: new Map(top.map((t) => [t.remId, t.priority])),
+      scopeRemId: null,
+    });
+    console.group(`[Cooling scan] ${result.verdicts.length} cooling of ${result.withDueCards} top-due rems (${result.checked} checked, ${result.clustersSkipped} clusters skipped) in ${result.elapsedMs}ms`);
+    console.table(
+      result.verdicts.map((v) => ({
+        priority: v.priority,
+        rem: (v.label ?? '').slice(0, 60),
+        remId: v.remId,
+        until: coolingIso(v.until),
+        windowDays: v.windowDays,
+        intervalDays: Math.round(v.intervalDays),
+        reasons: describeVerdictReasons(v),
+      }))
+    );
+    console.groupEnd();
+    await plugin.app.toast(`Cooling: ${result.verdicts.length} of ${result.withDueCards} top-due rems, ${result.elapsedMs}ms — see console`);
+  };
+
   const handleProbeSpoilerState = async () => {
     if (!rem) return;
     const now = Date.now();
@@ -4422,6 +4492,36 @@ function Debug() {
                  title="Print every card on this rem and on its cloze-extract children, with raw nextRepetitionTime and whether the queue's spoiler gate counts it as due"
                >
                  Probe Spoiler State
+               </button>
+               <button
+                 onClick={handleProbeCooling}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-secondary)',
+                   color: 'var(--rn-clr-content-primary)',
+                   border: '1px solid var(--rn-clr-border)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="Dry-run the Priority Queue cooling rule on this rem: lists every recently seen sibling/parent/descendant card it looked at and whether the rem is cooling, and for how long"
+               >
+                 Probe Cooling
+               </button>
+               <button
+                 onClick={handleCoolingScanTopDue}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-secondary)',
+                   color: 'var(--rn-clr-content-primary)',
+                   border: '1px solid var(--rn-clr-border)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="Run the cooling scan over the 200 highest-priority rems with due cards and publish the result to the session cache (what the shields will read). Prints verdicts + timing to the console"
+               >
+                 Cooling Scan (top 200 due)
                </button>
                <button
                  onClick={handleProbeCardEnablement}

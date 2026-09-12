@@ -210,7 +210,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
   plugin.app.registerMenuItem({
     id: 'create_priority_review_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
-    name: 'Create Priority Review Document',
+    name: 'Priority Queue',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) return;
@@ -222,7 +222,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         scopeName: remName,
       });
 
-      await plugin.widget.openPopup('review_document_creator');
+      await plugin.widget.openPopup('priority_queue_popup');
     },
   });
 
@@ -274,7 +274,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
   plugin.app.registerMenuItem({
     id: 'create_priority_review_queue_menuitem',
     location: PluginCommandMenuLocation.QueueMenu,
-    name: 'Create Priority Review Document',
+    name: 'Priority Queue',
     action: async () => {
       const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
 
@@ -293,7 +293,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         });
       }
 
-      await plugin.widget.openPopup('review_document_creator');
+      await plugin.widget.openPopup('priority_queue_popup');
     },
   });
 }

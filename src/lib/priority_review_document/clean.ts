@@ -1,7 +1,7 @@
 import { RNPlugin, PluginRem, RemId, RichTextInterface } from '@remnote/plugin-sdk';
 import dayjs from 'dayjs';
 import { IncrementalRem } from '../incremental_rem';
-import { allIncrementalRemKey, priorityGraphPowerupCode } from '../consts';
+import { allIncrementalRemKey, priorityGraphPowerupCode, priorityQueuePowerupCode } from '../consts';
 
 /**
  * Cleaning a Priority Review Document of entries that are no longer due.
@@ -53,6 +53,12 @@ export type EntryStatus =
   | 'due'
   /** Reviewed since the document was built — the entry is removable. */
   | 'stale'
+  /**
+   * Still due, but a card that would give its answer away was reviewed
+   * recently (see cooling.ts) — the entry is removable; a refill brings the
+   * Rem back once its window has run out.
+   */
+  | 'cooling'
   /** The referenced Rem no longer exists — the entry is removable. */
   | 'missing'
   /** Cannot be judged (see {@link PrdScanResult.incCacheUnavailable}) — kept. */
@@ -79,18 +85,21 @@ export interface PrdEntry {
 }
 
 /** Why a document that holds nothing due cannot simply be deleted. */
-export type UndeletableReason = 'kept-entries' | 'inc-with-notes' | 'your-notes';
+export type UndeletableReason = 'kept-entries' | 'inc-with-notes' | 'your-notes' | 'persistent';
 
 export const UNDELETABLE_REASON_LABELS: Record<UndeletableReason, string> = {
   'kept-entries': 'holds entries kept for your notes',
   'inc-with-notes': 'holds incremental entries with writing of your own under them',
   'your-notes': 'holds bullets of your own',
+  persistent: 'is a Priority Queue document, kept and refilled rather than deleted',
 };
 
 export interface PrdDocReport {
   docRemId: RemId;
   docName: string;
   createdAt: number;
+  /** A persistent Priority Queue document: never deleted, never stamped. */
+  persistent: boolean;
   /** Entries (reference-bearing children) found in the document. */
   totalEntries: number;
   /** The plugin's own children: the metadata block and the distribution graph. */
@@ -109,8 +118,10 @@ export interface PrdDocReport {
    * ones. Surfaced so the confirmation can say what deleting actually costs.
    */
   remainingIncEntries: number;
-  /** Entries that will be deleted. */
+  /** Entries that will be deleted — reviewed, missing, or cooling. */
   removableEntries: PrdEntry[];
+  /** How many of the removable entries are removable because they are cooling. */
+  coolingEntries: number;
   /** No longer due, but kept because deleting them would lose something. */
   keptEntries: PrdEntry[];
   /** Entries that could not be judged. */
@@ -168,6 +179,13 @@ export interface PrdCleanResult {
   incEntriesDropped: number;
   /** Documents left holding nothing due that were kept, and why. */
   emptiedDocs: { docRemId: RemId; docName: string; reason: UndeletableReason | 'not-requested' }[];
+}
+
+export interface PrdScanOptions {
+  /** Only these documents; every tagged document when absent. */
+  docIds?: RemId[];
+  /** Rems currently cooling: a due FC entry pointing at one is removable as `cooling`. */
+  coolingRemIds?: ReadonlySet<RemId>;
 }
 
 export interface PrdCleanOptions {
@@ -339,7 +357,8 @@ async function taggedIdSet(plugin: RNPlugin, tagName: string): Promise<Set<RemId
  */
 export async function scanPriorityReviewDocuments(
   plugin: RNPlugin,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  options: PrdScanOptions = {}
 ): Promise<PrdScanResult> {
   const startedAt = Date.now();
   const empty: PrdScanResult = {
@@ -359,7 +378,11 @@ export async function scanPriorityReviewDocuments(
   if (!prdTag) {
     return { ...empty, elapsedMs: Date.now() - startedAt };
   }
-  const docs = (await prdTag.taggedRem()) || [];
+  let docs = (await prdTag.taggedRem()) || [];
+  if (options.docIds) {
+    const wanted = new Set(options.docIds);
+    docs = docs.filter((d) => wanted.has(d._id));
+  }
   if (docs.length === 0) {
     return { ...empty, elapsedMs: Date.now() - startedAt };
   }
@@ -391,10 +414,18 @@ export async function scanPriorityReviewDocuments(
     const targets = targetIds.size ? (await plugin.rem.findMany([...targetIds])) || [] : [];
     const targetById = new Map<RemId, PluginRem>(targets.map((r) => [r._id, r]));
 
+    let persistent = false;
+    try {
+      persistent = await doc.hasPowerup(priorityQueuePowerupCode);
+    } catch {
+      persistent = false;
+    }
+
     const report: PrdDocReport = {
       docRemId: doc._id,
       docName,
       createdAt: doc.createdAt,
+      persistent,
       totalEntries: 0,
       generatedChildren: 0,
       userChildren: 0,
@@ -402,6 +433,7 @@ export async function scanPriorityReviewDocuments(
       dueFlashcards: 0,
       remainingIncEntries: 0,
       removableEntries: [],
+      coolingEntries: 0,
       keptEntries: [],
       unknownEntries: [],
       deletable: false,
@@ -449,8 +481,10 @@ export async function scanPriorityReviewDocuments(
       } else if (kind === 'inc') {
         if (!incState.available) entry.status = 'unknown';
         else entry.status = incState.due.has(targetRemId) ? 'due' : 'stale';
-      } else {
-        entry.status = dueCardRemIds.has(targetRemId) ? 'due' : 'stale';
+      } else if (!dueCardRemIds.has(targetRemId)) {
+        entry.status = 'stale';
+      } else if (options.coolingRemIds?.has(targetRemId)) {
+        entry.status = 'cooling';
       }
 
       // A surviving entry no longer guarantees the document survives, so this is
@@ -490,6 +524,7 @@ export async function scanPriorityReviewDocuments(
         report.keptEntries.push(entry);
       } else {
         report.removableEntries.push(entry);
+        if (entry.status === 'cooling') report.coolingEntries++;
       }
     }
 
@@ -506,7 +541,10 @@ export async function scanPriorityReviewDocuments(
     //
     // A document that already holds no entries at all lands here too, which is
     // the point — those are finished snapshots with nothing left in them.
-    if (report.dueFlashcards === 0) {
+    if (persistent) {
+      // Kept by design: it is emptied and refilled, never thrown away.
+      report.undeletableReason = 'persistent';
+    } else if (report.dueFlashcards === 0) {
       if (report.keptEntries.length > 0) {
         report.undeletableReason = 'kept-entries';
       } else if (incEntryHoldsNotes) {
@@ -645,11 +683,12 @@ export async function cleanPriorityReviewDocuments(
       onProgress?.(`Removed ${result.deleted} of ${total}…`);
     }
 
-    await stampMetadata(plugin, doc, deletedHere);
+    // A Priority Queue document rewrites its own status block on refresh.
+    if (!doc.persistent) await stampMetadata(plugin, doc, deletedHere);
 
     // Same predicate as `deletable`, so a document that qualified but was kept
     // is reported with the reason it was kept for.
-    if (doc.dueFlashcards === 0) {
+    if (doc.dueFlashcards === 0 && !doc.persistent) {
       result.emptiedDocs.push({
         docRemId: doc.docRemId,
         docName: doc.docName,

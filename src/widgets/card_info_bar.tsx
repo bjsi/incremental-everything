@@ -14,6 +14,7 @@ import {
   displayWeightedShieldId,
   cardPriorityCacheRefreshKey,
   seenCardInSessionKey,
+  coolingCacheKey,
   priorityCalcScopeRemIdsKey,
   incrementalQueueActiveKey,
   displayFsrsDsrId,
@@ -59,12 +60,18 @@ function computeShieldStatus(
   sessionCache: QueueSessionCache | null,
   allPrioritizedCardInfo: CardPriorityInfo[] | null | undefined,
   seenRemIds: string[],
-  scopeRemIds: string[] | null | undefined
+  scopeRemIds: string[] | null | undefined,
+  coolingRemIds: ReadonlySet<string> = new Set()
 ): ShieldStatus {
   if (!remId || !sessionCache) return null;
 
+  // A cooling Rem (priority_review_document/cooling.ts) cannot set the shield:
+  // its sibling was reviewed recently, so it is deliberately not being asked.
   const filterUnreviewed = (list: CardPriorityInfo[]) =>
-    list.filter((info) => !seenRemIds.includes(info.remId) || info.remId === remId);
+    list.filter(
+      (info) =>
+        (!seenRemIds.includes(info.remId) && !coolingRemIds.has(info.remId)) || info.remId === remId
+    );
 
   // Use the overdue lists (start-of-today criterion) for the shield.
   // Falls back to [] when the session cache pre-dates this feature.
@@ -73,7 +80,8 @@ function computeShieldStatus(
 
   // Predicate for percentile calculation also uses the start-of-today boundary.
   const predicate = (info: CardPriorityInfo) =>
-    (info.dueCardsOverdue ?? 0) > 0 && (!seenRemIds.includes(info.remId) || info.remId === remId);
+    (info.dueCardsOverdue ?? 0) > 0 &&
+    ((!seenRemIds.includes(info.remId) && !coolingRemIds.has(info.remId)) || info.remId === remId);
 
   let kbPercentile: number | undefined;
   if (topMissedInKb && allPrioritizedCardInfo) {
@@ -145,6 +153,18 @@ export function CardInfoBar() {
     (rp) => rp.storage.getSession<string[]>(seenCardInSessionKey),
     [refreshSignal]
   ) ?? [];
+
+  // Rems cooling as of the last cooling scan (published at QueueExit and on
+  // every Priority Queue refresh). Read from the session cache only — no scan
+  // runs on this path — and self-expiring, since each verdict carries its end.
+  const coolingCache = useTrackerPlugin(
+    (rp) => rp.storage.getSession<{ verdicts: { remId: string; until: number }[] }>(coolingCacheKey),
+    []
+  );
+  const coolingRemIds = React.useMemo(() => {
+    const now = Date.now();
+    return new Set((coolingCache?.verdicts ?? []).filter((v) => v.until > now).map((v) => v.remId));
+  }, [coolingCache]);
 
   // Inside a Card Cluster, RemNote keeps this FlashcardUnder widget mounted across all
   // sibling cards and `getWidgetContext().remId` stays pinned to the cluster parent.
@@ -456,8 +476,8 @@ export function CardInfoBar() {
   // --- REWRITTEN: The Shield calculation is now ultra-fast ---
   const shieldStatus = useMemo(() => {
     if (useLightMode || !rem || !sessionCache) return null;
-    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds, scopeRemIds);
-  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds]);
+    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds, scopeRemIds, coolingRemIds);
+  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds, coolingRemIds]);
 
   // --- Weighted Shield: per-CARD bucketing (matches Card Priority × Memory
   // Analytics). Expand each CardPriorityInfo into one item per card and use

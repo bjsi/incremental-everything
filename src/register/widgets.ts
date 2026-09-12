@@ -210,9 +210,12 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   });
   await plugin.app.registerCSS('queue-beautiful-bar', QUEUE_BEAUTIFUL_BAR_CSS);
 
-  plugin.app.registerWidget('review_document_creator', WidgetLocation.Popup, {
+  // The Priority Queue popup: status, refresh/drain/refill/practise for the
+  // persistent review document, and the Cooling list. Replaces the snapshot
+  // creator (review_document_creator).
+  plugin.app.registerWidget('priority_queue_popup', WidgetLocation.Popup, {
     dimensions: {
-      width: 500,
+      width: 640,
       height: 'auto',
     },
   });

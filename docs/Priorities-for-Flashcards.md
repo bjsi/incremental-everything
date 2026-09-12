@@ -12,7 +12,7 @@ Flashcard prioritisation is **off by default**. Turn it on in the plugin's setti
 
 It is opt-in because it is the one part of the plugin that works across your **entire** knowledge base rather than on the Rems you are handling. While it is on, the plugin tags flashcard-bearing Rems with the `cardPriority` powerup and keeps those tags in step as you edit — on a large library that means a long initial pass and continuous background work, and RemNote can feel slow until it settles.
 
-**Only turn it on if you create [Priority Review Documents](Priority-Review-Document.md) for flashcards and review the queue there.** That is what the tags are for. If you are unsure, leave it off — you can switch it on later at any time and the plugin will build what it needs then.
+**Only turn it on if you practise your flashcards through the [Priority Queue](Priority-Review-Document.md).** That is what the tags are for. If you are unsure, leave it off — you can switch it on later at any time and the plugin will build what it needs then.
 
 ### What still works with it off
 
@@ -270,14 +270,14 @@ This is the most critical concept to understand:
 
 If you just click "Flashcards" in the sidebar, RemNote will show you cards in its standard SRS order. It does not know about the `cardPriority` powerup.
 
-### The Solution: Priority Review Documents
+### The Solution: the Priority Queue
 
-To review your flashcards in priority order, you **must** use the **[Priority Review Document](Priority-Review-Document.md)** feature.
+To review your flashcards in priority order, you **must** practise the **[Priority Queue](Priority-Review-Document.md)** document.
 
 1.  This feature scans your database for due cards.
 2.  It looks at the priorities you've set (Manual/Inherited).
-3.  It generates a temporary document containing portals to your **Highest Priority Due Cards**.
-4.  You review that temporary document.
+3.  It keeps one persistent document topped up with references to your **Highest Priority Due Cards**, and drains it as you review them.
+4.  You practise that document.
 
 This effectively bypasses the native scheduler's "all cards are equal" logic and forces a "best cards first" workflow.
 

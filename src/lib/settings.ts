@@ -42,6 +42,10 @@ import {
   PriorityEditorDisplayMode,
   displayPriorityShieldId,
   deferSpoilerIncRemsId,
+  autoRefreshPriorityQueueId,
+  coolingIntervalPercentId,
+  coolingMinDaysId,
+  coolingMaxDaysId,
   displayWeightedShieldId,
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
@@ -104,6 +108,10 @@ export interface IESettings {
   [collapseQueueTopBar]: boolean;
   [displayPriorityShieldId]: boolean;
   [deferSpoilerIncRemsId]: boolean;
+  [autoRefreshPriorityQueueId]: boolean;
+  [coolingIntervalPercentId]: number;
+  [coolingMinDaysId]: number;
+  [coolingMaxDaysId]: number;
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
@@ -170,6 +178,10 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [collapseQueueTopBar]: false,
   [displayPriorityShieldId]: true,
   [deferSpoilerIncRemsId]: true,
+  [autoRefreshPriorityQueueId]: true,
+  [coolingIntervalPercentId]: 5,
+  [coolingMinDaysId]: 1,
+  [coolingMaxDaysId]: 15,
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
@@ -508,6 +520,48 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'you grade the card. The IncRem returns to the running once those cards are graded, ' +
       'and is released anyway once nothing else is due. Only applies to the normal queue — ' +
       'Practice All and In Order are unaffected.',
+  },
+  [autoRefreshPriorityQueueId]: {
+    kind: 'boolean',
+    group: 'queue',
+    title: 'Refresh the Priority Queue after each session',
+    description:
+      'When you leave the queue after practising a Priority Queue document, drains the entries ' +
+      'you reviewed and tops the document back up to its fill target, so it is ready before the ' +
+      'next Practice. Never runs while a queue is open.',
+  },
+  [coolingIntervalPercentId]: {
+    kind: 'number',
+    group: 'queue',
+    min: 0,
+    max: 100,
+    unit: '% of interval',
+    title: 'Cooling: share of the interval',
+    description:
+      'How long a Rem stays out of the Priority Queue after a card that gives its answer away was ' +
+      'reviewed, as a share of the cooled card\u2019s own interval — a mature card waits longer. ' +
+      'Rounded up to whole days and kept between the two limits below. 5% means a 100-day card ' +
+      'cools for 5 days.',
+  },
+  [coolingMinDaysId]: {
+    kind: 'number',
+    group: 'queue',
+    min: 0,
+    max: 365,
+    integer: true,
+    unit: 'days',
+    title: 'Cooling: minimum',
+    description: 'The shortest cooling window — what a brand-new card gets when its sibling was just reviewed.',
+  },
+  [coolingMaxDaysId]: {
+    kind: 'number',
+    group: 'queue',
+    min: 0,
+    max: 365,
+    integer: true,
+    unit: 'days',
+    title: 'Cooling: maximum',
+    description: 'The longest cooling window, reached by cards with intervals of a year or more at the default share.',
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',

@@ -50,7 +50,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
-| `Alt` + `Shift` + `R` | [Create Priority Review Document](Priority-Review-Document.md) | Creates a review document with IncRems and cards sorted by priority. | Editor Only |
+| `Alt` + `Shift` + `R` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Opens the Priority Queue popup: refresh, drain, refill and practise the persistent priority review document, and the Cooling list. | Editor Only |
 | (n/a) | Batch Priority Change (IncRems & Flashcards) | Opens popup to change priorities of Incremental Rems and Flashcards in bulk (Increase, Decrease, Spread evenly, Adjust proportionally). Access via Command Palette or Document Menu. | Editor Only |
 | `Alt` + `Shift` + `C` | Batch Assign Card Priority | Opens popup to assign card priorities in bulk for all flashcards tagged with the focused Rem. | Editor Only |
 
@@ -148,7 +148,7 @@ Function keys carry the utilities whose natural letter combination was already t
 | `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open) | Editor |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Global |
 | `Alt` + `Shift` + `O` | [Open Hovered Source in Floating Window](Utilities.md#floating-window-interaction-closing) | Editor and Queue |
-| `Alt` + `Shift` + `R` | [Create Priority Review Document](Priority-Review-Document.md) | Editor |
+| `Alt` + `Shift` + `R` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Editor |
 | `Alt` + `Shift` + `V` | [Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Editor |
 | `Alt` + `Shift` + `X` | Extract with Priority | Editor and Queue |
 | `Alt` + `Shift` + `Z` | Create Cloze Deletion with Priority | Editor |

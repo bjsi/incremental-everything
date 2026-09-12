@@ -112,11 +112,14 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 
 ## Special Operations
 
-- **[Create Priority Review Document](Priority-Review-Document.md)** (`Opt+Shift+R` / `Alt+Shift+R`) — `quick: prd`
-  Generate a custom document that compiles your absolute highest priority Rems mixed with standard Flashcards for subset review.
+- **[Priority Queue](Priority-Review-Document.md#the-priority-queue-popup)** (`Opt+Shift+R` / `Alt+Shift+R`) — `quick: prq`
+  Opens the Priority Queue popup for the focused document or the whole knowledge base: the persistent review document that is topped up to a fill target with your highest-priority due items and drained as you review them — refresh, drain, refill, practise, and the Cooling list. Also in the document menu, the queue menu, and on the **Priority Queue** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
 
-- **[Clean Priority Review Documents](Priority-Review-Document.md#cleaning-a-review-document)** — `quick: clean`
-  Scans every Priority Review Document, finds the entries whose Rem no longer has anything due — reviewed flashcards and Incremental Rems — and removes them after you confirm, per document. Documents with **no flashcards left due** are deleted outright, since incremental Rems reach your queue through the sorting criteria without needing a review document. Entries you have written notes under, and documents holding them, are never touched. Also on the **🧹** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
+- **[Practice Priority Queue (Full Knowledge Base)](Priority-Review-Document.md#practise-it)** — `quick: prqgo`
+  Opens the queue straight on the full-KB Priority Queue document, the same route as its Practice button.
+
+- **[Clean Priority Review Documents](Priority-Review-Document.md#cleaning-up-leftovers)** — `quick: clean`
+  Drains every document tagged *Priority Review Queue* at once: finds the entries whose Rem no longer has anything due — or is cooling — and removes them after you confirm, per document. Leftover snapshot documents from earlier versions with **no flashcards left due** are deleted outright; Priority Queue documents are never deleted. Entries you have written notes under, and documents holding them, are never touched.
 
 - **[Open Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)** — `quick: sort`
   Brings up the Sorting dialog to manipulate the flashcard:increm ratio and queue randomization.
