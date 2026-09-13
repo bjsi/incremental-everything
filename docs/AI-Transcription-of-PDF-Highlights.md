@@ -28,6 +28,8 @@ It runs on **your Claude subscription** — no API key, nothing to pay beyond yo
 
 **Requirements:** RemNote **desktop**, **Python 3**, and **Claude Code** logged in to your Claude account.
 
+The same helper also powers [Pin Source Quote](Source-Pins.md), which needs only Python and PyMuPDF — no Claude account.
+
 ## Setup { #setup }
 
 1. **Install Claude Code** ([claude.com/claude-code](https://claude.com/claude-code)) and run `claude` once in a terminal to log in.

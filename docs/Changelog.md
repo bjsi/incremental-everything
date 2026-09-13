@@ -2,6 +2,26 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.92 - September 13th, 2026
+
+### ✨ New - Pin Source Quote: pin the source of text you already have
+
+**Pin Source Quote** (`psq`) finds the focused Rem's text in the PDF or web article open beside it and pins the passage — reusing the highlight already there, or creating one — in a PDF, a saved web article or a PDF's Text Reader view.
+
+📖 [Source Pins](Source-Pins.md)
+
+### ✨ New - Create IncRem can pin both views of a PDF
+
+With **Create IncRem: Also Pin the Other PDF View** on, extracting from a PDF that also has a Text Reader version pins the passage in both views and marks both highlights as extracted.
+
+📖 [Pinning both views on Create IncRem](Source-Pins.md#create-increm-both-views)
+
+### ⚡ Improved - Pin rings tell a PDF page from an HTML source
+
+Pins to highlights in a saved web article or a PDF's Text Reader view now carry a purple ring; pins to PDF pages stay yellow.
+
+📖 [Reference pin rings](Colour-Coding-Reference.md#reference-pin-rings)
+
 ## v1.0.91 - September 12th, 2026
 
 ### ✨ New - AI Transcribe for PDF highlights

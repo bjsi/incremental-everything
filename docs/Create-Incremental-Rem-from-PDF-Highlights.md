@@ -95,6 +95,10 @@ If you need a destination that doesn't exist yet (e.g., "Section D" under "Chapt
 - **Auto-Bookmark**: If you are in the Queue, your current reading position is automatically updated to the location of this highlight, and an entry is added to your reading history.
 
 
+## Pinning Both Views of a PDF { #both-views }
+
+A PDF converted for the Text Reader keeps separate highlights in each view. With the setting **Create IncRem: Also Pin the Other PDF View** on, the new Rem also gets a pin to the same passage in the other view — the Text Reader for a PDF-page highlight, the PDF page for a Text Reader highlight — and that highlight is marked as extracted too. It needs the local helper; see [Pinning both views on Create IncRem](Source-Pins.md#create-increm-both-views).
+
 ## When to Use
 
 | Use Case | Benefit |

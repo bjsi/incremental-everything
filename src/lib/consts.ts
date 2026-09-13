@@ -573,10 +573,6 @@ export const convertExtractedMarkupCommandId = 'convert-extracted-markup';
 // AI transcription of a PDF highlight via the local helper (lib/ai_ocr.ts).
 export const aiTranscribeHighlightCommandId = 'ai-transcribe-highlight';
 export const restoreHighlightBeforeAiCommandId = 'restore-highlight-before-ai';
-
-// Test: does a PDF highlight built through the plugin API show in the viewer? (lib/pdf_highlight_create.ts)
-export const probeClonePdfHighlightCommandId = 'probe-clone-pdf-highlight';
-
 // Pin the source passage of the focused Rem's text in the open PDF (lib/source_pins).
 export const pinSourceQuoteCommandId = 'pin-source-quote';
 

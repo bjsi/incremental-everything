@@ -45,12 +45,13 @@ A ring around a **pin** says where that pin leads, which matters most inside an 
 | Ring | Says |
 |---|---|
 | **Blue** (RemNote's accent) | leads to a Rem holding an **image** — a figure in your own notes |
-| **Yellow** `#eab308` | leads to a **text highlight** — the source passage |
+| **Yellow** `#eab308` | leads to a **text highlight on a PDF page** — the source passage |
+| **Purple** `#a855f7` | leads to a **text highlight in an HTML source** — a saved web article or a PDF's Text Reader view |
 | **Yellow + blue**, alternating edges | leads to a **PDF area highlight** — a clipped figure from the source |
 | **Bottom and right edges in a ramp colour** | the target highlight carries a [**priority band**](Prioritization-&-Sorting.md#priorities-on-pdf-highlights) — hue from the ramp above, dashed if you have extracted from it, dotted if it is merely linked |
 | none | an ordinary Rem |
 
-Yellow means *"leads into a source document"*, blue means *"you will land on an image"*, and an area highlight — being both — carries both. The rings brighten on hover or while the Rem is being edited.
+Yellow and purple mean *"leads into a source document"* — a PDF page or HTML text respectively, which tells apart the two pins of a passage [pinned in both views](Source-Pins.md#pin-rings) of a PDF — blue means *"you will land on an image"*, and an area highlight — being both — carries both. The rings brighten on hover or while the Rem is being edited, each in its own hue.
 
 ![Three pins in one document, each labelled: a yellow ring on a pin to a PDF text highlight (its green dotted bottom and right edges carrying the linked highlight's 20s priority band), a blue ring on a pin to a Rem holding an image, and a yellow-and-blue ring on a pin to a PDF area highlight](assets/pin-rings-explanation.png){ width="900" }
 
@@ -123,6 +124,6 @@ The Queue Dashboard's **speed** reading has its own red→green scale, either fi
 
 The priority ramp occupies hue **0–240**, which is red through green through blue. Anything that must *not* read as a priority has to sit outside that span or use a different channel:
 
-- **Pin rings** use a fixed accent blue and a fixed yellow, but they are a hairline border on an 18px icon — never a background fill and never a left border — and they appear on nothing but pins. Where a pin also carries a band, the two occupy different edges of the same box, so neither has to give way.
+- **Pin rings** use a fixed accent blue, a fixed yellow and a fixed purple, but they are a hairline border on an 18px icon — never a background fill and never a left border — and they appear on nothing but pins. Where a pin also carries a band, the two occupy different edges of the same box, so neither has to give way.
 - **Provenance** on highlight markers uses line style, not hue, precisely because hue was already taken.
 - **`#pdfextract` blue and `#incremental` green** are backgrounds behind text, a channel nothing else uses in the editor.

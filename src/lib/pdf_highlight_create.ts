@@ -1,15 +1,12 @@
-import { BuiltInPowerupCodes, ReactRNPlugin, RichTextElementRemInterface } from '@remnote/plugin-sdk';
+import { BuiltInPowerupCodes, ReactRNPlugin } from '@remnote/plugin-sdk';
 
 /**
- * Create a PDF highlight Rem from the plugin, mirroring RemNote's own
- * `createHighlightOnPDFRem` (read from the app bundle): a Rem whose text is the
- * highlighted text, with the PDFHighlight powerup's `Data` slot holding
- * `{ content: { text }, position, id, temp }` and its `PdfId` slot pointing at
- * the PDF, parented under the PDF's "Page NNN" Rem.
+ * Create PDF and HTML highlight Rems from the plugin, mirroring RemNote's own
+ * `createHighlightOnPDFRem` / `createHTMLHighlight` (read from the app bundle).
  *
- * RemNote's version also calls an internal `addToPortal("pdfHighlight", pdfId)`
- * that the plugin SDK has no equivalent for, so whether a plugin-made highlight
- * shows in the PDF viewer is what `probeClonePdfHighlight` below is testing.
+ * RemNote's versions also call an internal `addToPortal(...)` the plugin SDK has
+ * no equivalent for. It turned out not to matter: plugin-made highlights render
+ * in the viewer, sync, and pins to them jump to the passage (verified 2026-09-13).
  */
 
 /** A box in the coordinates of a page viewport whose size is `width` × `height`. */
@@ -29,6 +26,11 @@ export interface PdfHighlightPosition {
   pageNumber: number;
 }
 
+/**
+ * A PDF highlight Rem: its text is the highlighted text, the PDFHighlight
+ * powerup's `Data` slot holds `{ content: { text }, position, id, temp }` and its
+ * `PdfId` slot points at the PDF, parented under the PDF's "Page NNN" Rem.
+ */
 export async function createPdfHighlight(
   plugin: ReactRNPlugin,
   opts: {
@@ -97,76 +99,4 @@ export async function createHtmlHighlight(
   await rem.setPowerupProperty(BuiltInPowerupCodes.HTMLHighlight, 'HTMLId', [{ i: 'q', _id: opts.sourceRemId }]);
   if (opts.color) await rem.setHighlightColor(opts.color);
   return rem;
-}
-
-/** Shift every box of a position vertically, in page units. */
-const shiftPosition = (position: PdfHighlightPosition, dy: number): PdfHighlightPosition => {
-  const shift = (r: HighlightRect): HighlightRect => ({ ...r, y1: r.y1 + dy, y2: r.y2 + dy });
-  return { ...position, boundingRect: shift(position.boundingRect), rects: position.rects.map(shift) };
-};
-
-const PROBE_PREFIX = '🧪 Probe copy — ';
-
-/**
- * Test: clone the focused highlight through the plugin API, placed just below
- * the original (or above, near the page bottom), in blue. If the copy shows in
- * the PDF viewer, plugin-made highlights work and AI features can pin sources.
- */
-export async function probeClonePdfHighlight(plugin: ReactRNPlugin, sourceRemId: string) {
-  const source = await plugin.rem.findOne(sourceRemId);
-  if (!source || !(await source.hasPowerup(BuiltInPowerupCodes.PDFHighlight))) {
-    await plugin.app.toast('Focus a PDF highlight Rem (in the Highlights document) first.');
-    return;
-  }
-
-  const dataString = await source.getPowerupProperty(BuiltInPowerupCodes.PDFHighlight, 'Data');
-  const pdfIdRichText = await source.getPowerupPropertyAsRichText(BuiltInPowerupCodes.PDFHighlight, 'PdfId');
-  const pdfRemId = (pdfIdRichText?.[0] as RichTextElementRemInterface | undefined)?._id;
-  const sourceData = dataString ? JSON.parse(dataString) : null;
-  const box: HighlightRect | undefined = sourceData?.position?.boundingRect;
-  if (!sourceData?.position || !box || !pdfRemId || !source.parent) {
-    console.warn('[HighlightProbe] Unusable source', { dataString, pdfIdRichText, parent: source.parent });
-    await plugin.app.toast('This highlight has no position data or PDF link — pick a highlight made in the PDF view.');
-    return;
-  }
-
-  const boxHeight = box.y2 - box.y1;
-  const gap = 12 * (box.height / 792); // ~12 pt on a letter-sized page, scaled to the viewport
-  const dy = box.y2 + gap + boxHeight <= box.height ? boxHeight + gap : -(boxHeight + gap);
-  const sourceText = await plugin.richText.toString(source.text ?? []);
-  const siblingIndex = await source.positionAmongstSiblings();
-
-  const copy = await createPdfHighlight(plugin, {
-    pdfRemId,
-    parentId: source.parent,
-    positionAmongstSiblings: siblingIndex !== undefined ? siblingIndex + 1 : undefined,
-    text: PROBE_PREFIX + sourceText,
-    position: shiftPosition(sourceData.position, dy),
-    color: 'Blue',
-  });
-  if (!copy) {
-    await plugin.app.toast('Could not create a Rem.');
-    return;
-  }
-
-  const readBack = {
-    copyId: copy._id,
-    hasPowerup: await copy.hasPowerup(BuiltInPowerupCodes.PDFHighlight),
-    data: await copy.getPowerupProperty(BuiltInPowerupCodes.PDFHighlight, 'Data'),
-    pdfId: await copy.getPowerupPropertyAsRichText(BuiltInPowerupCodes.PDFHighlight, 'PdfId'),
-    shiftedBy: dy,
-  };
-  console.log('[HighlightProbe] Created copy', readBack);
-
-  try {
-    await copy.scrollToReaderHighlight();
-  } catch (e) {
-    console.warn('[HighlightProbe] scrollToReaderHighlight failed:', e);
-  }
-
-  await plugin.app.toast(
-    readBack.hasPowerup && readBack.data
-      ? `🧪 Probe highlight created ${dy > 0 ? 'below' : 'above'} the original, in blue. Check the PDF, then delete the "🧪 Probe copy" Rem.`
-      : '🧪 Probe Rem created, but the highlight data did not stick — see the console.'
-  );
 }

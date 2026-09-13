@@ -10,9 +10,7 @@ import {
   QueueInteractionScore,
 } from '@remnote/plugin-sdk';
 import { convertRemTree } from '../lib/markup_to_richtext';
-import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
-import { probeClonePdfHighlight } from '../lib/pdf_highlight_create';
-import { pinSourceQuote } from '../lib/pdf_source_pins';
+import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';import { pinSourceQuote } from '../lib/pdf_source_pins';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import {
   powerupCode,
@@ -32,7 +30,6 @@ import {
   convertExtractedMarkupCommandId,
   aiTranscribeHighlightCommandId,
   restoreHighlightBeforeAiCommandId,
-  probeClonePdfHighlightCommandId,
   pinSourceQuoteCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
@@ -265,20 +262,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await restoreHighlightBeforeAi(plugin, focused._id);
     },
   });
-
-  await plugin.app.registerCommand({
-    id: probeClonePdfHighlightCommandId,
-    name: 'Test: Clone PDF Highlight',
-    action: async () => {
-      const focused = await plugin.focus.getFocusedRem();
-      if (!focused) {
-        await plugin.app.toast('No focused rem — place your cursor in a PDF highlight Rem first.');
-        return;
-      }
-      await probeClonePdfHighlight(plugin, focused._id);
-    },
-  });
-
   // Pin the focused Rem's source passage in the open PDF, reusing highlights already on the page.
   await plugin.app.registerCommand({
     id: pinSourceQuoteCommandId,
