@@ -4,7 +4,7 @@ import '../style.css';
 import '../App.css';
 import { MessageDialog } from '../lib/message_dialog';
 import { PinQuoteRequest, pinQuoteInViews, SourceView } from '../lib/pdf_source_pins';
-import { MessageBody } from './message_popup';
+import { MessageBody } from '../components/MessageBody';
 
 const CHOICE_KEY = 'pin-source-views-choice';
 
