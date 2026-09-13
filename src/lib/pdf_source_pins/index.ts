@@ -1,32 +1,48 @@
 import {
   BuiltInPowerupCodes,
+  PluginRem,
   ReactRNPlugin,
   RichTextElementRemInterface,
   RichTextInterface,
 } from '@remnote/plugin-sdk';
 import { AI_OCR_HELPER_URL } from '../ai_ocr';
 import { HighlightColorName, sourceHighlightColorId } from '../consts';
-import { createPdfHighlight } from '../pdf_highlight_create';
+import { createHtmlHighlight, createPdfHighlight } from '../pdf_highlight_create';
 import { safeRemTextToString } from '../pdfUtils';
 import { getIESetting } from '../settings';
-import { LocatedWord, PageHighlight, planSourcePins, positionFromWords, rectsOnPage, wordsText } from './overlap';
+import DOMPurify from 'dompurify';
+import { stripListMarker } from './quote';
+import { highlightDataFor, highlightSpan, mathPlaceholder, parseArticle, viewerHtml } from './html';
+import {
+  LocatedWord,
+  PageHighlight,
+  TextHighlight,
+  orderedPins,
+  ownersByInterval,
+  planFromOwners,
+  planSourcePins,
+  positionFromWords,
+  rectsOnPage,
+  wordsText,
+} from './overlap';
 
 /**
- * Source pins: pin the PDF passage a piece of text came from, reusing the
- * highlights already on the page and creating new ones only where none covers
- * the passage (see ./overlap.ts for the rule). The helper finds the quote's
- * words in the PDF; everything written to RemNote happens here.
+ * Source pins: pin the passage a piece of text came from — in a PDF or a saved
+ * web article — reusing the highlights already there and creating new ones only
+ * where none covers the passage (see ./overlap.ts for the rule). The helper
+ * finds the quote; everything written to RemNote happens here.
  */
 
 export interface SourceQuote {
   quote: string;
-  /** 1-based page to search first (±2 pages around it); omit to search the whole PDF. */
+  /** PDFs only: 1-based page to search first (±2 pages, then the whole document). */
   page?: number;
 }
 
 export interface SourcePinResult {
   quote: string;
   found: boolean;
+  /** PDFs only. */
   page?: number;
   score?: number;
   /** Highlight Rem ids to pin, in reading order: reused ones and new ones. */
@@ -35,6 +51,48 @@ export interface SourcePinResult {
   created: string[];
 }
 
+export class SourcePinError extends Error {}
+
+type SourceKind = 'pdf' | 'html';
+
+async function helperPost<T>(path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${AI_OCR_HELPER_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    console.error('[SourcePins] Helper unreachable:', e);
+    throw new SourcePinError(`AI helper is not running (${AI_OCR_HELPER_URL}). Start scripts/ai_ocr_helper.py.`);
+  }
+  const json = await res.json().catch(() => null);
+  if (!json?.ok) throw new SourcePinError(`AI helper: ${json?.error ?? `HTTP ${res.status}`}`);
+  return json as T;
+}
+
+async function sourceKind(rem: PluginRem): Promise<SourceKind | null> {
+  if (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) return 'pdf';
+  if (await rem.hasPowerup(BuiltInPowerupCodes.Link)) {
+    const fileUrl = await rem.getPowerupProperty(BuiltInPowerupCodes.Link, 'FileURL');
+    if (fileUrl) return 'html';
+  }
+  return null;
+}
+
+/** RemNote's managed container is identifiable only by name + being a direct child of the source. */
+async function findHighlightsContainer(plugin: ReactRNPlugin, source: PluginRem) {
+  for (const child of await source.getChildrenRem()) {
+    if ((await safeRemTextToString(plugin, child.text)) === 'Highlights') return child;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// PDF
+// ---------------------------------------------------------------------------
+
 interface LocateResult {
   found: boolean;
   page?: number;
@@ -42,17 +100,6 @@ interface LocateResult {
   pageWidth?: number;
   pageHeight?: number;
   words?: LocatedWord[];
-}
-
-async function locateQuotes(pdfUrl: string, quotes: SourceQuote[]) {
-  const res = await fetch(`${AI_OCR_HELPER_URL}/locate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pdfUrl, quotes }),
-  });
-  const body = await res.json();
-  if (!body?.ok) throw new Error(body?.error ?? 'locate failed');
-  return body as { pageCount: number; results: LocateResult[] };
 }
 
 const pageNumberOfLabel = (label: string) => {
@@ -65,8 +112,8 @@ const pageLabel = (page: number, pageCount: number) =>
   `Page ${String(page).padStart(String(pageCount).length, '0')}`;
 
 /**
- * Tracks one PDF's Highlights container, its "Page NNN" Rems and the highlights
- * on each page, so several quotes in one run see each other's new highlights.
+ * Tracks one PDF's "Page NNN" Rems and the highlights on each page, so several
+ * quotes in one run see each other's new highlights.
  */
 class PdfHighlightIndex {
   private pageRems = new Map<number, string>();
@@ -78,19 +125,7 @@ class PdfHighlightIndex {
     private pageCount: number
   ) {}
 
-  static async load(plugin: ReactRNPlugin, pdfRemId: string, pageCount: number) {
-    const pdfRem = await plugin.rem.findOne(pdfRemId);
-    if (!pdfRem) return null;
-    // The managed container is identifiable only by name + being a direct child of the PDF.
-    let container = null;
-    for (const child of await pdfRem.getChildrenRem()) {
-      if ((await safeRemTextToString(plugin, child.text)) === 'Highlights') {
-        container = child;
-        break;
-      }
-    }
-    if (!container) return null;
-
+  static async load(plugin: ReactRNPlugin, container: PluginRem, pageCount: number) {
     const index = new PdfHighlightIndex(plugin, container._id, pageCount);
     for (const page of await container.getChildrenRem()) {
       const n = pageNumberOfLabel(await safeRemTextToString(plugin, page.text));
@@ -136,37 +171,18 @@ class PdfHighlightIndex {
     this.pageRems.set(page, rem._id);
     return rem._id;
   }
-
-  remember(page: number, highlight: PageHighlight) {
-    this.highlights.get(page)?.push(highlight);
-  }
 }
 
-export class SourcePinError extends Error {}
-
-/** Find each quote in the PDF and return the highlights to pin, creating the missing ones. */
-export async function ensureSourcePins(
+async function ensurePdfPins(
   plugin: ReactRNPlugin,
-  pdfRemId: string,
-  quotes: SourceQuote[]
+  source: PluginRem,
+  container: PluginRem,
+  quotes: SourceQuote[],
+  color: HighlightColorName
 ): Promise<SourcePinResult[]> {
-  const pdfRem = await plugin.rem.findOne(pdfRemId);
-  const pdfUrl = pdfRem ? await pdfRem.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL') : '';
-  if (!pdfUrl) throw new SourcePinError('That Rem is not an uploaded PDF.');
-
-  let located;
-  try {
-    located = await locateQuotes(pdfUrl, quotes);
-  } catch (e) {
-    console.error('[SourcePins] Helper call failed:', e);
-    throw new SourcePinError(`AI helper is not reachable (${AI_OCR_HELPER_URL}): ${(e as Error).message}`);
-  }
-
-  const index = await PdfHighlightIndex.load(plugin, pdfRemId, located.pageCount);
-  if (!index) {
-    throw new SourcePinError('This PDF has no Highlights document yet — make one highlight in it first.');
-  }
-  const color = await getIESetting(plugin, sourceHighlightColorId);
+  const pdfUrl = await source.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
+  const located = await helperPost<{ pageCount: number; results: LocateResult[] }>('/locate', { pdfUrl, quotes });
+  const index = await PdfHighlightIndex.load(plugin, container, located.pageCount);
 
   const results: SourcePinResult[] = [];
   for (let k = 0; k < quotes.length; k++) {
@@ -177,34 +193,126 @@ export async function ensureSourcePins(
     result.page = hit.page;
     result.score = hit.score;
 
+    // `existing` is the index's own list for the page, so highlights created
+    // below are seen by the next quote in this run.
     const existing = await index.onPage(hit.page, hit.pageWidth, hit.pageHeight);
     const plan = planSourcePins(hit.words, existing);
     result.reused = plan.reuse;
 
+    const created: { id: string; firstWord: number }[] = [];
     for (const stretch of plan.create) {
       const position = positionFromWords(stretch, hit.pageWidth, hit.pageHeight, hit.page);
       const highlight = await createPdfHighlight(plugin, {
-        pdfRemId,
+        pdfRemId: source._id,
         parentId: await index.pageRemFor(hit.page),
         text: wordsText(stretch),
         position,
-        color: color as HighlightColorName,
+        color,
       });
       if (!highlight) continue;
-      result.created.push(highlight._id);
-      index.remember(hit.page, { remId: highlight._id, rects: position.rects });
+      created.push({ id: highlight._id, firstWord: hit.words.indexOf(stretch[0]) });
+      existing.push({ remId: highlight._id, rects: position.rects });
     }
-
-    // Pins follow the passage's reading order: each highlight at its first word.
-    const firstWord = (id: string) => {
-      const reusedAt = hit.words!.findIndex((w) => existing.find((h) => h.remId === id)?.rects.some(
-        (r) => (w.x1 + w.x2) / 2 >= r.x1 && (w.x1 + w.x2) / 2 <= r.x2 && (w.y1 + w.y2) / 2 >= r.y1 && (w.y1 + w.y2) / 2 <= r.y2
-      ));
-      return reusedAt === -1 ? Number.MAX_SAFE_INTEGER : reusedAt;
-    };
-    result.pins = [...new Set([...result.reused, ...result.created])].sort((a, b) => firstWord(a) - firstWord(b));
+    result.created = created.map((c) => c.id);
+    result.pins = orderedPins(plan.owners, created);
   }
   return results;
+}
+
+// ---------------------------------------------------------------------------
+// HTML (saved web articles)
+// ---------------------------------------------------------------------------
+
+async function ensureHtmlPins(
+  plugin: ReactRNPlugin,
+  source: PluginRem,
+  container: PluginRem,
+  quotes: SourceQuote[],
+  color: HighlightColorName
+): Promise<SourcePinResult[]> {
+  const fileUrl = await source.getPowerupProperty(BuiltInPowerupCodes.Link, 'FileURL');
+  const { text: html } = await helperPost<{ text: string }>('/source', { url: fileUrl });
+  // Prepare the article as RemNote's viewer does, or the XPaths will not line up.
+  // Static import on purpose: webpack.config.js banners every non-sandbox chunk
+  // with `import.meta`, which breaks lazily loaded chunks.
+  const article = parseArticle(
+    viewerHtml(html, (s) => String(DOMPurify.sanitize(s)), mathPlaceholder),
+    new DOMParser()
+  );
+
+  const existing: TextHighlight[] = [];
+  for (const child of await container.getChildrenRem()) {
+    if (!(await child.hasPowerup(BuiltInPowerupCodes.HTMLHighlight))) continue;
+    const raw = await child.getPowerupProperty(BuiltInPowerupCodes.HTMLHighlight, 'Data');
+    let data: any = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      continue;
+    }
+    const span = highlightSpan(article, data);
+    if (span) existing.push({ remId: child._id, intervals: [span] });
+    else console.warn('[SourcePins] HTML highlight anchor did not resolve', child._id, data);
+  }
+
+  const { results: matches } = await helperPost<{
+    results: { found: boolean; start?: number; end?: number; score?: number }[];
+  }>('/match', { words: article.words.map((w) => w.text), quotes: quotes.map((q) => ({ quote: q.quote })) });
+
+  const results: SourcePinResult[] = [];
+  for (let k = 0; k < quotes.length; k++) {
+    const match = matches[k];
+    const result: SourcePinResult = { quote: quotes[k].quote, found: !!match?.found, pins: [], reused: [], created: [] };
+    results.push(result);
+    if (!match?.found || match.start === undefined || match.end === undefined) continue;
+    result.score = match.score;
+
+    const words = article.words.slice(match.start, match.end + 1);
+    const plan = planFromOwners(words, ownersByInterval(words, existing));
+    result.reused = plan.reuse;
+
+    const created: { id: string; firstWord: number }[] = [];
+    for (const stretch of plan.create) {
+      const highlight = await createHtmlHighlight(plugin, {
+        sourceRemId: source._id,
+        parentId: container._id,
+        data: highlightDataFor(article, stretch),
+        color,
+      });
+      if (!highlight) continue;
+      created.push({ id: highlight._id, firstWord: words.indexOf(stretch[0]) });
+      existing.push({ remId: highlight._id, intervals: [{ start: stretch[0].start, end: stretch[stretch.length - 1].end }] });
+    }
+    result.created = created.map((c) => c.id);
+    result.pins = orderedPins(plan.owners, created);
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Entry points
+// ---------------------------------------------------------------------------
+
+/** Find each quote in the source (a PDF or a saved web article) and return the highlights to pin, creating missing ones. */
+export async function ensureSourcePins(
+  plugin: ReactRNPlugin,
+  sourceRemId: string,
+  quotes: SourceQuote[]
+): Promise<SourcePinResult[]> {
+  const source = await plugin.rem.findOne(sourceRemId);
+  const kind = source ? await sourceKind(source) : null;
+  if (!source || !kind) throw new SourcePinError('That Rem is not a PDF or a saved web article.');
+
+  const container = await findHighlightsContainer(plugin, source);
+  if (!container) {
+    throw new SourcePinError(
+      `This ${kind === 'pdf' ? 'PDF' : 'article'} has no Highlights document yet — make one highlight in it first.`
+    );
+  }
+  const color = (await getIESetting(plugin, sourceHighlightColorId)) as HighlightColorName;
+  return kind === 'pdf'
+    ? ensurePdfPins(plugin, source, container, quotes, color)
+    : ensureHtmlPins(plugin, source, container, quotes, color);
 }
 
 const isPin = (el: unknown): el is RichTextElementRemInterface & { pin: true } =>
@@ -218,38 +326,40 @@ export function withPins(text: RichTextInterface, ids: string[]): RichTextInterf
 }
 
 /**
- * Command: pin the source of the focused Rem's text in the PDF open in a pane.
- * The Rem's text (without its pins) is the quote.
+ * Command: pin the source of the focused Rem's text in the PDF or web article
+ * open in a pane. The Rem's text (without its pins) is the quote.
  */
 export async function pinSourceQuote(plugin: ReactRNPlugin) {
   const focused = await plugin.focus.getFocusedRem();
   if (!focused) {
-    await plugin.app.toast('Focus a Rem whose text is a passage from the open PDF.');
+    await plugin.app.toast('Focus a Rem whose text is a passage from the open PDF or article.');
     return;
   }
-  const quote = await plugin.richText.toString(((focused.text ?? []) as RichTextInterface).filter((el) => !isPin(el)));
+  const quote = stripListMarker(
+    await plugin.richText.toString(((focused.text ?? []) as RichTextInterface).filter((el) => !isPin(el)))
+  );
   if (!quote.trim()) {
     await plugin.app.toast('The focused Rem has no text to look for.');
     return;
   }
 
-  let pdfRemId: string | undefined;
+  let sourceRemId: string | undefined;
   for (const id of await plugin.window.getOpenPaneRemIds()) {
     const rem = await plugin.rem.findOne(id);
-    if (rem && (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile))) {
-      pdfRemId = id;
+    if (rem && (await sourceKind(rem))) {
+      sourceRemId = id;
       break;
     }
   }
-  if (!pdfRemId) {
-    await plugin.app.toast('Open the source PDF in a pane first.');
+  if (!sourceRemId) {
+    await plugin.app.toast('Open the source PDF or web article in a pane first.');
     return;
   }
 
-  await plugin.app.toast('📌 Looking for the passage in the PDF…');
+  await plugin.app.toast('📌 Looking for the passage in the source…');
   let result: SourcePinResult;
   try {
-    [result] = await ensureSourcePins(plugin, pdfRemId, [{ quote }]);
+    [result] = await ensureSourcePins(plugin, sourceRemId, [{ quote }]);
   } catch (e) {
     await plugin.app.toast(e instanceof SourcePinError ? e.message : `Pin Source Quote failed: ${(e as Error).message}`);
     console.error('[SourcePins]', e);
@@ -258,13 +368,14 @@ export async function pinSourceQuote(plugin: ReactRNPlugin) {
   console.log('[SourcePins] Result', result);
 
   if (!result.found) {
-    await plugin.app.toast('Passage not found in the open PDF.');
+    await plugin.app.toast('Passage not found in the open source.');
     return;
   }
   const fresh = await plugin.rem.findOne(focused._id);
   if (fresh) await fresh.setText(withPins((fresh.text ?? []) as RichTextInterface, result.pins));
+  const where = result.page ? `Page ${result.page}: ` : '';
   await plugin.app.toast(
-    `📌 Page ${result.page}: reused ${result.reused.length}, created ${result.created.length} highlight` +
+    `📌 ${where}reused ${result.reused.length}, created ${result.created.length} highlight` +
       `${result.created.length === 1 ? '' : 's'}.`
   );
 }

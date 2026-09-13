@@ -58,6 +58,47 @@ export async function createPdfHighlight(
   return rem;
 }
 
+/**
+ * An HTML highlight's Data, as RemNote's viewer records a selection: XPaths
+ * relative to the <div> the article is mounted in, plus offsets inside the start
+ * and end text nodes.
+ */
+export interface HtmlHighlightData {
+  startXPath: string;
+  endXPath: string;
+  startOffset: number;
+  endOffset: number;
+  text: string;
+  textBefore: string;
+  textAfter: string;
+}
+
+/**
+ * Create an HTML highlight Rem, mirroring RemNote's `createHTMLHighlight`: the
+ * HTMLHighlight powerup's `Data` holds the anchor, `HTMLId` points at the
+ * article Rem, and the Rem sits directly in the article's Highlights container
+ * (web articles have no "Page NNN" Rems).
+ */
+export async function createHtmlHighlight(
+  plugin: ReactRNPlugin,
+  opts: {
+    sourceRemId: string;
+    parentId: string;
+    data: HtmlHighlightData;
+    color?: 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple';
+  }
+) {
+  const rem = await plugin.rem.createRem();
+  if (!rem) return undefined;
+  await rem.setText([opts.data.text]);
+  await rem.setParent(opts.parentId);
+  await rem.addPowerup(BuiltInPowerupCodes.HTMLHighlight);
+  await rem.setPowerupProperty(BuiltInPowerupCodes.HTMLHighlight, 'Data', [JSON.stringify(opts.data)]);
+  await rem.setPowerupProperty(BuiltInPowerupCodes.HTMLHighlight, 'HTMLId', [{ i: 'q', _id: opts.sourceRemId }]);
+  if (opts.color) await rem.setHighlightColor(opts.color);
+  return rem;
+}
+
 /** Shift every box of a position vertically, in page units. */
 const shiftPosition = (position: PdfHighlightPosition, dy: number): PdfHighlightPosition => {
   const shift = (r: HighlightRect): HighlightRect => ({ ...r, y1: r.y1 + dy, y2: r.y2 + dy });

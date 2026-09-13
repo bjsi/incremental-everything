@@ -12,6 +12,7 @@
   "dependencies": {
     "@remnote/plugin-sdk": "^0.0.46",
     "dayjs": "^1.11.9",
+    "dompurify": "^3.4.15",
     "jsdom": "^29.0.0",
     "re-resizable": "^6.9.9",
     "react": "^17.0.2",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.7",
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^18.0.3",
     "@types/react": "^17.0.2",
     "@types/react-dom": "^17.0.2",

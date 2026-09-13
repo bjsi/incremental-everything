@@ -228,6 +228,7 @@ def transcribe(images, raw_text):
 MIN_SCORE = 0.6       # share of the quote's words that must match
 MAX_GAP_TOKENS = 6    # unmatched page words tolerated inside one match
 EDGE_TOKENS = 3       # unmatched words at either end of a quote taken back into the match
+EDGE_SIMILARITY = 0.5 # ...only when each resembles the quote word it stands for ("5e20" ~ "520")
 PDF_LOCK = threading.Lock()  # a PyMuPDF document is not safe across threads
 _open_pdfs = {}       # path -> (mtime, document, {page index: (words, tokens)})
 
@@ -295,11 +296,25 @@ def best_span(tokens, quote):
     matched = sum(b.size for b in cluster)
     score = matched / max(n, end - start + 1)
     # The text layer often garbles a quote's first or last token ("5–20%" reads
-    # "5e20%"), which leaves it out of the match. Take up to 3 unmatched edge
-    # words back in, so the highlight covers the whole quoted passage.
-    start = max(0, start - min(cluster[0].b, EDGE_TOKENS))
-    end = min(len(seq) - 1, end + min(n - (cluster[-1].b + cluster[-1].size), EDGE_TOKENS))
+    # "5e20%"), which leaves it out of the match. Take unmatched edge words back
+    # in — but only while each resembles the quote word it stands for. A leading
+    # "3." that the source renders as list numbering, not text, must not pull in
+    # the last word of the passage before it.
+    lead = cluster[0].b
+    k = 1
+    while k <= min(lead, EDGE_TOKENS) and start > 0 and similar_tokens(seq[start - 1], quote[lead - k]):
+        start -= 1
+        k += 1
+    trail = n - (cluster[-1].b + cluster[-1].size)
+    k = 0
+    while k < min(trail, EDGE_TOKENS) and end + 1 < len(seq) and similar_tokens(seq[end + 1], quote[n - trail + k]):
+        end += 1
+        k += 1
     return start, end, score
+
+
+def similar_tokens(a, b):
+    return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio() >= EDGE_SIMILARITY
 
 
 def locate_quote(entry, quote, page_hint):
@@ -385,7 +400,39 @@ def handle_locate(req, entry):
     return {'pageCount': page_count, 'results': results}
 
 
-ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate}
+def handle_source(req, entry):
+    """Text of a source file (a saved web article's HTML), resolving RemNote's
+    %LOCAL_FILE% placeholder like the PDF routes do."""
+    url = req.get('url')
+    if not url:
+        raise RuntimeError('no url')
+    entry['url'] = url
+    return {'text': fetch(url, '.html').read_text(encoding='utf-8', errors='replace')}
+
+
+def handle_match(req, entry):
+    """Match quotes against a word list the plugin extracted from a source it
+    parses itself (an HTML article's DOM). Returns word-index spans, using the
+    same matcher as /locate so PDF and HTML sources behave alike."""
+    words = req.get('words') or []
+    quotes = req.get('quotes') or []
+    tokens = [(token, [i]) for i, token in ((i, norm_token(w)) for i, w in enumerate(words)) if token]
+    results = []
+    for q in quotes:
+        wanted = [t for t in (norm_token(w) for w in (q.get('quote') or '').split()) if t]
+        span = best_span(tokens, wanted) if wanted and tokens else None
+        if not span or span[2] < MIN_SCORE:
+            results.append({'found': False, 'score': round(span[2], 3) if span else 0})
+        else:
+            start, end, score = span
+            results.append({'found': True, 'start': tokens[start][1][0], 'end': tokens[end][1][-1],
+                            'score': round(score, 3)})
+    entry.update(words=len(words), quotes=[(q.get('quote') or '')[:120] for q in quotes],
+                 results=[{k: r.get(k) for k in ('found', 'score')} for r in results])
+    return {'results': results}
+
+
+ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match}
 
 
 class Handler(BaseHTTPRequestHandler):
