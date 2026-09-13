@@ -69,6 +69,7 @@ import {
   flashcardResponseTimeLimitId,
   titleCaseAcronymsId,
   sourceHighlightColorId,
+  pinOtherReaderViewOnCreateIncRemId,
   HighlightColorName,
   enableMasteryDrillId,
   oldItemThresholdId,
@@ -144,6 +145,7 @@ export interface IESettings {
   [flashcardResponseTimeLimitId]: number;
   [titleCaseAcronymsId]: string;
   [sourceHighlightColorId]: HighlightColorName;
+  [pinOtherReaderViewOnCreateIncRemId]: boolean;
 
   // Mastery Drill
   [enableMasteryDrillId]: boolean;
@@ -211,6 +213,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [flashcardResponseTimeLimitId]: 180,
   [titleCaseAcronymsId]: '',
   [sourceHighlightColorId]: 'Orange',
+  [pinOtherReaderViewOnCreateIncRemId]: false,
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
@@ -919,6 +922,19 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'Blue', label: 'Blue' },
       { value: 'Purple', label: 'Purple' },
     ],
+  },
+  [pinOtherReaderViewOnCreateIncRemId]: {
+    kind: 'boolean',
+    group: 'misc',
+    title: 'Create IncRem: Also Pin the Other PDF View',
+    description:
+      'When a PDF also has a Text Reader version, Create Incremental Rem pins the passage in both ' +
+      'views: besides the pin to the highlight you extracted, the new Rem gets a pin to the same ' +
+      'passage in the other view — the Text Reader for a PDF-page highlight, the PDF page for a ' +
+      'Text Reader highlight. That view\'s highlight is reused when one already covers the passage, ' +
+      'and created (in the Source Highlight Colour) when not.\n\n' +
+      'Needs the local AI helper running. If it is not, or the passage cannot be found in the other ' +
+      'view, the Rem is created as usual with its single pin.',
   },
 };
 

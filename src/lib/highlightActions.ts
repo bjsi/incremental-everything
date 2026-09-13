@@ -33,6 +33,9 @@ import {
   saveLastSelectedDestination,
 } from './hierarchical_parent_selector/treeHelpers';
 import { isHtmlSource, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from './pdfUtils';
+import { pinOtherReaderViewOnCreateIncRemId } from './consts';
+import { getIESetting } from './settings';
+import { pinOtherViewOfHighlight } from './pdf_source_pins';
 
 type CreateRemFromHighlightOptions = {
   makeIncremental: boolean;
@@ -305,6 +308,8 @@ export const createRemUnderParent = async (
   }
   // Removed setHighlightColor('Yellow') -> CSS now handles styling via "pdfextract" tag
 
+  await pinOtherReaderView(plugin, highlightRem._id, newRem._id, makeIncremental);
+
   const actionText = makeIncremental ? 'incremental rem' : 'rem';
   const parentSuffix = parentName ? ` under "${parentName.slice(0, 30)}..."` : ' under source';
   await plugin.app.toast(`Created ${actionText}${parentSuffix}`);
@@ -312,6 +317,34 @@ export const createRemUnderParent = async (
   // Non-deferred path: this is only reached when NOT (showPriorityPopup &&
   // makeIncremental), so no priority popup is opened here.
   return newRem._id;
+};
+
+/**
+ * When enabled, pin the extracted passage in the PDF's other view as well (page ↔
+ * Text Reader), and — for an IncRem — tag those highlights `pdfextract` exactly
+ * like the one extracted, so both views mark the passage as extracted.
+ * Best effort: the Rem already has its pin, so a failure only logs.
+ */
+const pinOtherReaderView = async (
+  plugin: ReactRNPlugin,
+  highlightRemId: RemId,
+  newRemId: RemId,
+  tagAsExtract: boolean
+): Promise<void> => {
+  try {
+    if (!(await getIESetting(plugin, pinOtherReaderViewOnCreateIncRemId))) return;
+    const outcome = await pinOtherViewOfHighlight(plugin, highlightRemId, newRemId);
+    console.log('[HighlightActions] other-view pin:', outcome);
+    if (!tagAsExtract || !outcome.pins.length) return;
+    const pdfExtractTag = await ensurePdfExtractTag(plugin);
+    if (!pdfExtractTag) return;
+    for (const id of outcome.pins) {
+      const rem = await plugin.rem.findOne(id);
+      if (rem) await rem.addTag(pdfExtractTag._id);
+    }
+  } catch (e) {
+    console.error('[HighlightActions] other-view pin failed:', e);
+  }
 };
 
 /**
@@ -363,6 +396,12 @@ export const runIncRemCreateTail = async (
   } catch (err) {
     console.error('[IncRemTail] pdfextract tag failed:', err);
   }
+
+  // 2a. Pin the passage in the PDF's other view (page ↔ Text Reader) and tag that
+  //     highlight too, when enabled. Before the band sync below, so it reaches
+  //     both views' highlights. Silent on failure: a dialog here would replace the
+  //     priority popup the user is answering, and the IncRem already has its pin.
+  await pinOtherReaderView(plugin, highlightRemId, newRemId, true);
 
   // 2b. Mirror the extract's priority band onto that same highlight, so the
   // Highlights side panel badges it and its PDF marker takes the band colour.

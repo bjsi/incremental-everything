@@ -474,3 +474,78 @@ export async function pinSourceQuote(plugin: ReactRNPlugin) {
   }
   await plugin.app.toast('Open the source PDF or web article in a pane first.');
 }
+
+export interface OtherViewPinOutcome {
+  status: 'pinned' | 'not-found' | 'skipped' | 'failed';
+  pins: string[];
+  reason?: string;
+}
+
+const parseJson = (raw: string | undefined) => {
+  try {
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * For a PDF that has both views: pin on `targetRemId` the passage of
+ * `highlightRemId` in the OTHER view — the Text Reader for a PDF-page highlight,
+ * the PDF page for a Text Reader highlight — reusing that view's highlight or
+ * creating one. Best effort: it never throws, so a caller such as Create IncRem
+ * is never broken by it (the helper may not be running, the passage may differ).
+ */
+export async function pinOtherViewOfHighlight(
+  plugin: ReactRNPlugin,
+  highlightRemId: string,
+  targetRemId: string
+): Promise<OtherViewPinOutcome> {
+  try {
+    const highlight = await plugin.rem.findOne(highlightRemId);
+    if (!highlight) return { status: 'skipped', pins: [], reason: 'highlight not found' };
+
+    // The quote is the highlight's stored source text, not its Rem text: a
+    // ✨-transcribed highlight holds LaTeX that matches neither view.
+    let otherView: SourceView;
+    let sourceRemId: string | undefined;
+    let quote = '';
+    if (await highlight.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) {
+      otherView = 'html';
+      sourceRemId = (
+        (await highlight.getPowerupPropertyAsRichText(BuiltInPowerupCodes.PDFHighlight, 'PdfId'))?.[0] as
+          | RichTextElementRemInterface
+          | undefined
+      )?._id;
+      quote = parseJson(await highlight.getPowerupProperty(BuiltInPowerupCodes.PDFHighlight, 'Data'))?.content?.text ?? '';
+    } else if (await highlight.hasPowerup(BuiltInPowerupCodes.HTMLHighlight)) {
+      otherView = 'pdf';
+      sourceRemId = (
+        (await highlight.getPowerupPropertyAsRichText(BuiltInPowerupCodes.HTMLHighlight, 'HTMLId'))?.[0] as
+          | RichTextElementRemInterface
+          | undefined
+      )?._id;
+      quote = parseJson(await highlight.getPowerupProperty(BuiltInPowerupCodes.HTMLHighlight, 'Data'))?.text ?? '';
+    } else {
+      return { status: 'skipped', pins: [], reason: 'not a PDF or HTML highlight' };
+    }
+    // Area highlights hold an image, not text: nothing to look for.
+    if (!sourceRemId || !quote.trim()) return { status: 'skipped', pins: [], reason: 'no source or no text' };
+
+    const source = await plugin.rem.findOne(sourceRemId);
+    const views = source ? await sourceViews(source) : [];
+    if (!views.includes('pdf') || !views.includes('html')) {
+      return { status: 'skipped', pins: [], reason: 'the source has only one view' };
+    }
+
+    const [result] = await ensureSourcePins(plugin, sourceRemId, [{ quote }], [otherView]);
+    if (!result.found) return { status: 'not-found', pins: [] };
+    const pins = result.pins.filter((id) => id !== highlightRemId);
+    const target = await plugin.rem.findOne(targetRemId);
+    if (target && pins.length) await target.setText(withPins((target.text ?? []) as RichTextInterface, pins));
+    return { status: 'pinned', pins };
+  } catch (e) {
+    console.warn('[SourcePins] Pinning the other view failed:', e);
+    return { status: 'failed', pins: [], reason: (e as Error).message };
+  }
+}
