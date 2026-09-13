@@ -29,14 +29,18 @@ function VideoDebug() {
         hasVideoPowerup: await rem.hasPowerup('vi'),
         hasLinkPowerup: await rem.hasPowerup(BuiltInPowerupCodes.Link),
         text: await rp.richText.toString(rem.text || []),
-        childrenCount: rem.children?.length || 0,
+        childrenCount: 0,
       };
+      // getChildrenRem, not the lazy `children` field, which is empty for Rems
+      // whose document has not been loaded (priority_review_document/children.ts).
+      const remChildren = (await rem.getChildrenRem().catch(() => [])) || [];
+      info.childrenCount = remChildren.length;
 
       let urlSearchResults: any = {};
       
       // Check ALL children
-      if (rem.children && rem.children.length > 0) {
-        const children = await rp.rem.findMany(rem.children);
+      if (remChildren.length > 0) {
+        const children = remChildren;
         urlSearchResults.children = [];
         
         for (const child of children || []) {

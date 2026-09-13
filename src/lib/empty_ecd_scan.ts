@@ -445,6 +445,14 @@ export async function scanEmptyEcdRems(
 
   const skipped = emptySkips();
 
+  // Which scanned Rems have children, decided from `parent` — never from the
+  // lazy `children` field, which is empty for any document not opened this
+  // session (see priority_review_document/children.ts). Complete for both
+  // scopes: getAll() is every Rem in the KB, and [root, ...getDescendants()] is
+  // every Rem under the root, so a child of any scanned Rem is in the list.
+  const remsWithChildren = new Set<string>();
+  for (const r of scopeRems as any[]) if (r.parent) remsWithChildren.add(r.parent);
+
   // PHASE 1 — the free filter. Text and back text come off the snapshot, so
   // this costs nothing and is what makes walking the whole knowledge base
   // viable at all.
@@ -503,7 +511,7 @@ export async function scanEmptyEcdRems(
 
     // `remove()` deletes descendants too, so a blank Rem holding children is
     // the single most destructive thing this command could get wrong.
-    if ((rem.children?.length ?? 0) > 0) {
+    if (remsWithChildren.has(rem._id)) {
       skipped.hasChildren++;
       return;
     }

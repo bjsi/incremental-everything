@@ -2,6 +2,7 @@ import { RNPlugin, PluginRem, RemId, RichTextInterface } from '@remnote/plugin-s
 import dayjs from 'dayjs';
 import { IncrementalRem } from '../incremental_rem';
 import { allIncrementalRemKey, priorityGraphPowerupCode, priorityQueuePowerupCode } from '../consts';
+import { readChildren, readChildrenWithCounts } from './children';
 
 /**
  * Cleaning a Priority Review Document of entries that are no longer due.
@@ -307,8 +308,8 @@ async function isGeneratedChild(child: PluginRem): Promise<boolean> {
 }
 
 /** An empty bullet with nothing under it — no content, so nothing to lose. */
-function isEmptyBullet(child: PluginRem): boolean {
-  return flattenRichText(child.text).length === 0 && (child.children || []).length === 0;
+function isEmptyBullet(child: PluginRem, childCount: number): boolean {
+  return flattenRichText(child.text).length === 0 && childCount === 0;
 }
 
 /** Rem IDs that own at least one card due at any point up to the end of today. */
@@ -403,8 +404,12 @@ export async function scanPriorityReviewDocuments(
     const docName = (await flattenTitle(plugin, doc.text)) || 'Untitled review document';
     onProgress?.(`Document ${docIndex} of ${docs.length}: ${docName.slice(0, 60)}`);
 
-    const childIds = doc.children || [];
-    const children = childIds.length ? (await plugin.rem.findMany(childIds)) || [] : [];
+    // Never the lazy `children` field: for a document not opened this session
+    // it is empty (see children.ts). One getDescendants call gives the entries
+    // and how many children each holds — the "notes written under it" checks
+    // below must never mistake an unloaded list for an empty one.
+    const { children, childCounts } = await readChildrenWithCounts(plugin, doc);
+    const countOf = (rem: PluginRem) => childCounts.get(rem._id) ?? 0;
 
     // One lookup for every target in this document, instead of one per entry.
     const targetIds = new Set<RemId>();
@@ -449,7 +454,7 @@ export async function scanPriorityReviewDocuments(
         // ever be deleted, so the plugin's own two children are told apart from
         // anything you added.
         if (await isGeneratedChild(child)) report.generatedChildren++;
-        else if (isEmptyBullet(child)) report.generatedChildren++;
+        else if (isEmptyBullet(child, countOf(child))) report.generatedChildren++;
         else report.userChildren++;
         continue;
       }
@@ -492,7 +497,7 @@ export async function scanPriorityReviewDocuments(
       // entries too: `remove()` on the document takes their descendants with it,
       // and nothing else downstream looks at them.
       const carriesWritingOfYourOwn = () =>
-        (child.children || []).length > 0 || hasTextOfItsOwn(child.text);
+        countOf(child) > 0 || hasTextOfItsOwn(child.text);
 
       if (entry.status === 'due') {
         report.dueEntries.push(entry);
@@ -516,7 +521,7 @@ export async function scanPriorityReviewDocuments(
       // Removable in principle — unless deleting it would take something of
       // yours with it. `remove()` deletes descendants too, so a note written
       // under an entry is not recoverable from a re-run.
-      if ((child.children || []).length > 0) {
+      if (countOf(child) > 0) {
         entry.keepReason = 'has-children';
         report.keptEntries.push(entry);
       } else if (hasTextOfItsOwn(child.text)) {
@@ -722,9 +727,7 @@ async function stampMetadata(plugin: RNPlugin, doc: PrdDocReport, removed: numbe
   if (removed === 0) return;
   try {
     const docRem = await plugin.rem.findOne(doc.docRemId);
-    const children = docRem?.children?.length
-      ? (await plugin.rem.findMany(docRem.children)) || []
-      : [];
+    const children = docRem ? await readChildren(plugin, docRem) : [];
     const metadata = children.find((c) => flattenRichText(c.text).startsWith('Scope: '));
     if (!metadata) return;
 

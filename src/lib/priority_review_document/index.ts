@@ -3,6 +3,7 @@ import { priorityGraphPowerupCode } from '../consts';
 import { saveReviewGraphData, ReviewGraphData } from './graph_data';
 import { ensureReviewQueueTagPinnedOnce } from './sidebar_pin';
 import { SelectedItem } from './select';
+import { readChildren } from './children';
 
 export { hasCardClusterPowerup } from './cluster';
 export type { SkippedPausedItem, SkippedAncestorItem, SkippedCoolingItem, SelectedItem } from './select';
@@ -160,8 +161,7 @@ export function buildGraphData(items: GraphItem[], randomnessPct: { incRem: numb
 
 /** Finds the document's graph Rem, or creates it as the second child. */
 export async function findOrCreateGraphRem(plugin: RNPlugin, doc: PluginRem): Promise<PluginRem | null> {
-  const childIds = doc.children || [];
-  const children = childIds.length ? (await plugin.rem.findMany(childIds)) || [] : [];
+  const children = await readChildren(plugin, doc);
   for (const child of children) {
     try {
       if (await child.hasPowerup(priorityGraphPowerupCode)) return child;
@@ -186,8 +186,7 @@ export async function writeGraph(plugin: RNPlugin, doc: PluginRem, data: ReviewG
 
 /** Finds the document's metadata code block (text starts with `Scope: `), or creates it as the first child. */
 export async function findOrCreateMetadataRem(plugin: RNPlugin, doc: PluginRem): Promise<PluginRem | null> {
-  const childIds = doc.children || [];
-  const children = childIds.length ? (await plugin.rem.findMany(childIds)) || [] : [];
+  const children = await readChildren(plugin, doc);
   for (const child of children) {
     const text = Array.isArray(child.text) ? child.text.filter((t) => typeof t === 'string').join('') : '';
     if (text.startsWith('Scope: ')) return child;

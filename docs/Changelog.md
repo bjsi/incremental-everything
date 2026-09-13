@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.89 - September 12th, 2026
+
+### ⚡ Improved - a session in the Practiced Queues history opens its queue, not its document
+
+Clicking a past session in the history log now takes you straight into the queue on that document — the same route as its Practice button — instead of opening the document in the editor.
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
+### 🐛 Fixed - the paused-document filter lost its controls and its warning in the Priority Queue
+
+**Skip paused documents** and its *always keep priority* are back, now stored on each Priority Queue document, and skipped Rems are listed again in an amber panel with high-priority ones in red, and counted in the toast after the automatic refresh.
+
+📖 [Paused Document Filtering](Priority-Review-Document.md#paused-document-filtering)
+
 ## v1.0.88 - September 12th, 2026
 
 ### ✨ New - the Priority Queue: one persistent review document per scope, refilled in bursts and drained as you review

@@ -599,6 +599,12 @@ export const PRIORITY_QUEUE_SHIELD_SLICE = 0.2;
 export const PRIORITY_QUEUE_SHIELD_SLICE_MAX = 0.5;
 export const PRIORITY_QUEUE_BURST_MIN = 5;
 export const PRIORITY_QUEUE_BURST_MAX = 200;
+/** '1' / '0': leave out flashcard Rems inside documents whose Deck Status is Paused. */
+export const priorityQueueSkipPausedSlotCode = 'skipPaused';
+/** Priority at or below which a paused Rem is kept anyway (0–100). */
+export const priorityQueuePausedThresholdSlotCode = 'pausedThreshold';
+export const PRIORITY_QUEUE_SKIP_PAUSED = true;
+export const PRIORITY_QUEUE_PAUSED_THRESHOLD = 20;
 // Queue setting: refresh the Priority Queue document you just practised when
 // the session ends, so it is ready before the next Practice.
 export const autoRefreshPriorityQueueId = 'auto-refresh-priority-queue';

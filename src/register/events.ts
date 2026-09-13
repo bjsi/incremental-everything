@@ -390,9 +390,18 @@ async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, subQueueI
           scopeRemId: await extractOriginalScopeFromPriorityReview(doc) ?? null,
           skipQueueGuard: true,
         });
+        // The paused filter speaks up here too: this refresh happens with no
+        // popup open, so the toast is the only place a skipped Rem is visible.
+        const paused = result.selection?.skippedPausedItems ?? [];
+        const highPaused = paused.filter((s) => s.priority < 20).length;
         await plugin.app.toast(
           `Priority Queue refreshed: ${result.holding.total} items ready ` +
-            `(drained ${result.drained.reviewed + result.drained.cooling + result.drained.missing}, added ${result.added.total}).`
+            `(drained ${result.drained.reviewed + result.drained.cooling + result.drained.missing}, added ${result.added.total})` +
+            (paused.length
+              ? `. ⚠️ ${paused.length} skipped in paused documents` +
+                (highPaused ? `, ${highPaused} of them HIGH PRIORITY` : '') +
+                ' — open the Priority Queue popup and Refresh to see them.'
+              : '.')
         );
       } catch (e) {
         console.error('[Priority Queue] Auto-refresh after the session failed:', e);

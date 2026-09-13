@@ -73,9 +73,16 @@ export async function scanPausedDecks(
   onProgress?.(0, 0, 'Loading Rems…');
   const allRems = (await plugin.rem.getAll()) || [];
 
-  // Cheap snapshot filter: a deck has children, and `children` needs no round
-  // trip. This is what makes probing a large KB affordable.
-  const candidates = allRems.filter((r: any) => (r.children?.length ?? 0) > 0);
+  // Cheap snapshot filter: a deck has children. Decided from `parent`, not from
+  // `children`: the bridge fills `children` from RemNote's lazy child cache,
+  // which is empty for every document not opened this session — so a paused
+  // deck nobody had opened was never probed, and its cards counted as due in
+  // the shields and the Priority Queue. getAll() loads the whole database and
+  // every Rem carries its parent, so "some Rem names it as parent" is complete
+  // and still costs no round trip. See priority_review_document/children.ts.
+  const hasChildren = new Set<string>();
+  for (const r of allRems as any[]) if (r.parent) hasChildren.add(r.parent);
+  const candidates = allRems.filter((r: any) => hasChildren.has(r._id));
 
   const deckRems: any[] = [];
   const pausedRems: any[] = [];

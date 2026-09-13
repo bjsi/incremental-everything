@@ -9,6 +9,10 @@ import {
   priorityQueuePowerupCode,
   priorityQueueScopeSlotCode,
   priorityQueueShieldSliceSlotCode,
+  priorityQueueSkipPausedSlotCode,
+  priorityQueuePausedThresholdSlotCode,
+  PRIORITY_QUEUE_SKIP_PAUSED,
+  PRIORITY_QUEUE_PAUSED_THRESHOLD,
   PRIORITY_QUEUE_SHIELD_SLICE_MAX,
   PRIORITY_QUEUE_BURST_MIN,
   PRIORITY_QUEUE_BURST_MAX,
@@ -32,6 +36,7 @@ import { selectPriorityItems, SelectionResult } from './select';
 import { cleanPriorityReviewDocuments, PrdDocReport, scanPriorityReviewDocuments } from './clean';
 import { CoolingScanner } from './cooling_gather';
 import { CoolingVerdict } from './cooling';
+import { readChildren } from './children';
 
 /**
  * The persistent Priority Queue document — one per scope.
@@ -57,6 +62,10 @@ export interface PriorityQueueDocInfo {
   burst: number;
   /** 0–1. See PRIORITY_QUEUE_SHIELD_SLICE. */
   shieldSlice: number;
+  /** Leave out flashcard Rems inside paused documents. */
+  skipPaused: boolean;
+  /** Paused Rems at or below this priority are kept anyway. */
+  pausedThreshold: number;
   lastRefresh: number | null;
 }
 
@@ -64,6 +73,8 @@ export const clampBurst = (n: number) =>
   Math.max(PRIORITY_QUEUE_BURST_MIN, Math.min(PRIORITY_QUEUE_BURST_MAX, Math.round(n)));
 export const clampShieldSlice = (f: number) =>
   Math.max(0, Math.min(PRIORITY_QUEUE_SHIELD_SLICE_MAX, Math.round(f * 100) / 100));
+export const clampPausedThreshold = (n: number) =>
+  Math.max(0, Math.min(100, Math.round(Number.isFinite(n) ? n : PRIORITY_QUEUE_PAUSED_THRESHOLD)));
 
 /** True when RemNote is on a flashcards route or the plugin's queue widget is mounted. */
 export async function isQueueOpen(plugin: RNPlugin): Promise<boolean> {
@@ -103,11 +114,15 @@ async function readInfo(doc: PluginRem): Promise<PriorityQueueDocInfo> {
   const last = Number(await readSlot(doc, priorityQueueLastRefreshSlotCode));
   const sliceRaw = await readSlot(doc, priorityQueueShieldSliceSlotCode);
   const slice = sliceRaw === null ? NaN : Number(sliceRaw);
+  const skipRaw = await readSlot(doc, priorityQueueSkipPausedSlotCode);
+  const thresholdRaw = await readSlot(doc, priorityQueuePausedThresholdSlotCode);
   return {
     doc,
     scopeRemId: scope && scope !== PRIORITY_QUEUE_KB_SCOPE ? scope : null,
     burst: Number.isFinite(burst) && burst > 0 ? burst : PRIORITY_QUEUE_DEFAULT_BURST,
     shieldSlice: Number.isFinite(slice) ? clampShieldSlice(slice) : PRIORITY_QUEUE_SHIELD_SLICE,
+    skipPaused: skipRaw === null ? PRIORITY_QUEUE_SKIP_PAUSED : skipRaw !== '0',
+    pausedThreshold: thresholdRaw === null ? PRIORITY_QUEUE_PAUSED_THRESHOLD : clampPausedThreshold(Number(thresholdRaw)),
     lastRefresh: Number.isFinite(last) && last > 0 ? last : null,
   };
 }
@@ -142,6 +157,18 @@ export async function setPriorityQueueShieldSlice(plugin: RNPlugin, doc: PluginR
   ]);
 }
 
+export async function setPriorityQueuePausedFilter(
+  plugin: RNPlugin,
+  doc: PluginRem,
+  skipPaused: boolean,
+  pausedThreshold: number
+): Promise<void> {
+  await doc.setPowerupProperty(priorityQueuePowerupCode, priorityQueueSkipPausedSlotCode, [skipPaused ? '1' : '0']);
+  await doc.setPowerupProperty(priorityQueuePowerupCode, priorityQueuePausedThresholdSlotCode, [
+    String(clampPausedThreshold(pausedThreshold)),
+  ]);
+}
+
 export async function findOrCreatePriorityQueueDoc(
   plugin: RNPlugin,
   scopeRemId: RemId | null,
@@ -160,6 +187,7 @@ export async function findOrCreatePriorityQueueDoc(
   ]);
   await setPriorityQueueBurst(plugin, doc, burst);
   await setPriorityQueueShieldSlice(plugin, doc, PRIORITY_QUEUE_SHIELD_SLICE);
+  await setPriorityQueuePausedFilter(plugin, doc, PRIORITY_QUEUE_SKIP_PAUSED, PRIORITY_QUEUE_PAUSED_THRESHOLD);
   // Status block first, graph second, entries after — created now so the
   // first refill appends below them rather than above the graph.
   await findOrCreateMetadataRem(plugin, doc);
@@ -169,7 +197,15 @@ export async function findOrCreatePriorityQueueDoc(
   // does not create them mid-loop.
   await findOrCreateTag(plugin, 'INC');
   await findOrCreateTag(plugin, 'FC');
-  return { doc, scopeRemId, burst: clampBurst(burst), shieldSlice: PRIORITY_QUEUE_SHIELD_SLICE, lastRefresh: null };
+  return {
+    doc,
+    scopeRemId,
+    burst: clampBurst(burst),
+    shieldSlice: PRIORITY_QUEUE_SHIELD_SLICE,
+    skipPaused: PRIORITY_QUEUE_SKIP_PAUSED,
+    pausedThreshold: PRIORITY_QUEUE_PAUSED_THRESHOLD,
+    lastRefresh: null,
+  };
 }
 
 // --- refresh --------------------------------------------------------------
@@ -183,6 +219,10 @@ export interface RefreshOptions {
   burst?: number;
   /** Overrides (and stores) the document's shield slice, 0–1. */
   shieldSlice?: number;
+  /** Overrides (and stores) whether paused-document Rems are left out. */
+  skipPaused?: boolean;
+  /** Overrides (and stores) the priority at or below which paused Rems are kept. */
+  pausedThreshold?: number;
   /** Skip the open-queue guard — for the QueueExit hook, which runs as the queue closes. */
   skipQueueGuard?: boolean;
   onProgress?: (message: string) => void;
@@ -205,8 +245,7 @@ export interface RefreshResult {
 
 /** The target Rem ids the document's entries point at, by entry kind. */
 async function readDocTargets(plugin: RNPlugin, doc: PluginRem): Promise<Map<RemId, RemId>> {
-  const childIds = doc.children || [];
-  const children = childIds.length ? (await plugin.rem.findMany(childIds)) || [] : [];
+  const children = await readChildren(plugin, doc);
   const targets = new Map<RemId, RemId>(); // entryId -> targetId
   for (const child of children) {
     if (!Array.isArray(child.text)) continue;
@@ -259,6 +298,11 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   if (burst !== info.burst) await setPriorityQueueBurst(plugin, doc, burst);
   const shieldSlice = clampShieldSlice(options.shieldSlice ?? info.shieldSlice);
   if (shieldSlice !== info.shieldSlice) await setPriorityQueueShieldSlice(plugin, doc, shieldSlice);
+  const skipPaused = options.skipPaused ?? info.skipPaused;
+  const pausedThreshold = clampPausedThreshold(options.pausedThreshold ?? info.pausedThreshold);
+  if (skipPaused !== info.skipPaused || pausedThreshold !== info.pausedThreshold) {
+    await setPriorityQueuePausedFilter(plugin, doc, skipPaused, pausedThreshold);
+  }
 
   const scanner = new CoolingScanner(plugin, { scopeRemId: info.scopeRemId });
 
@@ -307,8 +351,8 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     scopeRemId: info.scopeRemId,
     itemCount: toAdd,
     cardRatio,
-    filterPaused: true,
-    pausedPriorityThreshold: 20,
+    filterPaused: skipPaused,
+    pausedPriorityThreshold: pausedThreshold,
     excludeRemIds: remainingTargets,
     shieldSliceFraction: shieldSlice,
     coolingScanner: scanner,
@@ -358,7 +402,9 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   const cooling = scanner.sortedVerdicts();
   const statusText =
     `Scope: ${s.scopeName}\n` +
-    `Priority Queue · fill target ${burst} · shield slice ${Math.round(shieldSlice * 100)}%\n` +
+    `Priority Queue · fill target ${burst} · shield slice ${Math.round(shieldSlice * 100)}% · ` +
+    (skipPaused ? `paused documents skipped above P${pausedThreshold}` : 'paused documents included') +
+    `\n` +
     `Holding: ${holding.total} items (${holding.flashcards} flashcard Rems, ${holding.incRems} IncRems)\n` +
     `Last refresh: ${formatStamp(now)} — drained ${drained.reviewed} reviewed` +
     (drained.cooling ? `, ${drained.cooling} cooling` : '') +
@@ -406,11 +452,11 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
 async function ensureHeaderOrder(plugin: RNPlugin, doc: PluginRem): Promise<void> {
   const metadata = await findOrCreateMetadataRem(plugin, doc);
   const graph = await findOrCreateGraphRem(plugin, doc);
-  const fresh = (await plugin.rem.findOne(doc._id)) ?? doc;
-  const children = (fresh.children as RemId[] | undefined) ?? [];
+  // Positions are asked of each Rem: neither the lazy `children` field nor
+  // getChildrenRem() can be trusted for order (see children.ts).
   try {
-    if (metadata && children[0] !== metadata._id) await metadata.setParent(doc, 0);
-    if (graph && children[1] !== graph._id) await graph.setParent(doc, 1);
+    if (metadata && (await metadata.positionAmongstSiblings()) !== 0) await metadata.setParent(doc, 0);
+    if (graph && (await graph.positionAmongstSiblings()) !== 1) await graph.setParent(doc, 1);
   } catch (e) {
     console.warn('[Priority Queue] Could not reorder the header children:', e);
   }

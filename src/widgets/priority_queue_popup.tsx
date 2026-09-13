@@ -9,6 +9,8 @@ import {
   PRIORITY_QUEUE_DEFAULT_BURST,
   PRIORITY_QUEUE_SHIELD_SLICE,
   PRIORITY_QUEUE_SHIELD_SLICE_MAX,
+  PRIORITY_QUEUE_SKIP_PAUSED,
+  PRIORITY_QUEUE_PAUSED_THRESHOLD,
   allCardPriorityInfoKey,
   coolingCacheKey,
 } from '../lib/consts';
@@ -17,7 +19,6 @@ import {
   findPriorityQueueDoc,
   isQueueOpen,
   practicePriorityQueue,
-  readDocTargetIds,
   refreshPriorityQueue,
   RefreshMode,
   RefreshResult,
@@ -73,6 +74,8 @@ type Control =
   | 'scope-kb'
   | 'burst'
   | 'slice'
+  | 'paused'
+  | 'pausedThreshold'
   | 'refresh'
   | 'drain'
   | 'refill'
@@ -87,6 +90,8 @@ interface ScopeStatus {
   docRemId: RemId | null;
   burst: number;
   shieldSlice: number;
+  skipPaused: boolean;
+  pausedThreshold: number;
   lastRefresh: number | null;
   report: PrdDocReport | null;
   outlook: { now: number | null; afterDocument: number | null; overdueRems: number } | null;
@@ -128,12 +133,21 @@ export function PriorityQueuePopup() {
    * built from a queue would only ever re-select what is already in it.
    */
   const [scopeBlocked, setScopeBlocked] = useState<boolean | null>(null);
+  /**
+   * Whether the document you came from already has a Priority Queue of its own.
+   * Only then does the popup open on it; otherwise it opens on the Full
+   * Knowledge Base, since a document scope with no queue has nothing to show
+   * and its shield takes seconds to compute on a large document.
+   */
+  const [docHasQueue, setDocHasQueue] = useState<boolean | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const [status, setStatus] = useState<ScopeStatus | null>(null);
   const [burst, setBurst] = useState<number>(PRIORITY_QUEUE_DEFAULT_BURST);
   const [slicePct, setSlicePct] = useState<number>(Math.round(PRIORITY_QUEUE_SHIELD_SLICE * 100));
+  const [skipPaused, setSkipPaused] = useState<boolean>(PRIORITY_QUEUE_SKIP_PAUSED);
+  const [pausedThreshold, setPausedThreshold] = useState<number>(PRIORITY_QUEUE_PAUSED_THRESHOLD);
   const [result, setResult] = useState<RefreshResult | null>(null);
   const [notice, setNotice] = useState('');
   // Practice is the default action: it is where the daily loop ends up.
@@ -144,6 +158,7 @@ export function PriorityQueuePopup() {
   const containerRef = useRef<HTMLDivElement>(null);
   const burstRef = useRef<HTMLInputElement>(null);
   const sliceRef = useRef<HTMLInputElement>(null);
+  const pausedThresholdRef = useRef<HTMLInputElement>(null);
 
   // Is the Rem you came from usable as a scope?
   useEffect(() => {
@@ -160,7 +175,19 @@ export function PriorityQueuePopup() {
           blocked = true;
         }
       }
-      if (!cancelled) setScopeBlocked(blocked);
+      let hasQueue = false;
+      if (context?.scopeRemId && !blocked) {
+        try {
+          hasQueue = !!(await findPriorityQueueDoc(plugin, context.scopeRemId));
+        } catch {
+          hasQueue = false;
+        }
+      }
+      if (cancelled) return;
+      // docHasQueue first: the default-scope effect waits on scopeBlocked, and
+      // these two updates are not batched outside an event handler.
+      setDocHasQueue(hasQueue);
+      setScopeBlocked(blocked);
     })();
     return () => {
       cancelled = true;
@@ -169,12 +196,14 @@ export function PriorityQueuePopup() {
 
   const docScopeAvailable = !!context?.scopeRemId && scopeBlocked === false;
 
-  // Default scope: the document you came from, when there is one and it qualifies.
+  // Default scope: the document you came from, when it qualifies AND already has
+  // a Priority Queue of its own; the Full Knowledge Base otherwise. The document
+  // stays selectable either way.
   useEffect(() => {
     if (context === undefined || scopeBlocked === null) return;
-    if (useFullKB === null) setUseFullKB(!docScopeAvailable);
+    if (useFullKB === null) setUseFullKB(!(docScopeAvailable && docHasQueue));
     else if (!docScopeAvailable && useFullKB === false) setUseFullKB(true);
-  }, [context, scopeBlocked, docScopeAvailable, useFullKB]);
+  }, [context, scopeBlocked, docScopeAvailable, docHasQueue, useFullKB]);
 
   const scopeRemId: RemId | null = useFullKB || !docScopeAvailable ? null : context?.scopeRemId ?? null;
   const scopeLabel = scopeRemId ? context?.scopeName || 'Current document' : 'Full Knowledge Base';
@@ -187,15 +216,44 @@ export function PriorityQueuePopup() {
   }, [coolingCache]);
   const coolingIds = useMemo(() => new Set(coolingVerdicts.map((v) => v.remId)), [coolingVerdicts]);
 
+  /**
+   * Every load is numbered, and a result is applied only if no newer load has
+   * started since. Switching scope while a slow load is still running used to
+   * let the old load finish last and overwrite the new status — a document
+   * scope's "no Priority Queue yet" landing under the Full Knowledge Base label.
+   */
+  const loadGeneration = useRef(0);
+  /** Comprehensive scope per document, built once per popup — it can take seconds. */
+  const scopeIdsCache = useRef(new Map<RemId, Promise<Set<RemId>>>());
+  const [outlookPending, setOutlookPending] = useState(false);
+
+  const scopeIdsFor = (remId: RemId): Promise<Set<RemId>> => {
+    let pending = scopeIdsCache.current.get(remId);
+    if (!pending) {
+      pending = buildComprehensiveScope(plugin, remId);
+      // A failed build must not be cached as a permanent failure.
+      pending.catch(() => scopeIdsCache.current.delete(remId));
+      scopeIdsCache.current.set(remId, pending);
+    }
+    return pending;
+  };
+
   const loadStatus = useCallback(async () => {
     if (useFullKB === null) return;
+    const generation = ++loadGeneration.current;
+    const isCurrent = () => generation === loadGeneration.current;
     setPhase('loading');
     setError('');
+    setOutlookPending(false);
     try {
-      // The document scope, for a document-scoped shield: the same comprehensive
-      // scope the queue uses at QueueEnter (descendants, portals, references).
-      const scopeIds = scopeRemId ? await buildComprehensiveScope(plugin, scopeRemId) : null;
+      // Status first: finding the document and scanning it is quick. The
+      // document-scoped shield needs the comprehensive scope, which on a large
+      // document takes several seconds, so it fills in afterwards instead of
+      // holding the whole status back.
       const info = await findPriorityQueueDoc(plugin, scopeRemId);
+      if (!isCurrent()) return;
+
+      let targets: RemId[] = [];
       if (!info) {
         setStatus({
           exists: false,
@@ -203,37 +261,63 @@ export function PriorityQueuePopup() {
           docRemId: null,
           burst: PRIORITY_QUEUE_DEFAULT_BURST,
           shieldSlice: PRIORITY_QUEUE_SHIELD_SLICE,
+          skipPaused: PRIORITY_QUEUE_SKIP_PAUSED,
+          pausedThreshold: PRIORITY_QUEUE_PAUSED_THRESHOLD,
           lastRefresh: null,
           report: null,
-          outlook: await computeShieldOutlook(plugin, new Set(), coolingIds, scopeIds),
+          outlook: null,
         });
         setBurst(PRIORITY_QUEUE_DEFAULT_BURST);
         setSlicePct(Math.round(PRIORITY_QUEUE_SHIELD_SLICE * 100));
+        setSkipPaused(PRIORITY_QUEUE_SKIP_PAUSED);
+        setPausedThreshold(PRIORITY_QUEUE_PAUSED_THRESHOLD);
         setPhase('ready');
-        return;
-      }
-      const [scan, targets] = await Promise.all([
-        scanPriorityReviewDocuments(plugin, undefined, { docIds: [info.doc._id], coolingRemIds: coolingIds }),
-        readDocTargetIds(plugin, info.doc),
-      ]);
+      } else {
+      // The entry targets come out of the scan itself: reading the document a
+      // second time only doubled the cost.
+      const scan = await scanPriorityReviewDocuments(plugin, undefined, {
+        docIds: [info.doc._id],
+        coolingRemIds: coolingIds,
+      });
+      if (!isCurrent()) return;
       const report = scan.docs[0] ?? null;
-      const outlook = await computeShieldOutlook(plugin, new Set(targets), coolingIds, scopeIds);
+      targets = report
+        ? [...report.dueEntries, ...report.removableEntries, ...report.keptEntries, ...report.unknownEntries]
+            .map((e) => e.targetRemId)
+            .filter((id): id is RemId => !!id)
+        : [];
       setStatus({
         exists: true,
         docName: report?.docName ?? 'Priority Queue',
         docRemId: info.doc._id,
         burst: info.burst,
         shieldSlice: info.shieldSlice,
+        skipPaused: info.skipPaused,
+        pausedThreshold: info.pausedThreshold,
         lastRefresh: info.lastRefresh,
         report,
-        outlook,
+        outlook: null,
       });
       setBurst(info.burst);
       setSlicePct(Math.round(info.shieldSlice * 100));
+      setSkipPaused(info.skipPaused);
+      setPausedThreshold(info.pausedThreshold);
       setPhase('ready');
+      }
+
+      // Then the shield outlook, patched into the status it belongs to.
+      setOutlookPending(true);
+      const scopeIds = scopeRemId ? await scopeIdsFor(scopeRemId) : null;
+      if (!isCurrent()) return;
+      const outlook = await computeShieldOutlook(plugin, new Set(targets), coolingIds, scopeIds);
+      if (!isCurrent()) return;
+      setStatus((prev) => (prev ? { ...prev, outlook } : prev));
+      setOutlookPending(false);
     } catch (e) {
+      if (!isCurrent()) return;
       console.error('[Priority Queue] status failed:', e);
       setError((e as any)?.message ?? String(e));
+      setOutlookPending(false);
       setPhase('error');
     }
   }, [plugin, scopeRemId, useFullKB, coolingIds]);
@@ -269,6 +353,8 @@ export function PriorityQueuePopup() {
 
   const clampBurstInput = (n: number) =>
     Math.max(PRIORITY_QUEUE_BURST_MIN, Math.min(PRIORITY_QUEUE_BURST_MAX, Math.round(Number.isFinite(n) ? n : PRIORITY_QUEUE_DEFAULT_BURST)));
+  const clampThresholdInput = (n: number) =>
+    Math.max(0, Math.min(100, Math.round(Number.isFinite(n) ? n : PRIORITY_QUEUE_PAUSED_THRESHOLD)));
   const clampSliceInput = (n: number) =>
     Math.max(0, Math.min(Math.round(PRIORITY_QUEUE_SHIELD_SLICE_MAX * 100), Math.round(Number.isFinite(n) ? n : 0)));
 
@@ -285,6 +371,8 @@ export function PriorityQueuePopup() {
         mode,
         burst: clampBurstInput(burst),
         shieldSlice: clampSliceInput(slicePct) / 100,
+        skipPaused,
+        pausedThreshold: clampThresholdInput(pausedThreshold),
         onProgress: (m) => setProgress(m),
       });
       if (r.blocked) {
@@ -316,6 +404,8 @@ export function PriorityQueuePopup() {
           scopeRemId,
           burst: clampBurstInput(burst),
           shieldSlice: clampSliceInput(slicePct) / 100,
+          skipPaused,
+          pausedThreshold: clampThresholdInput(pausedThreshold),
           onProgress: (m) => setProgress(m),
         });
         docId = r.doc?._id ?? null;
@@ -382,11 +472,13 @@ export function PriorityQueuePopup() {
   const controls: Control[] = useMemo(() => {
     const list: Control[] = [];
     if (docScopeAvailable) list.push('scope-doc');
-    list.push('scope-kb', 'burst', 'slice', 'refresh', 'drain', 'refill');
+    list.push('scope-kb', 'burst', 'slice', 'paused');
+    if (skipPaused) list.push('pausedThreshold');
+    list.push('refresh', 'drain', 'refill');
     if (status?.exists) list.push('open');
     list.push('cooling', 'sorting', 'practice');
     return list;
-  }, [docScopeAvailable, status?.exists]);
+  }, [docScopeAvailable, status?.exists, skipPaused]);
 
   const activate = (c: Control) => {
     switch (c) {
@@ -403,6 +495,13 @@ export function PriorityQueuePopup() {
       case 'slice':
         sliceRef.current?.focus();
         sliceRef.current?.select();
+        break;
+      case 'paused':
+        setSkipPaused((v) => !v);
+        break;
+      case 'pausedThreshold':
+        pausedThresholdRef.current?.focus();
+        pausedThresholdRef.current?.select();
         break;
       case 'refresh':
         void runAction('refresh');
@@ -620,10 +719,16 @@ export function PriorityQueuePopup() {
           </div>
           <div className="text-xs" style={faint}>
             {status.lastRefresh ? `Last refresh ${formatDateTime(status.lastRefresh)}` : 'Never refreshed'} · fill target{' '}
-            {status.burst} · shield slice {Math.round(status.shieldSlice * 100)}%
+            {status.burst} · shield slice {Math.round(status.shieldSlice * 100)}% ·{' '}
+            {status.skipPaused ? `paused skipped above P${status.pausedThreshold}` : 'paused included'}
             {willAdd > 0 && phase === 'ready' && <> · a refresh adds up to {willAdd}</>}
           </div>
         </>
+      )}
+      {!status?.outlook && outlookPending && (
+        <div className="text-xs pt-1" style={{ ...faint, borderTop: '1px solid var(--rn-clr-border-opaque, rgba(128,128,128,0.2))' }}>
+          {scopeRemId ? 'Computing the document card shield…' : 'Computing the KB card shield…'}
+        </div>
       )}
       {status?.outlook && (
         <div className="text-xs pt-1" style={{ ...muted, borderTop: '1px solid var(--rn-clr-border-opaque, rgba(128,128,128,0.2))' }}>
@@ -702,6 +807,43 @@ export function PriorityQueuePopup() {
         />
         <span>%</span>
       </label>
+      <div className="flex items-center gap-2 flex-wrap basis-full">
+        <label
+          className="flex items-center gap-2 rounded px-1 cursor-pointer"
+          style={ring('paused')}
+          onMouseEnter={() => setControl('paused')}
+          title='Leave out flashcard Rems inside documents whose Deck Status is "Paused". Skipped Rems are listed after each action.'
+        >
+          <input
+            type="checkbox"
+            checked={skipPaused}
+            onChange={(e) => setSkipPaused(e.target.checked)}
+            onMouseDown={(e) => e.preventDefault()}
+          />
+          <span>Skip paused documents</span>
+        </label>
+        {skipPaused && (
+          <label
+            className="flex items-center gap-2 rounded px-1"
+            style={ring('pausedThreshold')}
+            onMouseEnter={() => setControl('pausedThreshold')}
+          >
+            <span style={muted}>but always keep priority</span>
+            <input
+              ref={pausedThresholdRef}
+              type="number"
+              min={0}
+              max={100}
+              value={pausedThreshold}
+              onChange={(e) => setPausedThreshold(Number(e.target.value))}
+              onBlur={() => setPausedThreshold((t) => clampThresholdInput(t))}
+              className="w-14 px-1 py-0.5 rounded text-sm"
+              style={{ border: '1px solid var(--rn-clr-border-opaque, rgba(128,128,128,0.3))', background: 'var(--rn-clr-background-primary)' }}
+            />
+            <span style={muted}>or less</span>
+          </label>
+        )}
+      </div>
     </div>
   );
 
@@ -777,17 +919,33 @@ export function PriorityQueuePopup() {
             </div>
           ))
         )}
-      {result.selection &&
-        listPanel(
-          `⏸ ${plural(result.selection.skippedPausedItems.length, 'Rem', 'Rems')} skipped in paused documents`,
-          'rgba(234,179,8,0.12)',
-          result.selection.skippedPausedItems.slice(0, 50).map((s) => (
-            <div key={s.remId} className="flex items-center gap-2">
-              {priorityChip(s.priority)}
-              <span className="truncate flex-1" title={s.name}>{s.name}</span>
+      {result.selection && result.selection.skippedPausedItems.length > 0 && (() => {
+        const skipped = result.selection.skippedPausedItems;
+        const high = skipped.filter((s) => s.priority < 20).length;
+        return (
+          <div
+            className="rounded p-2 text-xs flex flex-col gap-1"
+            style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.45)' }}
+          >
+            <div className="font-semibold">
+              ⚠️ {plural(skipped.length, 'flashcard Rem', 'flashcard Rems')} skipped — inside paused documents
+              {high > 0 && <span style={{ color: '#ef4444', marginLeft: 8 }}>— includes {high} HIGH PRIORITY</span>}
             </div>
-          ))
-        )}
+            <div style={muted}>
+              Left out of the document. Unpause their documents, raise the “always keep” priority, or review them separately.
+            </div>
+            <div style={{ maxHeight: 160, overflowY: 'auto' }}>
+              {skipped.slice(0, 100).map((s) => (
+                <div key={s.remId} className="flex items-center gap-2" style={{ color: s.priority < 20 ? '#ef4444' : undefined }}>
+                  {priorityChip(s.priority)}
+                  <span className="truncate flex-1" title={s.name}>{s.name || s.remId}</span>
+                </div>
+              ))}
+              {skipped.length > 100 && <div style={faint}>…and {skipped.length - 100} more — the full list is in the console.</div>}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 

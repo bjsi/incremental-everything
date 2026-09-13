@@ -1008,15 +1008,21 @@ function QueueSessionItem({ session, onDelete, isLive, thresholds }: { session: 
         return formatInterval(totalMs);
     }
 
+    /**
+     * Straight into the queue on that document — the same route RemNote's own
+     * Practice button takes (see lib/priority_review_document/queue_doc.ts,
+     * practicePriorityQueue). Inlined rather than imported: that module pulls
+     * the selection and cooling code behind it, and this widget lives in the
+     * sidebar for the whole session.
+     */
     const handleOpen = async () => {
-        if (session.queueId) {
-            const rem = await plugin.rem.findOne(session.queueId);
-            if (rem) {
-                plugin.window.openRem(rem);
-            } else {
-                plugin.app.toast("Could not find the document for this queue.");
-            }
+        if (!session.queueId) return;
+        const rem = await plugin.rem.findOne(session.queueId);
+        if (!rem) {
+            plugin.app.toast("Could not find the document for this queue.");
+            return;
         }
+        await plugin.window.setURL(`/flashcards/${session.queueId}`);
     }
 
     const seconds = session.flashcardsTime / 1000;
@@ -1248,7 +1254,7 @@ function QueueSessionItem({ session, onDelete, isLive, thresholds }: { session: 
         <div className="p-3 border rounded-lg rn-clr-border-opaque hover:shadow-sm transition-shadow rn-clr-background-elevation-10">
             <div className="flex justify-between items-start">
                 <div onClick={handleOpen} className="cursor-pointer flex-grow">
-                    <div className="font-semibold text-lg hover:underline truncate" title={session.scopeName || "Ad-hoc Queue"}>
+                    <div className="font-semibold text-lg hover:underline truncate" title={session.queueId ? `Practice "${session.scopeName || 'this queue'}" again` : (session.scopeName || "Ad-hoc Queue")}>
                         {session.scopeName ? session.scopeName : (session.queueId ? (
                             <RemViewer remId={session.queueId} width="100%" />
                         ) : "Ad-hoc Queue")}

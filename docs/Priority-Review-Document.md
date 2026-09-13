@@ -24,10 +24,11 @@ Everything happens from one popup: **Priority Queue** in the Command Palette (qu
 
 ![The Priority Queue popup: scope, status card, fill target and shield slice, and the action buttons](assets/priority-queue-popup.png){ width="640" }
 
-* **Scope** — the document you came from, or the whole knowledge base. A review document is never offered as a scope: a queue built from a queue would only re-select what it already holds.
+* **Scope** — the document you came from, or the whole knowledge base. The popup opens on the document only when it already has a Priority Queue of its own, and on the whole knowledge base otherwise; the document stays one click away to build one. A review document is never offered as a scope: a queue built from a queue would only re-select what it already holds.
 * **Status** — what the document holds, how many flashcard Rems and IncRems are still due, how many entries a refresh would drain and how many of those are cooling, the last refresh, and the current settings. Below it, the **card shield now** and **after this document** — the priority the shield would reach once every entry is reviewed — for the KB or for the document scope, with cooling Rems already excluded.
 * **Fill target** — how many items the document is topped up to. `25`, `50` and `100` are one click; any number from 5 to 200 works. This is the size of one *burst*: one session works through one fill, and the refresh at the end prepares the next.
 * **Shield slice** — the share of each fill taken strictly by priority before your randomness applies. See [why it exists](#the-shield-slice). `0%` follows your [Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria) exactly.
+* **Skip paused documents** — leave out flashcard Rems inside paused documents, but always keep the ones at or below the priority you set (20 by default). See [Paused Document Filtering](#paused-document-filtering).
 * **Build / Refresh**, **Drain**, **Refill**, **▶ Practice**, **Open document**, **Cooling**, **Sorting…**.
 
 None of the actions runs while a queue is open — RemNote gathers a document's cards when you press Practice, so editing the document between sessions is safe and editing it during one is not. The popup says so and waits.
@@ -138,13 +139,15 @@ As each candidate flashcard Rem is pulled into the mixing loop:
 
 1. The plugin walks the Rem's ancestor chain looking for a Rem that carries the `Deck` powerup.
 2. If it finds one, it reads the `Status` slot.
-3. If the status is `"Paused"`, the Rem is skipped and reported — **unless** its absolute priority is 20 or lower, in which case it is always included.
+3. If the status is `"Paused"`, the Rem is skipped and reported — **unless** its absolute priority is at or below the **always keep** priority, in which case it is always included.
 
 This check is **lazy**: it runs for each card as it is drawn, so the number of ancestor walks is bounded by the fill target, not by the number of due cards in your knowledge base.
 
+Both controls sit under the fill target in the popup: the **Skip paused documents** checkbox, on by default, and **but always keep priority … or less**, 20 by default. Like the fill target, they are stored on each Priority Queue document, so the full-KB queue and a document-scoped one can differ.
+
 ### What You See
 
-The popup lists the skipped Rems with their priority after the action, and the status block counts them.
+After an action, an **amber ⚠️ panel** in the popup lists every skipped Rem with its priority. Rems below priority 20 are shown in red, and the header calls them out as **HIGH PRIORITY** — which only happens once you have lowered the always-keep priority below 20. The status block counts the skipped Rems, and the toast after the [automatic refresh](#refresh-after-every-session) says how many were skipped and how many of them were high priority, since no popup is open then.
 
 ---
 
@@ -299,7 +302,7 @@ Paused cards *do* have a valid `nextRepetitionTime` in the past, so they pass th
 |---|---|
 | **Due-card priority cache** | **Included** — `nextRepetitionTime` is valid, so the `?? Infinity` filter does not exclude them. Their `CardPriorityInfo` entry enters the cache, stamped `paused` by the paused-deck scan. |
 | **Priority Shield (widget)** | Suppressed through the `paused` stamp. |
-| **Priority Queue selection** | **Filtered out** via the lazy `isInPausedDocument` ancestor walk. High-priority items (priority ≤ 20) bypass the filter and are always included. |
+| **Priority Queue selection** | **Filtered out** via the lazy `isInPausedDocument` ancestor walk. Rems at or below the always-keep priority (20 by default) bypass the filter and are always included. |
 
 ### Why `rem.getCards()` Is Not Used for Paused Detection
 

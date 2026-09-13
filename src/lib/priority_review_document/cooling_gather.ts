@@ -17,6 +17,7 @@ import {
   isCardDue,
 } from './cooling';
 import { getCoolingParams, mergeCoolingCache, readCoolingOverrides } from './cooling_store';
+import { readChildren } from './children';
 
 /**
  * Turns RemNote data into the plain facts the cooling engine judges.
@@ -115,6 +116,26 @@ class RemReader {
 
   async one(id: RemId): Promise<PluginRem | null> {
     return (await this.many([id])).get(id) ?? null;
+  }
+
+  private childCache = new Map<RemId, Promise<PluginRem[]>>();
+
+  /**
+   * A Rem's children, through getChildrenRem — never the lazy `children` field,
+   * which is empty for documents not opened this session (see children.ts) and
+   * would silently hide every sibling and descendant spoiler in them. Memoised:
+   * siblings share a parent, and a descriptor tree shares whole rows.
+   */
+  childrenOf(rem: PluginRem): Promise<PluginRem[]> {
+    let pending = this.childCache.get(rem._id);
+    if (!pending) {
+      pending = readChildren(this.plugin, rem).then((kids) => {
+        for (const k of kids) if (!this.cache.has(k._id)) this.cache.set(k._id, k);
+        return kids;
+      });
+      this.childCache.set(rem._id, pending);
+    }
+    return pending;
   }
 }
 
@@ -264,13 +285,12 @@ export class CoolingScanner {
       const parent = await this.reader.one(parentId);
       if (parent && !(await this.isCluster(parent))) {
         const parentLabel = flattenText(parent.text) || undefined;
-        const siblingIds = ((parent.children as RemId[] | undefined) ?? []).filter(
-          (id) => id !== remId && this.clozeExtractIds.has(id)
+        const siblings = (await this.reader.childrenOf(parent)).filter(
+          (s) => s._id !== remId && this.clozeExtractIds.has(s._id)
         );
-        const siblings = await this.reader.many(siblingIds);
-        for (const [sibId, sib] of siblings) {
+        for (const sib of siblings) {
           candidate.seen.push(
-            ...this.seenEventsFor(sibId, 'cloze-sibling', flattenText(sib.text) || undefined)
+            ...this.seenEventsFor(sib._id, 'cloze-sibling', flattenText(sib.text) || undefined)
           );
         }
         candidate.seen.push(...this.seenEventsFor(parentId, 'parent-extract', parentLabel));
@@ -292,16 +312,17 @@ export class CoolingScanner {
 
     // 3 & 4. Own Alt+Z clozes, and descendant cards two levels down.
     if (!(await this.isCluster(rem))) {
-      const childIds = (rem.children as RemId[] | undefined) ?? [];
-      const children = await this.reader.many(childIds);
-      const grandchildIds: RemId[] = [];
-      for (const [childId, child] of children) {
+      const children = await this.reader.childrenOf(rem);
+      for (const child of children) {
         const childLabel = flattenText(child.text) || undefined;
-        const relation = this.clozeExtractIds.has(childId) ? 'own-cloze-child' : 'descendant';
-        candidate.seen.push(...this.seenEventsFor(childId, relation, childLabel));
-        grandchildIds.push(...((child.children as RemId[] | undefined) ?? []));
+        const relation = this.clozeExtractIds.has(child._id) ? 'own-cloze-child' : 'descendant';
+        candidate.seen.push(...this.seenEventsFor(child._id, relation, childLabel));
       }
-      const grandchildren = await this.reader.many(grandchildIds);
+      // Every child's own children, read concurrently — one call per child,
+      // memoised across candidates that share them.
+      const grandchildLists = await Promise.all(children.map((c) => this.reader.childrenOf(c)));
+      const grandchildren = new Map<RemId, PluginRem>();
+      for (const list of grandchildLists) for (const gc of list) grandchildren.set(gc._id, gc);
       for (const [gcId, gc] of grandchildren) {
         candidate.seen.push(
           ...this.seenEventsFor(gcId, 'descendant', flattenText(gc.text) || undefined)

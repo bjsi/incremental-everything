@@ -3922,7 +3922,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           text: rem.text,
           textIsEmpty: !rem.text || rem.text.length === 0,
           backText: rem.backText,
-          childCount: rem.children?.length ?? 0,
+          // getChildrenRem, not the lazy `children` field, which is empty for
+          // Rems whose document has not been loaded (priority_review_document/children.ts).
+          childCount: ((await rem.getChildrenRem().catch(() => [])) || []).length,
           type: rem.type,
           powerupsReportingTrue: powerups,
           tagRemIds: tags,
