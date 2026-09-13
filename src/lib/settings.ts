@@ -69,6 +69,7 @@ import {
   flashcardResponseTimeLimitId,
   titleCaseAcronymsId,
   sourceHighlightColorId,
+  textReaderSourceHighlightColorId,
   HighlightColorName,
   enableMasteryDrillId,
   oldItemThresholdId,
@@ -144,6 +145,7 @@ export interface IESettings {
   [flashcardResponseTimeLimitId]: number;
   [titleCaseAcronymsId]: string;
   [sourceHighlightColorId]: HighlightColorName;
+  [textReaderSourceHighlightColorId]: HighlightColorName;
 
   // Mastery Drill
   [enableMasteryDrillId]: boolean;
@@ -211,6 +213,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [flashcardResponseTimeLimitId]: 180,
   [titleCaseAcronymsId]: '',
   [sourceHighlightColorId]: 'Orange',
+  [textReaderSourceHighlightColorId]: 'Purple',
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
@@ -915,6 +918,22 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'Green', label: 'Green' },
       { value: 'Blue', label: 'Blue' },
       { value: 'Purple', label: 'Purple' },
+    ],
+  },
+  [textReaderSourceHighlightColorId]: {
+    kind: 'dropdown',
+    group: 'misc',
+    title: 'Text Reader Source Highlight Colour',
+    description:
+      'Colour of the highlights Pin Source Quote creates in a PDF\'s Text Reader view, so they are ' +
+      'easy to tell apart from the ones it creates in the PDF view.',
+    options: [
+      { value: 'Purple', label: 'Purple' },
+      { value: 'Orange', label: 'Orange' },
+      { value: 'Yellow', label: 'Yellow' },
+      { value: 'Red', label: 'Red' },
+      { value: 'Green', label: 'Green' },
+      { value: 'Blue', label: 'Blue' },
     ],
   },
 };

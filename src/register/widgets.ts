@@ -249,6 +249,23 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Pin Source Quote on a PDF that also has a Text Reader version: pin in both
+  // views or just one (lib/pdf_source_pins PIN_SOURCE_VIEWS_POPUP).
+  plugin.app.registerWidget('pin_source_views_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 440,
+      height: 'auto',
+    },
+  });
+
+  // Generic message dialog for failures the user must read (lib/message_dialog.ts).
+  plugin.app.registerWidget('message_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 420,
+      height: 'auto',
+    },
+  });
+
   // Scan → review → delete for entries left behind in Priority Review Documents.
   // Tall and scrollable because the review stage is also the diagnostic: it lists
   // every document with what it still carries, and you tick which ones to clean.

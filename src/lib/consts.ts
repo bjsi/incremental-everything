@@ -91,6 +91,8 @@ export const titleCaseAcronymsId = 'title-case-acronyms';
 /** Colour of the PDF highlights the plugin creates for source pins (lib/source_pins). */
 export const sourceHighlightColorId = 'source-highlight-color';
 export type HighlightColorName = 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple';
+/** Colour of source-pin highlights created in a PDF's Text Reader view, so they are told apart from PDF-view ones. */
+export const textReaderSourceHighlightColorId = 'text-reader-source-highlight-color';
 export const enableMasteryDrillId = 'enable-mastery-drill';
 /** Pre-inversion id, kept only so the migration can convert stored values. */
 export const legacySkipMasteryDrillId = 'skip_mastery_drill';

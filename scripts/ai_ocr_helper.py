@@ -112,8 +112,14 @@ def fetch(url, suffix):
 
     RemNote stores uploads as `%LOCAL_FILE%<name>`, a placeholder for its S3
     prefix; the desktop app keeps the file itself in ~/remnote/remnote-<kb>/files/."""
+    # A PDF's Text Reader HTML is referenced by its full storage URL instead of
+    # the placeholder, but the desktop app keeps a local copy under the same name.
+    name = None
     if url.startswith(LOCAL_FILE):
         name = url[len(LOCAL_FILE):]
+    elif url.startswith(REMNOTE_FILES_URL):
+        name = urllib.parse.urlsplit(url).path.lstrip('/')
+    if name:
         for local in REMNOTE_DATA.glob(f'remnote-*/files/{name}'):
             return local
         url = REMNOTE_FILES_URL + name
