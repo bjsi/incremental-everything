@@ -8,6 +8,9 @@ the PDF, hands the image to the user's own `claude` CLI (their subscription —
 no API key involved) and returns KaTeX/markdown-ish markup for the plugin to
 write back as rich text.
 
+It also locates quotes in a PDF (`/locate`), so the plugin can pin a passage's
+source highlight without the user selecting it.
+
     python3 scripts/ai_ocr_helper.py          # listens on 127.0.0.1:3457
 
 Requires PyMuPDF (`pip install pymupdf`) and a logged-in `claude` CLI.
@@ -25,13 +28,17 @@ Files live in ~/.incremental-remnote/ai-ocr/:
     pdf-cache/      downloaded PDFs
 """
 import base64
+import difflib
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -124,6 +131,10 @@ def fetch(url, suffix):
     return path
 
 
+# ---------------------------------------------------------------------------
+# /ocr — transcribe a highlight's region
+# ---------------------------------------------------------------------------
+
 def page_boxes(data):
     """Highlight Data -> [(pageNumber, (x1, y1, x2, y2) as page fractions)].
 
@@ -210,6 +221,173 @@ def transcribe(images, raw_text):
     raise RuntimeError(f'claude exited {proc.returncode}: {proc.stderr.strip()[-400:]}')
 
 
+# ---------------------------------------------------------------------------
+# /locate — find a quote's words on the page
+# ---------------------------------------------------------------------------
+
+MIN_SCORE = 0.6       # share of the quote's words that must match
+MAX_GAP_TOKENS = 6    # unmatched page words tolerated inside one match
+EDGE_TOKENS = 3       # unmatched words at either end of a quote taken back into the match
+PDF_LOCK = threading.Lock()  # a PyMuPDF document is not safe across threads
+_open_pdfs = {}       # path -> (mtime, document, {page index: (words, tokens)})
+
+
+def open_pdf(path):
+    mtime = path.stat().st_mtime
+    cached = _open_pdfs.get(str(path))
+    if cached and cached[0] == mtime:
+        return cached
+    entry = (mtime, pymupdf.open(path), {})
+    _open_pdfs[str(path)] = entry
+    return entry
+
+
+def norm_token(text):
+    return re.sub(r'\W', '', unicodedata.normalize('NFKC', text).lower())
+
+
+def page_tokens(entry, index):
+    """The page's words (x0, y0, x1, y1, text, block, line, word) plus matchable
+    tokens, each mapped to the word indices it came from. A word hyphenated
+    across a line break becomes one token, so "tur-" + "bulence" matches."""
+    cache = entry[2]
+    if index not in cache:
+        words = entry[1][index].get_text('words')
+        tokens = []
+        i = 0
+        while i < len(words):
+            word = words[i]
+            text, indices = word[4], [i]
+            following = words[i + 1] if i + 1 < len(words) else None
+            if text.endswith('-') and following and (following[5], following[6]) != (word[5], word[6]):
+                text, indices = text[:-1] + following[4], [i, i + 1]
+            token = norm_token(text)
+            if token:
+                tokens.append((token, indices))
+            i += len(indices)
+        cache[index] = (words, tokens)
+    return cache[index]
+
+
+def best_span(tokens, quote):
+    """(first token, last token, score) of the best match of `quote` in `tokens`.
+    Exact first; otherwise the densest cluster of matching blocks, scored by the
+    share of quote words matched over the longer of quote and span."""
+    seq = [t for t, _ in tokens]
+    n = len(quote)
+    for start in range(len(seq) - n + 1):
+        if seq[start:start + n] == quote:
+            return start, start + n - 1, 1.0
+    blocks = [b for b in difflib.SequenceMatcher(None, seq, quote, autojunk=False).get_matching_blocks() if b.size]
+    if not blocks:
+        return None
+    clusters, current = [], [blocks[0]]
+    for block in blocks[1:]:
+        last = current[-1]
+        if block.a - (last.a + last.size) <= MAX_GAP_TOKENS:
+            current.append(block)
+        else:
+            clusters.append(current)
+            current = [block]
+    clusters.append(current)
+    cluster = max(clusters, key=lambda c: sum(b.size for b in c))
+    start, end = cluster[0].a, cluster[-1].a + cluster[-1].size - 1
+    matched = sum(b.size for b in cluster)
+    score = matched / max(n, end - start + 1)
+    # The text layer often garbles a quote's first or last token ("5–20%" reads
+    # "5e20%"), which leaves it out of the match. Take up to 3 unmatched edge
+    # words back in, so the highlight covers the whole quoted passage.
+    start = max(0, start - min(cluster[0].b, EDGE_TOKENS))
+    end = min(len(seq) - 1, end + min(n - (cluster[-1].b + cluster[-1].size), EDGE_TOKENS))
+    return start, end, score
+
+
+def locate_quote(entry, quote, page_hint):
+    page_count = entry[1].page_count
+    wanted = [t for t in (norm_token(w) for w in quote.split()) if t]
+    if not wanted:
+        return {'found': False, 'reason': 'empty quote'}
+    def search(pages, best=None):
+        for page_number in pages:
+            if not 1 <= page_number <= page_count:
+                continue
+            words, tokens = page_tokens(entry, page_number - 1)
+            span = best_span(tokens, wanted)
+            if span and (best is None or span[2] > best[0][2]):
+                best = (span, page_number, words, tokens)
+                if span[2] == 1.0:
+                    break
+        return best
+
+    all_pages = range(1, page_count + 1)
+    if page_hint:
+        # A cited page can be off (printed page labels, a model's slip): search
+        # around it first, then the whole document if that finds nothing good.
+        best = search([page_hint + d for d in (0, 1, -1, 2, -2)])
+        if not best or best[0][2] < MIN_SCORE:
+            best = search(all_pages, best)
+    else:
+        best = search(all_pages)
+    if not best or best[0][2] < MIN_SCORE:
+        return {'found': False, 'score': round(best[0][2], 3) if best else 0}
+
+    (start, end, score), page_number, words, tokens = best
+    first, last = tokens[start][1][0], tokens[end][1][-1]
+    page = entry[1][page_number - 1]
+    span_words = [{'i': k, 'x1': words[k][0], 'y1': words[k][1], 'x2': words[k][2], 'y2': words[k][3],
+                   'line': f'{words[k][5]}-{words[k][6]}', 'text': words[k][4]} for k in range(first, last + 1)]
+    return {'found': True, 'page': page_number, 'score': round(score, 3),
+            'pageWidth': page.rect.width, 'pageHeight': page.rect.height,
+            'words': span_words, 'text': ' '.join(w['text'] for w in span_words)}
+
+
+# ---------------------------------------------------------------------------
+# HTTP
+# ---------------------------------------------------------------------------
+
+def handle_ocr(req, entry):
+    rem_id = req.get('remId') or 'unknown'
+    data = req.get('data')
+    data = json.loads(data) if isinstance(data, str) else (data or {})
+    raw_text = req.get('rawText') or ''
+    entry.update(remId=rem_id, pdfUrl=req.get('pdfUrl'), data=data, rawText=raw_text[:300])
+
+    image_url = (data.get('content') or {}).get('imageUrl')
+    if image_url:
+        # Area highlight: RemNote already stored the snapshot.
+        images = [fetch(image_url, '.img').read_bytes()]
+        raw_text = ''
+    else:
+        boxes = page_boxes(data)
+        if not boxes:
+            raise RuntimeError('highlight Data has no usable position')
+        if not req.get('pdfUrl'):
+            raise RuntimeError('no PDF URL')
+        images = render_crops(fetch(req['pdfUrl'], '.pdf'), boxes, rem_id)
+        entry['boxes'] = boxes
+
+    markup = transcribe(images, raw_text)
+    entry['markup'] = markup
+    return {'markup': markup}
+
+
+def handle_locate(req, entry):
+    if not req.get('pdfUrl'):
+        raise RuntimeError('no PDF URL')
+    quotes = req.get('quotes') or []
+    path = fetch(req['pdfUrl'], '.pdf')
+    with PDF_LOCK:
+        pdf = open_pdf(path)
+        results = [locate_quote(pdf, q.get('quote') or '', q.get('page')) for q in quotes]
+        page_count = pdf[1].page_count
+    entry.update(pdfUrl=req['pdfUrl'], quotes=[{'quote': (q.get('quote') or '')[:120], 'page': q.get('page')} for q in quotes],
+                 results=[{k: r.get(k) for k in ('found', 'page', 'score')} for r in results])
+    return {'pageCount': page_count, 'results': results}
+
+
+ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate}
+
+
 class Handler(BaseHTTPRequestHandler):
     def send_json(self, status, payload):
         body = json.dumps(payload).encode()
@@ -230,48 +408,29 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
             return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL})
-        self.send_json(404, {'ok': False, 'error': 'POST /ocr'})
+        self.send_json(404, {'ok': False, 'error': 'POST /ocr or /locate'})
 
     def do_POST(self):
-        if self.path != '/ocr':
-            return self.send_json(404, {'ok': False, 'error': 'POST /ocr'})
+        route = ROUTES.get(self.path)
+        if not route:
+            return self.send_json(404, {'ok': False, 'error': 'POST /ocr or /locate'})
         origin = self.headers.get('Origin')
         if ALLOWED_ORIGINS and origin not in ALLOWED_ORIGINS:
-            log({'at': time.time(), 'origin': origin, 'rejected': True})
+            log({'at': time.time(), 'route': self.path, 'origin': origin, 'rejected': True})
             return self.send_json(403, {'ok': False, 'error': f'origin not allowed: {origin}'})
 
         started = time.time()
-        entry = {'at': started, 'origin': origin}
+        entry = {'at': started, 'route': self.path, 'origin': origin}
         try:
             req = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))))
-            rem_id = req.get('remId') or 'unknown'
-            data = req.get('data')
-            data = json.loads(data) if isinstance(data, str) else (data or {})
-            raw_text = req.get('rawText') or ''
-            entry.update(remId=rem_id, pdfUrl=req.get('pdfUrl'), data=data, rawText=raw_text[:300])
-
-            image_url = (data.get('content') or {}).get('imageUrl')
-            if image_url:
-                # Area highlight: RemNote already stored the snapshot.
-                images = [fetch(image_url, '.img').read_bytes()]
-                raw_text = ''
-            else:
-                boxes = page_boxes(data)
-                if not boxes:
-                    raise RuntimeError('highlight Data has no usable position')
-                if not req.get('pdfUrl'):
-                    raise RuntimeError('no PDF URL')
-                images = render_crops(fetch(req['pdfUrl'], '.pdf'), boxes, rem_id)
-                entry['boxes'] = boxes
-
-            markup = transcribe(images, raw_text)
+            payload = route(req, entry)
             ms = int((time.time() - started) * 1000)
-            entry.update(ok=True, ms=ms, markup=markup)
-            print(f'[ai-ocr] {rem_id} ok in {ms} ms', flush=True)
-            self.send_json(200, {'ok': True, 'markup': markup, 'ms': ms})
+            entry.update(ok=True, ms=ms)
+            print(f'[ai-ocr] {self.path} ok in {ms} ms', flush=True)
+            self.send_json(200, {'ok': True, 'ms': ms, **payload})
         except Exception as e:  # noqa: BLE001 — every failure goes back to the plugin as a toast
             entry.update(ok=False, error=str(e))
-            print(f'[ai-ocr] error: {e}', file=sys.stderr, flush=True)
+            print(f'[ai-ocr] {self.path} error: {e}', file=sys.stderr, flush=True)
             self.send_json(500, {'ok': False, 'error': str(e)})
         finally:
             log(entry)

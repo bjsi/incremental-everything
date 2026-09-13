@@ -88,6 +88,9 @@ export const performanceModeId = 'performanceMode';
 export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
 /** Custom acronyms the Text Case Converter keeps uppercase in Title Case. */
 export const titleCaseAcronymsId = 'title-case-acronyms';
+/** Colour of the PDF highlights the plugin creates for source pins (lib/source_pins). */
+export const sourceHighlightColorId = 'source-highlight-color';
+export type HighlightColorName = 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple';
 export const enableMasteryDrillId = 'enable-mastery-drill';
 /** Pre-inversion id, kept only so the migration can convert stored values. */
 export const legacySkipMasteryDrillId = 'skip_mastery_drill';
@@ -572,6 +575,9 @@ export const restoreHighlightBeforeAiCommandId = 'restore-highlight-before-ai';
 
 // Test: does a PDF highlight built through the plugin API show in the viewer? (lib/pdf_highlight_create.ts)
 export const probeClonePdfHighlightCommandId = 'probe-clone-pdf-highlight';
+
+// Pin the source passage of the focused Rem's text in the open PDF (lib/source_pins).
+export const pinSourceQuoteCommandId = 'pin-source-quote';
 
 // --- Priority Queue cooling (lib/priority_review_document/cooling*.ts) ---
 // The cooling SET is never stored: it is a function of card data, recomputed on

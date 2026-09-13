@@ -68,6 +68,8 @@ import {
   remnoteEnvironmentId,
   flashcardResponseTimeLimitId,
   titleCaseAcronymsId,
+  sourceHighlightColorId,
+  HighlightColorName,
   enableMasteryDrillId,
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
@@ -141,6 +143,7 @@ export interface IESettings {
   [remnoteEnvironmentId]: 'beta' | 'www';
   [flashcardResponseTimeLimitId]: number;
   [titleCaseAcronymsId]: string;
+  [sourceHighlightColorId]: HighlightColorName;
 
   // Mastery Drill
   [enableMasteryDrillId]: boolean;
@@ -207,6 +210,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [remnoteEnvironmentId]: 'www',
   [flashcardResponseTimeLimitId]: 180,
   [titleCaseAcronymsId]: '',
+  [sourceHighlightColorId]: 'Orange',
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
@@ -895,6 +899,23 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'technical acronyms (GT, IMO, SOLAS, PDF…) are built in. Entries win over the ' +
       'article/preposition rules, so a two-letter entry that is also a word — "SE", "NO" — will ' +
       'capitalise every occurrence of it.',
+  },
+  [sourceHighlightColorId]: {
+    kind: 'dropdown',
+    group: 'misc',
+    title: 'Source Highlight Colour',
+    description:
+      'Colour of the PDF highlights the plugin creates when it pins the source of a passage ' +
+      '(Pin Source Quote, and the AI study tools). A passage that already has a highlight is ' +
+      'pinned to that highlight, which keeps its own colour.',
+    options: [
+      { value: 'Orange', label: 'Orange' },
+      { value: 'Yellow', label: 'Yellow' },
+      { value: 'Red', label: 'Red' },
+      { value: 'Green', label: 'Green' },
+      { value: 'Blue', label: 'Blue' },
+      { value: 'Purple', label: 'Purple' },
+    ],
   },
 };
 

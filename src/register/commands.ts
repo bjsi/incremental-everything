@@ -12,6 +12,7 @@ import {
 import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { probeClonePdfHighlight } from '../lib/pdf_highlight_create';
+import { pinSourceQuote } from '../lib/pdf_source_pins';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import {
   powerupCode,
@@ -32,6 +33,7 @@ import {
   aiTranscribeHighlightCommandId,
   restoreHighlightBeforeAiCommandId,
   probeClonePdfHighlightCommandId,
+  pinSourceQuoteCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
   allCardPriorityInfoKey,
@@ -274,6 +276,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
       await probeClonePdfHighlight(plugin, focused._id);
+    },
+  });
+
+  // Pin the focused Rem's source passage in the open PDF, reusing highlights already on the page.
+  await plugin.app.registerCommand({
+    id: pinSourceQuoteCommandId,
+    name: 'Pin Source Quote',
+    quickCode: 'psq',
+    action: async () => {
+      await pinSourceQuote(plugin);
     },
   });
 
