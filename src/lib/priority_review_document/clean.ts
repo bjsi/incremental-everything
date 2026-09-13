@@ -60,6 +60,12 @@ export type EntryStatus =
    * Rem back once its window has run out.
    */
   | 'cooling'
+  /**
+   * Still due, but a parent or grandparent of it is due too, and practising it
+   * would show that ancestor's answer as context — the entry is removable, and
+   * the refresh pulls the ancestor in instead (see select.ts, forceAncestors).
+   */
+  | 'ancestor-due'
   /** The referenced Rem no longer exists — the entry is removable. */
   | 'missing'
   /** Cannot be judged (see {@link PrdScanResult.incCacheUnavailable}) — kept. */
@@ -123,6 +129,8 @@ export interface PrdDocReport {
   removableEntries: PrdEntry[];
   /** How many of the removable entries are removable because they are cooling. */
   coolingEntries: number;
+  /** How many of the removable entries are removable because an ancestor is due. */
+  ancestorEntries: number;
   /** No longer due, but kept because deleting them would lose something. */
   keptEntries: PrdEntry[];
   /** Entries that could not be judged. */
@@ -187,6 +195,8 @@ export interface PrdScanOptions {
   docIds?: RemId[];
   /** Rems currently cooling: a due FC entry pointing at one is removable as `cooling`. */
   coolingRemIds?: ReadonlySet<RemId>;
+  /** Rems with a due ancestor: a due FC entry pointing at one is removable as `ancestor-due`. */
+  ancestorHeldRemIds?: ReadonlySet<RemId>;
 }
 
 export interface PrdCleanOptions {
@@ -439,6 +449,7 @@ export async function scanPriorityReviewDocuments(
       remainingIncEntries: 0,
       removableEntries: [],
       coolingEntries: 0,
+      ancestorEntries: 0,
       keptEntries: [],
       unknownEntries: [],
       deletable: false,
@@ -488,6 +499,8 @@ export async function scanPriorityReviewDocuments(
         else entry.status = incState.due.has(targetRemId) ? 'due' : 'stale';
       } else if (!dueCardRemIds.has(targetRemId)) {
         entry.status = 'stale';
+      } else if (options.ancestorHeldRemIds?.has(targetRemId)) {
+        entry.status = 'ancestor-due';
       } else if (options.coolingRemIds?.has(targetRemId)) {
         entry.status = 'cooling';
       }
@@ -530,6 +543,7 @@ export async function scanPriorityReviewDocuments(
       } else {
         report.removableEntries.push(entry);
         if (entry.status === 'cooling') report.coolingEntries++;
+        else if (entry.status === 'ancestor-due') report.ancestorEntries++;
       }
     }
 

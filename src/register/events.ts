@@ -396,7 +396,10 @@ async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, subQueueI
         const highPaused = paused.filter((s) => s.priority < 20).length;
         await plugin.app.toast(
           `Priority Queue refreshed: ${result.holding.total} items ready ` +
-            `(drained ${result.drained.reviewed + result.drained.cooling + result.drained.missing}, added ${result.added.total})` +
+            `(drained ${result.drained.reviewed + result.drained.cooling + result.drained.ancestor + result.drained.missing}, added ${result.added.total})` +
+            (result.drained.ancestor
+              ? `. 🎭 ${result.drained.ancestor} held back for a due parent, which comes first`
+              : '') +
             (paused.length
               ? `. ⚠️ ${paused.length} skipped in paused documents` +
                 (highPaused ? `, ${highPaused} of them HIGH PRIORITY` : '') +

@@ -24,6 +24,12 @@ Clicking a past session in the history log now takes you straight into the queue
 
 📖 [Paused Document Filtering](Priority-Review-Document.md#paused-document-filtering)
 
+### 🐛 Fixed - a child already in the Priority Queue stayed when its parent came due
+
+Every refresh now checks the entries the document already holds: a child whose parent or grandparent has become due is drained, and the ancestor is pulled in to be reviewed first.
+
+📖 [Ancestor Spoiler Protection](Priority-Review-Document.md#ancestor-spoiler-protection)
+
 ## v1.0.88 - September 12th, 2026
 
 ### ✨ New - the Priority Queue: one persistent review document per scope, refilled in bursts and drained as you review

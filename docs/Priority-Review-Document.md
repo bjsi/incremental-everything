@@ -178,6 +178,8 @@ The swap is the point. Dropping the child on its own would leave the block stand
 
 Due-ness is read from the ancestor's **actual cards**, not from the plugin's priority cache, so a flashcard you created minutes ago still protects its descendants. A never-practised card counts as due — the case that matters most, since nothing has been recalled for the descendant to give away.
 
+**Entries already in the document are checked too.** The draw only looks at a child's ancestors when it first picks the child, so every refresh also checks each flashcard entry the document already holds. A child whose parent or grandparent has come due since it was added is drained, and that ancestor is pulled in ahead of the normal fill, so it is reviewed first. The toast after the [automatic refresh](#refresh-after-every-session) counts these, and the status block shows how many ancestors were swapped in.
+
 Once the ancestor *has* been reviewed, its descendant returns at a later refresh — and that is exactly when the reverse relation takes over: a descendant reviewed recently cools its ancestor, since the descendant's context line showed the ancestor's answer. The two rules are the same rule in the two directions of time.
 
 ### What You See
