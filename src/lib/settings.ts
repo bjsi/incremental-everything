@@ -69,7 +69,6 @@ import {
   flashcardResponseTimeLimitId,
   titleCaseAcronymsId,
   sourceHighlightColorId,
-  textReaderSourceHighlightColorId,
   HighlightColorName,
   enableMasteryDrillId,
   oldItemThresholdId,
@@ -145,7 +144,6 @@ export interface IESettings {
   [flashcardResponseTimeLimitId]: number;
   [titleCaseAcronymsId]: string;
   [sourceHighlightColorId]: HighlightColorName;
-  [textReaderSourceHighlightColorId]: HighlightColorName;
 
   // Mastery Drill
   [enableMasteryDrillId]: boolean;
@@ -213,7 +211,6 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [flashcardResponseTimeLimitId]: 180,
   [titleCaseAcronymsId]: '',
   [sourceHighlightColorId]: 'Orange',
-  [textReaderSourceHighlightColorId]: 'Purple',
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
@@ -908,9 +905,12 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     group: 'misc',
     title: 'Source Highlight Colour',
     description:
-      'Colour of the PDF highlights the plugin creates when it pins the source of a passage ' +
-      '(Pin Source Quote, and the AI study tools). A passage that already has a highlight is ' +
-      'pinned to that highlight, which keeps its own colour.',
+      'Colour of the highlights the plugin creates when it pins the source of a passage ' +
+      '(Pin Source Quote, and the AI study tools) — in a PDF, a saved web article, or a PDF\'s ' +
+      'Text Reader view. A passage that already has a highlight is pinned to that highlight, ' +
+      'which keeps its own colour.\n\n' +
+      'With pin rings on, a pin to a PDF page is ringed yellow and a pin to an HTML source ' +
+      '(web article or Text Reader) purple, so the two pins of one passage are told apart.',
     options: [
       { value: 'Orange', label: 'Orange' },
       { value: 'Yellow', label: 'Yellow' },
@@ -918,22 +918,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'Green', label: 'Green' },
       { value: 'Blue', label: 'Blue' },
       { value: 'Purple', label: 'Purple' },
-    ],
-  },
-  [textReaderSourceHighlightColorId]: {
-    kind: 'dropdown',
-    group: 'misc',
-    title: 'Text Reader Source Highlight Colour',
-    description:
-      'Colour of the highlights Pin Source Quote creates in a PDF\'s Text Reader view, so they are ' +
-      'easy to tell apart from the ones it creates in the PDF view.',
-    options: [
-      { value: 'Purple', label: 'Purple' },
-      { value: 'Orange', label: 'Orange' },
-      { value: 'Yellow', label: 'Yellow' },
-      { value: 'Red', label: 'Red' },
-      { value: 'Green', label: 'Green' },
-      { value: 'Blue', label: 'Blue' },
     ],
   },
 };

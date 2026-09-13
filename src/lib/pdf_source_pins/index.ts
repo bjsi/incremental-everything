@@ -6,7 +6,7 @@ import {
   RichTextInterface,
 } from '@remnote/plugin-sdk';
 import { AI_OCR_HELPER_URL } from '../ai_ocr';
-import { HighlightColorName, sourceHighlightColorId, textReaderSourceHighlightColorId } from '../consts';
+import { HighlightColorName, sourceHighlightColorId } from '../consts';
 import { createHtmlHighlight, createPdfHighlight } from '../pdf_highlight_create';
 import { safeRemTextToString } from '../pdfUtils';
 import { getIESetting } from '../settings';
@@ -320,7 +320,8 @@ async function ensureHtmlPins(
 /**
  * Find each quote in the source and return the highlights to pin, creating the
  * missing ones, in each of `views` (default: the source's first view — the PDF
- * view for a PDF). A PDF's Text Reader highlights get their own colour.
+ * view for a PDF). Every view uses the one Source Highlight Colour; pin rings
+ * (yellow for a PDF page, purple for an HTML source) tell the views' pins apart.
  */
 export async function ensureSourcePins(
   plugin: ReactRNPlugin,
@@ -341,15 +342,14 @@ export async function ensureSourcePins(
       `This ${isPdf ? 'PDF' : 'article'} has no Highlights document yet — make one highlight in it first.`
     );
   }
-  const pdfColor = (await getIESetting(plugin, sourceHighlightColorId)) as HighlightColorName;
-  const textReaderColor = (await getIESetting(plugin, textReaderSourceHighlightColorId)) as HighlightColorName;
+  const color = (await getIESetting(plugin, sourceHighlightColorId)) as HighlightColorName;
 
   const perView: ViewPinResult[][] = [];
   for (const view of wanted) {
     perView.push(
       view === 'pdf'
-        ? await ensurePdfPins(plugin, source, container, quotes, pdfColor)
-        : await ensureHtmlPins(plugin, source, container, quotes, isPdf ? textReaderColor : pdfColor)
+        ? await ensurePdfPins(plugin, source, container, quotes, color)
+        : await ensureHtmlPins(plugin, source, container, quotes, color)
     );
   }
 

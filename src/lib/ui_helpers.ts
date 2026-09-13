@@ -419,7 +419,9 @@ export async function registerPinReferenceCSS(plugin: ReactRNPlugin) {
   const css = `
     /* A pin's ring says where it leads:
          blue           — a Rem holding an image (a figure in your own notes)
-         yellow         — a TEXT highlight: the source passage
+         yellow         — a TEXT highlight on a PDF page: the source passage
+         purple         — a TEXT highlight in an HTML source: a saved web
+                          article or a PDF's Text Reader view
          yellow + blue  — a PDF AREA highlight: a clipped figure from the source
 
        All three are SOLID, which keeps them clear of the priority-band marker's
@@ -499,10 +501,15 @@ export async function registerPinReferenceCSS(plugin: ReactRNPlugin) {
       border-color: var(--rn-clr-border-selected, #1d4ed8);
     }
 
-    /* TEXT highlights — the pin opens the source passage. */
-    [data-rem-reference-pin="true"][data-rem-tags~="pdf-highlight" i]:not([data-rem-tags~="${areaSlug}" i]),
-    [data-rem-reference-pin="true"][data-rem-tags~="html-highlight" i]:not([data-rem-tags~="${areaSlug}" i]) {
+    /* TEXT highlights — the pin opens the source passage. Yellow for a PDF
+       page, purple for an HTML source: a saved web article or a PDF's Text
+       Reader view. The ring is what tells apart the two pins Pin Source Quote
+       adds for one passage (one per view), so the highlights share one colour. */
+    [data-rem-reference-pin="true"][data-rem-tags~="pdf-highlight" i]:not([data-rem-tags~="${areaSlug}" i]) {
       border-color: #eab308;
+    }
+    [data-rem-reference-pin="true"][data-rem-tags~="html-highlight" i]:not([data-rem-tags~="${areaSlug}" i]) {
+      border-color: #a855f7;
     }
 
     /* AREA highlights are both things at once — a highlight (yellow) AND an
@@ -523,13 +530,17 @@ export async function registerPinReferenceCSS(plugin: ReactRNPlugin) {
       border-color: #eab308 #3B82F6 #eab308 #3B82F6;
     }
 
-    /* Both yellow states brighten together — this has to gain contrast in dark
-       mode too, where a deeper amber would sink into the background. */
+    /* Hover and edit-mode brighten each text-highlight colour in its own hue —
+       this has to gain contrast in dark mode too, where a deeper shade would sink
+       into the background. Keep the two apart: sharing one bright colour here
+       turned the purple (HTML source) ring yellow whenever its Rem was edited. */
     [data-rem-reference-pin="true"][data-rem-tags~="pdf-highlight" i]:not([data-rem-tags~="${areaSlug}" i]):hover,
-    [data-rem-reference-pin="true"][data-rem-tags~="html-highlight" i]:not([data-rem-tags~="${areaSlug}" i]):hover,
-    .rem-text:focus-within [data-rem-reference-pin="true"][data-rem-tags~="pdf-highlight" i]:not([data-rem-tags~="${areaSlug}" i]),
-    .rem-text:focus-within [data-rem-reference-pin="true"][data-rem-tags~="html-highlight" i]:not([data-rem-tags~="${areaSlug}" i]) {
+    .rem-text:focus-within [data-rem-reference-pin="true"][data-rem-tags~="pdf-highlight" i]:not([data-rem-tags~="${areaSlug}" i]) {
       border-color: #facc15;
+    }
+    [data-rem-reference-pin="true"][data-rem-tags~="html-highlight" i]:not([data-rem-tags~="${areaSlug}" i]):hover,
+    .rem-text:focus-within [data-rem-reference-pin="true"][data-rem-tags~="html-highlight" i]:not([data-rem-tags~="${areaSlug}" i]) {
+      border-color: #c084fc;
     }
     [data-rem-reference-pin="true"][data-rem-tags~="${areaSlug}" i]:hover,
     .rem-text:focus-within [data-rem-reference-pin="true"][data-rem-tags~="${areaSlug}" i] {
