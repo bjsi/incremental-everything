@@ -225,6 +225,8 @@ Values are colour-coded on the same red → green gradient as the live session c
 
 Above the Sessions Summary table you'll find a **Refresh Statistics** button alongside an "Updated *N* ago" timestamp. Clicking it walks RemNote's durable state — every card's repetition history, every Incremental Rem's history slot, and the Dismissed powerup's preserved history — and recomputes the per-period totals from ground truth instead of from the live event listeners.
 
+**It also runs on its own at startup.** When the plugin builds its [card priority cache](Priorities-for-Flashcards.md#startup-cache) as RemNote starts, it already reads every card, and the recompute reuses that read instead of making its own. Incremental Rem reviews come from the Incremental Rem cache loaded at the same time, and only the Dismissed histories are read directly. The stored summary is rewritten only when it has changed. This happens only in Full Mode with flashcard prioritisation on, where that cache is built; in Light Mode, or with prioritisation off, use the button.
+
 **Why it exists:** event-listener tracking can miss sessions when the queue is interrupted without firing `QueueExit` (tab closed, page navigated, plugin reloaded), and can over- or under-count IncRem time in certain engagement edge cases. The authoritative recompute reconciles the Summary against the same data RemNote uses for its own statistics.
 
 **How it works:**

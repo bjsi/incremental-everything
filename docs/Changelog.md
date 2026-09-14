@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.99 - September 14th, 2026
+
+### ⚡ Improved - the Practiced Queues summary refreshes itself at startup
+
+The summary table is recomputed from your cards' own review history each time RemNote starts, reusing the card read the plugin already makes then, so it no longer waits for **Refresh Statistics** to catch up with sessions the queue listeners missed. Full Mode with flashcard prioritisation on only.
+
+📖 [Refresh Statistics](History-Queue-Dashboard-and-Mastery-Drill.md#refresh-statistics-authoritative-summary-recompute)
+
 ## v1.0.98 - September 14th, 2026
 
 ### ⚡ Improved - refreshing the Priority Queue no longer loads every card
