@@ -2,6 +2,18 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.102 - September 14th, 2026
+
+### ⚡ Improved - AI Transcribe puts key terms in bold
+
+Transcriptions now bold the passage's key terms and concepts and keep the page's own italics. Already have `prompt.md`? Delete it to get the new instructions.
+
+📖 [Customising the instructions](AI-Transcription-of-PDF-Highlights.md#prompt)
+
+### 🐛 Fixed - bold or italic around a formula showed literal asterisks
+
+📖 [Customising the instructions](AI-Transcription-of-PDF-Highlights.md#prompt)
+
 ## v1.0.101 - September 14th, 2026
 
 ### ⚡ Improved - Pin Source Quote reads a Rem's front and back

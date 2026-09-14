@@ -63,7 +63,7 @@ DPI = 220
 # subscripts of display formulae hang below it.
 PAD_X, PAD_Y = 6, 14
 
-DEFAULT_PROMPT = r"""Extract text from the images I provide. Do not acknowledge the request, do not comment, and do not ask questions: output the extracted text and nothing else.
+DEFAULT_PROMPT = r"""Extract text from the images I provide. Do not acknowledge the request, do not comment, and do not ask questions: output the transcription, marked up as below, and nothing else.
 
 The output goes into a single RemNote rem. Never break lines inside a paragraph; separate paragraphs, and set each display formula apart, with one blank line.
 
@@ -76,7 +76,12 @@ Formulae, in KaTeX:
 
 Lists: keep each item's own marker exactly as printed (•, –, 1., a), …), one item per line, separated by a single line break — no blank line between items. Never use markdown list syntax (* or - as a bullet): write the printed marker itself, e.g. "• geometrical similarity;".
 
-Emphasise keywords and key concepts or ideas (if you find them) using **bold** or *italic*. Use no other markup: no headings, no code.
+Emphasis — the reader skims these Rems later, so mark what matters:
+- Put the passage's key terms and key concepts in **bold**, even when the page does not emphasise them: usually one to three per paragraph, each a word or a short phrase, never a whole sentence.
+- Keep the emphasis the page itself prints: italics as *italic*, bold as **bold**.
+- An emphasised phrase may contain a formula (**state variables $x_i$**), but never put ** or * inside a formula's $...$.
+
+Use no other markup: no headings, no code, no links.
 
 If part of the image is illegible, transcribe what you can and mark the gap inline as [illegible].
 """
@@ -235,15 +240,18 @@ def transcribe(images, raw_text):
            '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence',
            '--model', MODEL, '--system-prompt', prompt()]
     proc = subprocess.run(cmd, input=message + '\n', capture_output=True, text=True, timeout=240, cwd=HOME)
+    model = None  # the model the CLI actually resolved the alias to, reported in its init event
     for line in proc.stdout.splitlines():
         try:
             event = json.loads(line)
         except ValueError:
             continue
+        if event.get('type') == 'system' and event.get('subtype') == 'init':
+            model = event.get('model')
         if event.get('type') == 'result':
             if event.get('is_error'):
                 raise RuntimeError(event.get('result') or 'claude reported an error')
-            return bullets_to_markers(event.get('result', '').strip())
+            return bullets_to_markers(event.get('result', '').strip()), model
     raise RuntimeError(f'claude exited {proc.returncode}: {proc.stderr.strip()[-400:]}')
 
 
@@ -414,8 +422,8 @@ def handle_ocr(req, entry):
         images = render_crops(fetch(req['pdfUrl'], '.pdf'), boxes, rem_id)
         entry['boxes'] = boxes
 
-    markup = transcribe(images, raw_text)
-    entry['markup'] = markup
+    markup, model = transcribe(images, raw_text)
+    entry.update(model=model, markup=markup)
     return {'markup': markup}
 
 

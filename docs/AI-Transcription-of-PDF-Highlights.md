@@ -11,7 +11,7 @@ In RemNote the italics show as italics and each `$…$` as a typeset formula.
 What you get:
 
 - **Formulas as LaTeX** — inline inside a sentence, display on their own line, numbered equations keep their number (`\tag{1.1}`).
-- **Key concepts emphasised** in bold or italic.
+- **Key terms and concepts in bold**, and the page's own italics kept.
 - **Lists keep their printed markers** (`•`, `–`, `1.`), one item per line.
 - **Everything stays in the highlight Rem** — paragraphs and formulas are separated by soft line breaks, never split into several Rems.
 - Anything unreadable is marked `[illegible]` rather than guessed.
@@ -128,14 +128,16 @@ Run **Restore PDF Highlight Text Before AI** on the highlight's Rem to put back 
 
 The instructions given to the AI live in `~/.incremental-remnote/ai-ocr/prompt.md`. Edit them freely: they are read again for every highlight, so no restart is needed. Delete the file to get the defaults back.
 
+The helper writes this file only when it is missing, so **updating the helper does not change instructions you already have**. To get a newer version's defaults, delete `prompt.md` and transcribe a highlight: the file is recreated.
+
 Keep to the markup the plugin converts into rich text — anything else arrives as literal characters:
 
 | Write | Becomes |
 |---|---|
 | `$x$` | inline formula |
 | `$$x$$` | display formula (always use this for `\tag`) |
-| `**text**` | bold |
-| `*text*` | italic |
+| `**text**` | bold (may contain a formula: `**the angle $\theta$**`) |
+| `*text*` | italic (same) |
 | line breaks | soft line breaks inside the same Rem |
 
 ## Troubleshooting { #troubleshooting }
