@@ -56,6 +56,8 @@ import {
 import {
   saveKBShield,
   saveDocumentShield,
+  formatShieldSummary,
+  ShieldSaveSummary,
   isIncRemDue,
   isCardDue,
   isCardDueOverdue,
@@ -181,15 +183,27 @@ export function registerQueueExitListener(
     await flushPendingServed(plugin);
 
     await flushCacheUpdatesNow(plugin);
-    console.log('QueueExit triggered, subQueueId:', subQueueId);
+
+    // RemNote fires QueueExit with no subQueueId, so the queue that was open is
+    // read from the id QueueEnter stored — and read NOW: resetQueueSession below
+    // clears it, and the Priority Queue auto-refresh needs it after that.
+    const exitQueueId: RemId | null =
+      subQueueId || (await plugin.storage.getSession<RemId | null>(currentSubQueueIdKey)) || null;
 
     const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
     const priorityCalcScopeRemIds = await plugin.storage.getSession<RemId[] | null>(priorityCalcScopeRemIdsKey);
-    console.log('[QueueExit] Priority calculation scope:', priorityCalcScopeRemIds?.length || 0, 'rems');
-    console.log('[QueueExit] Original scope ID for history:', originalScopeId);
+
+    // Everything the shield save computes is gathered here and printed once, at
+    // the end, instead of a dozen lines as it goes.
+    const exitStartedAt = Date.now();
+    const summary: string[] = [
+      `queue ${exitQueueId ?? 'ad-hoc'} · priority scope ${(priorityCalcScopeRemIds?.length || 0).toLocaleString()} Rems · ` +
+        `history scope ${originalScopeId ?? (originalScopeId === null ? 'Full KB' : 'unknown')}`,
+    ];
+    const shieldLine = (r: ShieldSaveSummary) => summary.push(formatShieldSummary(r));
+    const verifyNotes: string[] = [];
 
     if (!(await shouldUseLightMode(plugin))) {
-      console.log('[QueueExit] Full mode. Saving Priority Shield history...');
 
       const skipCardHistorySave = await plugin.storage.getSession<boolean>('skipCardHistorySave');
       const skipIncRemHistorySave = await plugin.storage.getSession<boolean>('skipIncRemHistorySave');
@@ -209,9 +223,9 @@ export function registerQueueExitListener(
 
       // Save KB-level shields
       if (shouldSaveIncRem) {
-        await saveKBShield(plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem', displayWeighted);
+        shieldLine(await saveKBShield(plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem', displayWeighted));
       } else {
-        console.warn('[QueueExit] Skipping KB IncRem shield save because cache was incomplete');
+        summary.push('KB  IncRem skipped: cache incomplete');
       }
 
       // Card KB shield: recorded over the PER-CARD universe, the same one the
@@ -227,6 +241,7 @@ export function registerQueueExitListener(
           return rem ? await rem.getCards() : [];
         },
         dueThreshold: startOfToday,
+        notes: verifyNotes,
       };
 
       // Cooling, judged NOW rather than read from the last refresh: the siblings
@@ -255,14 +270,14 @@ export function registerQueueExitListener(
           await scanner.scan([...headIds, ...scopeHeadIds]);
           await scanner.publish();
           coolingRemIds = scanner.coolingIds();
-          console.log(`[QueueExit] Cooling scan: ${coolingRemIds.size} of ${scanner.checkedIds.size} top overdue Rems are cooling and will not set the shield.`);
+          summary.push(`cooling: ${coolingRemIds.size} of ${scanner.checkedIds.size} top overdue Rems excluded from the shield`);
         } catch (e) {
           console.warn('[QueueExit] Cooling scan failed; the shield is saved without the exclusion:', e);
         }
       }
 
       if (shouldSaveCard) {
-        await saveKBShield(
+        shieldLine(await saveKBShield(
           plugin,
           allCardItems,
           (item) => isPerCardDueOverdue(item, startOfToday),
@@ -272,9 +287,9 @@ export function registerQueueExitListener(
           displayWeighted,
           cardVerifyOptions,
           coolingRemIds
-        );
+        ));
       } else {
-        console.warn('[QueueExit] Skipping KB Card shield save because cache was incomplete');
+        summary.push('KB  Card   skipped: cache incomplete');
       }
 
       // Save document-level shields if scope exists
@@ -311,17 +326,16 @@ export function registerQueueExitListener(
             ])
           );
           scopeUsable = { incRem: true, card: true };
-          console.log(
-            `[QueueExit] Rebuilt the full-KB priority scope from the finished caches: ` +
-              `${priorityCalcScopeRemIds?.length ?? 0} → ${docScopeRemIds.length} rems. ` +
-              `It was materialised at queue enter while a cache was still loading.`
+          summary.push(
+            `rebuilt the full-KB priority scope from the finished caches: ` +
+              `${priorityCalcScopeRemIds?.length ?? 0} to ${docScopeRemIds.length} Rems (built while a cache was loading)`
           );
         }
       }
 
       if (historyKey && docScopeRemIds && docScopeRemIds.length > 0) {
         if (shouldSaveIncRem && scopeUsable.incRem) {
-          await saveDocumentShield(
+          shieldLine(await saveDocumentShield(
             plugin,
             allIncRems as any,
             docScopeRemIds,
@@ -331,16 +345,13 @@ export function registerQueueExitListener(
             historyKey,
             'IncRem',
             displayWeighted
-          );
+          ));
         } else if (shouldSaveIncRem) {
-          console.warn(
-            '[QueueExit] Skipping IncRem document shield: the priority scope was built ' +
-              'before the IncRem cache finished loading, so its universe would be wrong.'
-          );
+          summary.push('Doc IncRem skipped: scope built before the IncRem cache finished loading');
         }
 
         if (shouldSaveCard && scopeUsable.card) {
-          await saveDocumentShield(
+          shieldLine(await saveDocumentShield(
             plugin,
             allCardItems,
             docScopeRemIds,
@@ -352,19 +363,20 @@ export function registerQueueExitListener(
             displayWeighted,
             cardVerifyOptions,
             coolingRemIds
-          );
+          ));
         } else if (shouldSaveCard) {
-          console.warn(
-            '[QueueExit] Skipping Card document shield: the priority scope was built ' +
-              'before the card priority cache finished loading, so its universe would be wrong.'
-          );
+          summary.push('Doc Card   skipped: scope built before the card cache finished loading');
         }
+        if (historyKey) summary.push(`doc history key ${historyKey}`);
       } else {
-        console.log('[QueueExit] No scope ID or priority calc scope - skipping document shield saves');
+        summary.push('Doc shields skipped: no scope id or priority scope');
       }
     } else {
-      console.log('[QueueExit] Light mode. Skipping Priority Shield history save.');
+      summary.push('light mode: shield history not saved');
     }
+
+    if (verifyNotes.length) summary.push(`verify: ${verifyNotes.join(' | ')}`);
+    console.log(`[QueueExit] Shield summary (${Date.now() - exitStartedAt}ms)\n  ${summary.join('\n  ')}`);
 
     await resetQueueSession(plugin);
     resetSessionItemCounter();
@@ -374,18 +386,35 @@ export function registerQueueExitListener(
     // Off the exit path: the delay keeps the bridge free for RemNote's own
     // teardown, and the guard is skipped because this IS the moment the queue
     // closes — the URL may still read /flashcards for a beat.
-    void schedulePriorityQueueAutoRefresh(plugin, subQueueId);
+    void schedulePriorityQueueAutoRefresh(plugin, exitQueueId);
   });
 }
 
-async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, subQueueId: RemId | null | undefined) {
+async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, queueId: RemId | null) {
+  const tag = '[QueueExit] Priority Queue auto-refresh';
   try {
-    if (!subQueueId) return;
-    if (!(await getIESetting(plugin, autoRefreshPriorityQueueId))) return;
-    const doc = await plugin.rem.findOne(subQueueId);
-    if (!doc || !(await isPriorityQueueDoc(doc))) return;
+    if (!queueId) {
+      console.log(`${tag}: skipped, no queue id (an ad-hoc or Practice All session)`);
+      return;
+    }
+    if (!(await getIESetting(plugin, autoRefreshPriorityQueueId))) {
+      console.log(`${tag}: skipped, the setting is off`);
+      return;
+    }
+    const doc = await plugin.rem.findOne(queueId);
+    if (!doc) {
+      console.log(`${tag}: skipped, queue document ${queueId} not found`);
+      return;
+    }
+    if (!(await isPriorityQueueDoc(doc))) {
+      console.log(`${tag}: skipped, ${queueId} is not a Priority Queue document`);
+      return;
+    }
+    console.log(`${tag}: scheduled for ${queueId} in 2.5s`);
     setTimeout(async () => {
       try {
+        const startedAt = Date.now();
+        console.log(`${tag}: started for ${queueId}`);
         const result = await refreshPriorityQueue(plugin, {
           scopeRemId: await extractOriginalScopeFromPriorityReview(doc) ?? null,
           skipQueueGuard: true,
@@ -394,6 +423,12 @@ async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, subQueueI
         // popup open, so the toast is the only place a skipped Rem is visible.
         const paused = result.selection?.skippedPausedItems ?? [];
         const highPaused = paused.filter((s) => s.priority < 20).length;
+        console.log(
+          `${tag}: done in ${Date.now() - startedAt}ms, holding ${result.holding.total}, ` +
+            `drained ${result.drained.reviewed} reviewed, ${result.drained.cooling} cooling, ` +
+            `${result.drained.ancestor} ancestor-held, ${result.drained.missing} missing, ` +
+            `added ${result.added.total}, ${paused.length} paused skipped`
+        );
         await plugin.app.toast(
           `Priority Queue refreshed: ${result.holding.total} items ready ` +
             `(drained ${result.drained.reviewed + result.drained.cooling + result.drained.ancestor + result.drained.missing}, added ${result.added.total})` +
@@ -407,11 +442,11 @@ async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, subQueueI
               : '.')
         );
       } catch (e) {
-        console.error('[Priority Queue] Auto-refresh after the session failed:', e);
+        console.error(`${tag}: failed`, e);
       }
     }, 2500);
   } catch (e) {
-    console.error('[Priority Queue] Auto-refresh scheduling failed:', e);
+    console.error(`${tag}: scheduling failed`, e);
   }
 }
 

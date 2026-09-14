@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.95 - September 14th, 2026
+
+### 🐛 Fixed - the Priority Queue did not refresh after a session
+
+Leaving the queue now drains what you reviewed from the Priority Queue document and tops it back up, as the **Refresh the Priority Queue after each session** setting promises; it never started, because the plugin looked for the closed queue where RemNote does not report it.
+
+📖 [Refresh after every session](Priority-Review-Document.md#refresh-after-every-session)
+
 ## v1.0.94 - September 14th, 2026
 
 ### 🐛 Fixed - a card rated Again or Hard inside the Mastery Drill skipped its minimum delay

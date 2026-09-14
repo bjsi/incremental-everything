@@ -613,7 +613,7 @@ export function PluginHub() {
         </button>
 
         {/*
-          Create / browse / clean, in the order you meet them. The label cell is
+          Create / browse / Practice, in the order you meet them. The label cell is
           the only one that flexes, and it truncates rather than overflowing its
           box the way a `nowrap` button does at sidebar widths.
         */}
@@ -653,15 +653,45 @@ export function PluginHub() {
           >
             👁
           </button>
+          {/*
+            The daily driver, so it is the one filled cell in the panel, and it
+            breathes the same way the Card Shield does when a card is inside it.
+            The glow is inset: the group clips its children (`overflow: hidden`),
+            so an outer box-shadow would be cut off at the rounded border.
+          */}
           <button
             onClick={practiceKbQueue}
-            style={segmentIconStyle}
-            className="hover:opacity-75"
+            style={{
+              ...segmentIconStyle,
+              width: 24,
+              borderLeft: '1px solid #2563eb',
+              background: '#3b82f6',
+              color: '#fff',
+              animation: 'hubPlayCellGlow 2s ease-in-out infinite',
+            }}
+            className="hover:opacity-90"
             title="Practice the Priority Queue for the whole knowledge base — builds it first if there is none yet"
             aria-label="Practice the Priority Queue"
           >
-            ▶
+            <span
+              style={{
+                display: 'inline-block',
+                animation: 'hubPlayPulse 2s ease-in-out infinite',
+              }}
+            >
+              ▶
+            </span>
           </button>
+          <style>{`
+            @keyframes hubPlayPulse {
+              0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)); }
+              50% { transform: scale(1.15); filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)); }
+            }
+            @keyframes hubPlayCellGlow {
+              0%, 100% { box-shadow: inset 0 0 0px rgba(191, 219, 254, 0); filter: brightness(1); }
+              50% { box-shadow: inset 0 0 6px rgba(191, 219, 254, 0.9); filter: brightness(1.15); }
+            }
+          `}</style>
         </div>
       </div>
 
