@@ -37,6 +37,7 @@ import { cleanPriorityReviewDocuments, PrdDocReport, scanPriorityReviewDocuments
 import { CoolingScanner } from './cooling_gather';
 import { CoolingVerdict } from './cooling';
 import { readChildren } from './children';
+import { loadCardSource } from './card_source';
 
 /**
  * The persistent Priority Queue document — one per scope.
@@ -313,7 +314,12 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     await setPriorityQueuePausedFilter(plugin, doc, skipPaused, pausedThreshold);
   }
 
-  const scanner = new CoolingScanner(plugin, { scopeRemId: info.scopeRemId });
+  // Card facts, loaded ONCE for the whole refresh: the card cache in Full Mode
+  // (no card read), one card.getAll() otherwise, shared by the drain, cooling
+  // and selection below. See card_source.ts.
+  progress('Reading card state…');
+  const cardSource = await loadCardSource(plugin);
+  const scanner = new CoolingScanner(plugin, { scopeRemId: info.scopeRemId, cardSource });
 
   // 1. Drain. The document's own targets are judged for cooling first, so an
   //    entry whose sibling was reviewed in the last session leaves with the
@@ -361,6 +367,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     docIds: [doc._id],
     coolingRemIds: scanner.coolingIds(),
     ancestorHeldRemIds: new Set(heldByAncestor.keys()),
+    cardSource,
   });
   const report: PrdDocReport | undefined = scan.docs[0];
   const drained = { reviewed: 0, cooling: 0, ancestor: 0, missing: 0, kept: 0 };
@@ -404,6 +411,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     excludeRemIds: remainingTargets,
     shieldSliceFraction: shieldSlice,
     coolingScanner: scanner,
+    cardSource,
     // Drain only removes; the ancestors wait for the next refresh or refill.
     forceAncestors: mode === 'drain' ? [] : forceAncestors,
   });
@@ -482,7 +490,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   console.log(
     `[Priority Queue] ${mode} (${s.scopeName}): holding ${holding.total}, drained ${drained.reviewed + drained.cooling + drained.ancestor + drained.missing} ` +
       `(${drained.cooling} cooling, ${drained.ancestor} ancestor-held), added ${selection.items.length} (${selection.shieldSliceCount} shield slice), ` +
-      `${cooling.length} cooling in scope, in ${elapsedMs}ms`
+      `${cooling.length} cooling in scope, card state from ${cardSource.kind === 'cache' ? 'the cache' : 'card.getAll()'}, in ${elapsedMs}ms`
   );
 
   return {

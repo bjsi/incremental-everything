@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.98 - September 14th, 2026
+
+### ⚡ Improved - refreshing the Priority Queue no longer loads every card
+
+In Full Mode, the drain, cooling and selection now read the card cache, which records when each card was last shown; in Light Mode, a refresh from the popup loads the cards once for all three, and cooling works there too. The automatic refresh after a session no longer runs in Light Mode.
+
+📖 [Refresh after every session](Priority-Review-Document.md#refresh-after-every-session)
+
 ## v1.0.97 - September 14th, 2026
 
 ### 🐛 Fixed - PDFs and web articles did not fill the card in the Beautiful queue variant

@@ -208,6 +208,31 @@ export function cardIntervalDays(card: CardLike): number {
 }
 
 /**
+ * Card facts rebuilt from a card-priority cache entry, so cooling can run with
+ * no card read at all. The cache keeps, per card and in the same order, the
+ * next due date (`cardsNextRep`) and when the card was last shown
+ * (`cardsLastSeen`, computed with {@link cardLastSeenAt} when the entry was
+ * built). Card ids are not cached; each fact gets a stable positional id, which
+ * only ever labels a cooling reason.
+ *
+ * An entry built before `cardsLastSeen` existed yields cards with no viewing,
+ * so it can never cool anything — the fail-open direction.
+ */
+export function cardsFromCacheInfo(info: {
+  remId: string;
+  cardsNextRep?: (number | null)[];
+  cardsLastSeen?: (number | null)[];
+}): CardLike[] {
+  const next = info.cardsNextRep ?? [];
+  const seen = info.cardsLastSeen ?? [];
+  return next.map((nextRepetitionTime, i) => ({
+    _id: `${info.remId}#${i}`,
+    nextRepetitionTime,
+    lastRepetitionTime: seen[i] ?? null,
+  }));
+}
+
+/**
  * The queue's due predicate: `?? Infinity` so a card with no schedule
  * (disabled, table row, markup removed) never reads as due.
  */

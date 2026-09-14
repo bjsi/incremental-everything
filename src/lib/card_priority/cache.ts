@@ -1,3 +1,4 @@
+import { cardLastSeenAt } from '../priority_review_document/cooling';
 import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey, orphanRemIdsKey } from '../consts';
 import {
@@ -406,6 +407,8 @@ function buildInfoFromStore(
     dueCards: cards.filter((c) => (c.nextRepetitionTime ?? Infinity) <= now).length,
     dueCardsOverdue: cards.filter((c) => (c.nextRepetitionTime ?? Infinity) <= startOfToday).length,
     cardsNextRep: cards.map((c) => c.nextRepetitionTime ?? null),
+    // From the same launch-time card.getAll() — see CardPriorityInfo.cardsLastSeen.
+    cardsLastSeen: cards.map((c) => cardLastSeenAt(c as any)),
   };
 }
 

@@ -18,13 +18,15 @@ import {
 } from './cooling';
 import { getCoolingParams, mergeCoolingCache, readCoolingOverrides } from './cooling_store';
 import { readChildren } from './children';
+import { CardSource, loadCardSource } from './card_source';
 
 /**
  * Turns RemNote data into the plain facts the cooling engine judges.
  *
- * COST MODEL. One `card.getAll()` answers every card question for every
- * candidate — due-ness, last viewing, interval — as map lookups; the clean
- * command already pays this read and it is the cheap part. Tree reads are the
+ * COST MODEL. Every card question for every candidate — due-ness, last
+ * viewing, interval — is a map lookup into one card source (card_source.ts):
+ * the card cache in Full Mode, which costs no read at all, or a single
+ * `card.getAll()` when there is no cache, shared with the rest of the refresh. Tree reads are the
  * only per-candidate cost and they are bounded by the candidate list, never by
  * the KB: a candidate's parent, its siblings, its children and grandchildren,
  * fetched with `findMany` in a few batches and memoised across candidates that
@@ -58,6 +60,13 @@ export interface CoolingScanOptions {
   priorityByRemId?: Map<RemId, number>;
   /** Keep the raw candidates (every seen event) — for probes. */
   includeCandidates?: boolean;
+  /**
+   * Card facts to judge with. Omitted, the scanner loads its own: the card cache
+   * in Full Mode, one card.getAll() otherwise (see card_source.ts). A refresh
+   * passes the source it already loaded so the drain, cooling and selection
+   * share a single read.
+   */
+  cardSource?: CardSource;
 }
 
 export interface CoolingScanResult {
@@ -181,24 +190,15 @@ export class CoolingScanner {
   private load(): Promise<void> {
     if (!this.loaded) {
       this.loaded = (async () => {
-        const [allCards, overrides, allIncRems, clozeExtractTag, params] = await Promise.all([
-          this.plugin.card.getAll().catch((e) => {
-            console.error('[Cooling] card.getAll failed:', e);
-            return [] as CardLike[];
-          }),
+        const [source, overrides, allIncRems, clozeExtractTag, params] = await Promise.all([
+          this.options.cardSource ? Promise.resolve(this.options.cardSource) : loadCardSource(this.plugin),
           readCoolingOverrides(this.plugin),
           this.plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey).then((v) => v || []),
           this.plugin.rem.findByName(['cloze-extract'], null).catch(() => null),
           this.options.params ? Promise.resolve(this.options.params) : getCoolingParams(this.plugin),
         ]);
         this.params = params;
-        for (const card of allCards as any[]) {
-          const owner = card.remId as RemId | undefined;
-          if (!owner) continue;
-          const list = this.cardsByRem.get(owner);
-          if (list) list.push(card);
-          else this.cardsByRem.set(owner, [card]);
-        }
+        this.cardsByRem = source.cardsByRem;
         this.incByRem = new Map(allIncRems.map((r) => [r.remId, r]));
         this.overrides = overrides;
         if (clozeExtractTag) {

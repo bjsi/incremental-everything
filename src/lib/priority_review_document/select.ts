@@ -9,6 +9,7 @@ import { buildComprehensiveScope } from '../scope_helpers';
 import { safeRemTextToString } from '../pdfUtils';
 import { hasCardClusterPowerup } from './cluster';
 import { CoolingScanner } from './cooling_gather';
+import { CardSource } from './card_source';
 import { COOLING_RELATION_LABELS, CoolingVerdict } from './cooling';
 
 /**
@@ -93,6 +94,12 @@ export interface SelectionOptions {
    * as held back. Added even past `itemCount`, like a cluster: protection first.
    */
   forceAncestors?: ForcedAncestor[];
+  /**
+   * Card facts the caller already loaded. When they came from card.getAll()
+   * (no card cache), the due-cards gatherer reuses them instead of loading every
+   * card a second time.
+   */
+  cardSource?: CardSource;
 }
 
 export interface ForcedAncestor {
@@ -269,7 +276,8 @@ export async function selectPriorityItems(
     plugin,
     scopeRem,
     true,
-    comprehensiveScopeIds ?? undefined
+    comprehensiveScopeIds ?? undefined,
+    options.cardSource?.kind === 'all' ? options.cardSource.allCards : undefined
   );
 
   // Universe for percentiles: the cached infos in scope, plus any due card the
