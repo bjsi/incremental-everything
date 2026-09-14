@@ -1,5 +1,5 @@
 import { RNPlugin, PluginRem, RemId } from '@remnote/plugin-sdk';
-import { allIncrementalRemKey } from '../consts';
+import { allIncrementalRemKey, allCardPriorityInfoKey } from '../consts';
 import { IncrementalRem } from '../incremental_rem';
 import { repCountsForStats } from '../incremental_rem/types';
 import { hasCardClusterPowerup } from './cluster';
@@ -16,7 +16,9 @@ import {
   evaluateCooling,
   isCardDue,
 } from './cooling';
-import { getCoolingParams, mergeCoolingCache, readCoolingOverrides } from './cooling_store';
+import { getCoolingParams, HeldByCoolingAncestor, mergeCoolingCache, readCoolingOverrides } from './cooling_store';
+import { getCardPriorityValue } from '../card_priority';
+import type { CardPriorityInfo } from '../card_priority/types';
 import { readChildren } from './children';
 import { CardSource, loadCardSource } from './card_source';
 
@@ -179,6 +181,13 @@ export class CoolingScanner {
   private incByRem = new Map<RemId, IncrementalRem>();
   private clozeExtractIds = new Set<RemId>();
   private overrides: CoolingOverrides = { released: {}, extended: {}, never: [] };
+  /**
+   * Priority per Rem for the verdicts. The caller's map when given; otherwise the
+   * card cache's, so a scan that was not handed one (the Priority Queue refresh)
+   * no longer publishes `P?`. Anything still missing is read per verdict in
+   * {@link publish} — bounded by how many Rems are cooling, never by the KB.
+   */
+  private priorityByRemId = new Map<RemId, number>();
 
   constructor(private readonly plugin: RNPlugin, private readonly options: CoolingScanOptions = {}) {
     this.now = options.now ?? Date.now();
@@ -199,6 +208,13 @@ export class CoolingScanner {
         ]);
         this.params = params;
         this.cardsByRem = source.cardsByRem;
+        if (this.options.priorityByRemId) {
+          this.priorityByRemId = this.options.priorityByRemId;
+        } else {
+          const infos =
+            (await this.plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey).catch(() => null)) || [];
+          this.priorityByRemId = new Map(infos.map((i) => [i.remId, i.priority]));
+        }
         this.incByRem = new Map(allIncRems.map((r) => [r.remId, r]));
         this.overrides = overrides;
         if (clozeExtractTag) {
@@ -258,7 +274,7 @@ export class CoolingScanner {
     const candidate: CoolingCandidate = {
       remId,
       label,
-      priority: this.options.priorityByRemId?.get(remId),
+      priority: this.priorityByRemId.get(remId),
       dueCards: dueCards.map((c) => ({ cardId: c._id, intervalDays: cardIntervalDays(c) })),
       seen: [],
     };
@@ -392,12 +408,39 @@ export class CoolingScanner {
    * Rems it judged replace their old entries (cooling or not), Rems it never
    * looked at keep theirs until they expire.
    */
-  async publish(): Promise<void> {
+  /** The card facts this scanner judges with — shared so a caller need not load them twice. */
+  async cardFacts(): Promise<Map<RemId, CardLike[]>> {
+    await this.load();
+    return this.cardsByRem;
+  }
+
+  /** Reads the priority of cooling Rems no map knew — Light Mode, or a Rem missing from the cache. */
+  private async fillMissingPriorities(): Promise<void> {
+    const missing = [...this.verdicts.values()].filter((v) => typeof v.priority !== 'number');
+    if (missing.length === 0) return;
+    const rems = await this.reader.many(missing.map((v) => v.remId));
+    await Promise.all(
+      missing.map(async (v) => {
+        const rem = rems.get(v.remId);
+        if (!rem) return;
+        try {
+          v.priority = await getCardPriorityValue(this.plugin, rem);
+        } catch {
+          /* stays unknown */
+        }
+      })
+    );
+  }
+
+  async publish(extra?: { held?: HeldByCoolingAncestor[]; heldCheckedIds?: ReadonlySet<RemId> }): Promise<void> {
+    await this.fillMissingPriorities();
     await mergeCoolingCache(this.plugin, {
       computedAt: this.now,
       scopeRemId: this.options.scopeRemId ?? null,
       checkedIds: this.checkedIds,
       verdicts: this.sortedVerdicts(),
+      held: extra?.held,
+      heldCheckedIds: extra?.heldCheckedIds,
     });
   }
 }

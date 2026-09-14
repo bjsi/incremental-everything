@@ -1,3 +1,4 @@
+import { CoolingCache, shieldExclusionIds } from '../lib/priority_review_document/cooling_store';
 import {
   renderWidget,
   usePlugin,
@@ -158,13 +159,12 @@ export function CardInfoBar() {
   // every Priority Queue refresh). Read from the session cache only — no scan
   // runs on this path — and self-expiring, since each verdict carries its end.
   const coolingCache = useTrackerPlugin(
-    (rp) => rp.storage.getSession<{ verdicts: { remId: string; until: number }[] }>(coolingCacheKey),
+    (rp) => rp.storage.getSession<CoolingCache>(coolingCacheKey),
     []
   );
-  const coolingRemIds = React.useMemo(() => {
-    const now = Date.now();
-    return new Set((coolingCache?.verdicts ?? []).filter((v) => v.until > now).map((v) => v.remId));
-  }, [coolingCache]);
+  // Cooling Rems AND Rems held back by a cooling ancestor: neither can be
+  // practised now, so neither may set the live shield.
+  const coolingRemIds = React.useMemo(() => shieldExclusionIds(coolingCache), [coolingCache]);
 
   // Inside a Card Cluster, RemNote keeps this FlashcardUnder widget mounted across all
   // sibling cards and `getWidgetContext().remId` stays pinned to the cluster parent.

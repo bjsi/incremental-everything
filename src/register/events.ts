@@ -47,6 +47,7 @@ import { transferToDismissed } from '../lib/dismissed';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../lib/priority_review_document';
 import { CoolingScanner } from '../lib/priority_review_document/cooling_gather';
+import { findHeldByCoolingAncestor } from '../lib/priority_review_document/shield_eligibility';
 import { isPriorityQueueDoc, refreshPriorityQueue } from '../lib/priority_review_document/queue_doc';
 import {
   calculateAllPercentiles,
@@ -267,10 +268,23 @@ export function registerQueueExitListener(
             scopeRemId: originalScopeId ?? null,
             priorityByRemId: new Map(overdueByPriority.map((info) => [info.remId, info.priority])),
           });
-          await scanner.scan([...headIds, ...scopeHeadIds]);
-          await scanner.publish();
-          coolingRemIds = scanner.coolingIds();
-          summary.push(`cooling: ${coolingRemIds.size} of ${scanner.checkedIds.size} top overdue Rems excluded from the shield`);
+          const toCheck = [...new Set([...headIds, ...scopeHeadIds])];
+          await scanner.scan(toCheck);
+          // Not cooling themselves, but held back by a cooling ancestor: just as
+          // unavailable, so just as ineligible to set the shield. A due ancestor
+          // that is NOT cooling keeps its child counted — that review is open.
+          const held = await findHeldByCoolingAncestor(
+            plugin,
+            toCheck.filter((id) => !scanner.isCooling(id)),
+            scanner
+          );
+          await scanner.publish({ held, heldCheckedIds: new Set(toCheck) });
+          const coolingInHead = toCheck.filter((id) => scanner.isCooling(id)).length;
+          coolingRemIds = new Set([...scanner.coolingIds(), ...held.map((h) => h.remId)]);
+          summary.push(
+            `cooling: ${coolingInHead} of ${toCheck.length} top overdue Rems cooling, ` +
+              `${held.length} held back by a cooling ancestor; all excluded from the shield`
+          );
         } catch (e) {
           console.warn('[QueueExit] Cooling scan failed; the shield is saved without the exclusion:', e);
         }

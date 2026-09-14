@@ -30,6 +30,7 @@ import {
   extendCooling,
   releaseCooling,
   setNeverCool,
+  shieldExclusionIds,
 } from '../lib/priority_review_document/cooling_store';
 import { scanCooling } from '../lib/priority_review_document/cooling_gather';
 import { CardPriorityInfo } from '../lib/card_priority/types';
@@ -215,6 +216,9 @@ export function PriorityQueuePopup() {
       .sort((a, b) => (a.priority ?? 101) - (b.priority ?? 101) || a.until - b.until);
   }, [coolingCache]);
   const coolingIds = useMemo(() => new Set(coolingVerdicts.map((v) => v.remId)), [coolingVerdicts]);
+  // What the shield outlook must skip: cooling Rems plus Rems held back by a
+  // cooling ancestor — the same set the queue-exit shield excludes.
+  const shieldExcludedIds = useMemo(() => shieldExclusionIds(coolingCache), [coolingCache]);
 
   /**
    * Every load is numbered, and a result is applied only if no newer load has
@@ -309,7 +313,7 @@ export function PriorityQueuePopup() {
       setOutlookPending(true);
       const scopeIds = scopeRemId ? await scopeIdsFor(scopeRemId) : null;
       if (!isCurrent()) return;
-      const outlook = await computeShieldOutlook(plugin, new Set(targets), coolingIds, scopeIds);
+      const outlook = await computeShieldOutlook(plugin, new Set(targets), shieldExcludedIds, scopeIds);
       if (!isCurrent()) return;
       setStatus((prev) => (prev ? { ...prev, outlook } : prev));
       setOutlookPending(false);
@@ -320,7 +324,7 @@ export function PriorityQueuePopup() {
       setOutlookPending(false);
       setPhase('error');
     }
-  }, [plugin, scopeRemId, useFullKB, coolingIds]);
+  }, [plugin, scopeRemId, useFullKB, coolingIds, shieldExcludedIds]);
 
   useEffect(() => {
     void loadStatus();

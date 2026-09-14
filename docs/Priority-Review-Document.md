@@ -181,7 +181,7 @@ As each candidate flashcard Rem is drawn, the plugin looks at its **parent and g
 1. If neither ancestor has a due card, the Rem is included as normal.
 2. If one does, the Rem is **held back**, and the blocking ancestor **takes its place in the document**.
 3. When *both* ancestors are due, the **grandparent** is the one swapped in — the highest blocker, not the nearest — so releasing it frees the parent for the next refresh, which in turn frees the original card. The tree drains top-down, one level per review.
-4. If the blocking ancestor is itself [cooling](#cooling-spoiler-protection-across-sessions), nothing is swapped in: both wait, and the popup says so.
+4. If the blocking ancestor is itself [cooling](#cooling-spoiler-protection-across-sessions), nothing is swapped in: both wait, and the popup says so. While it waits, the child cannot set the [Priority Shield](#smart-scope--priority-shield-integration) either. A child whose due ancestor is *not* cooling keeps counting, because that ancestor can be reviewed right away.
 
 The swap is the point. Dropping the child on its own would leave the block standing: the parent might not be drawn this time, and the same pair would collide again at the next refresh. Practising the ancestor **now** is what makes the descendant free next time. The ancestor swapped in may be **lower priority** than the card it displaced — its priority is beside the point; it is in the way.
 
@@ -234,7 +234,7 @@ Even though you are reviewing a generated list, the plugin knows where the items
 
 * **Original Scope Awareness:** While reviewing a Priority Queue document, the plugin "pretends" you are reviewing the original source.
 * **[Priority Shield](Prioritization-&-Sorting.md#priority-shield):** The Priority Shield (the stats below the answer buttons) calculates your protection against the **original scope** — the document you chose, or the whole knowledge base — never against the review document itself. *Example:* a Priority Queue scoped to "Biology 101" shows how well you are protecting priorities within "Biology 101".
-* **Cooling Rems are not counted.** A Rem whose spoiler sibling you reviewed recently cannot set the shield, live or in the history graph — the set is recomputed at every queue exit, so the siblings you just reviewed are already accounted for.
+* **Cooling Rems are not counted.** A Rem whose spoiler sibling you reviewed recently cannot set the shield, live or in the history graph — the set is recomputed at every queue exit, so the siblings you just reviewed are already accounted for. Neither can a Rem held back because its parent or grandparent is due and cooling: the Priority Queue will not serve it until that window ends.
 * **Stats Tracking:** The history graph records your progress against the original document or the whole knowledge base, keeping your long-term stats accurate.
 
 ## Cleaning up leftovers
