@@ -14,7 +14,10 @@ import {
   cardIntervalDays,
   cardLastSeenAt,
   evaluateCooling,
+  isBackwardCard,
   isCardDue,
+  pickConceptAncestor,
+  REM_TYPE_DESCRIPTOR,
 } from './cooling';
 import { getCoolingParams, HeldByCoolingAncestor, mergeCoolingCache, readCoolingOverrides } from './cooling_store';
 import { getCardPriorityValue } from '../card_priority';
@@ -84,6 +87,8 @@ export interface CoolingScanResult {
 }
 
 const WINDOW = 8;
+/** How far up a chain of nested descriptors the concept is looked for. */
+const MAX_CONCEPT_WALK = 8;
 
 /** Local, allocation-only text for labels — same trade as clean.ts. */
 function flattenText(text: unknown): string {
@@ -292,6 +297,37 @@ export class CoolingScanner {
         seenAt,
         stillDue: false,
       });
+    }
+
+    // 1b. The concept, for a descriptor's backward card. That card shows the
+    //     descriptor and asks for the concept it belongs to — the nearest
+    //     ancestor that is not itself a descriptor, which is a grandparent or
+    //     higher when descriptors are nested. Any card of that concept being
+    //     shown (forward, backward, or a cloze inside it) puts the answer on
+    //     screen. RemNote's own bury pairs a descriptor's backward card with its
+    //     parent for an hour; this follows the chain and lasts the window.
+    const parentForConcept = (rem.parent as RemId | undefined) ?? null;
+    if (
+      parentForConcept &&
+      (rem as any).type === REM_TYPE_DESCRIPTOR &&
+      dueCards.some((c) => isBackwardCard(c))
+    ) {
+      const chain: { _id: RemId; type?: number | null }[] = [];
+      let cursor: RemId | null = parentForConcept;
+      for (let depth = 0; cursor && depth < MAX_CONCEPT_WALK; depth++) {
+        const ancestor: PluginRem | null = await this.reader.one(cursor);
+        if (!ancestor) break;
+        chain.push({ _id: ancestor._id, type: (ancestor as any).type ?? null });
+        if ((ancestor as any).type !== REM_TYPE_DESCRIPTOR) break;
+        cursor = (ancestor.parent as RemId | undefined) ?? null;
+      }
+      const conceptId = pickConceptAncestor(chain);
+      if (conceptId) {
+        const concept = await this.reader.one(conceptId);
+        candidate.seen.push(
+          ...this.seenEventsFor(conceptId, 'concept-reviewed', flattenText(concept?.text) || undefined)
+        );
+      }
     }
 
     // 2. Cloze siblings and the parent extract — only when this Rem IS an Alt+Z

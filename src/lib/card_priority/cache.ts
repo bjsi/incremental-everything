@@ -1,5 +1,5 @@
 import { refreshAuthoritativeAggregatesFromCardRead } from '../authoritative_aggregates';
-import { cardLastSeenAt } from '../priority_review_document/cooling';
+import { cardLastSeenAt, cardTypeTag } from '../priority_review_document/cooling';
 import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey, orphanRemIdsKey } from '../consts';
 import {
@@ -410,6 +410,7 @@ function buildInfoFromStore(
     cardsNextRep: cards.map((c) => c.nextRepetitionTime ?? null),
     // From the same launch-time card.getAll() — see CardPriorityInfo.cardsLastSeen.
     cardsLastSeen: cards.map((c) => cardLastSeenAt(c as any)),
+    cardsType: cards.map((c) => cardTypeTag((c as any).type)),
   };
 }
 

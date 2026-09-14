@@ -41,7 +41,13 @@ export type CoolingRelation =
   /** One of this Rem's own Alt+Z cloze children was graded. */
   | 'own-cloze-child'
   /** A child or grandchild card was graded, and its context line displayed this Rem's answer. */
-  | 'descendant';
+  | 'descendant'
+  /**
+   * This Rem is a descriptor with a due BACKWARD card, which answers with its
+   * concept — and a card of that concept (forward, backward or a cloze in it)
+   * was shown. RemNote buries the same pairing for an hour; this extends it.
+   */
+  | 'concept-reviewed';
 
 export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'same-rem': 'another card of this Rem was reviewed',
@@ -49,6 +55,7 @@ export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'parent-extract': 'the parent extract was read',
   'own-cloze-child': 'one of its Alt+Z clozes was reviewed',
   descendant: 'a descendant card showed its answer as context',
+  'concept-reviewed': 'its concept was reviewed',
 };
 
 export interface CoolingParams {
@@ -170,6 +177,38 @@ export interface CardLike {
   nextRepetitionTime?: number | null;
   lastRepetitionTime?: number | null;
   repetitionHistory?: { date: number; score: number }[] | null;
+  /** RemNote's card type ('forward' | 'backward' | { clozeId }), or the cache's 'cloze' tag. */
+  type?: unknown;
+}
+
+/** RemType.DESCRIPTOR in the SDK; kept as a literal so this module stays SDK-free. */
+export const REM_TYPE_DESCRIPTOR = 2;
+
+/** A card's direction as the cache stores it: 'forward', 'backward', 'cloze', or null. */
+export function cardTypeTag(type: unknown): 'forward' | 'backward' | 'cloze' | null {
+  if (type === 'forward' || type === 'backward' || type === 'cloze') return type;
+  if (type && typeof type === 'object') return 'cloze';
+  return null;
+}
+
+export function isBackwardCard(card: CardLike): boolean {
+  return cardTypeTag(card.type) === 'backward';
+}
+
+/**
+ * The concept a descriptor's backward card answers with: the nearest ancestor
+ * that is not itself a descriptor. Descriptors can nest — "pode ser transmitido
+ * por estações de navios?" under "transmitidos por quem" under "Recibos de
+ * socorro" answers with the grandparent — so the chain is walked past every
+ * descriptor. `ancestors` runs from the parent upwards; null when every Rem in
+ * it is a descriptor, or it is empty.
+ */
+export function pickConceptAncestor(ancestors: { _id: string; type?: number | null }[]): string | null {
+  for (const a of ancestors) {
+    if (!a) return null;
+    if (a.type !== REM_TYPE_DESCRIPTOR) return a._id;
+  }
+  return null;
 }
 
 /**
@@ -222,13 +261,16 @@ export function cardsFromCacheInfo(info: {
   remId: string;
   cardsNextRep?: (number | null)[];
   cardsLastSeen?: (number | null)[];
+  cardsType?: (string | null)[];
 }): CardLike[] {
   const next = info.cardsNextRep ?? [];
   const seen = info.cardsLastSeen ?? [];
+  const types = info.cardsType ?? [];
   return next.map((nextRepetitionTime, i) => ({
     _id: `${info.remId}#${i}`,
     nextRepetitionTime,
     lastRepetitionTime: seen[i] ?? null,
+    type: types[i] ?? null,
   }));
 }
 

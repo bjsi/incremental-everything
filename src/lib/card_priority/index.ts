@@ -1,4 +1,4 @@
-import { cardLastSeenAt } from '../priority_review_document/cooling';
+import { cardLastSeenAt, cardTypeTag } from '../priority_review_document/cooling';
 import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
 import { buildComprehensiveScope } from '../scope_helpers';
@@ -147,6 +147,7 @@ export async function getCardPriority(
   // When each card was last shown, from the same cards — no extra read. Feeds
   // the Priority Queue's cooling (see CardPriorityInfo.cardsLastSeen).
   const cardsLastSeen: (number | null)[] = cards.map((c) => cardLastSeenAt(c as any));
+  const cardsType = cards.map((c) => cardTypeTag((c as any).type));
 
   if (priorityValue) {
     const parsedPriority = parseInt(priorityValue);
@@ -162,6 +163,7 @@ export async function getCardPriority(
       dueCardsOverdue,
       cardsNextRep,
       cardsLastSeen,
+      cardsType,
     };
   } else {
     const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
@@ -177,6 +179,7 @@ export async function getCardPriority(
         dueCardsOverdue,
         cardsNextRep,
         cardsLastSeen,
+        cardsType,
       };
     }
 
@@ -191,6 +194,7 @@ export async function getCardPriority(
       dueCardsOverdue,
       cardsNextRep,
       cardsLastSeen,
+      cardsType,
     };
   }
 }

@@ -89,12 +89,13 @@ A Rem is **cooling** when it still owes the queue a card, and a card that gives 
 
 ### What counts as a spoiler
 
-Four relations, each a distinct way one review puts another card's answer on screen:
+Five relations, each a distinct way one review puts another card's answer on screen:
 
 * **Another card of the same Rem** — the other direction, or another cloze in the same text. RemNote's hour-long bury, extended.
 * **A sibling `Alt+Z` cloze under the same parent extract**, or the **parent extract itself** read as an Incremental Rem. Each cloze quotes the whole sentence with one span blanked, so any one of them shows the others' answers.
 * **One of the Rem's own `Alt+Z` clozes**, when the Rem carries a card of its own as well.
 * **A child or grandchild card**, whose context line displayed this Rem's answer — the [ancestor gate](#ancestor-spoiler-protection) extended across time, in the direction that actually spoils.
+* **Its concept, for a descriptor's backward card.** A descriptor's backward card shows the descriptor and asks for the concept it belongs to: the nearest ancestor that is not itself a descriptor, which is a grandparent or higher when descriptors are nested. Reviewing any card of that concept, forward, backward or a cloze in it, puts the answer on screen, so the descriptor waits. RemNote buries this pairing for an hour; cooling extends it for the whole window.
 
 Card Cluster siblings never cool each other: a cluster is designed to be shown together, and RemNote treats it as one unit. A sibling rated *Again* that is still due does not cool anything either — RemNote's own rule already separates that pair within the hour.
 
