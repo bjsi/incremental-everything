@@ -45,6 +45,8 @@ While you practise, the plugin knows where the items came from: the [Priority Sh
 
 When you leave the queue after practising a Priority Queue document, the plugin refreshes it a couple of seconds later: what you reviewed is drained, what is now cooling is drained, and the document is topped back up. A toast reports the result. This is the **Refresh the Priority Queue after each session** setting, on by default.
 
+In [Light Mode](Full-Mode-x-Light-Mode.md), including on mobile, the automatic refresh does not run. Light Mode keeps no card cache, so a refresh there has to read every card in your knowledge base — once, shared by the drain, cooling and the new selection — which is the kind of work Light Mode exists to avoid after every session. Press **Refresh** or **▶ Practice** in the popup instead; both still work, cooling included. In Full Mode a refresh reads no cards at all: everything comes from the card cache.
+
 ## How Items Are Selected
 
 Every refill runs the same selection:
@@ -55,6 +57,13 @@ Every refill runs the same selection:
 4.  **Gates**, applied to each flashcard Rem as it is drawn, so their cost is bounded by the fill target rather than by the size of your knowledge base: already in the document, [paused](#paused-document-filtering), [due ancestor](#ancestor-spoiler-protection), [cooling](#cooling-spoiler-protection-across-sessions), and [Card Cluster](#card-cluster-support) expansion.
 
 The status block at the top of the document records what each refresh did, and the popup shows the Rems each gate held back, by name, after every action.
+
+![The Priority Queue popup after a refresh: the result line, a blue panel with one Rem left out as cooling, and a purple panel with one Rem held back by a due ancestor that is cooling too](assets/priority-queue-popup-cooling-ancestor-messages.png){ width="640" }
+
+Above, a refresh drained 4 reviewed entries and added 4. Under the result line, each gate that held something back gets its own panel, one row per Rem with its priority:
+
+* **🧊 left out, cooling** — why the Rem is [cooling](#cooling-spoiler-protection-across-sessions) and the day it comes back: here, another card of the same Rem was reviewed 7 days ago, so it returns on Sep 17.
+* **🎭 held back by a due ancestor** — the blocking parent or grandparent and what happened to it. Here the parent is itself cooling, so nothing was swapped in and both wait; see [Ancestor Spoiler Protection](#ancestor-spoiler-protection).
 
 ### The shield slice
 
@@ -109,7 +118,7 @@ Counted from the moment the spoiling card was seen, not from when the plugin not
 
 ### Nothing is stored
 
-The cooling set is **recomputed from your card data** on every refresh and at every queue exit — it is a function of what is scheduled and when each card was last shown. That is what makes it correct on every device the moment your cards sync, impossible to disagree with reality, and immune to a wipe of the plugin's synced storage. The only thing persisted is what *you* decide about specific Rems (below), one small record per knowledge base.
+The cooling set is **recomputed from your card data** on every refresh and at every queue exit — it is a function of what is scheduled and when each card was last shown. In Full Mode both come from the card cache, which records when each card was last shown alongside when it is due; note [what the cache cannot see](Priorities-for-Flashcards.md#cache-blind-spot). That is what makes it correct on every device the moment your cards sync, impossible to disagree with reality, and immune to a wipe of the plugin's synced storage. The only thing persisted is what *you* decide about specific Rems (below), one small record per knowledge base.
 
 ### The Cooling list
 
@@ -177,6 +186,8 @@ As each candidate flashcard Rem is drawn, the plugin looks at its **parent and g
 The swap is the point. Dropping the child on its own would leave the block standing: the parent might not be drawn this time, and the same pair would collide again at the next refresh. Practising the ancestor **now** is what makes the descendant free next time. The ancestor swapped in may be **lower priority** than the card it displaced — its priority is beside the point; it is in the way.
 
 Due-ness is read from the ancestor's **actual cards**, not from the plugin's priority cache, so a flashcard you created minutes ago still protects its descendants. A never-practised card counts as due — the case that matters most, since nothing has been recalled for the descendant to give away.
+
+**Entries already in the document are checked too.** The draw only looks at a child's ancestors when it first picks the child, so every refresh also checks each flashcard entry the document already holds. A child whose parent or grandparent has come due since it was added is drained, and that ancestor is pulled in ahead of the normal fill, so it is reviewed first. The toast after the [automatic refresh](#refresh-after-every-session) counts these, and the status block shows how many ancestors were swapped in.
 
 Once the ancestor *has* been reviewed, its descendant returns at a later refresh — and that is exactly when the reverse relation takes over: a descendant reviewed recently cools its ancestor, since the descendant's context line showed the ancestor's answer. The two rules are the same rule in the two directions of time.
 

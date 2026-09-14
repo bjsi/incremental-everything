@@ -126,11 +126,12 @@ A rem that has **neither** been made Incremental nor dismissed — the book's ow
 
 ## 4. PDF Highlight Toolbar Utilities
 
-When you select text in the PDF Reader and create a highlight, the native RemNote popup toolbar appears. The plugin injects four widgets into this toolbar to help you process and organize information on the fly:
+When you select text in the PDF Reader and create a highlight, the native RemNote popup toolbar appears. The plugin injects five widgets into this toolbar to help you process and organize information on the fly:
 
 | Icon | Tool | Description |
 |------|------|-------------|
 | 🔖 | **Set Bookmark Position** | Manually records your current reading position at this highlight's exact page. *(Note: Using the extraction tools below will also do this automatically).* |
+| ✨ | **AI Transcribe** | Replaces the highlight's raw text (missing spaces, broken formulas) with a clean AI transcription of the highlighted region, formulas as LaTeX. Uses your own Claude account through a small local helper. See [AI Transcription of PDF Highlights](AI-Transcription-of-PDF-Highlights.md). |
 | ![](https://cdn-icons-png.flaticon.com/512/8365/8365483.png){ width="16" } | **Create Incremental Rem** | Extracts the highlight into a standalone Incremental Rem and lets you choose precisely where it should live in your Knowledge Base hierarchy. See the [Create-Incremental-Rem-from-PDF-Highlights](Create-Incremental-Rem-from-PDF-Highlights.md) for full details. |
 | ![](https://cdn-icons-png.flaticon.com/512/1504/1504044.png){ width="16" } | **Toggle Incremental Rem** | Quick-tags the highlight itself as an Incremental Rem without moving it. The button background turns blue to indicate the highlight is now actively tracked in your queue. |
 | 👁️ / 🙈 | **Toggle Marker Borders (Peek)** | Shows/hides the extract & incremental **marker borders** (see below) over all PDF highlights, so you can read a busy page cleanly. Turns amber while markers are hidden. Also available as the **Toggle PDF Highlight Marker Borders** command (quick code `tb`), and remembered per device (default: on). |

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   cardIntervalDays,
   cardLastSeenAt,
+  cardsFromCacheInfo,
   coolingWindowDays,
   DAY_MS,
   DEFAULT_COOLING_PARAMS,
@@ -210,5 +211,46 @@ describe('excludeCooling', () => {
     const items = [{ remId: 'a', priority: 1 }, { remId: 'b', priority: 2 }];
     assert.equal(excludeCooling(items, new Set()), items);
     assert.deepEqual(excludeCooling(items, new Set(['a'])), [{ remId: 'b', priority: 2 }]);
+  });
+});
+
+describe('cardsFromCacheInfo', () => {
+  it('rebuilds due and last-seen facts per card, in order', () => {
+    const cards = cardsFromCacheInfo({
+      remId: 'r',
+      cardsNextRep: [NOW - DAY_MS, NOW + 40 * DAY_MS, null],
+      cardsLastSeen: [daysAgo(10), daysAgo(1), null],
+    });
+    assert.equal(cards.length, 3);
+    assert.equal(isCardDue(cards[0], NOW), true);
+    assert.equal(isCardDue(cards[2], NOW), false);
+    assert.equal(cardLastSeenAt(cards[1]), daysAgo(1));
+    assert.equal(cardLastSeenAt(cards[2]), null);
+    assert.equal(Math.round(cardIntervalDays(cards[1])), 41);
+    assert.equal(cards[1]._id, 'r#1');
+  });
+  it('fails open for an entry built before cardsLastSeen existed', () => {
+    const cards = cardsFromCacheInfo({ remId: 'r', cardsNextRep: [NOW - DAY_MS] });
+    assert.equal(cardLastSeenAt(cards[0]), null);
+  });
+  it('drives a same-rem cooling verdict from cache facts alone', () => {
+    const cards = cardsFromCacheInfo({
+      remId: 'r',
+      cardsNextRep: [NOW - DAY_MS, NOW + 99 * DAY_MS],
+      cardsLastSeen: [daysAgo(101), daysAgo(1)],
+    });
+    const due = cards.filter((c) => isCardDue(c, NOW));
+    const v = evaluateCooling(
+      {
+        remId: 'r',
+        dueCards: due.map((c) => ({ cardId: c._id, intervalDays: cardIntervalDays(c) })),
+        seen: cards
+          .filter((c) => !isCardDue(c, NOW))
+          .map((c) => ({ relation: 'same-rem' as const, sourceRemId: 'r', cardId: c._id, seenAt: cardLastSeenAt(c)!, stillDue: false })),
+      },
+      NOW
+    );
+    assert.ok(v);
+    assert.equal(v.reasons[0].cardId, 'r#1');
   });
 });

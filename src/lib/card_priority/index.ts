@@ -1,3 +1,4 @@
+import { cardLastSeenAt } from '../priority_review_document/cooling';
 import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
 import { buildComprehensiveScope } from '../scope_helpers';
@@ -143,6 +144,9 @@ export async function getCardPriority(
   // Per-card nextRep, captured here so the Weighted Shield of Cards can be
   // bucketed per-card later without re-fetching every card.
   const cardsNextRep: (number | null)[] = cards.map((c) => c.nextRepetitionTime ?? null);
+  // When each card was last shown, from the same cards — no extra read. Feeds
+  // the Priority Queue's cooling (see CardPriorityInfo.cardsLastSeen).
+  const cardsLastSeen: (number | null)[] = cards.map((c) => cardLastSeenAt(c as any));
 
   if (priorityValue) {
     const parsedPriority = parseInt(priorityValue);
@@ -157,6 +161,7 @@ export async function getCardPriority(
       dueCards,
       dueCardsOverdue,
       cardsNextRep,
+      cardsLastSeen,
     };
   } else {
     const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
@@ -171,6 +176,7 @@ export async function getCardPriority(
         dueCards,
         dueCardsOverdue,
         cardsNextRep,
+        cardsLastSeen,
       };
     }
 
@@ -184,6 +190,7 @@ export async function getCardPriority(
       dueCards,
       dueCardsOverdue,
       cardsNextRep,
+      cardsLastSeen,
     };
   }
 }
@@ -414,7 +421,13 @@ export async function getDueCardsWithPriorities(
   plugin: RNPlugin,
   scopeRem: PluginRem | null,
   includeNonPrioritized: boolean = true,
-  precomputedScopeIds?: Set<RemId>
+  precomputedScopeIds?: Set<RemId>,
+  /**
+   * Cards already read with `card.getAll()` by the caller. Only the cache-less
+   * path uses them, so a Light Mode refresh that needs every card for its drain
+   * and cooling as well pays for one full read instead of two.
+   */
+  preloadedCards?: any[]
 ): Promise<
   Array<{
     rem: PluginRem;
@@ -437,7 +450,7 @@ export async function getDueCardsWithPriorities(
 
   if (!allCardInfos || allCardInfos.length === 0) {
     console.warn(`[getDueCardsWithPriorities] Cache is empty! Consider running cache build first.`);
-    return getDueCardsWithPrioritiesSlow(plugin, scopeRem, includeNonPrioritized, precomputedScopeIds);
+    return getDueCardsWithPrioritiesSlow(plugin, scopeRem, includeNonPrioritized, precomputedScopeIds, preloadedCards);
   }
 
   console.log(`[getDueCardsWithPriorities] Cache loaded: ${allCardInfos.length} card priority entries`);
@@ -536,7 +549,8 @@ async function getDueCardsWithPrioritiesSlow(
   plugin: RNPlugin,
   scopeRem: PluginRem | null,
   includeNonPrioritized: boolean = true,
-  precomputedScopeIds?: Set<RemId>
+  precomputedScopeIds?: Set<RemId>,
+  preloadedCards?: any[]
 ): Promise<
   Array<{
     rem: PluginRem;
@@ -562,8 +576,9 @@ async function getDueCardsWithPrioritiesSlow(
     source: PrioritySource;
   }> = [];
 
-  // Get all cards once using the reliable plugin.card.getAll()
-  const allCards = await plugin.card.getAll();
+  // Get all cards once using the reliable plugin.card.getAll() — unless the
+  // caller already paid for that read.
+  const allCards = preloadedCards ?? (await plugin.card.getAll());
   const now = Date.now();
 
   // Build a map of remId -> due card count.

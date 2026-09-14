@@ -88,7 +88,11 @@ export const performanceModeId = 'performanceMode';
 export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
 /** Custom acronyms the Text Case Converter keeps uppercase in Title Case. */
 export const titleCaseAcronymsId = 'title-case-acronyms';
-export const enableMasteryDrillId = 'enable-mastery-drill';
+/** Colour of the PDF highlights the plugin creates for source pins (lib/source_pins). */
+export const sourceHighlightColorId = 'source-highlight-color';
+export type HighlightColorName = 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple';
+/** Create IncRem also pins the passage in a PDF's other view (page ↔ Text Reader) — lib/pdf_source_pins pinOtherViewOfHighlight. */
+export const pinOtherReaderViewOnCreateIncRemId = 'pin-other-reader-view-on-create-increm';export const enableMasteryDrillId = 'enable-mastery-drill';
 /** Pre-inversion id, kept only so the migration can convert stored values. */
 export const legacySkipMasteryDrillId = 'skip_mastery_drill';
 export const oldItemThresholdId = 'old_item_threshold';
@@ -565,6 +569,12 @@ export const sourceFloatingActiveIdKey = 'source-floating-active-id';
 // Convert literal \[..\] / \(..\) / **..** left by PDF text-layer extraction
 // into real RemNote rich text (formulas, bold, italic).
 export const convertExtractedMarkupCommandId = 'convert-extracted-markup';
+
+// AI transcription of a PDF highlight via the local helper (lib/ai_ocr.ts).
+export const aiTranscribeHighlightCommandId = 'ai-transcribe-highlight';
+export const restoreHighlightBeforeAiCommandId = 'restore-highlight-before-ai';
+// Pin the source passage of the focused Rem's text in the open PDF (lib/source_pins).
+export const pinSourceQuoteCommandId = 'pin-source-quote';
 
 // --- Priority Queue cooling (lib/priority_review_document/cooling*.ts) ---
 // The cooling SET is never stored: it is a function of card data, recomputed on

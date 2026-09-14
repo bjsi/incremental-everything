@@ -9,6 +9,7 @@ import { buildComprehensiveScope } from '../scope_helpers';
 import { safeRemTextToString } from '../pdfUtils';
 import { hasCardClusterPowerup } from './cluster';
 import { CoolingScanner } from './cooling_gather';
+import { CardSource } from './card_source';
 import { COOLING_RELATION_LABELS, CoolingVerdict } from './cooling';
 
 /**
@@ -86,6 +87,27 @@ export interface SelectionOptions {
    * reported; the caller owns the scanner and decides whether to publish it.
    */
   coolingScanner?: CoolingScanner | null;
+  /**
+   * Children already in the document that were drained because an ancestor of
+   * theirs is due. Each ancestor is pulled in before the normal draw — the swap,
+   * applied to entries the draw never sees again — and each child is reported
+   * as held back. Added even past `itemCount`, like a cluster: protection first.
+   */
+  forceAncestors?: ForcedAncestor[];
+  /**
+   * Card facts the caller already loaded. When they came from card.getAll()
+   * (no card cache), the due-cards gatherer reuses them instead of loading every
+   * card a second time.
+   */
+  cardSource?: CardSource;
+}
+
+export interface ForcedAncestor {
+  childRemId: RemId;
+  childName: string;
+  ancestorRemId: RemId;
+  ancestorName: string;
+  level: 1 | 2;
 }
 
 export interface SelectionStats {
@@ -132,7 +154,7 @@ async function isInPausedDocument(rem: PluginRem): Promise<boolean> {
   return false;
 }
 
-interface AncestorInfo {
+export interface AncestorInfo {
   parentId: RemId | null;
   hasDueCard: boolean;
   text: any;
@@ -178,7 +200,7 @@ async function readAncestorInfo(
  * grandparent only, HIGHEST due ancestor first so the tree unblocks top-down.
  * See the Ancestor Spoiler Protection section of the docs.
  */
-async function findDueAncestorSpoiler(
+export async function findDueAncestorSpoiler(
   plugin: RNPlugin,
   rem: PluginRem,
   now: number,
@@ -254,7 +276,8 @@ export async function selectPriorityItems(
     plugin,
     scopeRem,
     true,
-    comprehensiveScopeIds ?? undefined
+    comprehensiveScopeIds ?? undefined,
+    options.cardSource?.kind === 'all' ? options.cardSource.allCards : undefined
   );
 
   // Universe for percentiles: the cached infos in scope, plus any due card the
@@ -450,6 +473,46 @@ export async function selectPriorityItems(
 
     return true;
   };
+
+  // Ancestors of children drained from the document (see forceAncestors): the
+  // swap, for entries that were already there when their ancestor came due.
+  for (const forced of options.forceAncestors ?? []) {
+    let ancestorAction: SkippedAncestorItem['ancestorAction'] = 'already-included';
+    if (!isBlocked(forced.ancestorRemId)) {
+      if (await coolingVerdict(forced.ancestorRemId)) {
+        ancestorAction = 'cooling';
+      } else {
+        const ancestorRem = await plugin.rem.findOne(forced.ancestorRemId);
+        if (ancestorRem) {
+          items.push({
+            rem: ancestorRem,
+            type: 'flashcard',
+            priority:
+              dueCardByRemId.get(forced.ancestorRemId)?.priority ??
+              priorityByRemId.get(forced.ancestorRemId) ??
+              priorityByRemId.get(forced.childRemId) ??
+              100,
+            percentile: cardPercentiles[forced.ancestorRemId] ?? 100,
+          });
+          addedRemIds.add(forced.ancestorRemId);
+          ancestorAction = 'added';
+        } else {
+          ancestorAction = 'unavailable';
+        }
+      }
+    }
+    // The child is out of the document now; keep it out of this fill too.
+    addedRemIds.add(forced.childRemId);
+    skippedAncestorItems.push({
+      remId: forced.childRemId,
+      name: forced.childName,
+      priority: priorityByRemId.get(forced.childRemId) ?? 100,
+      ancestorRemId: forced.ancestorRemId,
+      ancestorName: forced.ancestorName,
+      level: forced.level,
+      ancestorAction,
+    });
+  }
 
   let incRemIndex = 0;
   let cardIndex = 0;

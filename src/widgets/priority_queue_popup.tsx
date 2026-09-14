@@ -887,6 +887,7 @@ export function PriorityQueuePopup() {
         Now holding <span className="font-bold">{result.holding.total}</span> ({result.holding.flashcards} FC, {result.holding.incRems} INC) — drained{' '}
         <span className="font-bold">{result.drained.reviewed}</span> reviewed
         {result.drained.cooling > 0 && <>, <span className="font-bold">{result.drained.cooling}</span> cooling</>}
+        {result.drained.ancestor > 0 && <>, <span className="font-bold">{result.drained.ancestor}</span> held by a due ancestor</>}
         {result.drained.missing > 0 && <>, {result.drained.missing} missing</>}, added{' '}
         <span className="font-bold">{result.added.total}</span>
         {result.added.shieldSlice > 0 && <> ({result.added.shieldSlice} from the shield slice)</>}.{' '}

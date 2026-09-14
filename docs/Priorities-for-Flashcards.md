@@ -406,6 +406,15 @@ The seven-day limit covers the one change that cannot be detected. If you edit a
 
     The debug widget's **Warm-Start Store** panel also clears the copy, which makes the *next* start rebuild from scratch. Clearing it is harmless — it is derived data, and the rebuild writes it again.
 
+### What the cache cannot see { #cache-blind-spot }
+
+Within a session, the cache is kept current by what happens **on this device**: every card you rate in a queue updates its entry straight away, and every start rebuilds the card data from scratch.
+
+!!! warning "Reviews synced from another device arrive only at the next start"
+    Cards you review on **another device** while the plugin is running here — your phone, another computer, the web app — are synced into RemNote, but nothing tells this device's cache about them. Until you restart RemNote here, those cards still look due to the plugin.
+
+    Everything that reads the cache is affected the same way: the [Card Shield](#monitoring-your-load-card-shield) and its history, the choice of what goes into the [Priority Queue](Priority-Review-Document.md), what its drain removes, and which Rems are [cooling](Priority-Review-Document.md#cooling-spoiler-protection-across-sessions). If you study on two devices in one day, restart RemNote on the one you come back to.
+
 ## See also
 
 * [Priority Review Document](Priority-Review-Document.md)

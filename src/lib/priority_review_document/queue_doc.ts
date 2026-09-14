@@ -32,11 +32,12 @@ import {
   writeEntries,
   writeGraph,
 } from './index';
-import { selectPriorityItems, SelectionResult } from './select';
+import { selectPriorityItems, SelectionResult, findDueAncestorSpoiler, AncestorInfo, ForcedAncestor } from './select';
 import { cleanPriorityReviewDocuments, PrdDocReport, scanPriorityReviewDocuments } from './clean';
 import { CoolingScanner } from './cooling_gather';
 import { CoolingVerdict } from './cooling';
 import { readChildren } from './children';
+import { loadCardSource } from './card_source';
 
 /**
  * The persistent Priority Queue document — one per scope.
@@ -236,7 +237,7 @@ export interface RefreshResult {
   burst: number;
   /** Entries in the document after the refresh. */
   holding: { total: number; flashcards: number; incRems: number };
-  drained: { reviewed: number; cooling: number; missing: number; kept: number };
+  drained: { reviewed: number; cooling: number; ancestor: number; missing: number; kept: number };
   added: { total: number; flashcards: number; incRems: number; shieldSlice: number };
   cooling: CoolingVerdict[];
   selection: SelectionResult | null;
@@ -253,6 +254,15 @@ async function readDocTargets(plugin: RNPlugin, doc: PluginRem): Promise<Map<Rem
     if (ref) targets.set(child._id, (ref as any)._id as RemId);
   }
   return targets;
+}
+
+/** Plain text of a Rem for labels, without a bridge call. */
+function flattenLabel(text: unknown): string {
+  if (!Array.isArray(text)) return '';
+  return text
+    .map((el) => (typeof el === 'string' ? el : el && typeof el === 'object' && typeof (el as any).text === 'string' ? (el as any).text : ''))
+    .join('')
+    .trim();
 }
 
 function formatStamp(ms: number): string {
@@ -284,7 +294,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
       scopeRemId: options.scopeRemId,
       burst: options.burst ?? existing?.burst ?? PRIORITY_QUEUE_DEFAULT_BURST,
       holding: { total: 0, flashcards: 0, incRems: 0 },
-      drained: { reviewed: 0, cooling: 0, missing: 0, kept: 0 },
+      drained: { reviewed: 0, cooling: 0, ancestor: 0, missing: 0, kept: 0 },
       added: { total: 0, flashcards: 0, incRems: 0, shieldSlice: 0 },
       cooling: [],
       selection: null,
@@ -304,7 +314,12 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     await setPriorityQueuePausedFilter(plugin, doc, skipPaused, pausedThreshold);
   }
 
-  const scanner = new CoolingScanner(plugin, { scopeRemId: info.scopeRemId });
+  // Card facts, loaded ONCE for the whole refresh: the card cache in Full Mode
+  // (no card read), one card.getAll() otherwise, shared by the drain, cooling
+  // and selection below. See card_source.ts.
+  progress('Reading card state…');
+  const cardSource = await loadCardSource(plugin);
+  const scanner = new CoolingScanner(plugin, { scopeRemId: info.scopeRemId, cardSource });
 
   // 1. Drain. The document's own targets are judged for cooling first, so an
   //    entry whose sibling was reviewed in the last session leaves with the
@@ -314,17 +329,57 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   const targetIds = [...new Set(entryTargets.values())];
   await scanner.scan(targetIds);
 
-  progress('Draining reviewed and cooling entries…');
+  // The parent switch, for entries already in the document. The draw only
+  // checks a child's ancestors when it first picks the child, so a child that
+  // entered in one fill stayed through every later refresh even after its
+  // parent or grandparent came due — and practising it would show that
+  // ancestor's answer. Each entry's ancestors are checked on every refresh; a
+  // child with a due ancestor is drained, and the ancestor pulled in instead.
+  // Same detector, same two levels, same memoised reads as the draw.
+  progress('Checking entries for due ancestors…');
+  const heldByAncestor = new Map<RemId, ForcedAncestor>();
+  {
+    const now = Date.now();
+    const ancestorCache = new Map<RemId, AncestorInfo>();
+    const targetRems = targetIds.length ? (await plugin.rem.findMany(targetIds)) || [] : [];
+    await Promise.all(
+      targetRems.map(async (rem) => {
+        try {
+          const spoiler = await findDueAncestorSpoiler(plugin, rem, now, ancestorCache);
+          if (!spoiler) return;
+          heldByAncestor.set(rem._id, {
+            childRemId: rem._id,
+            childName: flattenLabel(rem.text),
+            ancestorRemId: spoiler.remId,
+            ancestorName: flattenLabel(spoiler.text),
+            level: spoiler.level,
+          });
+        } catch (e) {
+          // Fails open, like the draw: an unreadable ancestor keeps the entry.
+          console.warn(`[Priority Queue] Ancestor check failed for ${rem._id}:`, e);
+        }
+      })
+    );
+  }
+
+  progress('Draining reviewed, cooling and ancestor-held entries…');
   const scan = await scanPriorityReviewDocuments(plugin, undefined, {
     docIds: [doc._id],
     coolingRemIds: scanner.coolingIds(),
+    ancestorHeldRemIds: new Set(heldByAncestor.keys()),
+    cardSource,
   });
   const report: PrdDocReport | undefined = scan.docs[0];
-  const drained = { reviewed: 0, cooling: 0, missing: 0, kept: 0 };
+  const drained = { reviewed: 0, cooling: 0, ancestor: 0, missing: 0, kept: 0 };
+  const forceAncestors: ForcedAncestor[] = [];
   if (report && mode !== 'refill') {
     for (const e of report.removableEntries) {
       if (e.status === 'cooling') drained.cooling++;
-      else if (e.status === 'missing') drained.missing++;
+      else if (e.status === 'ancestor-due') {
+        drained.ancestor++;
+        const held = e.targetRemId ? heldByAncestor.get(e.targetRemId) : undefined;
+        if (held) forceAncestors.push(held);
+      } else if (e.status === 'missing') drained.missing++;
       else drained.reviewed++;
     }
     drained.kept = report.keptEntries.length;
@@ -356,6 +411,9 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     excludeRemIds: remainingTargets,
     shieldSliceFraction: shieldSlice,
     coolingScanner: scanner,
+    cardSource,
+    // Drain only removes; the ancestors wait for the next refresh or refill.
+    forceAncestors: mode === 'drain' ? [] : forceAncestors,
   });
   await scanner.publish();
 
@@ -408,12 +466,16 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     `Holding: ${holding.total} items (${holding.flashcards} flashcard Rems, ${holding.incRems} IncRems)\n` +
     `Last refresh: ${formatStamp(now)} — drained ${drained.reviewed} reviewed` +
     (drained.cooling ? `, ${drained.cooling} cooling` : '') +
+    (drained.ancestor ? `, ${drained.ancestor} held by a due ancestor` : '') +
     (drained.missing ? `, ${drained.missing} missing` : '') +
     ` · added ${selection.items.length}` +
     (selection.shieldSliceCount ? ` (${selection.shieldSliceCount} from the shield slice)` : '') +
     `\n` +
     `Cooling now: ${cooling.length} Rems` +
-    (heldBack ? ` · Held back (due ancestor): ${heldBack}` : '') +
+    (heldBack
+      ? ` · Held back (due ancestor): ${heldBack}, ` +
+        `${selection.skippedAncestorItems.filter((a) => a.ancestorAction === 'added').length} ancestors swapped in`
+      : '') +
     (selection.skippedPausedItems.length ? ` · Skipped (paused): ${selection.skippedPausedItems.length}` : '') +
     `\n` +
     `Due in scope: ${s.dueCardRems} flashcard Rems (${s.dueCards} cards), ${s.dueIncRems} IncRems\n` +
@@ -426,9 +488,9 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
 
   const elapsedMs = Date.now() - startedAt;
   console.log(
-    `[Priority Queue] ${mode} (${s.scopeName}): holding ${holding.total}, drained ${drained.reviewed + drained.cooling + drained.missing} ` +
-      `(${drained.cooling} cooling), added ${selection.items.length} (${selection.shieldSliceCount} shield slice), ` +
-      `${cooling.length} cooling in scope, in ${elapsedMs}ms`
+    `[Priority Queue] ${mode} (${s.scopeName}): holding ${holding.total}, drained ${drained.reviewed + drained.cooling + drained.ancestor + drained.missing} ` +
+      `(${drained.cooling} cooling, ${drained.ancestor} ancestor-held), added ${selection.items.length} (${selection.shieldSliceCount} shield slice), ` +
+      `${cooling.length} cooling in scope, card state from ${cardSource.kind === 'cache' ? 'the cache' : 'card.getAll()'}, in ${elapsedMs}ms`
   );
 
   return {

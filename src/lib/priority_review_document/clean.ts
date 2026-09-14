@@ -3,6 +3,8 @@ import dayjs from 'dayjs';
 import { IncrementalRem } from '../incremental_rem';
 import { allIncrementalRemKey, priorityGraphPowerupCode, priorityQueuePowerupCode } from '../consts';
 import { readChildren, readChildrenWithCounts } from './children';
+import { CardSource, isCardCacheUsable, cardsByRemFromCache } from './card_source';
+import { CardLike } from './cooling';
 
 /**
  * Cleaning a Priority Review Document of entries that are no longer due.
@@ -30,9 +32,11 @@ import { readChildren, readChildrenWithCounts } from './children';
  * thresholds coincide: `nextRepDate` is a Daily Document date at midnight, so
  * anything at or before today is already ≤ now.
  *
- * Two whole-KB reads (`card.getAll()` and the IncRem session cache) answer
- * every entry in every document, so the per-entry cost is a map lookup rather
- * than a round trip.
+ * Card due-ness comes from the card cache in Full Mode, and from the IncRem
+ * session cache for INC entries, so the per-entry cost is a map lookup rather
+ * than a round trip. Without a usable card cache, a scan of specific documents
+ * reads just their entries' cards, and only a scan of every document falls
+ * back to one `card.getAll()` (see buildDueCardRemIds and card_source.ts).
  *
  * A document that cleaning would leave with nothing due is finished, and the
  * cleaner offers to delete it outright — including one that already holds
@@ -60,6 +64,12 @@ export type EntryStatus =
    * Rem back once its window has run out.
    */
   | 'cooling'
+  /**
+   * Still due, but a parent or grandparent of it is due too, and practising it
+   * would show that ancestor's answer as context — the entry is removable, and
+   * the refresh pulls the ancestor in instead (see select.ts, forceAncestors).
+   */
+  | 'ancestor-due'
   /** The referenced Rem no longer exists — the entry is removable. */
   | 'missing'
   /** Cannot be judged (see {@link PrdScanResult.incCacheUnavailable}) — kept. */
@@ -123,6 +133,8 @@ export interface PrdDocReport {
   removableEntries: PrdEntry[];
   /** How many of the removable entries are removable because they are cooling. */
   coolingEntries: number;
+  /** How many of the removable entries are removable because an ancestor is due. */
+  ancestorEntries: number;
   /** No longer due, but kept because deleting them would lose something. */
   keptEntries: PrdEntry[];
   /** Entries that could not be judged. */
@@ -187,6 +199,15 @@ export interface PrdScanOptions {
   docIds?: RemId[];
   /** Rems currently cooling: a due FC entry pointing at one is removable as `cooling`. */
   coolingRemIds?: ReadonlySet<RemId>;
+  /** Rems with a due ancestor: a due FC entry pointing at one is removable as `ancestor-due`. */
+  ancestorHeldRemIds?: ReadonlySet<RemId>;
+  /**
+   * Card facts to judge FC entries with. Omitted: the card cache in Full Mode;
+   * without a usable cache, a scan of specific documents reads just their
+   * entries' cards, and a scan of every document falls back to one
+   * card.getAll() (see card_source.ts).
+   */
+  cardSource?: CardSource;
 }
 
 export interface PrdCleanOptions {
@@ -312,17 +333,39 @@ function isEmptyBullet(child: PluginRem, childCount: number): boolean {
   return flattenRichText(child.text).length === 0 && childCount === 0;
 }
 
-/** Rem IDs that own at least one card due at any point up to the end of today. */
-async function buildDueCardRemIds(plugin: RNPlugin): Promise<Set<RemId>> {
+/** Rem IDs among `cardsByRem` that own at least one card due by the end of today. */
+function dueRemIdsFrom(cardsByRem: Map<RemId, CardLike[]>): Set<RemId> {
   const cutoff = dayjs().endOf('day').valueOf();
-  const allCards = (await plugin.card.getAll()) || [];
   const due = new Set<RemId>();
-  for (const card of allCards) {
+  for (const [remId, cards] of cardsByRem) {
     // `?? Infinity` mirrors getCardPriority: a disabled direction has a null
     // nextRepetitionTime and must not read as due.
-    if ((card.nextRepetitionTime ?? Infinity) <= cutoff) due.add(card.remId);
+    if (cards.some((c) => (c.nextRepetitionTime ?? Infinity) <= cutoff)) due.add(remId);
   }
   return due;
+}
+
+/**
+ * The due set for the scan, without `card.getAll()` whenever that is avoidable:
+ * the caller's source, else the Full Mode cache. Null means "read per entry"
+ * (targeted scan, no cache) — resolved inside the document loop.
+ */
+async function buildDueCardRemIds(
+  plugin: RNPlugin,
+  options: PrdScanOptions
+): Promise<Set<RemId> | null> {
+  if (options.cardSource) return dueRemIdsFrom(options.cardSource.cardsByRem);
+  const infos = await isCardCacheUsable(plugin);
+  if (infos) return dueRemIdsFrom(cardsByRemFromCache(infos));
+  if (options.docIds) return null;
+  const allCards = (await plugin.card.getAll()) || [];
+  const byRem = new Map<RemId, CardLike[]>();
+  for (const card of allCards as any[]) {
+    const list = byRem.get(card.remId);
+    if (list) list.push(card);
+    else byRem.set(card.remId, [card]);
+  }
+  return dueRemIdsFrom(byRem);
 }
 
 /** Rem IDs whose IncRem next-repetition date has arrived (by the end of today). */
@@ -390,7 +433,7 @@ export async function scanPriorityReviewDocuments(
 
   onProgress?.('Reading due state for the whole knowledge base…');
   const [dueCardRemIds, incState, incTagged, fcTagged] = await Promise.all([
-    buildDueCardRemIds(plugin),
+    buildDueCardRemIds(plugin, options),
     buildDueIncRemIds(plugin),
     taggedIdSet(plugin, INC_TAG_NAME),
     taggedIdSet(plugin, FC_TAG_NAME),
@@ -419,6 +462,23 @@ export async function scanPriorityReviewDocuments(
     const targets = targetIds.size ? (await plugin.rem.findMany([...targetIds])) || [] : [];
     const targetById = new Map<RemId, PluginRem>(targets.map((r) => [r._id, r]));
 
+    // No cache and no source: read just this document's entries' cards — a
+    // handful of calls instead of the whole card database.
+    let docDue = dueCardRemIds;
+    if (!docDue) {
+      const byRem = new Map<RemId, CardLike[]>();
+      await Promise.all(
+        targets.map(async (t) => {
+          try {
+            byRem.set(t._id, ((await t.getCards()) || []) as any);
+          } catch {
+            // Unreadable: not due, which keeps the entry only if it is otherwise due — fails toward stale.
+          }
+        })
+      );
+      docDue = dueRemIdsFrom(byRem);
+    }
+
     let persistent = false;
     try {
       persistent = await doc.hasPowerup(priorityQueuePowerupCode);
@@ -439,6 +499,7 @@ export async function scanPriorityReviewDocuments(
       remainingIncEntries: 0,
       removableEntries: [],
       coolingEntries: 0,
+      ancestorEntries: 0,
       keptEntries: [],
       unknownEntries: [],
       deletable: false,
@@ -486,8 +547,10 @@ export async function scanPriorityReviewDocuments(
       } else if (kind === 'inc') {
         if (!incState.available) entry.status = 'unknown';
         else entry.status = incState.due.has(targetRemId) ? 'due' : 'stale';
-      } else if (!dueCardRemIds.has(targetRemId)) {
+      } else if (!docDue.has(targetRemId)) {
         entry.status = 'stale';
+      } else if (options.ancestorHeldRemIds?.has(targetRemId)) {
+        entry.status = 'ancestor-due';
       } else if (options.coolingRemIds?.has(targetRemId)) {
         entry.status = 'cooling';
       }
@@ -530,6 +593,7 @@ export async function scanPriorityReviewDocuments(
       } else {
         report.removableEntries.push(entry);
         if (entry.status === 'cooling') report.coolingEntries++;
+        else if (entry.status === 'ancestor-due') report.ancestorEntries++;
       }
     }
 

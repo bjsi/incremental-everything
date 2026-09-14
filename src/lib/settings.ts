@@ -68,6 +68,9 @@ import {
   remnoteEnvironmentId,
   flashcardResponseTimeLimitId,
   titleCaseAcronymsId,
+  sourceHighlightColorId,
+  pinOtherReaderViewOnCreateIncRemId,
+  HighlightColorName,
   enableMasteryDrillId,
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
@@ -141,6 +144,8 @@ export interface IESettings {
   [remnoteEnvironmentId]: 'beta' | 'www';
   [flashcardResponseTimeLimitId]: number;
   [titleCaseAcronymsId]: string;
+  [sourceHighlightColorId]: HighlightColorName;
+  [pinOtherReaderViewOnCreateIncRemId]: boolean;
 
   // Mastery Drill
   [enableMasteryDrillId]: boolean;
@@ -207,6 +212,8 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [remnoteEnvironmentId]: 'www',
   [flashcardResponseTimeLimitId]: 180,
   [titleCaseAcronymsId]: '',
+  [sourceHighlightColorId]: 'Orange',
+  [pinOtherReaderViewOnCreateIncRemId]: false,
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
@@ -528,7 +535,8 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     description:
       'When you leave the queue after practising a Priority Queue document, drains the entries ' +
       'you reviewed and tops the document back up to its fill target, so it is ready before the ' +
-      'next Practice. Never runs while a queue is open.',
+      'next Practice. Never runs while a queue is open, and not in Light Mode — refresh from the ' +
+      'Priority Queue popup there.',
   },
   [coolingIntervalPercentId]: {
     kind: 'number',
@@ -895,6 +903,39 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'technical acronyms (GT, IMO, SOLAS, PDF…) are built in. Entries win over the ' +
       'article/preposition rules, so a two-letter entry that is also a word — "SE", "NO" — will ' +
       'capitalise every occurrence of it.',
+  },
+  [sourceHighlightColorId]: {
+    kind: 'dropdown',
+    group: 'misc',
+    title: 'Source Highlight Colour',
+    description:
+      'Colour of the highlights the plugin creates when it pins the source of a passage ' +
+      '(Pin Source Quote, and the AI study tools) — in a PDF, a saved web article, or a PDF\'s ' +
+      'Text Reader view. A passage that already has a highlight is pinned to that highlight, ' +
+      'which keeps its own colour.\n\n' +
+      'With pin rings on, a pin to a PDF page is ringed yellow and a pin to an HTML source ' +
+      '(web article or Text Reader) purple, so the two pins of one passage are told apart.',
+    options: [
+      { value: 'Orange', label: 'Orange' },
+      { value: 'Yellow', label: 'Yellow' },
+      { value: 'Red', label: 'Red' },
+      { value: 'Green', label: 'Green' },
+      { value: 'Blue', label: 'Blue' },
+      { value: 'Purple', label: 'Purple' },
+    ],
+  },
+  [pinOtherReaderViewOnCreateIncRemId]: {
+    kind: 'boolean',
+    group: 'misc',
+    title: 'Create IncRem: Also Pin the Other PDF View',
+    description:
+      'When a PDF also has a Text Reader version, Create Incremental Rem pins the passage in both ' +
+      'views: besides the pin to the highlight you extracted, the new Rem gets a pin to the same ' +
+      'passage in the other view — the Text Reader for a PDF-page highlight, the PDF page for a ' +
+      'Text Reader highlight. That view\'s highlight is reused when one already covers the passage, ' +
+      'and created (in the Source Highlight Colour) when not.\n\n' +
+      'Needs the local AI helper running. If it is not, or the passage cannot be found in the other ' +
+      'view, the Rem is created as usual with its single pin.',
   },
 };
 

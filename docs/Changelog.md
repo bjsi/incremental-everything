@@ -2,6 +2,74 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.99 - September 14th, 2026
+
+### ⚡ Improved - the Practiced Queues summary refreshes itself at startup
+
+The summary table is recomputed from your cards' own review history each time RemNote starts, reusing the card read the plugin already makes then, so it no longer waits for **Refresh Statistics** to catch up with sessions the queue listeners missed. Full Mode with flashcard prioritisation on only.
+
+📖 [Refresh Statistics](History-Queue-Dashboard-and-Mastery-Drill.md#refresh-statistics-authoritative-summary-recompute)
+
+## v1.0.98 - September 14th, 2026
+
+### ⚡ Improved - refreshing the Priority Queue no longer loads every card
+
+In Full Mode, the drain, cooling and selection now read the card cache, which records when each card was last shown; in Light Mode, a refresh from the popup loads the cards once for all three, and cooling works there too. The automatic refresh after a session no longer runs in Light Mode.
+
+📖 [Refresh after every session](Priority-Review-Document.md#refresh-after-every-session)
+
+## v1.0.97 - September 14th, 2026
+
+### 🐛 Fixed - PDFs and web articles did not fill the card in the Beautiful queue variant
+
+In RemNote's Beautiful queue variant, the reader of a PDF or web IncRem now fills the card down to the answer buttons, instead of stopping at half height above a blank band.
+
+📖 [Reviewing Items in the Queue](Reviewing-Items-in-the-Queue.md)
+
+## v1.0.95 - September 14th, 2026
+
+### 🐛 Fixed - the Priority Queue did not refresh after a session
+
+Leaving the queue now drains what you reviewed from the Priority Queue document and tops it back up, as the **Refresh the Priority Queue after each session** setting promises; it never started, because the plugin looked for the closed queue where RemNote does not report it.
+
+📖 [Refresh after every session](Priority-Review-Document.md#refresh-after-every-session)
+
+## v1.0.94 - September 14th, 2026
+
+### 🐛 Fixed - a card rated Again or Hard inside the Mastery Drill skipped its minimum delay
+
+Rating a card *Again* or *Hard* again — in the drill or in a regular queue — now restarts its minimum delay, instead of leaving it ready to come straight back.
+
+📖 [Minimum Delay](History-Queue-Dashboard-and-Mastery-Drill.md#minimum-delay)
+
+## v1.0.92 - September 13th, 2026
+
+### ✨ New - Pin Source Quote: pin the source of text you already have
+
+**Pin Source Quote** (`psq`) finds the focused Rem's text in the PDF or web article open beside it and pins the passage — reusing the highlight already there, or creating one — in a PDF, a saved web article or a PDF's Text Reader view.
+
+📖 [Source Pins](Source-Pins.md)
+
+### ✨ New - Create IncRem can pin both views of a PDF
+
+With **Create IncRem: Also Pin the Other PDF View** on, extracting from a PDF that also has a Text Reader version pins the passage in both views and marks both highlights as extracted.
+
+📖 [Pinning both views on Create IncRem](Source-Pins.md#create-increm-both-views)
+
+### ⚡ Improved - Pin rings tell a PDF page from an HTML source
+
+Pins to highlights in a saved web article or a PDF's Text Reader view now carry a purple ring; pins to PDF pages stay yellow.
+
+📖 [Reference pin rings](Colour-Coding-Reference.md#reference-pin-rings)
+
+## v1.0.91 - September 12th, 2026
+
+### ✨ New - AI Transcribe for PDF highlights
+
+A **✨** button in the PDF highlight toolbar (and the `ait` command) replaces a highlight's raw text with a clean transcription of the highlighted region — spaces restored, formulas as LaTeX with their equation numbers, key concepts emphasised, list markers kept — using your own Claude account. It needs a small helper running on your computer; the page walks you through the one-time setup.
+
+📖 [AI Transcription of PDF Highlights](AI-Transcription-of-PDF-Highlights.md)
+
 ## v1.0.89 - September 12th, 2026
 
 ### ⚡ Improved - a session in the Practiced Queues history opens its queue, not its document
@@ -15,6 +83,12 @@ Clicking a past session in the history log now takes you straight into the queue
 **Skip paused documents** and its *always keep priority* are back, now stored on each Priority Queue document, and skipped Rems are listed again in an amber panel with high-priority ones in red, and counted in the toast after the automatic refresh.
 
 📖 [Paused Document Filtering](Priority-Review-Document.md#paused-document-filtering)
+
+### 🐛 Fixed - a child already in the Priority Queue stayed when its parent came due
+
+Every refresh now checks the entries the document already holds: a child whose parent or grandparent has become due is drained, and the ancestor is pulled in to be reviewed first.
+
+📖 [Ancestor Spoiler Protection](Priority-Review-Document.md#ancestor-spoiler-protection)
 
 ## v1.0.88 - September 12th, 2026
 

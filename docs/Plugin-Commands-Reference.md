@@ -173,6 +173,15 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   > [!NOTE]
   > When you **author** a text layer, write `\[…\]` / `\(…\)`, not `$$…$$` / `$…$`. RemNote unescapes markdown inside dollar-delimited spans before the math parser sees them, which strips the backslash from `\,` `\;` `\{` `\}` `\%` `\\` — the formula still renders, just wrongly (a thin space becomes a literal comma). Dollar delimiters are recognised by this command for PDFs you did not author.
 
+- **AI Transcribe PDF Highlight** — `quick: ait`
+  Replaces the focused PDF highlight's raw text with an AI transcription of the highlighted region: clean text, formulas as LaTeX, list markers kept. Same as the **✨** button in the PDF highlight toolbar. Needs the local helper — see [AI Transcription of PDF Highlights](AI-Transcription-of-PDF-Highlights.md#setup).
+
+- **Restore PDF Highlight Text Before AI**
+  Puts back the text that the last AI transcription replaced on the focused highlight. The previous text is kept on the device where you transcribed. See [Undoing a transcription](AI-Transcription-of-PDF-Highlights.md#restore).
+
+- **Pin Source Quote** — `quick: psq`
+  Pins the source of the focused Rem's text: finds the passage in the PDF or saved web article open in a pane and appends a pin to its highlight, reusing a highlight that already covers it or creating one. Works in a PDF's page view, a saved web article and a PDF's Text Reader view (asking which, when a PDF has both). Needs the local helper — see [Source Pins](Source-Pins.md).
+
 ### Queue Display Commands
 
 These commands tag a Rem with one of the [Utilities#queue-display-utilities](Utilities.md#queue-display-utilities) powerups. The tagged Rem then renders differently (or is removed entirely) during queue review. All commands work both from the editor and directly inside the Queue. See the [Utilities](Utilities.md#queue-display-utilities) page for visual examples and full behavior of each powerup.

@@ -47,6 +47,15 @@ export interface CardPriorityInfo {
    */
   cardsNextRep?: (number | null)[];
   /**
+   * Per-card time the card was last SHOWN (a graded or skipped repetition),
+   * same length and order as `cardsNextRep`; `null` for a card never shown.
+   * Computed with priority_review_document/cooling.ts `cardLastSeenAt` from
+   * the same cards the entry is built from, so it costs no extra read. Lets
+   * the Priority Queue's cooling judge spoilers from the cache instead of a
+   * `card.getAll()`.
+   */
+  cardsLastSeen?: (number | null)[];
+  /**
    * The owning Rem sits under a PAUSED deck. Its cards keep real
    * `nextRepetitionTime` values — pausing does not clear them — so due-ness has
    * to be suppressed explicitly or the queue's shields will count cards RemNote

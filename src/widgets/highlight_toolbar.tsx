@@ -7,6 +7,7 @@ import {
   handleOpenBookmarkPopup,
 } from '../lib/highlightToolbarActions';
 import { togglePdfHighlightBorders } from '../lib/ui_helpers';
+import { aiTranscribeHighlight } from '../lib/ai_ocr';
 
 export function HighlightToolbar() {
   const plugin = usePlugin();
@@ -62,6 +63,11 @@ export function HighlightToolbar() {
     if (id) await handleOpenBookmarkPopup(plugin as any, id);
   };
 
+  const onAiTranscribe = async () => {
+    const id = await getFreshRemId();
+    if (id) await aiTranscribeHighlight(plugin as any, id);
+  };
+
   // Global "peek" toggle — independent of the selected highlight.
   const onTogglePeek = async () => {
     await togglePdfHighlightBorders(plugin as any);
@@ -74,6 +80,7 @@ export function HighlightToolbar() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
       <BookmarkButton onClick={onOpenBookmark} />
+      <AiButton onClick={onAiTranscribe} />
       <ExtractButton onClick={onCreateExtract} />
       <ToggleButton
         onClick={onToggleIncremental}
@@ -154,6 +161,36 @@ function PeekButton({
       }
     >
       {bordersEnabled ? '👁️' : '🙈'}
+    </div>
+  );
+}
+
+function AiButton({ onClick }: { onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      style={{
+        padding: '2px 6px',
+        cursor: 'pointer',
+        fontSize: '15px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '4px',
+        color: 'var(--rn-clr-content-primary)',
+        transition: 'box-shadow 0.15s ease, background-color 0.15s ease, transform 0.1s ease',
+        boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.18)' : 'none',
+        backgroundColor: hovered
+          ? 'var(--rn-clr-background-secondary, rgba(0,0,0,0.06))'
+          : 'transparent',
+        transform: hovered ? 'translateY(-1px)' : 'none',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
+      title="AI Transcribe — replace the raw highlight text with a clean transcription (formulae as LaTeX)"
+    >
+      ✨
     </div>
   );
 }

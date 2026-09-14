@@ -265,7 +265,7 @@ function FinalDrill() {
           return;
         }
         console.log(
-          `[MasteryDrill] Card ${currentDrillCardId} is no longer in the drill but was presented again — skipping it (${skips}/${MAX_CONSECUTIVE_SKIPS}).`
+          `[MasteryDrill] Card ${currentDrillCardId} is no longer in the drill (or is cooling) but was presented again — skipping it (${skips}/${MAX_CONSECUTIVE_SKIPS}).`
         );
         await plugin.queue.removeCurrentCardFromQueue(false);
       } catch (error) {

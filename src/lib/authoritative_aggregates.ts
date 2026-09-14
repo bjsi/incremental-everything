@@ -1,11 +1,14 @@
 import { QueueInteractionScore, RNPlugin } from '@remnote/plugin-sdk';
 import {
+  allIncrementalRemKey,
   powerupCode,
   repHistorySlotCode,
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   flashcardResponseTimeLimitId,
+  enableFlashcardPrioritisationId,
 } from './consts';
+import { shouldUseLightMode } from './mobileUtils';
 import { tryParseJson } from './utils';
 import {
   DailyAggregate,
@@ -14,7 +17,7 @@ import {
   getLocalDateKey,
 } from './queue_aggregates';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
-import type { IncrementalRep } from './incremental_rem/types';
+import type { IncrementalRem, IncrementalRep } from './incremental_rem/types';
 import { repCountsForStats } from './incremental_rem/types';
 import { getIESetting } from './settings';
 
@@ -287,6 +290,61 @@ function isRealIncRemRep(eventType: IncrementalRep['eventType']): boolean {
   return repCountsForStats(eventType);
 }
 
+/** Buckets one Incremental/Dismissed history's real reviews. Returns how many it counted. */
+function bucketIncRemHistory(history: unknown, kbId: string, buckets: DailyAggregate[]): number {
+  if (!Array.isArray(history)) return 0;
+  let counted = 0;
+  for (const rep of history as IncrementalRep[]) {
+    if (!rep || typeof rep.date !== 'number') continue;
+    if (!isRealIncRemRep(rep.eventType)) continue;
+    const b = findOrCreateBucket(buckets, getLocalDateKey(rep.date), kbId);
+    b.incRemsCount += 1;
+    const t = (rep.reviewTimeSeconds || 0) * 1000;
+    b.incRemsTime += t;
+    b.totalTime += t;
+    counted++;
+  }
+  return counted;
+}
+
+/**
+ * Buckets every real flashcard review in `allCards`. Pure and synchronous —
+ * shared by the Refresh Statistics button and the startup refresh, which feeds it
+ * the card cache build's own card.getAll(). Returns how many reviews it counted.
+ */
+export function bucketCardReviews(
+  allCards: any[],
+  kbId: string,
+  flashcardResponseTimeCapMs: number,
+  buckets: DailyAggregate[],
+  options?: ComputeOptions
+): number {
+  let cardRepCount = 0;
+  for (let i = 0; i < allCards.length; i++) {
+    if (options?.signal?.aborted && i % 200 === 0) throw new Error('Aborted');
+    const card = allCards[i];
+    const history = card?.repetitionHistory || [];
+    for (const rep of history) {
+      if (!rep || typeof rep.date !== 'number') continue;
+      if (!isRealCardScore(rep.score)) continue;
+      const b = findOrCreateBucket(buckets, getLocalDateKey(rep.date), kbId);
+      const t = Math.min(Math.max(0, rep.responseTime || 0), flashcardResponseTimeCapMs);
+      b.cardsCount += 1;
+      b.cardsTime += t;
+      b.totalTime += t;
+      if (rep.score === QueueInteractionScore.AGAIN) b.forgotCount += 1;
+      cardRepCount++;
+    }
+    if (options?.onProgress && i % 1000 === 0 && i > 0) {
+      options.onProgress({
+        percent: 0.05 + 0.35 * (i / allCards.length),
+        label: `Cards: ${i}/${allCards.length}`,
+      });
+    }
+  }
+  return cardRepCount;
+}
+
 async function processHistorySlots(
   rems: { _id: string; getPowerupProperty: (p: string, s: string) => Promise<any> }[],
   pCode: string,
@@ -314,16 +372,7 @@ async function processHistorySlots(
       )
     );
     for (const history of histories) {
-      if (!Array.isArray(history)) continue;
-      for (const rep of history as IncrementalRep[]) {
-        if (!rep || typeof rep.date !== 'number') continue;
-        if (!isRealIncRemRep(rep.eventType)) continue;
-        const b = findOrCreateBucket(buckets, getLocalDateKey(rep.date), kbId);
-        b.incRemsCount += 1;
-        const t = (rep.reviewTimeSeconds || 0) * 1000;
-        b.incRemsTime += t;
-        b.totalTime += t;
-      }
+      bucketIncRemHistory(history, kbId, buckets);
     }
     const done = Math.min(i + HISTORY_FETCH_CHUNK, rems.length);
     const pct = fromPct + (toPct - fromPct) * (done / rems.length);
@@ -360,30 +409,7 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
     label: `Processing ${allCards.length} cards…`,
   });
 
-  let cardRepCount = 0;
-  for (let i = 0; i < allCards.length; i++) {
-    if (options?.signal?.aborted && i % 200 === 0) throw new Error('Aborted');
-    const card = allCards[i];
-    const history = card.repetitionHistory || [];
-    for (const rep of history) {
-      if (!rep || typeof rep.date !== 'number') continue;
-      if (!isRealCardScore(rep.score)) continue;
-      const b = findOrCreateBucket(buckets, getLocalDateKey(rep.date), kbId);
-      const t = Math.min(Math.max(0, rep.responseTime || 0), flashcardResponseTimeCapMs);
-      b.cardsCount += 1;
-      b.cardsTime += t;
-      b.totalTime += t;
-      if (rep.score === QueueInteractionScore.AGAIN) b.forgotCount += 1;
-      cardRepCount++;
-    }
-    if (i % 1000 === 0 && i > 0) {
-      const pct = 0.05 + 0.35 * (i / allCards.length);
-      options?.onProgress?.({
-        percent: pct,
-        label: `Cards: ${i}/${allCards.length}`,
-      });
-    }
-  }
+  const cardRepCount = bucketCardReviews(allCards, kbId, flashcardResponseTimeCapMs, buckets, options);
   options?.onProgress?.({
     percent: 0.4,
     label: `Cards done (${cardRepCount} reps)`,
@@ -474,6 +500,106 @@ export async function saveAuthoritativeAggregates(
 
   await plugin.storage.setSynced(authoritativeShardKey(kbId), payload);
   await plugin.storage.setSynced(AUTHORITATIVE_LAST_COMPUTED_KEY, Date.now());
+}
+
+// ---------------------------------------------------------------------------
+// Startup refresh — the Refresh Statistics button's recompute, for free
+//
+// The card-priority cache build already calls card.getAll() at launch. That read
+// is the only card read the recompute needs, so the startup refresh borrows it
+// instead of making its own: flashcard reviews are bucketed from those cards in
+// memory, straight away. Incremental Rem reviews come from the Incremental Rem
+// session cache, which holds every Rem's complete history, so the ~one slot read
+// per Incremental Rem the button pays is skipped too. Only the Dismissed
+// histories are read from their slots — they are cached nowhere.
+//
+// It runs wherever the card cache is built (Full Mode with flashcard
+// prioritisation on, at launch and on "Refresh Card Priority Cache"), never
+// makes a card read of its own, and writes the synced shard only when the result
+// differs from what is stored, so an unchanged history costs no sync traffic.
+// ---------------------------------------------------------------------------
+
+const STARTUP_INC_CACHE_WAIT_MS = 5 * 60 * 1000;
+const STARTUP_INC_CACHE_POLL_MS = 2000;
+let startupRefreshInFlight = false;
+
+/**
+ * @param holder The build's cards. Read once and then cleared, so this job does
+ *   not keep ~67k card objects alive while it waits for the Incremental Rem cache.
+ */
+export async function refreshAuthoritativeAggregatesFromCardRead(
+  plugin: RNPlugin,
+  holder: { cards: any[] | null }
+): Promise<void> {
+  if (startupRefreshInFlight) {
+    holder.cards = null;
+    return;
+  }
+  startupRefreshInFlight = true;
+  const tag = '[AuthoritativeAggregates] startup refresh';
+  const startedAt = Date.now();
+  try {
+    // Only where the card cache itself is meant to be built. Startup never
+    // builds it in Light Mode or with flashcard prioritisation off, but
+    // "Refresh Card Priority Cache" can be run anywhere, so decide here rather
+    // than trust every caller.
+    const [light, prioritisationOn] = await Promise.all([
+      shouldUseLightMode(plugin),
+      getIESetting(plugin, enableFlashcardPrioritisationId),
+    ]);
+    if (light || !prioritisationOn) {
+      holder.cards = null;
+      console.log(`${tag}: skipped, ${light ? 'Light Mode' : 'flashcard prioritisation is off'}`);
+      return;
+    }
+    const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())?._id;
+    const cards = holder.cards;
+    holder.cards = null;
+    if (!kbId || !cards) {
+      console.log(`${tag}: skipped, ${kbId ? 'no cards' : 'no KB id'}`);
+      return;
+    }
+    const capMs = (await getIESetting(plugin, flashcardResponseTimeLimitId)) * 1000;
+    const buckets: DailyAggregate[] = [];
+    const cardReps = bucketCardReviews(cards, kbId, capMs, buckets);
+
+    // Incremental Rem histories come from the session cache once it is complete.
+    const deadline = Date.now() + STARTUP_INC_CACHE_WAIT_MS;
+    while (!(await plugin.storage.getSession<boolean>('inc_rem_cache_fully_loaded'))) {
+      if (Date.now() > deadline) {
+        console.log(`${tag}: skipped, the Incremental Rem cache did not finish loading in time`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, STARTUP_INC_CACHE_POLL_MS));
+    }
+    const incRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    let incReps = 0;
+    for (const inc of incRems) incReps += bucketIncRemHistory(inc?.history, kbId, buckets);
+
+    // Dismissed histories are cached nowhere: read their slots.
+    const dismPowerup = await plugin.powerup.getPowerupByCode(dismissedPowerupCode);
+    const dismRems = (await dismPowerup?.taggedRem()) || [];
+    await processHistorySlots(dismRems as any, dismissedPowerupCode, dismissedHistorySlotCode, buckets, kbId, undefined, 0, 1, 'Dismissed');
+
+    const payload = encodeAuthoritativeAggregates(buckets);
+    const stored = await plugin.storage.getSynced(authoritativeShardKey(kbId));
+    const unchanged = JSON.stringify(stored ?? null) === JSON.stringify(payload);
+    if (unchanged) {
+      await plugin.storage.setSynced(AUTHORITATIVE_LAST_COMPUTED_KEY, Date.now());
+    } else {
+      await saveAuthoritativeAggregates(plugin, buckets);
+    }
+    console.log(
+      `${tag}: ${buckets.length} day buckets from ${cardReps} card reviews, ${incReps} Incremental Rem reviews ` +
+        `and ${dismRems.length} dismissed histories, ${unchanged ? 'unchanged, only the timestamp written' : 'saved'}, ` +
+        `in ${Date.now() - startedAt}ms`
+    );
+  } catch (e) {
+    console.warn(`${tag}: failed`, e);
+  } finally {
+    holder.cards = null;
+    startupRefreshInFlight = false;
+  }
 }
 
 /**

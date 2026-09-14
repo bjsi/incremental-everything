@@ -1,3 +1,5 @@
+import { refreshAuthoritativeAggregatesFromCardRead } from '../authoritative_aggregates';
+import { cardLastSeenAt } from '../priority_review_document/cooling';
 import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey, orphanRemIdsKey } from '../consts';
 import {
@@ -406,6 +408,8 @@ function buildInfoFromStore(
     dueCards: cards.filter((c) => (c.nextRepetitionTime ?? Infinity) <= now).length,
     dueCardsOverdue: cards.filter((c) => (c.nextRepetitionTime ?? Infinity) <= startOfToday).length,
     cardsNextRep: cards.map((c) => c.nextRepetitionTime ?? null),
+    // From the same launch-time card.getAll() — see CardPriorityInfo.cardsLastSeen.
+    cardsLastSeen: cards.map((c) => cardLastSeenAt(c as any)),
   };
 }
 
@@ -548,6 +552,11 @@ export async function loadCardPriorityCache(
   const allCards = await plugin.card.getAll();
   const cardRemIds = allCards ? _.uniq(allCards.map((c) => c.remId)) : [];
   console.log(`[Card Priority Cache] Found ${cardRemIds.length} rems with cards`);
+
+  // Same read, second use: the Practiced Queues summary statistics are rebuilt
+  // from these cards instead of from a card.getAll() of their own. Not awaited —
+  // it waits for the Incremental Rem cache and must not hold this build up.
+  void refreshAuthoritativeAggregatesFromCardRead(plugin, { cards: allCards || [] });
 
   // Bucket cards by rem once — replaces per-rem rem.getCards() inside getCardPriority.
   const cardsByRem = new Map<RemId, Card[]>();
