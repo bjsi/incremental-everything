@@ -46,6 +46,32 @@ const QUEUE_LAYOUT_FIX_CSS = `
     flex-grow: 1 !important;
   }
 
+  /* Beautiful variant: RemNote nests the card in a scroll layout whose stage and
+     content wrappers size to their content, so the grow chain above stops there and
+     the iframe falls back to its min-h-[500px]. The layout is already a min-h-full
+     flex column (ending in the spacer that clears the overlaid answer buttons), so
+     growing these two lets the card fill down to the buttons. */
+  .queue-beautiful-box:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .beautiful-queue-card-scroll-stage {
+    display: flex !important;
+    flex-direction: column;
+    flex-grow: 1 !important;
+    min-height: 0;
+  }
+  .queue-beautiful-box:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .beautiful-queue-card-content {
+    flex-grow: 1 !important;
+    min-height: 0;
+  }
+  /* RemNote sizes both the trailing spacer and the bottom fade mask as
+     gradient (56px) + controls height + solid padding (24px), so scrolling text
+     fades out behind the answer buttons. Our card fills the box and never scrolls
+     under them, so those extra 80px were only a blank band above the buttons.
+     Zeroing both vars shrinks the spacer and the mask together, keeping the
+     gradient off the bottom of the reader. */
+  .queue-beautiful-box:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) {
+    --beautiful-queue-bottom-fade-gradient-height: 0px;
+    --beautiful-queue-bottom-fade-solid-padding: 0px;
+  }
+
   /* Ensure card_info_bar (our widget) renders above flashcard-repetition-history.
      The parent flashcard container is already "flex flex-col", so flex order is sufficient.
      Scoped to only activate when our card_info_bar iframe is present, so regular

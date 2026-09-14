@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.97 - September 14th, 2026
+
+### 🐛 Fixed - PDFs and web articles did not fill the card in the Beautiful queue variant
+
+In RemNote's Beautiful queue variant, the reader of a PDF or web IncRem now fills the card down to the answer buttons, instead of stopping at half height above a blank band.
+
+📖 [Reviewing Items in the Queue](Reviewing-Items-in-the-Queue.md)
+
 ## v1.0.95 - September 14th, 2026
 
 ### 🐛 Fixed - the Priority Queue did not refresh after a session
