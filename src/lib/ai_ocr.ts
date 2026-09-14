@@ -51,7 +51,8 @@ export async function aiTranscribeHighlight(plugin: ReactRNPlugin, remId: string
     const res = await fetch(`${AI_OCR_HELPER_URL}/ocr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ remId, pdfUrl, data, rawText }),
+      // kbId: the helper looks for the PDF's local copy only in this knowledge base's folder.
+      body: JSON.stringify({ remId, pdfUrl, data, rawText, kbId: (await plugin.kb.getCurrentKnowledgeBaseData())?._id }),
     });
     body = await res.json();
   } catch (e) {

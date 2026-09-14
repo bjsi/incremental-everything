@@ -95,7 +95,7 @@ export function PinSourceViewsPopup() {
   };
 
   const ring: React.CSSProperties = { outline: '2px solid var(--rn-clr-border-accent, #3B82F6)', outlineOffset: '2px' };
-  const quote = request?.quote ?? '';
+  const quote = request?.candidates?.[0] ?? '';
   const excerpt = quote.length > 160 ? `${quote.slice(0, 160)}…` : quote;
 
   return (

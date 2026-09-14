@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.101 - September 14th, 2026
+
+### ⚡ Improved - Pin Source Quote reads a Rem's front and back
+
+When the Rem has a back, **Pin Source Quote** tries the front, the back and both joined, pins the version that matches best, and places the pin at the end of the back.
+
+📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
+
+### 🐛 Fixed - Pin Source Quote and AI Transcribe could not reach a source without a local copy
+
+They now look for the file in the knowledge base you are using and download it when it is not stored locally.
+
+📖 [Source Pins](Source-Pins.md)
+
 ## v1.0.100 - September 14th, 2026
 
 ### 🐛 Fixed - the priority badge showed twice in the Beautiful queue
