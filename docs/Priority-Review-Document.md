@@ -45,6 +45,8 @@ While you practise, the plugin knows where the items came from: the [Priority Sh
 
 When you leave the queue after practising a Priority Queue document, the plugin refreshes it a couple of seconds later: what you reviewed is drained, what is now cooling is drained, and the document is topped back up. A toast reports the result. This is the **Refresh the Priority Queue after each session** setting, on by default.
 
+In [Light Mode](Full-Mode-x-Light-Mode.md), including on mobile, the automatic refresh does not run: a refresh reads every card in your knowledge base, which is the kind of work Light Mode exists to avoid. Press **Refresh** or **▶ Practice** in the popup instead; both still work there.
+
 ## How Items Are Selected
 
 Every refill runs the same selection:

@@ -401,6 +401,16 @@ async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, queueId: 
       console.log(`${tag}: skipped, the setting is off`);
       return;
     }
+    // Light Mode exists to keep the plugin off the heavy KB-wide reads, and a
+    // refresh makes them (the drain and the cooling scan each read every card
+    // in the KB). Doing that at every queue exit would make Light Mode — and
+    // mobile, where it is on by default — anything but light. The popup's
+    // Refresh and Practice still work, so a Priority Queue can be built on
+    // request.
+    if (await shouldUseLightMode(plugin)) {
+      console.log(`${tag}: skipped, Light Mode (refresh from the Priority Queue popup instead)`);
+      return;
+    }
     const doc = await plugin.rem.findOne(queueId);
     if (!doc) {
       console.log(`${tag}: skipped, queue document ${queueId} not found`);
