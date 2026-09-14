@@ -858,13 +858,12 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
               typeof item === 'string' ? item : item.cardId;
 
             if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
-              if (!finalDrillIds.some((item) => getCardId(item) === effectiveCardId)) {
-                finalDrillIds = [
-                  ...finalDrillIds,
-                  { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
-                ];
-                await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
-              }
+              // Re-adding restarts the cooling of a card that was already in the drill.
+              finalDrillIds = [
+                ...finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId),
+                { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
+              ];
+              await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
             } else if (score >= QueueInteractionScore.GOOD) {
               const filtered = finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId);
               if (filtered.length !== finalDrillIds.length) {
@@ -978,13 +977,12 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                 typeof item === 'string' ? item : item.cardId;
 
               if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
-                if (!finalDrillIds.some((item) => getCardId(item) === clusterCardId)) {
-                  finalDrillIds = [
-                    ...finalDrillIds,
-                    { cardId: clusterCardId, kbId: currentKbId, addedAt: Date.now() },
-                  ];
-                  await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
-                }
+                // Re-adding restarts the cooling of a card that was already in the drill.
+                finalDrillIds = [
+                  ...finalDrillIds.filter((item) => getCardId(item) !== clusterCardId),
+                  { cardId: clusterCardId, kbId: currentKbId, addedAt: Date.now() },
+                ];
+                await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
               } else if (score >= QueueInteractionScore.GOOD) {
                 const filtered = finalDrillIds.filter((item) => getCardId(item) !== clusterCardId);
                 if (filtered.length !== finalDrillIds.length) {
@@ -1389,10 +1387,13 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
       typeof item === 'string' ? item : item.cardId;
 
     if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
-      if (!finalDrillIds.some((item) => getCardId(item) === cardId)) {
-        finalDrillIds = [...finalDrillIds, { cardId, kbId: currentKbId, addedAt: Date.now() }];
-        await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
-      }
+      // A card already in the drill restarts its cooling: its answer was just revealed, so the
+      // minimum delay must run again from now rather than from when it first entered the drill.
+      finalDrillIds = [
+        ...finalDrillIds.filter((item) => getCardId(item) !== cardId),
+        { cardId, kbId: currentKbId, addedAt: Date.now() },
+      ];
+      await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
     } else if (score >= QueueInteractionScore.GOOD) {
       const filtered = finalDrillIds.filter((item) => getCardId(item) !== cardId);
       if (filtered.length !== finalDrillIds.length) {

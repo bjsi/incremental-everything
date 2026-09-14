@@ -284,7 +284,7 @@ Use the Mastery Drill to review only items you struggled with recently, ensuring
 
 ### Minimum Delay
 
-Cards rated *Again* or *Hard* enter the drill queue immediately but are held back for a configurable cooldown period (default: **120 minutes**) before appearing in the drill. This prevents you from re-reviewing the same card seconds after rating it, giving the initial repetition time to consolidate. While cards are cooling, a **"X cooling"** badge is shown in the drill toolbar. The notification widget in the Left Sidebar also excludes cooling cards from its count, so it only shows cards that are genuinely ready to drill.
+Cards rated *Again* or *Hard* enter the drill queue immediately but are held back for a configurable cooldown period (default: **120 minutes**) before appearing in the drill. This prevents you from re-reviewing the same card seconds after rating it, giving the initial repetition time to consolidate. Rating a card *Again* or *Hard* again — inside the drill or in a regular queue — restarts its delay. While cards are cooling, a **"X cooling"** badge is shown in the drill toolbar. The notification widget in the Left Sidebar also excludes cooling cards from its count, so it only shows cards that are genuinely ready to drill.
 
 ### Queue Management
 

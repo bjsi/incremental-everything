@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.94 - September 14th, 2026
+
+### 🐛 Fixed - a card rated Again or Hard inside the Mastery Drill skipped its minimum delay
+
+Rating a card *Again* or *Hard* again — in the drill or in a regular queue — now restarts its minimum delay, instead of leaving it ready to come straight back.
+
+📖 [Minimum Delay](History-Queue-Dashboard-and-Mastery-Drill.md#minimum-delay)
+
 ## v1.0.92 - September 13th, 2026
 
 ### ✨ New - Pin Source Quote: pin the source of text you already have
