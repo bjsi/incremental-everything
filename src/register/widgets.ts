@@ -2,22 +2,29 @@ import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sd
 import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 
-/* RemNote wraps each location widget as
-     div.fade-in-first-load.rn-queue__widget-below-top-bar > div > iframe
-   inside .rn-queue, which carries .queue-beautiful-box only in the Beautiful
-   variant. Registering anything at QueueBelowTopBar also drops RemNote's own
-   h-2 spacer there (it renders only when the location is empty), so the wrapper
-   keeps that 0.5rem in both variants. The hidden iframe is also how the widget
-   learns it is in Compact mode (useHostShown in queue_beautiful_bar.tsx).
+/* Shows each queue badge/timer widget in one queue variant only. RemNote wraps
+   each location widget as
+     div.fade-in-first-load.<location class> > div > iframe
+   and a hidden iframe is how the widget learns to stop polling (useHostShown).
 
-   In Beautiful the wrapper leaves the flow and overlays the box's top-right
-   corner: the box already opens with 40px of blank space (that 0.5rem spacer +
-   the card content's pt-8) above the breadcrumbs, and the ~36px badge row fits
-   inside it. In flow it stacked on top of that blank space instead. The spacer
-   moves to the next sibling so the card sits exactly where RemNote puts it.
-   The width cap keeps the transparent iframe from swallowing clicks across the
-   whole strip when the card content scrolls under it. */
-const QUEUE_BEAUTIFUL_BAR_CSS = `
+   Compact: the toolbar widgets live in the top bar. queue_beautiful_bar sits in
+   .rn-queue (which carries .queue-beautiful-box only in Beautiful) and is hidden.
+   Registering anything at QueueBelowTopBar drops RemNote's own h-2 spacer there
+   (it renders only when the location is empty), so its wrapper keeps that 0.5rem.
+
+   Beautiful: RemNote now mounts QueueToolbar widgets in the chrome's action row
+   (.queue-beautiful-chrome-actions), where the badge looks out of place — so our
+   two are hidden there and queue_beautiful_bar carries them. Its wrapper leaves
+   the flow and overlays the card box's top-right corner: the box already opens
+   with 40px of blank space (that 0.5rem spacer + the card content's pt-8) above
+   the breadcrumbs, and the ~36px badge row fits inside it. The spacer moves to
+   the next sibling so the card sits exactly where RemNote puts it. The width cap
+   keeps the transparent iframe from swallowing clicks across the whole strip
+   when the card content scrolls under it. */
+const QUEUE_VARIANT_CSS = `
+  .queue-beautiful-chrome-actions .rn-queue__widget-toolbar:has(> div > iframe[data-plugin-id="incremental-everything"]:is([src*="widgetName=queue_toolbar_priority&"], [src*="widgetName=no_inc_timer_indicator&"])) {
+    display: none;
+  }
   .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) {
     min-height: 0.5rem;
     flex-shrink: 0;
@@ -199,16 +206,16 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // Beautiful queue variant: it renders no QueueToolbar, so the two widgets
-  // above never mount. This one carries both at QueueBelowTopBar (top of the
-  // card box), which both variants render — the CSS below hides it in Compact.
+  // Beautiful queue variant: carries the two widgets above at QueueBelowTopBar
+  // (top of the card box). QUEUE_VARIANT_CSS hides it in Compact, and hides the
+  // two above in the Beautiful chrome, so each variant shows one copy.
   plugin.app.registerWidget('queue_beautiful_bar', WidgetLocation.QueueBelowTopBar, {
     dimensions: {
       width: '100%',
       height: 'auto',
     },
   });
-  await plugin.app.registerCSS('queue-beautiful-bar', QUEUE_BEAUTIFUL_BAR_CSS);
+  await plugin.app.registerCSS('queue-beautiful-bar', QUEUE_VARIANT_CSS);
 
   // The Priority Queue popup: status, refresh/drain/refill/practise for the
   // persistent review document, and the Cooling list. Replaces the snapshot
