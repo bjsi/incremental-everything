@@ -240,6 +240,7 @@ export type SettingGroupId =
   | 'scheduling'
   | 'priority'
   | 'queue'
+  | 'priorityQueue'
   | 'editor'
   | 'fsrs'
   | 'masteryDrill'
@@ -287,7 +288,14 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     label: 'Priority',
     blurb: 'Defaults and editing behaviour for priority values.',
   },
-  queue: { label: 'Queue', blurb: 'What the queue shows during review.' },
+  queue: { label: 'Queue Display', blurb: 'What the queue shows, and holds back, during review.' },
+  priorityQueue: {
+    label: 'Priority Queue',
+    blurb:
+      'The persistent Priority Queue document: when it refreshes, and how long cooling keeps a ' +
+      'spoiled Rem out of it.',
+    helpPath: 'Priority-Review-Document/',
+  },
   editor: { label: 'Editor Indicators', blurb: 'Visual markers on rems in the editor.' },
   fsrs: {
     label: 'FSRS',
@@ -530,7 +538,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [autoRefreshPriorityQueueId]: {
     kind: 'boolean',
-    group: 'queue',
+    group: 'priorityQueue',
     title: 'Refresh the Priority Queue after each session',
     description:
       'When you leave the queue after practising a Priority Queue document, drains the entries ' +
@@ -540,7 +548,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [coolingIntervalPercentId]: {
     kind: 'number',
-    group: 'queue',
+    group: 'priorityQueue',
     min: 0,
     max: 100,
     unit: '% of interval',
@@ -553,7 +561,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [coolingMinDaysId]: {
     kind: 'number',
-    group: 'queue',
+    group: 'priorityQueue',
     min: 0,
     max: 365,
     integer: true,
@@ -563,7 +571,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [coolingMaxDaysId]: {
     kind: 'number',
-    group: 'queue',
+    group: 'priorityQueue',
     min: 0,
     max: 365,
     integer: true,

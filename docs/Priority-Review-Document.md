@@ -115,7 +115,7 @@ cooling days = clamp( ceil( interval × 5% ), 1, 15 )
 | 200 days | 10 days |
 | a year or more | 15 days |
 
-Counted from the moment the spoiling card was seen, not from when the plugin noticed. The three parameters — the share of the interval, the minimum and the maximum — are in the [settings](Plugin-Settings-Reference.md#queue).
+Counted from the moment the spoiling card was seen, not from when the plugin noticed. The three parameters — the share of the interval, the minimum and the maximum — are in the [settings](Plugin-Settings-Reference.md#priority-queue).
 
 ### Nothing is stored
 
