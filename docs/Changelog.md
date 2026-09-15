@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.107 - September 15th, 2026
+
+### ⚡ Improved - Learn is the plugin's main action
+
+The command that practises the full-KB Priority Queue is now **Learn - Practice Priority Queue (Full Knowledge Base)**, with quick code `learn` and the shortcut `Cmd+L` / `Ctrl+L`, like SuperMemo's Learn button.
+
+📖 [Practise it](Priority-Review-Document.md#practise-it)
+
+### 🐛 Fixed - Next Item in Queue used the Windows key on Windows
+
+**Next Item in Queue** now answers to `Ctrl+Right` on Windows and Linux, as documented, instead of `Win+Right`; on Mac it stays `Cmd+Right`.
+
+📖 [Next](Reviewing-Items-in-the-Queue.md#next)
+
 ## v1.0.106 - September 15th, 2026
 
 ### 🐛 Fixed - the live Card Shield disagreed with the saved one

@@ -18,6 +18,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
+| `Cmd` + `L` (Mac) / `Ctrl` + `L` (Win) | [Learn - Practice Priority Queue (Full Knowledge Base)](Priority-Review-Document.md#practise-it) | The plugin's main action: opens the queue on the full-KB Priority Queue. Sits next to RemNote's own `Cmd/Ctrl+Shift+L` (Practice Flashcards in Global Queue). | Global |
 | `Alt` + `X` | Make Incremental (Extract) | Tags the currently focused Rem as "Incremental". Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Reviewing-Items-in-the-Editor.md#extracting-text)** if text is selected. If triggered in the queue on a flashcard with no text selected, it intelligently converts that specific flashcard to an Incremental Rem natively. | Editor and Queue |
 | `Alt` + `Shift` + `X` | Extract with Priority | Tags as "Incremental" and opens the Priority & Interval popup. Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Reviewing-Items-in-the-Editor.md#extracting-text)** if text is selected. If triggered in the queue on a flashcard with no text selected, it smartly converts the flashcard to an Incremental Rem and opens the Priority popup. | Editor and Queue |
 | `Alt` + `Z` | Create Cloze Deletion | Applies **[Reviewing-Items-in-the-Editor#creating-clozes](Reviewing-Items-in-the-Editor.md#creating-clozes)** formatting to the selected text. | Editor Only |
@@ -165,6 +166,7 @@ Function keys carry the utilities whose natural letter combination was already t
 
 | Shortcut | Command | Context |
 | :--- | :--- | :--- |
+| `Cmd` + `L` / `Ctrl` + `L` | [Learn - Practice Priority Queue (Full Knowledge Base)](Priority-Review-Document.md#practise-it) | Global |
 | `Cmd` + `→` / `Ctrl` + `→` | [Next Item in Queue](Reviewing-Items-in-the-Queue.md#next) | Queue |
 
 ### Not bound by default

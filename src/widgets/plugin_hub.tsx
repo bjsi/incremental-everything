@@ -670,8 +670,8 @@ export function PluginHub() {
               animation: 'hubPlayCellGlow 2s ease-in-out infinite',
             }}
             className="hover:opacity-90"
-            title="Practice the Priority Queue for the whole knowledge base — builds it first if there is none yet"
-            aria-label="Practice the Priority Queue"
+            title="Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base; builds it first if there is none yet"
+            aria-label="Learn — practise the Priority Queue"
           >
             <span
               style={{

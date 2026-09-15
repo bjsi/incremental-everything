@@ -37,7 +37,7 @@ The popup is keyboard-driven: `←` `→` move the selection ring across the con
 
 ### Practise it
 
-**▶ Practice** opens the queue on the document — the same thing as its own Practice button. With no document yet, it builds one first. The **▶** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel) and the command **Practice Priority Queue (Full Knowledge Base)** (quick code `prqgo`) do the same for the whole knowledge base from anywhere.
+**▶ Practice** opens the queue on the document — the same thing as its own Practice button. With no document yet, it builds one first. The **▶** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel) and the command **Learn - Practice Priority Queue (Full Knowledge Base)** (`Cmd+L` / `Ctrl+L`, quick code `learn`) do the same for the whole knowledge base from anywhere. **Learn** is the plugin's main action, as in SuperMemo: open RemNote, press `Cmd/Ctrl+L`, and study what matters most.
 
 While you practise, the plugin knows where the items came from: the [Priority Shield](Prioritization-&-Sorting.md#priority-shield) and its history are computed against the **original scope** (the document you chose, or the whole knowledge base), not against the review document itself. See [Smart Scope](#smart-scope-priority-shield-integration).
 

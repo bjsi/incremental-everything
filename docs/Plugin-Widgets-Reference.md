@@ -576,7 +576,7 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 
 The plugin's hub, at the bottom of the left sidebar. Header controls: **⌨** ([Keyboard Shortcuts](Keyboard-Shortcuts.md)), **⚙** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation, **✕** hides the panel for the session — it returns on the next start, and the **Show Incremental RemNote Panel** command brings it back sooner.
 
-Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Queue** group of three — the label opens the [Priority Queue popup](#614-priority-queue-popup) with the document you currently have open as the offered scope (naming it under the button), **👁** opens the **Priority Review Queue** Rem that lists every Priority Queue document, and **▶** opens the queue on the full-KB Priority Queue, building it first if needed.
+Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Queue** group of three — the label opens the [Priority Queue popup](#614-priority-queue-popup) with the document you currently have open as the offered scope (naming it under the button), **👁** opens the **Priority Review Queue** Rem that lists every Priority Queue document, and **▶** (**Learn**, `Cmd/Ctrl+L`) opens the queue on the full-KB Priority Queue, building it first if needed.
 
 ![The Incremental RemNote panel in the sidebar](assets/panel-hub-3.png){ width="500" }
 

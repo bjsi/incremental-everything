@@ -115,8 +115,8 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Priority Queue](Priority-Review-Document.md#the-priority-queue-popup)** (`Opt+Shift+R` / `Alt+Shift+R`) — `quick: prq`
   Opens the Priority Queue popup for the focused document or the whole knowledge base: the persistent review document that is topped up to a fill target with your highest-priority due items and drained as you review them — refresh, drain, refill, practise, and the Cooling list. Also in the document menu, the queue menu, and on the **Priority Queue** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
 
-- **[Practice Priority Queue (Full Knowledge Base)](Priority-Review-Document.md#practise-it)** — `quick: prqgo`
-  Opens the queue straight on the full-KB Priority Queue document, the same route as its Practice button.
+- **[Learn - Practice Priority Queue (Full Knowledge Base)](Priority-Review-Document.md#practise-it)** (`Cmd+L` / `Ctrl+L`) — `quick: learn`
+  The plugin's main action: opens the queue straight on the full-KB Priority Queue document, the same route as its Practice button and the **▶** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
 
 - **[Clean Priority Review Documents](Priority-Review-Document.md#cleaning-up-leftovers)** — `quick: clean`
   Drains every document tagged *Priority Review Queue* at once: finds the entries whose Rem no longer has anything due — or is cooling — and removes them after you confirm, per document. Leftover snapshot documents from earlier versions with **no flashcards left due** are deleted outright; Priority Queue documents are never deleted. Entries you have written notes under, and documents holding them, are never touched.

@@ -50,7 +50,7 @@ Once installed, the plugin adds a small **Incremental RemNote** 🌐 panel at th
 |--------|--------------|
 | **Priority Queue** | Opens the [Priority Queue popup](Priority-Review-Document.md#the-priority-queue-popup) with the document you currently have open offered as the scope — the scope it will use is named under the button — and the whole knowledge base as the alternative |
 | 👁 | Opens the **Priority Review Queue** Rem — every Priority Queue document is tagged with it, so its references are the list of them. Go there to practise one from your phone |
-| ▶ | Opens the queue on the **full-KB** Priority Queue, building the document first if there is none yet. Document-scoped queues are practised from the popup |
+| ▶ | **Learn** (`Cmd/Ctrl+L`) — the plugin's main action. Opens the queue on the **full-KB** Priority Queue, building the document first if there is none yet. Document-scoped queues are practised from the popup |
 
 The 👁 button says so if you have no review documents yet: the tag is created by the first one.
 

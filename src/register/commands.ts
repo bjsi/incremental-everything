@@ -1670,9 +1670,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // Straight to Practice on the full-KB Priority Queue, for the keyboard.
   plugin.app.registerCommand({
     id: 'practice-priority-queue-kb',
-    name: 'Practice Priority Queue (Full Knowledge Base)',
+    name: 'Learn - Practice Priority Queue (Full Knowledge Base)',
     description: 'Opens the queue on the full-KB Priority Queue document — the same route as its Practice button.',
-    quickCode: 'prqgo',
+    quickCode: 'learn',
+    // Cmd+L / Ctrl+L, next to RemNote's mod+shift+l (Global Queue). RemNote binds
+    // no mod+l by default; the only listener is its CSS theme-preview lock.
+    keyboardShortcut: 'mod+l',
     action: async () => {
       if (await isQueueOpen(plugin)) {
         await plugin.app.toast('A queue is already open.');
@@ -3067,13 +3070,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  // Next item in the queue command (Ctrl+Right Arrow)
+  // Next item in the queue command (Cmd+Right on Mac, Ctrl+Right elsewhere)
   // Only works in the queue with an Incremental Rem active.
   // Replicates the Next button logic: PDF page history + handleNextRepetitionClick.
   plugin.app.registerCommand({
     id: nextInQueueCommandId,
     name: 'Next Item in Queue',
-    keyboardShortcut: 'cmd+right',
+    keyboardShortcut: 'mod+right',
     quickCode: 'next',
     action: async () => {
       const url = await plugin.window.getURL();
