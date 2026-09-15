@@ -85,17 +85,20 @@ let ensureInFlight = false;
  * and the card cache is ready. Returns without doing anything otherwise — in
  * Light Mode, while the cache is still loading, or once any scan (startup, an
  * exit, a refresh, Rescan) has published.
+ *
+ * Resolves `true` when cooling data is published (by this call or an earlier
+ * one; a call already in flight counts), `false` when it was skipped or failed.
  */
-export async function ensureShieldCoolingScanned(plugin: RNPlugin, reason: string): Promise<void> {
-  if (ensureInFlight) return;
+export async function ensureShieldCoolingScanned(plugin: RNPlugin, reason: string): Promise<boolean> {
+  if (ensureInFlight) return true;
   ensureInFlight = true;
   const tag = `[CoolingScan] ${reason}`;
   try {
-    if (await readCoolingCache(plugin)) return;
+    if (await readCoolingCache(plugin)) return true;
     const infos = await isCardCacheUsable(plugin);
     if (!infos) {
       console.log(`${tag}: skipped, the card cache is not ready (or Light Mode)`);
-      return;
+      return false;
     }
     const startedAt = Date.now();
     const scopeRemIds = (await plugin.storage.getSession<RemId[] | null>(priorityCalcScopeRemIdsKey)) ?? null;
@@ -105,8 +108,10 @@ export async function ensureShieldCoolingScanned(plugin: RNPlugin, reason: strin
         `${result.held.length} held back by a cooling ancestor — published for the live shield, ` +
         `in ${Date.now() - startedAt}ms`
     );
+    return true;
   } catch (e) {
     console.warn(`${tag}: failed`, e);
+    return false;
   } finally {
     ensureInFlight = false;
   }
@@ -119,21 +124,29 @@ const STARTUP_POLL_MS = 3000;
  * Once per startup: waits for the card cache to finish loading, then runs the
  * scan so the first queue of this RemNote run already excludes cooling Rems.
  * Call only where the card cache is built (Full Mode, prioritisation on).
+ *
+ * Resolves with the scan's outcome, or `false` if the card cache never finished
+ * loading in time — the startup status reads it (lib/startup_status.ts).
  */
-export function registerStartupShieldCoolingScan(plugin: RNPlugin): void {
-  const deadline = Date.now() + STARTUP_WAIT_MS;
-  const tick = async () => {
-    try {
-      const loaded = await plugin.storage.getSession<boolean>('card_priority_cache_fully_loaded');
-      if (loaded) {
-        await ensureShieldCoolingScanned(plugin, 'startup');
-        return;
+export function registerStartupShieldCoolingScan(plugin: RNPlugin): Promise<boolean> {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + STARTUP_WAIT_MS;
+    const tick = async () => {
+      try {
+        const loaded = await plugin.storage.getSession<boolean>('card_priority_cache_fully_loaded');
+        if (loaded) {
+          resolve(await ensureShieldCoolingScanned(plugin, 'startup'));
+          return;
+        }
+      } catch {
+        /* keep polling */
       }
-    } catch {
-      /* keep polling */
-    }
-    if (Date.now() < deadline) setTimeout(tick, STARTUP_POLL_MS);
-    else console.log('[CoolingScan] startup: skipped, the card cache did not finish loading in time');
-  };
-  setTimeout(tick, STARTUP_POLL_MS);
+      if (Date.now() < deadline) setTimeout(tick, STARTUP_POLL_MS);
+      else {
+        console.log('[CoolingScan] startup: skipped, the card cache did not finish loading in time');
+        resolve(false);
+      }
+    };
+    setTimeout(tick, STARTUP_POLL_MS);
+  });
 }

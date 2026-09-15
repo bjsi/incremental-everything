@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.109 - September 15th, 2026
+
+### ⚡ Improved - the ▶ Learn button pulses when startup is done
+
+The **▶** button of the Incremental RemNote panel now starts pulsing only once the plugin's startup work has finished, so you can tell it is ready without checking the console; hover it to see what is still running.
+
+📖 [When ▶ starts pulsing](Getting-Started.md#when-learn-starts-pulsing)
+
 ## v1.0.108 - September 15th, 2026
 
 ### 🐛 Fixed - a cloze made with Alt+Z could enter the Priority Queue the same day

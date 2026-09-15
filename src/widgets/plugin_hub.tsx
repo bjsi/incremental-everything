@@ -12,7 +12,12 @@ import {
   practicePriorityQueue,
   refreshPriorityQueue,
 } from '../lib/priority_review_document/queue_doc';
-import { onboardingTipsWidgetId, pluginHubHiddenKey } from '../lib/consts';
+import { onboardingTipsWidgetId, pluginHubHiddenKey, startupTasksStatusKey } from '../lib/consts';
+import {
+  StartupTasksStatus,
+  describeStartupTasks,
+  startupTasksSucceeded,
+} from '../lib/startup_status';
 import {
   OnboardingTip,
   acknowledgeTip,
@@ -409,6 +414,18 @@ export function PluginHub() {
     []
   );
 
+  /**
+   * The ▶ button only starts pulsing once the startup work has finished — the
+   * caches, pre-tagging, the cooling scan, the hidden-slot check and the band
+   * stylesheets — so "is the plugin ready?" is answered here, not in the console.
+   * It stays still if any of them failed; the tooltip says which.
+   */
+  const startupStatus = useTrackerPlugin(
+    async (rp) => await rp.storage.getSession<StartupTasksStatus>(startupTasksStatusKey),
+    []
+  );
+  const startupFinished = startupTasksSucceeded(startupStatus);
+
   // Retire the tip and stop there — one tip per session. Handing back the next
   // one on acknowledgement turns the panel into a quiz the user did not ask for,
   // and the pile is meant to be drained over weeks, not in one sitting.
@@ -654,8 +671,9 @@ export function PluginHub() {
             👁
           </button>
           {/*
-            The daily driver, so it is the one filled cell in the panel, and it
-            breathes the same way the Card Shield does when a card is inside it.
+            The daily driver, so it is the one filled cell in the panel. Once
+            startup has finished it breathes the same way the Card Shield does
+            when a card is inside it — until then it stays still.
             The glow is inset: the group clips its children (`overflow: hidden`),
             so an outer box-shadow would be cut off at the rounded border.
           */}
@@ -667,16 +685,19 @@ export function PluginHub() {
               borderLeft: '1px solid #2563eb',
               background: '#3b82f6',
               color: '#fff',
-              animation: 'hubPlayCellGlow 2s ease-in-out infinite',
+              animation: startupFinished ? 'hubPlayCellGlow 2s ease-in-out infinite' : 'none',
             }}
             className="hover:opacity-90"
-            title="Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base; builds it first if there is none yet"
+            title={
+              'Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base; builds it first if there is none yet\n\n' +
+              describeStartupTasks(startupStatus)
+            }
             aria-label="Learn — practise the Priority Queue"
           >
             <span
               style={{
                 display: 'inline-block',
-                animation: 'hubPlayPulse 2s ease-in-out infinite',
+                animation: startupFinished ? 'hubPlayPulse 2s ease-in-out infinite' : 'none',
               }}
             >
               ▶

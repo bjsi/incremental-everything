@@ -212,6 +212,12 @@ export const onboardingTipsWidgetId = 'onboarding_tips';
  * {@link showPluginHubCommandId}.
  */
 export const pluginHubHiddenKey = 'plugin-hub-hidden';
+/**
+ * Session: which activation-time tasks (caches, pre-tagging, cooling scan,
+ * hidden-slot check, band stylesheets) have settled. Written only by the index
+ * widget; read by the hub to start its ▶ pulse. See lib/startup_status.ts.
+ */
+export const startupTasksStatusKey = 'startup-tasks-status';
 /** Command that brings the hub back within the same session. */
 export const showPluginHubCommandId = 'ie_show_plugin_hub';
 

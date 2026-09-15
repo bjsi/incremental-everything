@@ -567,10 +567,19 @@ async function tryWarmPhase1(
  *
  * @param plugin Plugin instance
  */
+export interface CardPriorityCacheLoad {
+  /**
+   * Phase 2 — the deferred pre-tagging of untagged rems with cards — which keeps
+   * running after the build itself resolves. `true` once it has finished (or
+   * there was nothing to defer), `false` if it hit a fatal error.
+   */
+  deferred: Promise<boolean>;
+}
+
 export async function loadCardPriorityCache(
   plugin: RNPlugin,
   opts?: { forceCold?: boolean }
-) {
+): Promise<CardPriorityCacheLoad> {
   console.log(
     `[Card Priority Cache] Starting cache build with deferred loading...` +
       (opts?.forceCold ? ' (FORCED COLD — ignoring the saved copy)' : '')
@@ -616,7 +625,7 @@ export async function loadCardPriorityCache(
     console.log('[Card Priority Cache] No cards or cardPriority tags found. Setting empty cache.');
     await writeCardPriorityCache(plugin, []);
     await persistCardPriorityStore(plugin, [], Date.now(), Date.now());
-    return;
+    return { deferred: Promise.resolve(true) };
   }
 
   const phase1Start = Date.now();
@@ -662,8 +671,7 @@ export async function loadCardPriorityCache(
     if (enrichedWarm.length > 0) {
       await plugin.app.toast(`✅ Loaded ${enrichedWarm.length} card priorities in ${totalWarmTime}s`);
     }
-    await schedulePhase2(plugin, untaggedRemIds, totalUnique);
-    return;
+    return schedulePhase2(plugin, untaggedRemIds, totalUnique);
   }
 
   console.log(`[Card Priority Cache] Phase 1 (COLD) - Loading ${taggedForInheritanceRems.length} pre-tagged rems...`);
@@ -749,7 +757,7 @@ export async function loadCardPriorityCache(
     await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} pre-tagged card priorities in ${totalTime}s`);
   }
 
-  await schedulePhase2(plugin, untaggedRemIds, totalUnique);
+  return schedulePhase2(plugin, untaggedRemIds, totalUnique);
 }
 
 /**
@@ -763,14 +771,14 @@ async function schedulePhase2(
   plugin: RNPlugin,
   untaggedRemIds: string[],
   totalUnique: number
-) {
+): Promise<CardPriorityCacheLoad> {
   console.log(`[Card Priority Cache] Found ${untaggedRemIds.length} untagged rems with cards for deferred processing`);
 
   if (untaggedRemIds.length === 0) {
     console.log('[Card Priority Cache] All rems with cards are pre-tagged! No deferred processing needed.');
     await plugin.app.toast('✅ All card priorities loaded!');
     await plugin.storage.setSession('card_priority_cache_fully_loaded', true);
-    return;
+    return { deferred: Promise.resolve(true) };
   }
 
   const untaggedPercentage = Math.round((untaggedRemIds.length / totalUnique) * 100);
@@ -778,9 +786,12 @@ async function schedulePhase2(
     await plugin.app.toast(`⏳ Processing ${untaggedRemIds.length} untagged rems in background... `);
   }
 
-  setTimeout(async () => {
-    await processDeferredCardPriorityCache(plugin, untaggedRemIds);
-  }, 3000);
+  const deferred = new Promise<boolean>((resolve) => {
+    setTimeout(() => {
+      processDeferredCardPriorityCache(plugin, untaggedRemIds).then(resolve, () => resolve(false));
+    }, 3000);
+  });
+  return { deferred };
 }
 
 /**
@@ -789,7 +800,7 @@ async function schedulePhase2(
  * @param plugin Plugin instance
  * @param untaggedRemIds Array of rem IDs that don't have cardPriority tags yet
  */
-async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds: string[]) {
+async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds: string[]): Promise<boolean> {
   console.log(`[Card Priority Cache] Phase 2 (deferred) - Starting background processing of ${untaggedRemIds.length} untagged cards...`);
   const startTime = Date.now();
 
@@ -948,9 +959,11 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
         );
       }, 2000);
     }
+    return true;
   } catch (error) {
     console.error('[Card Priority Cache] Phase 2 fatal error during background processing:', error);
     await plugin.app.toast('⚠️ Background processing encountered an error. Some cards may not be cached.');
+    return false;
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
   }

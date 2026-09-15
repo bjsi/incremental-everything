@@ -54,6 +54,20 @@ Once installed, the plugin adds a small **Incremental RemNote** 🌐 panel at th
 
 The 👁 button says so if you have no review documents yet: the tag is created by the first one.
 
+### When ▶ starts pulsing { #when-learn-starts-pulsing }
+
+After you open RemNote, the plugin keeps working in the background for a while — up to a few minutes on a large knowledge base. The **▶** button stays still until all of it has finished, then starts pulsing:
+
+- the card priority cache and the IncRem cache
+- the deferred pre-tagging of flashcards that have no priority yet
+- the cooling scan for the Card Shield
+- the CardPriority hidden-slot check
+- the priority band colours
+
+Hover **▶** to see what is still running. If it never starts pulsing, one of these failed or took too long: the tooltip names it, and the console has the details.
+
+In [Light Mode](Full-Mode-x-Light-Mode.md), or with [flashcard prioritisation](Priorities-for-Flashcards.md#the-opt-in) off, the card cache, pre-tagging and cooling scan do not run, so ▶ waits only for the rest. You can practise at any time — the pulse only tells you the plugin is fully ready.
+
 ### Tips { #tips }
 
 The panel shows **one tip per session**. Answer it and the tip area is done until the next time you open RemNote — it will not hand you another one, and moving around RemNote will not swap it for a different one either. Each tip has four buttons:
