@@ -10,6 +10,12 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
 
+### 📚 Docs - every RemNote shortcut on one page
+
+A new **RemNote Native Shortcuts** page lists all of RemNote's default shortcuts by function and by key, with the plugin's shortcuts in the same keyboard map so you can see which combinations are free.
+
+📖 [RemNote Native Shortcuts](RemNote-Native-Shortcuts.md)
+
 ## v1.0.109 - September 15th, 2026
 
 ### ⚡ Improved - the ▶ Learn button pulses when startup is done

@@ -7,7 +7,7 @@ The same shortcuts are listed **twice**, in two different orders — pick whiche
 - **[By function](#plugin-shortcuts)** — grouped by what you want to do (extract, prioritize, navigate the queue…). Use this when you know the *task* but not the key.
 - **[By key](#shortcuts-by-key)** — grouped by modifier (`Ctrl+…`, `Opt+…`, `Ctrl+Shift+…`…). Use this when you know the *key* but not what it does, or when you are looking for a free binding.
 
-Also on this page: **[keys inside plugin popups](#keys-inside-plugin-popups)**, **[native RemNote shortcuts](#important-native-remnote-shortcuts)** and **[macOS notes](#macos-notes)**.
+Also on this page: **[keys inside plugin popups](#keys-inside-plugin-popups)**, **[native RemNote shortcuts](#important-native-remnote-shortcuts)** and **[macOS notes](#macos-notes)**. Every shortcut of RemNote itself, with the plugin's mixed into one keyboard map, is on **[RemNote Native Shortcuts](RemNote-Native-Shortcuts.md)**.
 
 ---
 ## Plugin Shortcuts
@@ -217,7 +217,7 @@ These keys are active **while a plugin popup or floating window is open** — th
 ---
 ## Important Native RemNote Shortcuts
 
-While not part of the plugin itself, these native RemNote shortcuts are crucial for an efficient incremental learning workflow.
+While not part of the plugin itself, these native RemNote shortcuts are crucial for an efficient incremental learning workflow. For every RemNote shortcut, with a keyboard map that shows the plugin's alongside, see [RemNote Native Shortcuts](RemNote-Native-Shortcuts.md).
 
 | Shortcut | Name | Function | Context |
 | :--- | :--- | :--- | :--- |
