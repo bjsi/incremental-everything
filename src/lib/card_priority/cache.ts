@@ -207,6 +207,33 @@ export async function updateCardPriorityCache(
   }
 }
 
+/**
+ * Replaces an optimistic entry with one read from the Rem's real cards, once
+ * those cards exist. A command that writes the text a card is made from (Alt+Z)
+ * cannot read that card straight away, so it stores what it knows and calls
+ * this; each attempt waits longer, and the first one that finds cards wins.
+ */
+export function rereadCardPriorityCacheWhenCardsExist(
+  plugin: RNPlugin,
+  remId: RemId,
+  delaysMs: number[] = [2000, 5000, 15000]
+) {
+  const attempt = async (i: number) => {
+    try {
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) return;
+      if (((await rem.getCards()) || []).length > 0) {
+        await updateCardPriorityCache(plugin, remId);
+        return;
+      }
+    } catch (e) {
+      console.warn('[Cache] Deferred card re-read failed for Rem:', remId, e);
+    }
+    if (i + 1 < delaysMs.length) setTimeout(() => void attempt(i + 1), delaysMs[i + 1]);
+  };
+  setTimeout(() => void attempt(0), delaysMs[0]);
+}
+
 export async function flushCacheUpdatesNow(plugin: RNPlugin) {
   await flushCacheUpdates(plugin, true);
 }

@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.108 - September 15th, 2026
+
+### 🐛 Fixed - a cloze made with Alt+Z could enter the Priority Queue the same day
+
+A cloze created with **Create Cloze Deletion** (Alt+Z) now cools as a new card straight away, instead of being served by the Priority Queue until RemNote was restarted.
+
+📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler)
+
 ## v1.0.107 - September 15th, 2026
 
 ### ⚡ Improved - Learn is the plugin's main action

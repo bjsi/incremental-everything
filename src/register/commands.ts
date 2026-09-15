@@ -93,7 +93,7 @@ import {
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
-import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
+import { loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist, updateCardPriorityCache } from '../lib/card_priority/cache';
 import {
   isHiddenSlotMigrated,
   isVisiblePrioritySlotRetired,
@@ -965,13 +965,24 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // Apply the auto-priority computed at the top (before the new cloze existed,
         // so the existing-cloze count was correct).
         await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual', false, { event: 'cloze' });
+        // The new cloze card cannot be read yet, but its facts are known: due now,
+        // created now, never shown. Writing them keeps the entry usable by the
+        // Priority Queue's cooling (which reads the per-card arrays, not the
+        // counts); the deferred re-read then replaces them with the real card.
+        const clozeCreatedAt = Date.now();
         await updateCardPriorityCache(plugin, clozeRem._id, true, {
           remId: clozeRem._id,
           priority: autoPriority.priority,
           source: 'manual',
           cardCount: 1,
           dueCards: 1,
+          dueCardsOverdue: 0,
+          cardsNextRep: [clozeCreatedAt],
+          cardsLastSeen: [null],
+          cardsType: ['cloze'],
+          cardsCreatedAt: [clozeCreatedAt],
         } as any);
+        rereadCardPriorityCacheWhenCardsExist(plugin, clozeRem._id);
 
         return { clozeRem, parentRem: rem, autoPriority };
       } finally {

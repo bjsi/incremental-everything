@@ -55,10 +55,53 @@ export function cardsByRemFromCache(infos: CardPriorityInfo[]): Map<RemId, CardL
   return byRem;
 }
 
+/**
+ * Entries that report cards but carry no per-card facts. A shortcut write can
+ * leave one — Create Cloze Deletion (Alt+Z) used to store just the counts — and
+ * it stays that way until the next launch, since nothing re-reads a Rem whose
+ * priority did not change. Counted as due by selection but invisible to cooling
+ * and the drain, such a Rem was served the day it was written.
+ */
+function incompleteEntryIds(infos: CardPriorityInfo[]): RemId[] {
+  return infos
+    .filter((info) => info?.remId && !info.cardsNextRep?.length && ((info.cardCount ?? 0) > 0 || (info.dueCards ?? 0) > 0))
+    .map((info) => info.remId);
+}
+
+/**
+ * The card facts from the cache, with any incomplete entry filled from its own
+ * cards — one getCards per such Rem, normally none or a handful.
+ */
+export async function cardsByRemFromCacheComplete(
+  plugin: RNPlugin,
+  infos: CardPriorityInfo[]
+): Promise<Map<RemId, CardLike[]>> {
+  const byRem = cardsByRemFromCache(infos);
+  const incomplete = incompleteEntryIds(infos);
+  if (incomplete.length === 0) return byRem;
+  try {
+    const rems = (await plugin.rem.findMany(incomplete)) || [];
+    await Promise.all(
+      rems.map(async (rem) => {
+        try {
+          const cards = (await rem.getCards()) || [];
+          if (cards.length) byRem.set(rem._id, cards as CardLike[]);
+        } catch {
+          /* stays without facts, as before */
+        }
+      })
+    );
+    console.log(`[CardSource] ${incomplete.length} cache entries had no card facts; read their cards directly.`);
+  } catch (e) {
+    console.warn('[CardSource] Could not read the cards of incomplete cache entries:', e);
+  }
+  return byRem;
+}
+
 export async function loadCardSource(plugin: RNPlugin): Promise<CardSource> {
   const infos = await isCardCacheUsable(plugin);
   if (infos) {
-    return { kind: 'cache', cardsByRem: cardsByRemFromCache(infos) };
+    return { kind: 'cache', cardsByRem: await cardsByRemFromCacheComplete(plugin, infos) };
   }
   let allCards: any[] = [];
   try {
