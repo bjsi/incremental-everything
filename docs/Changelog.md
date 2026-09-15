@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.106 - September 15th, 2026
+
+### 🐛 Fixed - "Hidden in queue" overlapped the card in the Beautiful queue variant
+
+On the front of a card in RemNote's Beautiful queue variant, the "Hidden in queue" placeholder left by Hide in Queue, Hide Parent and Hide Grandparent now sits on its own line instead of over the question.
+
+📖 [Hide in Queue](Utilities.md#hide-in-queue)
+
 ## v1.0.105 - September 14th, 2026
 
 ### ✨ New - a card you just created waits before its first review
