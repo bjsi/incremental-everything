@@ -1,4 +1,5 @@
 import { declareIndexPlugin, ReactRNPlugin } from '@remnote/plugin-sdk';
+import { registerStartupShieldCoolingScan } from '../lib/priority_review_document/shield_cooling_scan';
 import '../style.css';
 import '../App.css';
 import { allCardPriorityInfoKey } from '../lib/consts';
@@ -188,6 +189,9 @@ async function onActivate(plugin: ReactRNPlugin) {
       () => plugin.storage.setSession(priorityBandColorsReloadKey, Date.now()),
       (err) => console.error('CACHE: card priority cache build failed', err)
     );
+    // Once the cache has finished loading, judge cooling for the shield, so the
+    // first queue of this RemNote run already excludes cooling Rems.
+    registerStartupShieldCoolingScan(plugin);
 
   } else {
     // Empty cache. Readers treat "absent" as "no card priorities known", which is

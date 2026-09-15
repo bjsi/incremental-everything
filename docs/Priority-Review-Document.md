@@ -121,7 +121,7 @@ Counted from the moment the spoiling card was seen, not from when the plugin not
 
 ### Nothing is stored
 
-The cooling set is **recomputed from your card data** on every refresh and at every queue exit — it is a function of what is scheduled and when each card was last shown. In Full Mode both come from the card cache, which records when each card was last shown alongside when it is due; note [what the cache cannot see](Priorities-for-Flashcards.md#cache-blind-spot). That is what makes it correct on every device the moment your cards sync, impossible to disagree with reality, and immune to a wipe of the plugin's synced storage. The only thing persisted is what *you* decide about specific Rems (below), one small record per knowledge base.
+The cooling set is **recomputed from your card data** on every refresh, at every queue exit, and once when RemNote starts — it is a function of what is scheduled and when each card was last shown. In Full Mode both come from the card cache, which records when each card was last shown alongside when it is due; note [what the cache cannot see](Priorities-for-Flashcards.md#cache-blind-spot). That is what makes it correct on every device the moment your cards sync, impossible to disagree with reality, and immune to a wipe of the plugin's synced storage. The only thing persisted is what *you* decide about specific Rems (below), one small record per knowledge base.
 
 ### The Cooling list
 
@@ -237,7 +237,7 @@ Even though you are reviewing a generated list, the plugin knows where the items
 
 * **Original Scope Awareness:** While reviewing a Priority Queue document, the plugin "pretends" you are reviewing the original source.
 * **[Priority Shield](Prioritization-&-Sorting.md#priority-shield):** The Priority Shield (the stats below the answer buttons) calculates your protection against the **original scope** — the document you chose, or the whole knowledge base — never against the review document itself. *Example:* a Priority Queue scoped to "Biology 101" shows how well you are protecting priorities within "Biology 101".
-* **Cooling Rems are not counted.** A Rem whose spoiler sibling you reviewed recently cannot set the shield, live or in the history graph — the set is recomputed at every queue exit, so the siblings you just reviewed are already accounted for. Neither can a Rem held back because its parent or grandparent is due and cooling: the Priority Queue will not serve it until that window ends.
+* **Cooling Rems are not counted.** A Rem whose spoiler sibling you reviewed recently cannot set the shield, live or in the history graph — the set is recomputed once when RemNote starts and at every queue exit, so the siblings you just reviewed are already accounted for, and the first queue after a restart counts the same Rems as the last one. Neither can a Rem held back because its parent or grandparent is due and cooling: the Priority Queue will not serve it until that window ends.
 * **Stats Tracking:** The history graph records your progress against the original document or the whole knowledge base, keeping your long-term stats accurate.
 
 ## Cleaning up leftovers

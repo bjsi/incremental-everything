@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.106 - September 15th, 2026
 
+### 🐛 Fixed - the live Card Shield disagreed with the saved one
+
+The Card Shield shown while you practise now matches the one saved when you leave the queue: cooling Rems are excluded from the first queue after a restart, and the percentile counts cards, not Rems with cards.
+
+📖 [Smart Scope & Priority Shield Integration](Priority-Review-Document.md#smart-scope-priority-shield-integration)
+
 ### 🐛 Fixed - "Hidden in queue" overlapped the card in the Beautiful queue variant
 
 On the front of a card in RemNote's Beautiful queue variant, the "Hidden in queue" placeholder left by Hide in Queue, Hide Parent and Hide Grandparent now sits on its own line instead of over the question.
