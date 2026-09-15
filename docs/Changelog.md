@@ -2,6 +2,40 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.105 - September 14th, 2026
+
+### ✨ New - a card you just created waits before its first review
+
+A never-reviewed card stays out of the Priority Queue for a set number of days after you create it, **1** by default — SuperMemo counts creating an item as its first repetition, so a cloze written while reading is not asked while its answer is still in view.
+
+📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler)
+
+### ⚡ Improved - Priority Queue settings have their own group
+
+The refresh and cooling settings moved out of **Queue**, now **Queue Display**, into a new **Priority Queue** group.
+
+📖 [Priority Queue settings](Plugin-Settings-Reference.md#priority-queue)
+
+## v1.0.104 - September 14th, 2026
+
+### ⚡ Improved - a descriptor's backward card cools after its concept was reviewed
+
+That card asks for the concept, so reviewing any card of the concept — forward, backward or a cloze, even across nested descriptors — now keeps it out of the Priority Queue for its cooling window.
+
+📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler)
+
+## v1.0.103 - September 14th, 2026
+
+### 🐛 Fixed - a card held back by a cooling parent could still pin the Priority Shield
+
+A Rem the Priority Queue holds back because its parent or grandparent is due and cooling no longer sets the shield; one whose due ancestor is not cooling still counts.
+
+📖 [Smart Scope & Priority Shield Integration](Priority-Review-Document.md#smart-scope-priority-shield-integration)
+
+### 🐛 Fixed - the Cooling list showed P? instead of priorities
+
+📖 [The Cooling list](Priority-Review-Document.md#the-cooling-list)
+
 ## v1.0.102 - September 14th, 2026
 
 ### ⚡ Improved - AI Transcribe puts key terms in bold
