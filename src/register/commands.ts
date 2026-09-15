@@ -267,6 +267,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: pinSourceQuoteCommandId,
     name: 'Pin Source Quote',
     quickCode: 'psq',
+    keyboardShortcut: 'opt+shift+q',
     action: async () => {
       await pinSourceQuote(plugin);
     },

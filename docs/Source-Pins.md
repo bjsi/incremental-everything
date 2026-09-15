@@ -14,7 +14,7 @@ A **source pin** is a pin reference to the highlight that holds a passage: click
 
 1. Open the source in a pane: a **PDF**, a **saved web article** (RemNote's reader view of a page), or a **PDF in Text Reader mode**.
 2. Focus the Rem whose text comes from that source.
-3. Run **Pin Source Quote** (quick code `psq`).
+3. Run **Pin Source Quote**: `Opt+Shift+Q` / `Alt+Shift+Q`, or quick code `psq`.
 
 A toast reports where the passage was found and what was reused or created — for example *📌 PDF p.95: reused 0, created 1*.
 

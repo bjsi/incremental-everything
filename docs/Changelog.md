@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.110 - September 15th, 2026
+
+### ⚡ Improved - Pin Source Quote has a shortcut
+
+**Pin Source Quote** now runs with `Opt+Shift+Q` / `Alt+Shift+Q`, next to Paste Rem Sources on `Alt+Shift+V`.
+
+📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
+
 ## v1.0.109 - September 15th, 2026
 
 ### ⚡ Improved - the ▶ Learn button pulses when startup is done

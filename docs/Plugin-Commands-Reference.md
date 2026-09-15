@@ -179,7 +179,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **Restore PDF Highlight Text Before AI**
   Puts back the text that the last AI transcription replaced on the focused highlight. The previous text is kept on the device where you transcribed. See [Undoing a transcription](AI-Transcription-of-PDF-Highlights.md#restore).
 
-- **Pin Source Quote** — `quick: psq`
+- **[Pin Source Quote](Source-Pins.md#pin-source-quote)** (`Opt+Shift+Q` / `Alt+Shift+Q`) — `quick: psq`
   Pins the source of the focused Rem's text: finds the passage in the PDF or saved web article open in a pane and appends a pin to its highlight, reusing a highlight that already covers it or creating one. Works in a PDF's page view, a saved web article and a PDF's Text Reader view (asking which, when a PDF has both). Needs the local helper — see [Source Pins](Source-Pins.md).
 
 ### Queue Display Commands

@@ -81,6 +81,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | `Alt` + `Shift` + `O` | [Open Hovered Source in Floating Window](Utilities.md#floating-window-interaction-closing) | Same viewer, opened as a **non-blocking floating window** (~48% width, right side) so the card stays visible for peeking back and forth. Stays open when you click inside the PDF, **auto-closes when you advance the card**, and `Esc` closes it without closing the queue. | Editor and Queue |
 | `Ctrl` + `Shift` + `F1` | [Copy Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Copies all sources of the **focused Rem** into a session clipboard (and registers it in the PDF index). | Editor Only |
 | `Alt` + `Shift` + `V` | [Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Adds the copied sources to **every selected Rem** (or the focused Rem). Sources already present are skipped, so it is safe to re-run. | Editor Only |
+| `Alt` + `Shift` + `Q` | [Pin Source Quote](Source-Pins.md) | Finds the focused Rem's text in the open PDF or article, reuses the highlight that covers it or creates one, and pins it to the Rem. | Editor Only |
 
 ---
 ## Shortcuts by Key
@@ -149,6 +150,7 @@ Function keys carry the utilities whose natural letter combination was already t
 | `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open) | Editor |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Global |
 | `Alt` + `Shift` + `O` | [Open Hovered Source in Floating Window](Utilities.md#floating-window-interaction-closing) | Editor and Queue |
+| `Alt` + `Shift` + `Q` | [Pin Source Quote](Source-Pins.md) | Editor |
 | `Alt` + `Shift` + `R` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Editor |
 | `Alt` + `Shift` + `V` | [Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Editor |
 | `Alt` + `Shift` + `X` | Extract with Priority | Editor and Queue |
