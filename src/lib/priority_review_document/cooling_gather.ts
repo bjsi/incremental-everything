@@ -16,6 +16,7 @@ import {
   evaluateCooling,
   isBackwardCard,
   isCardDue,
+  isRecentlyCreatedUnseen,
   pickConceptAncestor,
   REM_TYPE_DESCRIPTOR,
 } from './cooling';
@@ -283,6 +284,26 @@ export class CoolingScanner {
       dueCards: dueCards.map((c) => ({ cardId: c._id, intervalDays: cardIntervalDays(c) })),
       seen: [],
     };
+
+    // 0. A due card of this Rem that was just created and never shown. Its own
+    //    fixed window (the new-card setting), counted from the card's creation —
+    //    the card's, never the Rem's, which can be younger than its cards.
+    const newCardDays = this.params.newCardDays ?? 0;
+    if (newCardDays > 0) {
+      for (const card of dueCards) {
+        if (!isRecentlyCreatedUnseen(card, this.now, newCardDays)) continue;
+        candidate.seen.push({
+          relation: 'just-created',
+          sourceRemId: remId,
+          sourceLabel: label,
+          cardId: card._id,
+          seenAt: card.createdAt as number,
+          // The card is due by definition; the rule is about the card itself.
+          stillDue: false,
+          windowDays: newCardDays,
+        });
+      }
+    }
 
     // 1. Other cards of the same Rem.
     for (const card of own) {

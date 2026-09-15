@@ -47,7 +47,14 @@ export type CoolingRelation =
    * concept — and a card of that concept (forward, backward or a cloze in it)
    * was shown. RemNote buries the same pairing for an hour; this extends it.
    */
-  | 'concept-reviewed';
+  | 'concept-reviewed'
+  /**
+   * The card itself was created recently and has never been shown. SuperMemo
+   * counts creating an item as its first repetition; this keeps a card you just
+   * wrote out of the queue for a fixed number of days (not the interval formula
+   * — a new card has no interval).
+   */
+  | 'just-created';
 
 export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'same-rem': 'another card of this Rem was reviewed',
@@ -56,6 +63,7 @@ export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'own-cloze-child': 'one of its Alt+Z clozes was reviewed',
   descendant: 'a descendant card showed its answer as context',
   'concept-reviewed': 'its concept was reviewed',
+  'just-created': 'a card of it was created',
 };
 
 export interface CoolingParams {
@@ -65,12 +73,15 @@ export interface CoolingParams {
   minDays: number;
   /** Ceiling of the window in days. */
   maxDays: number;
+  /** Fixed window for a never-shown card counted from its creation (0 = off). Defaults to 1. */
+  newCardDays?: number;
 }
 
 export const DEFAULT_COOLING_PARAMS: CoolingParams = {
   intervalFraction: 0.05,
   minDays: 1,
   maxDays: 15,
+  newCardDays: 1,
 };
 
 /** A due card of the candidate: what would be spoiled. */
@@ -96,6 +107,11 @@ export interface SpoilerSeenEvent {
    * within a session, and holding the candidate would only stall the pair.
    */
   stillDue: boolean;
+  /**
+   * A fixed window for this event, replacing the candidate's interval-derived
+   * one — used by `just-created`, whose length is its own setting.
+   */
+  windowDays?: number;
 }
 
 export interface CoolingCandidate {
@@ -114,6 +130,8 @@ export interface CoolingReason {
   seenAt: number;
   /** seenAt + window. */
   until: number;
+  /** The window this reason used, in days. */
+  windowDays: number;
 }
 
 export interface CoolingVerdict {
@@ -179,6 +197,23 @@ export interface CardLike {
   repetitionHistory?: { date: number; score: number }[] | null;
   /** RemNote's card type ('forward' | 'backward' | { clozeId }), or the cache's 'cloze' tag. */
   type?: unknown;
+  /** When the card record was created. Per card; never compare it to the Rem's createdAt. */
+  createdAt?: number | null;
+}
+
+/**
+ * True when a card was created within `days` of `now` and has never been shown.
+ * "Never shown" is read from its repetition history, not from its due date equal
+ * to its creation time: a direction switched on for the first time is due a few
+ * seconds after it is created (measured). A direction switched off and back on
+ * returns its ORIGINAL record, creation date and history included, so it is not
+ * mistaken for new.
+ */
+export function isRecentlyCreatedUnseen(card: CardLike, now: number, days: number): boolean {
+  if (days <= 0) return false;
+  if (typeof card.createdAt !== 'number' || card.createdAt <= 0) return false;
+  if (cardLastSeenAt(card) !== null) return false;
+  return now - card.createdAt < days * DAY_MS;
 }
 
 /** RemType.DESCRIPTOR in the SDK; kept as a literal so this module stays SDK-free. */
@@ -262,15 +297,18 @@ export function cardsFromCacheInfo(info: {
   cardsNextRep?: (number | null)[];
   cardsLastSeen?: (number | null)[];
   cardsType?: (string | null)[];
+  cardsCreatedAt?: (number | null)[];
 }): CardLike[] {
   const next = info.cardsNextRep ?? [];
   const seen = info.cardsLastSeen ?? [];
   const types = info.cardsType ?? [];
+  const created = info.cardsCreatedAt ?? [];
   return next.map((nextRepetitionTime, i) => ({
     _id: `${info.remId}#${i}`,
     nextRepetitionTime,
     lastRepetitionTime: seen[i] ?? null,
     type: types[i] ?? null,
+    createdAt: created[i] ?? null,
   }));
 }
 
@@ -313,7 +351,9 @@ export function evaluateCooling(
     // A timestamp from the future is a clock skew, not a review from tomorrow.
     const seenAt = Math.min(event.seenAt, now);
     if (seenAt <= releasedAt) continue;
-    const until = seenAt + windowMs;
+    const eventWindowDays = typeof event.windowDays === 'number' ? Math.max(0, event.windowDays) : windowDays;
+    if (eventWindowDays <= 0) continue;
+    const until = seenAt + eventWindowDays * DAY_MS;
     if (until <= now) continue;
     reasons.push({
       relation: event.relation,
@@ -322,6 +362,7 @@ export function evaluateCooling(
       cardId: event.cardId,
       seenAt,
       until,
+      windowDays: eventWindowDays,
     });
   }
   reasons.sort((a, b) => b.until - a.until);
@@ -339,7 +380,9 @@ export function evaluateCooling(
     label: candidate.label,
     priority: candidate.priority,
     until,
-    windowDays,
+    // The window of the reason that decides `until`, so the list shows the
+    // length that is actually holding the Rem.
+    windowDays: reasons.length ? reasons[0].windowDays : windowDays,
     intervalDays,
     reasons,
     extendedUntil: extensionApplies && extendedUntil >= reasonUntil ? extendedUntil : undefined,
@@ -358,7 +401,7 @@ export function pruneCoolingOverrides(
   now: number,
   params: CoolingParams = DEFAULT_COOLING_PARAMS
 ): CoolingOverrides {
-  const horizon = now - Math.max(params.minDays, params.maxDays) * DAY_MS;
+  const horizon = now - Math.max(params.minDays, params.maxDays, params.newCardDays ?? 0) * DAY_MS;
   const released: Record<string, number> = {};
   for (const [remId, at] of Object.entries(overrides.released ?? {})) {
     if (typeof at === 'number' && at > horizon) released[remId] = at;

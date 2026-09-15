@@ -623,3 +623,8 @@ export const autoRefreshPriorityQueueId = 'auto-refresh-priority-queue';
 export const coolingIntervalPercentId = 'cooling-interval-percent';
 export const coolingMinDaysId = 'cooling-min-days';
 export const coolingMaxDaysId = 'cooling-max-days';
+// Days a never-reviewed card stays cooling after it was created (0 = off, max 10).
+// SuperMemo counts creating an item as its first review; this keeps a card you
+// just wrote from being graded while its answer is still in view.
+export const coolingNewCardDaysId = 'cooling-new-card-days';
+export const COOLING_NEW_CARD_DAYS_MAX = 10;

@@ -46,6 +46,7 @@ import {
   coolingIntervalPercentId,
   coolingMinDaysId,
   coolingMaxDaysId,
+  coolingNewCardDaysId,
   displayWeightedShieldId,
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
@@ -115,6 +116,7 @@ export interface IESettings {
   [coolingIntervalPercentId]: number;
   [coolingMinDaysId]: number;
   [coolingMaxDaysId]: number;
+  [coolingNewCardDaysId]: number;
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
@@ -187,6 +189,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [coolingIntervalPercentId]: 5,
   [coolingMinDaysId]: 1,
   [coolingMaxDaysId]: 15,
+  [coolingNewCardDaysId]: 1,
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
@@ -578,6 +581,19 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     unit: 'days',
     title: 'Cooling: maximum',
     description: 'The longest cooling window, reached by cards with intervals of a year or more at the default share.',
+  },
+  [coolingNewCardDaysId]: {
+    kind: 'number',
+    group: 'priorityQueue',
+    min: 0,
+    max: 10,
+    integer: true,
+    unit: 'days',
+    title: 'Cooling: new cards',
+    description:
+      'How long a card you just created stays out of the Priority Queue before its first review — ' +
+      'SuperMemo counts creating an item as its first repetition, so it is never asked the same day. ' +
+      'Counted from the card\u2019s own creation time; 0 turns this off. At most 10 days.',
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',

@@ -62,6 +62,13 @@ export interface CardPriorityInfo {
    */
   cardsType?: ('forward' | 'backward' | 'cloze' | null)[];
   /**
+   * Per-card creation time, same length and order as `cardsNextRep`. Lets the
+   * Priority Queue's new-card cooling tell a card you just wrote from an old one
+   * without a card read. Per card — never the Rem's createdAt, which can be
+   * younger than its own cards.
+   */
+  cardsCreatedAt?: (number | null)[];
+  /**
    * The owning Rem sits under a PAUSED deck. Its cards keep real
    * `nextRepetitionTime` values — pausing does not clear them — so due-ness has
    * to be suppressed explicitly or the queue's shields will count cards RemNote

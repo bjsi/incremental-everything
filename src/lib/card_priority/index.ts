@@ -148,6 +148,7 @@ export async function getCardPriority(
   // the Priority Queue's cooling (see CardPriorityInfo.cardsLastSeen).
   const cardsLastSeen: (number | null)[] = cards.map((c) => cardLastSeenAt(c as any));
   const cardsType = cards.map((c) => cardTypeTag((c as any).type));
+  const cardsCreatedAt = cards.map((c) => (typeof (c as any).createdAt === 'number' ? (c as any).createdAt : null));
 
   if (priorityValue) {
     const parsedPriority = parseInt(priorityValue);
@@ -164,6 +165,7 @@ export async function getCardPriority(
       cardsNextRep,
       cardsLastSeen,
       cardsType,
+      cardsCreatedAt,
     };
   } else {
     const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
@@ -180,6 +182,7 @@ export async function getCardPriority(
         cardsNextRep,
         cardsLastSeen,
         cardsType,
+        cardsCreatedAt,
       };
     }
 
@@ -195,6 +198,7 @@ export async function getCardPriority(
       cardsNextRep,
       cardsLastSeen,
       cardsType,
+      cardsCreatedAt,
     };
   }
 }

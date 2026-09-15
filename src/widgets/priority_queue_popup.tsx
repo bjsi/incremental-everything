@@ -1017,7 +1017,7 @@ export function PriorityQueuePopup() {
                 </div>
                 <div style={faint}>
                   {first
-                    ? `${COOLING_RELATION_LABELS[first.relation]} ${formatDate(first.seenAt)}${first.sourceLabel && first.relation !== 'same-rem' ? ` (“${first.sourceLabel.slice(0, 40)}”)` : ''}`
+                    ? `${COOLING_RELATION_LABELS[first.relation]} ${formatDate(first.seenAt)}${first.sourceLabel && first.relation !== 'same-rem' && first.relation !== 'just-created' ? ` (“${first.sourceLabel.slice(0, 40)}”)` : ''}`
                     : 'extended by you'}
                   {' · '}back {formatDate(v.until)} ({plural(daysLeft(v.until), 'day', 'days')}, window {v.windowDays}d)
                 </div>

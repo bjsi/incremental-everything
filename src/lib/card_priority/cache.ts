@@ -411,6 +411,7 @@ function buildInfoFromStore(
     // From the same launch-time card.getAll() — see CardPriorityInfo.cardsLastSeen.
     cardsLastSeen: cards.map((c) => cardLastSeenAt(c as any)),
     cardsType: cards.map((c) => cardTypeTag((c as any).type)),
+    cardsCreatedAt: cards.map((c) => (typeof (c as any).createdAt === 'number' ? (c as any).createdAt : null)),
   };
 }
 

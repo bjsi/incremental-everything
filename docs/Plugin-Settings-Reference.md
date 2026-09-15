@@ -94,6 +94,7 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 | **Cooling: share of the interval** | Number | `5` % | How long a Rem stays out of the Priority Queue after a card that gives its answer away was reviewed, as a share of the cooled card's own interval, rounded up to whole days — a 100-day card cools for 5 days. 📖 [How long](Priority-Review-Document.md#how-long). |
 | **Cooling: minimum** | Number | `1` day | The shortest cooling window — what a brand-new card gets when its sibling was just reviewed. |
 | **Cooling: maximum** | Number | `15` days | The longest cooling window, reached by cards with intervals of a year or more at the default share. |
+| **Cooling: new cards** | Number | `1` day | How long a card you just created stays out of the Priority Queue before its first review, counted from the card's own creation time — SuperMemo counts creating an item as its first repetition. `0` turns it off; at most 10 days. 📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler). |
 
 ---
 
