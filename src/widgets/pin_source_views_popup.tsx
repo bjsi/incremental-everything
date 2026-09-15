@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
 import { MessageDialog } from '../lib/message_dialog';
-import { PinQuoteRequest, pinQuoteInViews, SourceView } from '../lib/pdf_source_pins';
+import { PinQuoteRequest, pinQuotesInViews, SourceView } from '../lib/pdf_source_pins';
 import { MessageBody } from '../components/MessageBody';
 
 const CHOICE_KEY = 'pin-source-views-choice';
@@ -28,7 +28,8 @@ const ENTER_GRACE_MS = 300;
  */
 export function PinSourceViewsPopup() {
   const plugin = usePlugin();
-  const [request, setRequest] = useState<PinQuoteRequest | null>(null);
+  const [requests, setRequests] = useState<PinQuoteRequest[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [selected, setSelected] = useState(0);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MessageDialog | null>(null);
@@ -38,7 +39,7 @@ export function PinSourceViewsPopup() {
   useEffect(() => {
     (async () => {
       const ctx = await plugin.widget.getWidgetContext<WidgetLocation.Popup>();
-      setRequest((ctx?.contextData?.request as PinQuoteRequest) ?? null);
+      setRequests((ctx?.contextData?.requests as PinQuoteRequest[]) ?? []);
       const saved = await plugin.storage.getLocal<number>(CHOICE_KEY);
       if (typeof saved === 'number' && saved >= 0 && saved < CHOICES.length) setSelected(saved);
     })();
@@ -58,11 +59,13 @@ export function PinSourceViewsPopup() {
   const close = () => plugin.widget.closePopup();
 
   const choose = async (index: number) => {
-    if (!request || busy) return;
+    if (!requests.length || busy) return;
     setBusy(true);
     setSelected(index);
     await plugin.storage.setLocal(CHOICE_KEY, index);
-    const outcome = await pinQuoteInViews(plugin as any, request, CHOICES[index].views);
+    const outcome = await pinQuotesInViews(plugin as any, requests, CHOICES[index].views, (done, total) =>
+      setProgress({ done, total })
+    );
     if (outcome.ok) {
       close();
       return;
@@ -95,7 +98,8 @@ export function PinSourceViewsPopup() {
   };
 
   const ring: React.CSSProperties = { outline: '2px solid var(--rn-clr-border-accent, #3B82F6)', outlineOffset: '2px' };
-  const quote = request?.quote ?? '';
+  const quote = requests[0]?.candidates?.[0] ?? '';
+  const many = requests.length > 1 ? `${requests.length} Rems` : '';
   const excerpt = quote.length > 160 ? `${quote.slice(0, 160)}…` : quote;
 
   return (
@@ -130,7 +134,10 @@ export function PinSourceViewsPopup() {
             <span className="font-semibold text-base">Pin Source Quote</span>
           </div>
 
-          <div className="text-sm">This PDF also has a Text Reader version. Where should the passage be pinned?</div>
+          <div className="text-sm">
+            This PDF also has a Text Reader version. Where should the {many ? `passages of ${many}` : 'passage'} be
+            pinned?
+          </div>
           {excerpt && (
             <div
               className="text-xs italic p-2 rounded"
@@ -147,7 +154,7 @@ export function PinSourceViewsPopup() {
                 onClick={() => choose(index)}
                 onMouseEnter={() => !busy && setSelected(index)}
                 onMouseDown={(e) => e.preventDefault()}
-                disabled={busy || !request}
+                disabled={busy || !requests.length}
                 className="w-full py-2 px-3 text-sm font-medium rounded text-left"
                 style={{
                   ...(index === 0
@@ -163,7 +170,11 @@ export function PinSourceViewsPopup() {
               >
                 <div>{choice.label}</div>
                 <div className="text-xs font-normal mt-0.5" style={{ opacity: 0.85 }}>
-                  {busy && selected === index ? 'Pinning…' : choice.hint}
+                  {busy && selected === index
+                    ? progress && progress.total > 1
+                      ? `Pinning ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
+                      : 'Pinning…'
+                    : choice.hint}
                 </div>
               </button>
             ))}

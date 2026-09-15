@@ -1,3 +1,4 @@
+import { CoolingCache, shieldExclusionIds } from '../lib/priority_review_document/cooling_store';
 import {
   renderWidget,
   usePlugin,
@@ -27,6 +28,7 @@ import {
   expandCardInfosToCards,
   isPerCardDue,
   getCardPriority,
+  PerCardShieldItem,
 } from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
@@ -55,6 +57,23 @@ type ShieldStatus = {
  * Compute the shield status using pre-filtered session cache data.
  * Falls back to the main cache only when percentiles are missing.
  */
+/**
+ * The per-CARD universe the saved shield ranks, built once per cache version.
+ * The live shield used to rank Rems-with-cards while the history saved at queue
+ * exit ranks cards (see shield_history.ts), so the same shield read P9 · 8.2%
+ * live and P9 · 7.3% saved. Keyed by the cache array's identity: a new cache
+ * write is a new array, so the expansion never goes stale.
+ */
+const perCardUniverseCache = new WeakMap<object, PerCardShieldItem[]>();
+function perCardUniverse(infos: CardPriorityInfo[]): PerCardShieldItem[] {
+  let universe = perCardUniverseCache.get(infos);
+  if (!universe) {
+    universe = expandCardInfosToCards(infos);
+    perCardUniverseCache.set(infos, universe);
+  }
+  return universe;
+}
+
 function computeShieldStatus(
   remId: string | undefined,
   sessionCache: QueueSessionCache | null,
@@ -78,32 +97,39 @@ function computeShieldStatus(
   const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.overdueCardsInKB ?? []), (info) => info.priority);
   const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.overdueCardsInScope ?? []), (info) => info.priority);
 
-  // Predicate for percentile calculation also uses the start-of-today boundary.
-  const predicate = (info: CardPriorityInfo) =>
-    (info.dueCardsOverdue ?? 0) > 0 &&
-    ((!seenRemIds.includes(info.remId) && !coolingRemIds.has(info.remId)) || info.remId === remId);
+  // Percentile over CARDS, with exactly the saved shield's test (QueueExit →
+  // calculateShieldStatus): a card is still pending when it was due by the start
+  // of today and its Rem has not been reviewed this session (the Rem on screen
+  // always counts, as in the pick above). Cooling decides which Rem sets the
+  // shield, not how the ranking counts — same as the saved one.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTodayMs = startOfToday.getTime();
+  const seenSet = new Set(seenRemIds);
+  const perCardPending = (item: PerCardShieldItem) =>
+    isPerCardDue(item, startOfTodayMs) && (!seenSet.has(item.remId) || item.remId === remId);
 
   let kbPercentile: number | undefined;
   if (topMissedInKb && allPrioritizedCardInfo) {
     kbPercentile = calculateVolumeBasedPercentile(
-      allPrioritizedCardInfo,
+      perCardUniverse(allPrioritizedCardInfo),
       topMissedInKb.priority,
-      predicate
+      perCardPending
     );
-    // console.log(`[CardShield] KB Shield: priority ${topMissedInKb.priority}, percentile ${kbPercentile}%, triggered by remId: ${topMissedInKb.remId}`);
+
   }
 
   let docPercentile: number | undefined;
   if (topMissedInDoc && allPrioritizedCardInfo && scopeRemIds) {
     const scopeSet = new Set(scopeRemIds);
-    const allCardsInScope = allPrioritizedCardInfo.filter(c => scopeSet.has(c.remId));
-    if (allCardsInScope.length > 0) {
+    const cardsInScope = perCardUniverse(allPrioritizedCardInfo).filter((c) => scopeSet.has(c.remId));
+    if (cardsInScope.length > 0) {
       docPercentile = calculateVolumeBasedPercentile(
-        allCardsInScope,
+        cardsInScope,
         topMissedInDoc.priority,
-        predicate
+        perCardPending
       );
-      // console.log(`[CardShield] Doc Shield: priority ${topMissedInDoc.priority}, percentile ${docPercentile}%, triggered by remId: ${topMissedInDoc.remId}`);
+
     }
   }
 
@@ -158,13 +184,12 @@ export function CardInfoBar() {
   // every Priority Queue refresh). Read from the session cache only — no scan
   // runs on this path — and self-expiring, since each verdict carries its end.
   const coolingCache = useTrackerPlugin(
-    (rp) => rp.storage.getSession<{ verdicts: { remId: string; until: number }[] }>(coolingCacheKey),
+    (rp) => rp.storage.getSession<CoolingCache>(coolingCacheKey),
     []
   );
-  const coolingRemIds = React.useMemo(() => {
-    const now = Date.now();
-    return new Set((coolingCache?.verdicts ?? []).filter((v) => v.until > now).map((v) => v.remId));
-  }, [coolingCache]);
+  // Cooling Rems AND Rems held back by a cooling ancestor: neither can be
+  // practised now, so neither may set the live shield.
+  const coolingRemIds = React.useMemo(() => shieldExclusionIds(coolingCache), [coolingCache]);
 
   // Inside a Card Cluster, RemNote keeps this FlashcardUnder widget mounted across all
   // sibling cards and `getWidgetContext().remId` stays pinned to the cluster parent.

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { IncrementalRem } from '../incremental_rem';
 import { allIncrementalRemKey, priorityGraphPowerupCode, priorityQueuePowerupCode } from '../consts';
 import { readChildren, readChildrenWithCounts } from './children';
-import { CardSource, isCardCacheUsable, cardsByRemFromCache } from './card_source';
+import { CardSource, isCardCacheUsable, cardsByRemFromCacheComplete } from './card_source';
 import { CardLike } from './cooling';
 
 /**
@@ -356,7 +356,7 @@ async function buildDueCardRemIds(
 ): Promise<Set<RemId> | null> {
   if (options.cardSource) return dueRemIdsFrom(options.cardSource.cardsByRem);
   const infos = await isCardCacheUsable(plugin);
-  if (infos) return dueRemIdsFrom(cardsByRemFromCache(infos));
+  if (infos) return dueRemIdsFrom(await cardsByRemFromCacheComplete(plugin, infos));
   if (options.docIds) return null;
   const allCards = (await plugin.card.getAll()) || [];
   const byRem = new Map<RemId, CardLike[]>();

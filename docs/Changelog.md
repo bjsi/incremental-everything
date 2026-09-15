@@ -2,6 +2,152 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.111 - September 15th, 2026
+
+### ⚡ Improved - Pin Source Quote runs over a multi-Rem selection
+
+Select several Rems and **Pin Source Quote** pins each one's source in turn, asking which view to use only once and reporting at the end what was pinned and what was not found.
+
+📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
+
+## v1.0.110 - September 15th, 2026
+
+### ⚡ Improved - Pin Source Quote has a shortcut
+
+**Pin Source Quote** now runs with `Opt+Shift+Q` / `Alt+Shift+Q`, next to Paste Rem Sources on `Alt+Shift+V`.
+
+📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
+
+### ⚡ Improved - Priority Queue moved to Opt+Shift+L
+
+The **Priority Queue** popup now opens with `Opt+Shift+L` / `Alt+Shift+L`, next to Learn on `Cmd/Ctrl+L`, because `Alt+Shift+R` is RemNote's Restore Last Closed Tab.
+
+📖 [The Priority Queue popup](Priority-Review-Document.md#the-priority-queue-popup)
+
+### 📚 Docs - every RemNote shortcut on one page
+
+A new **RemNote Native Shortcuts** page lists all of RemNote's default shortcuts by function and by key, with the plugin's shortcuts in the same keyboard map so you can see which combinations are free.
+
+📖 [RemNote Native Shortcuts](RemNote-Native-Shortcuts.md)
+
+### 📚 Docs - shortcuts that conflict on Windows
+
+The Keyboard Shortcuts page now lists the three plugin shortcuts that press the same keys as a RemNote command on Windows and Linux.
+
+📖 [Windows Notes](Keyboard-Shortcuts.md#windows-notes)
+
+## v1.0.109 - September 15th, 2026
+
+### ⚡ Improved - the ▶ Learn button pulses when startup is done
+
+The **▶** button of the Incremental RemNote panel now starts pulsing only once the plugin's startup work has finished, so you can tell it is ready without checking the console; hover it to see what is still running.
+
+📖 [When ▶ starts pulsing](Getting-Started.md#when-learn-starts-pulsing)
+
+## v1.0.108 - September 15th, 2026
+
+### 🐛 Fixed - a cloze made with Alt+Z could enter the Priority Queue the same day
+
+A cloze created with **Create Cloze Deletion** (Alt+Z) now cools as a new card straight away, instead of being served by the Priority Queue until RemNote was restarted.
+
+📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler)
+
+## v1.0.107 - September 15th, 2026
+
+### ⚡ Improved - Learn is the plugin's main action
+
+The command that practises the full-KB Priority Queue is now **Learn - Practice Priority Queue (Full Knowledge Base)**, with quick code `learn` and the shortcut `Cmd+L` / `Ctrl+L`, like SuperMemo's Learn button.
+
+📖 [Practise it](Priority-Review-Document.md#practise-it)
+
+### 🐛 Fixed - Next Item in Queue used the Windows key on Windows
+
+**Next Item in Queue** now answers to `Ctrl+Right` on Windows and Linux, as documented, instead of `Win+Right`; on Mac it stays `Cmd+Right`.
+
+📖 [Next](Reviewing-Items-in-the-Queue.md#next)
+
+## v1.0.106 - September 15th, 2026
+
+### 🐛 Fixed - the live Card Shield disagreed with the saved one
+
+The Card Shield shown while you practise now matches the one saved when you leave the queue: cooling Rems are excluded from the first queue after a restart, and the percentile counts cards, not Rems with cards.
+
+📖 [Smart Scope & Priority Shield Integration](Priority-Review-Document.md#smart-scope-priority-shield-integration)
+
+### 🐛 Fixed - "Hidden in queue" overlapped the card in the Beautiful queue variant
+
+On the front of a card in RemNote's Beautiful queue variant, the "Hidden in queue" placeholder left by Hide in Queue, Hide Parent and Hide Grandparent now sits on its own line instead of over the question.
+
+📖 [Hide in Queue](Utilities.md#hide-in-queue)
+
+## v1.0.105 - September 14th, 2026
+
+### ✨ New - a card you just created waits before its first review
+
+A never-reviewed card stays out of the Priority Queue for a set number of days after you create it, **1** by default — SuperMemo counts creating an item as its first repetition, so a cloze written while reading is not asked while its answer is still in view.
+
+📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler)
+
+### ⚡ Improved - Priority Queue settings have their own group
+
+The refresh and cooling settings moved out of **Queue**, now **Queue Display**, into a new **Priority Queue** group.
+
+📖 [Priority Queue settings](Plugin-Settings-Reference.md#priority-queue)
+
+## v1.0.104 - September 14th, 2026
+
+### ⚡ Improved - a descriptor's backward card cools after its concept was reviewed
+
+That card asks for the concept, so reviewing any card of the concept — forward, backward or a cloze, even across nested descriptors — now keeps it out of the Priority Queue for its cooling window.
+
+📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler)
+
+## v1.0.103 - September 14th, 2026
+
+### 🐛 Fixed - a card held back by a cooling parent could still pin the Priority Shield
+
+A Rem the Priority Queue holds back because its parent or grandparent is due and cooling no longer sets the shield; one whose due ancestor is not cooling still counts.
+
+📖 [Smart Scope & Priority Shield Integration](Priority-Review-Document.md#smart-scope-priority-shield-integration)
+
+### 🐛 Fixed - the Cooling list showed P? instead of priorities
+
+📖 [The Cooling list](Priority-Review-Document.md#the-cooling-list)
+
+## v1.0.102 - September 14th, 2026
+
+### ⚡ Improved - AI Transcribe puts key terms in bold
+
+Transcriptions now bold the passage's key terms and concepts and keep the page's own italics. Already have `prompt.md`? Delete it to get the new instructions.
+
+📖 [Customising the instructions](AI-Transcription-of-PDF-Highlights.md#prompt)
+
+### 🐛 Fixed - bold or italic around a formula showed literal asterisks
+
+📖 [Customising the instructions](AI-Transcription-of-PDF-Highlights.md#prompt)
+
+## v1.0.101 - September 14th, 2026
+
+### ⚡ Improved - Pin Source Quote reads a Rem's front and back
+
+When the Rem has a back, **Pin Source Quote** tries the front, the back and both joined, pins the version that matches best, and places the pin at the end of the back.
+
+📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
+
+### 🐛 Fixed - Pin Source Quote and AI Transcribe could not reach a source without a local copy
+
+They now look for the file in the knowledge base you are using and download it when it is not stored locally.
+
+📖 [Source Pins](Source-Pins.md)
+
+## v1.0.100 - September 14th, 2026
+
+### 🐛 Fixed - the priority badge showed twice in the Beautiful queue
+
+**Queue Toolbar Priority**: Now that RemNote's Beautiful queue shows plugin toolbar widgets, the badge and the *No Inc Rem* countdown are kept out of its top bar and stay in the card's top-right corner.
+
+📖 [In the Beautiful queue variant](Plugin-Widgets-Reference.md#beautiful-queue-variant)
+
 ## v1.0.99 - September 14th, 2026
 
 ### ⚡ Improved - the Practiced Queues summary refreshes itself at startup
@@ -2295,7 +2441,7 @@ Adds/removes an `#ignore` tag on the focused editor Rem. Ignored rems are visual
 
 ### ✨ Improvement: Isolated Card View Setting Expanded to Cover Highlights
 
-The previous **Show regular Rems in isolated view (Queue)** boolean has been replaced by a dropdown — [**Use Isolated Card View in Queue for**](Plugin-Settings-Reference.md#queue) — letting you pick which item types open in the [Isolated Card Viewer](Plugin-Widgets-Reference.md) by default in the queue:
+The previous **Show regular Rems in isolated view (Queue)** boolean has been replaced by a dropdown — [**Use Isolated Card View in Queue for**](Plugin-Settings-Reference.md#queue-display) — letting you pick which item types open in the [Isolated Card Viewer](Plugin-Widgets-Reference.md) by default in the queue:
 
 - **Highlights (PDF/HTML)** *(default)* — only highlights open in the card view; regular Rems open in their full document context.
 - **Regular Rems** — only regular Rems open in the card view; highlights open in the PDF/HTML reader.
@@ -2705,7 +2851,7 @@ IncRem time in the **Practiced Queues** dashboard is now tracked reliably from e
 - **Removed the `QueueItemType.Plugin` heuristic.** The old code inferred that the current queue item was an IncRem by checking `QueueItemType.Plugin`. This was fragile and would silently miss editor-side reviews. It has been replaced by explicit signals from the review components.
 - **Editor-only sessions.** If you review an IncRem directly from the editor (not from a queue), the plugin now opens a dedicated **"Editor Review"** session. That session auto-saves and closes after **60 minutes of inactivity**, keeping your history clean without any manual step.
 - **Queue → editor deduplication.** When you click *Review in Editor* from the queue, the time is counted once — it carries over into the same session rather than starting a separate engagement. The queue and editor timer together record a single continuous block.
-- **New setting — Auto focus Queue Dashboard** (default `false`): when enabled, the Practiced Queues dashboard opens automatically in the Right Sidebar every time you enter a queue (except in mobile devices). See [Plugin Settings Reference](Plugin-Settings-Reference.md#queue) for details.
+- **New setting — Auto focus Queue Dashboard** (default `false`): when enabled, the Practiced Queues dashboard opens automatically in the Right Sidebar every time you enter a queue (except in mobile devices). See [Plugin Settings Reference](Plugin-Settings-Reference.md#queue-display) for details.
 
 ## v0.2.192 - May 1st, 2026
 
@@ -3312,7 +3458,7 @@ A brand-new **Weighted Shield** metric has been introduced to give you a macro-l
 *   **Global Graph Toggle:** The [Prioritization-&-Sorting#priority-shield-history](Prioritization-&-Sorting.md#priority-shield-history) widget now features a global checkbox at the top to toggle the Weighted Shield line across all charts simultaneously.
 *   **Settings Integration:** The display of the Weighted Shield in the queue can be toggled on/off in the plugin settings.
 
-📖 **Learn more:** See the [Prioritization-&-Sorting#weighted-shield](Prioritization-&-Sorting.md#weighted-shield) documentation and the updated [Plugin-Settings-Reference#queue-display](Plugin-Settings-Reference.md#queue) for more details.
+📖 **Learn more:** See the [Prioritization-&-Sorting#weighted-shield](Prioritization-&-Sorting.md#weighted-shield) documentation and the updated [Plugin-Settings-Reference#queue-display](Plugin-Settings-Reference.md#queue-display) for more details.
 
 ![Weighted Shield](assets/shield-weighted-card.png){ width="1000" }
 

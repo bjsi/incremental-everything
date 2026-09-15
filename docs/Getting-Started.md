@@ -50,9 +50,23 @@ Once installed, the plugin adds a small **Incremental RemNote** 🌐 panel at th
 |--------|--------------|
 | **Priority Queue** | Opens the [Priority Queue popup](Priority-Review-Document.md#the-priority-queue-popup) with the document you currently have open offered as the scope — the scope it will use is named under the button — and the whole knowledge base as the alternative |
 | 👁 | Opens the **Priority Review Queue** Rem — every Priority Queue document is tagged with it, so its references are the list of them. Go there to practise one from your phone |
-| ▶ | Opens the queue on the **full-KB** Priority Queue, building the document first if there is none yet. Document-scoped queues are practised from the popup |
+| ▶ | **Learn** (`Cmd/Ctrl+L`) — the plugin's main action. Opens the queue on the **full-KB** Priority Queue, building the document first if there is none yet. Document-scoped queues are practised from the popup |
 
 The 👁 button says so if you have no review documents yet: the tag is created by the first one.
+
+### When ▶ starts pulsing { #when-learn-starts-pulsing }
+
+After you open RemNote, the plugin keeps working in the background for a while — up to a few minutes on a large knowledge base. The **▶** button stays still until all of it has finished, then starts pulsing:
+
+- the card priority cache and the IncRem cache
+- the deferred pre-tagging of flashcards that have no priority yet
+- the cooling scan for the Card Shield
+- the CardPriority hidden-slot check
+- the priority band colours
+
+Hover **▶** to see what is still running. If it never starts pulsing, one of these failed or took too long: the tooltip names it, and the console has the details.
+
+In [Light Mode](Full-Mode-x-Light-Mode.md), or with [flashcard prioritisation](Priorities-for-Flashcards.md#the-opt-in) off, the card cache, pre-tagging and cooling scan do not run, so ▶ waits only for the rest. You can practise at any time — the pulse only tells you the plugin is fully ready.
 
 ### Tips { #tips }
 

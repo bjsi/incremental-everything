@@ -184,7 +184,7 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     id: 'priority-review-document',
     category: 'basics',
     title: 'Too many cards due?',
-    body: 'The Priority Queue keeps one document topped up with your most important due items, and drains it as you review — Alt+Shift+R.',
+    body: 'The Priority Queue keeps one document topped up with your most important due items, and drains it as you review — Alt+Shift+L.',
     docsPath: 'Priority-Review-Document/',
   },
   {

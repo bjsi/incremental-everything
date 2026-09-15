@@ -42,7 +42,7 @@ Unlike the *Card Info Bar*, which lives at the bottom of flashcards and can be e
 
 #### In the Beautiful queue variant { #beautiful-queue-variant }
 
-RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) has no toolbar for plugins to join, so there the badge sits in the **top-right corner of the card**, in the blank space above the breadcrumbs — the card layout itself is unchanged. The *No Inc Rem* countdown moves there with it. Switching back to *Compact* returns both to the toolbar.
+In RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) the badge sits in the **top-right corner of the card**, in the blank space above the breadcrumbs, rather than in the top bar — the card layout itself is unchanged. The *No Inc Rem* countdown moves there with it. Switching back to *Compact* returns both to the toolbar.
 
 
 ### 1.3. Answer Buttons Info Bar
@@ -576,7 +576,7 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 
 The plugin's hub, at the bottom of the left sidebar. Header controls: **⌨** ([Keyboard Shortcuts](Keyboard-Shortcuts.md)), **⚙** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation, **✕** hides the panel for the session — it returns on the next start, and the **Show Incremental RemNote Panel** command brings it back sooner.
 
-Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Queue** group of three — the label opens the [Priority Queue popup](#614-priority-queue-popup) with the document you currently have open as the offered scope (naming it under the button), **👁** opens the **Priority Review Queue** Rem that lists every Priority Queue document, and **▶** opens the queue on the full-KB Priority Queue, building it first if needed.
+Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Queue** group of three — the label opens the [Priority Queue popup](#614-priority-queue-popup) with the document you currently have open as the offered scope (naming it under the button), **👁** opens the **Priority Review Queue** Rem that lists every Priority Queue document, and **▶** (**Learn**, `Cmd/Ctrl+L`) opens the queue on the full-KB Priority Queue, building it first if needed. **▶** starts pulsing once the plugin's startup work has finished; hover it to see what is still running — see [When ▶ starts pulsing](Getting-Started.md#when-learn-starts-pulsing).
 
 ![The Incremental RemNote panel in the sidebar](assets/panel-hub-3.png){ width="500" }
 
@@ -641,7 +641,7 @@ Finds the Rems in an anchor's orbit that generate no flashcards, and fixes the t
 📖 **Full documentation:** [Card Enablement Audit](Utilities.md#card-enablement-audit)
 
 ### 6.14. Priority Queue Popup
-**Trigger:** `Priority Queue` command (quick code `prq`, `Alt+Shift+R`), the **Document Menu** (⋯) of any document, the queue's ⋮ menu, or the **Priority Queue** button of the panel
+**Trigger:** `Priority Queue` command (quick code `prq`, `Opt+Shift+L` / `Alt+Shift+L`), the **Document Menu** (⋯) of any document, the queue's ⋮ menu, or the **Priority Queue** button of the panel
 
 The front door to the persistent review document, one per scope.
 

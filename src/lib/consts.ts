@@ -212,6 +212,12 @@ export const onboardingTipsWidgetId = 'onboarding_tips';
  * {@link showPluginHubCommandId}.
  */
 export const pluginHubHiddenKey = 'plugin-hub-hidden';
+/**
+ * Session: which activation-time tasks (caches, pre-tagging, cooling scan,
+ * hidden-slot check, band stylesheets) have settled. Written only by the index
+ * widget; read by the hub to start its ▶ pulse. See lib/startup_status.ts.
+ */
+export const startupTasksStatusKey = 'startup-tasks-status';
 /** Command that brings the hub back within the same session. */
 export const showPluginHubCommandId = 'ie_show_plugin_hub';
 
@@ -623,3 +629,8 @@ export const autoRefreshPriorityQueueId = 'auto-refresh-priority-queue';
 export const coolingIntervalPercentId = 'cooling-interval-percent';
 export const coolingMinDaysId = 'cooling-min-days';
 export const coolingMaxDaysId = 'cooling-max-days';
+// Days a never-reviewed card stays cooling after it was created (0 = off, max 10).
+// SuperMemo counts creating an item as its first review; this keeps a card you
+// just wrote from being graded while its answer is still in view.
+export const coolingNewCardDaysId = 'cooling-new-card-days';
+export const COOLING_NEW_CARD_DAYS_MAX = 10;

@@ -122,6 +122,18 @@ const CORE_CSS = `
   display: none !important;
 }
 
+/* ===== "Hidden in queue" placeholder — Beautiful queue variant =====
+   Beautiful turns the bullet container into a zero-size inline box and centres
+   the dot absolutely inside it. Once Hide in Queue / Hide Parent / Hide
+   Grandparent remove the row's text, nothing in flow is left, the row collapses
+   to zero height, and the absolute "Hidden in queue" label lands on the next row.
+   Putting the label back in flow gives the row its line again. Kept in CORE so it
+   also fixes the standalone Hide in Queue plugin's placeholder; RemNote draws no
+   ::after of its own on these bullets, so rows without the label are untouched. */
+.rn-queue__content--answer-hidden .queue-beautiful-hierarchy-rem > .rn-bullet-container.queue-beautiful-line-centered-bullet::after {
+  position: static !important;
+}
+
 /* ===== Preserved History (tombstones) =====
    The 'Preserve history & remove' command scrubs a rem's content and tags it
    with the Preserved History powerup. Always hidden — both in the editor

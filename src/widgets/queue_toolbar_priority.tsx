@@ -1,10 +1,12 @@
 import { renderWidget } from '@remnote/plugin-sdk';
 import { QueuePriorityBadge } from '../components/QueuePriorityBadge';
+import { useHostShown } from '../components/useHostShown';
 
-// Compact queue only: the Beautiful variant does not render the QueueToolbar
-// location at all — queue_beautiful_bar carries this badge there.
+// Compact queue only: QUEUE_VARIANT_CSS hides it in the Beautiful chrome, where
+// queue_beautiful_bar carries this badge instead.
 function QueueToolbarPriority() {
-  return <QueuePriorityBadge />;
+  const shown = useHostShown();
+  return <QueuePriorityBadge active={shown} />;
 }
 
 renderWidget(QueueToolbarPriority);

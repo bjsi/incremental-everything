@@ -8,6 +8,11 @@ import {
   cardIntervalDays,
   cardLastSeenAt,
   cardsFromCacheInfo,
+  cardTypeTag,
+  isBackwardCard,
+  pickConceptAncestor,
+  isRecentlyCreatedUnseen,
+  COOLING_RELATION_LABELS,
   coolingWindowDays,
   DAY_MS,
   DEFAULT_COOLING_PARAMS,
@@ -252,5 +257,101 @@ describe('cardsFromCacheInfo', () => {
     );
     assert.ok(v);
     assert.equal(v.reasons[0].cardId, 'r#1');
+  });
+});
+
+describe('concept-reviewed relation', () => {
+  it('tags card directions the way the cache stores them', () => {
+    assert.equal(cardTypeTag('forward'), 'forward');
+    assert.equal(cardTypeTag('backward'), 'backward');
+    assert.equal(cardTypeTag({ clozeId: 'x' }), 'cloze');
+    assert.equal(cardTypeTag('cloze'), 'cloze');
+    assert.equal(cardTypeTag(undefined), null);
+  });
+  it('reads backward cards from raw cards and from cache entries alike', () => {
+    assert.equal(isBackwardCard({ _id: 'c', type: 'backward' }), true);
+    assert.equal(isBackwardCard({ _id: 'c', type: { clozeId: 'z' } }), false);
+    const fromCache = cardsFromCacheInfo({
+      remId: 'd',
+      cardsNextRep: [NOW - DAY_MS, NOW + DAY_MS],
+      cardsLastSeen: [daysAgo(700), daysAgo(3)],
+      cardsType: ['backward', 'forward'],
+    });
+    assert.equal(isBackwardCard(fromCache[0]), true);
+    assert.equal(isBackwardCard(fromCache[1]), false);
+  });
+  it('finds the concept past nested descriptors', () => {
+    // pode ser transmitido...? -> transmitidos por quem (descriptor) -> Recibos de socorro (concept)
+    assert.equal(pickConceptAncestor([{ _id: 'transmitidos', type: 2 }, { _id: 'recibos', type: 1 }]), 'recibos');
+    assert.equal(pickConceptAncestor([{ _id: 'flutuacoes', type: 1 }]), 'flutuacoes');
+    assert.equal(pickConceptAncestor([{ _id: 'plain-parent', type: 0 }]), 'plain-parent');
+    assert.equal(pickConceptAncestor([{ _id: 'a', type: 2 }, { _id: 'b', type: 2 }]), null);
+    assert.equal(pickConceptAncestor([]), null);
+  });
+  it('cools a mature backward card for the full window after its concept was reviewed', () => {
+    const v = evaluateCooling(
+      {
+        remId: 'translation',
+        // Backward card: last interval 2 years, so 5% caps at the 15-day maximum.
+        dueCards: [{ cardId: 'translation#1', intervalDays: 723 }],
+        seen: [
+          { relation: 'concept-reviewed', sourceRemId: 'flutuacoes', cardId: 'flutuacoes#0', seenAt: daysAgo(2), stillDue: false },
+          { relation: 'concept-reviewed', sourceRemId: 'flutuacoes', cardId: 'flutuacoes#1', seenAt: daysAgo(0.5), stillDue: false },
+        ],
+      },
+      NOW
+    );
+    assert.ok(v);
+    assert.equal(v.windowDays, 15);
+    assert.equal(v.reasons[0].relation, 'concept-reviewed');
+    assert.equal(COOLING_RELATION_LABELS['concept-reviewed'], 'its concept was reviewed');
+  });
+});
+
+describe('just-created cooling', () => {
+  it('recognises a never-shown card created within the window, and only that', () => {
+    const fresh = { _id: 'c', createdAt: NOW - 3600_000, nextRepetitionTime: NOW - 3600_000 + 3000 };
+    assert.equal(isRecentlyCreatedUnseen(fresh, NOW, 1), true);
+    assert.equal(isRecentlyCreatedUnseen(fresh, NOW, 0), false, '0 days switches it off');
+    assert.equal(isRecentlyCreatedUnseen({ ...fresh, createdAt: daysAgo(2) }, NOW, 1), false, 'older than the window');
+    // A direction switched back on keeps its old record and history.
+    const reEnabled = { _id: 'c', createdAt: NOW - 3600_000, repetitionHistory: [{ date: daysAgo(20), score: 1 }] };
+    assert.equal(isRecentlyCreatedUnseen(reEnabled, NOW, 1), false, 'already shown once');
+    assert.equal(isRecentlyCreatedUnseen({ _id: 'c' }, NOW, 1), false, 'no creation time');
+  });
+  it('reads the creation time from cache entries', () => {
+    const cards = cardsFromCacheInfo({
+      remId: 'r',
+      cardsNextRep: [NOW - 1000],
+      cardsLastSeen: [null],
+      cardsCreatedAt: [NOW - 5000],
+    });
+    assert.equal(isRecentlyCreatedUnseen(cards[0], NOW, 1), true);
+  });
+  it('holds for the fixed new-card window, not the interval formula', () => {
+    const createdAt = NOW - 6 * 3600_000;
+    const v = evaluateCooling(
+      {
+        remId: 'r',
+        dueCards: [{ cardId: 'r#0', intervalDays: 0 }],
+        seen: [{ relation: 'just-created', sourceRemId: 'r', cardId: 'r#0', seenAt: createdAt, stillDue: false, windowDays: 3 }],
+      },
+      NOW
+    );
+    assert.ok(v);
+    assert.equal(v.until, createdAt + 3 * DAY_MS);
+    assert.equal(v.windowDays, 3);
+    assert.equal(v.reasons[0].relation, 'just-created');
+  });
+  it('a 0-day new-card window never cools', () => {
+    const v = evaluateCooling(
+      {
+        remId: 'r',
+        dueCards: [{ cardId: 'r#0', intervalDays: 0 }],
+        seen: [{ relation: 'just-created', sourceRemId: 'r', cardId: 'r#0', seenAt: NOW - 1000, stillDue: false, windowDays: 0 }],
+      },
+      NOW
+    );
+    assert.equal(v, null);
   });
 });

@@ -46,7 +46,7 @@ import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { transferToDismissed } from '../lib/dismissed';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../lib/priority_review_document';
-import { CoolingScanner } from '../lib/priority_review_document/cooling_gather';
+import { ensureShieldCoolingScanned, runShieldCoolingScan } from '../lib/priority_review_document/shield_cooling_scan';
 import { isPriorityQueueDoc, refreshPriorityQueue } from '../lib/priority_review_document/queue_doc';
 import {
   calculateAllPercentiles,
@@ -254,23 +254,17 @@ export function registerQueueExitListener(
       let coolingRemIds: ReadonlySet<string> = new Set();
       if (shouldSaveCard) {
         try {
-          const seenSet = new Set(seenCardIds);
-          const overdueByPriority = allCardInfos
-            .filter((info) => (info.dueCardsOverdue ?? 0) > 0 && !info.paused && !seenSet.has(info.remId))
-            .sort((a, b) => a.priority - b.priority);
-          const headIds = overdueByPriority.slice(0, 150).map((info) => info.remId);
-          const scopeIdSet = priorityCalcScopeRemIds ? new Set(priorityCalcScopeRemIds) : null;
-          const scopeHeadIds = scopeIdSet
-            ? overdueByPriority.filter((info) => scopeIdSet.has(info.remId)).slice(0, 100).map((info) => info.remId)
-            : [];
-          const scanner = new CoolingScanner(plugin, {
+          const scan = await runShieldCoolingScan(plugin, {
+            allCardInfos,
+            seenRemIds: seenCardIds,
+            scopeRemIds: priorityCalcScopeRemIds,
             scopeRemId: originalScopeId ?? null,
-            priorityByRemId: new Map(overdueByPriority.map((info) => [info.remId, info.priority])),
           });
-          await scanner.scan([...headIds, ...scopeHeadIds]);
-          await scanner.publish();
-          coolingRemIds = scanner.coolingIds();
-          summary.push(`cooling: ${coolingRemIds.size} of ${scanner.checkedIds.size} top overdue Rems excluded from the shield`);
+          coolingRemIds = scan.excludedIds;
+          summary.push(
+            `cooling: ${scan.coolingInHead} of ${scan.checked} top overdue Rems cooling, ` +
+              `${scan.held.length} held back by a cooling ancestor; all excluded from the shield`
+          );
         } catch (e) {
           console.warn('[QueueExit] Cooling scan failed; the shield is saved without the exclusion:', e);
         }
@@ -713,6 +707,14 @@ export function registerQueueEnterListener(
 
     await plugin.storage.setSession(queueSessionCacheKey, sessionCache);
     console.log('QUEUE ENTER: Pre-calculation complete. Session cache has been saved.');
+
+    // The live shield excludes cooling Rems from a scan kept in session storage,
+    // which a restart empties. If nothing has scanned yet in this RemNote run —
+    // a queue opened before the startup scan finished — run it now, in the
+    // background: the live shield watches that data and corrects itself when it
+    // lands. No-op once any scan has published, in Light Mode, or while the card
+    // cache is still loading.
+    void ensureShieldCoolingScanned(plugin, 'queue entry');
 
     const performanceMode = await getPerformanceMode(plugin);
     const dueIncRemCount = await calculateDueIncRemCount(

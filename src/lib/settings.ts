@@ -46,6 +46,7 @@ import {
   coolingIntervalPercentId,
   coolingMinDaysId,
   coolingMaxDaysId,
+  coolingNewCardDaysId,
   displayWeightedShieldId,
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
@@ -115,6 +116,7 @@ export interface IESettings {
   [coolingIntervalPercentId]: number;
   [coolingMinDaysId]: number;
   [coolingMaxDaysId]: number;
+  [coolingNewCardDaysId]: number;
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
@@ -187,6 +189,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [coolingIntervalPercentId]: 5,
   [coolingMinDaysId]: 1,
   [coolingMaxDaysId]: 15,
+  [coolingNewCardDaysId]: 1,
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
@@ -240,6 +243,7 @@ export type SettingGroupId =
   | 'scheduling'
   | 'priority'
   | 'queue'
+  | 'priorityQueue'
   | 'editor'
   | 'fsrs'
   | 'masteryDrill'
@@ -287,7 +291,14 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     label: 'Priority',
     blurb: 'Defaults and editing behaviour for priority values.',
   },
-  queue: { label: 'Queue', blurb: 'What the queue shows during review.' },
+  queue: { label: 'Queue Display', blurb: 'What the queue shows, and holds back, during review.' },
+  priorityQueue: {
+    label: 'Priority Queue',
+    blurb:
+      'The persistent Priority Queue document: when it refreshes, and how long cooling keeps a ' +
+      'spoiled Rem out of it.',
+    helpPath: 'Priority-Review-Document/',
+  },
   editor: { label: 'Editor Indicators', blurb: 'Visual markers on rems in the editor.' },
   fsrs: {
     label: 'FSRS',
@@ -530,7 +541,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [autoRefreshPriorityQueueId]: {
     kind: 'boolean',
-    group: 'queue',
+    group: 'priorityQueue',
     title: 'Refresh the Priority Queue after each session',
     description:
       'When you leave the queue after practising a Priority Queue document, drains the entries ' +
@@ -540,7 +551,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [coolingIntervalPercentId]: {
     kind: 'number',
-    group: 'queue',
+    group: 'priorityQueue',
     min: 0,
     max: 100,
     unit: '% of interval',
@@ -553,7 +564,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [coolingMinDaysId]: {
     kind: 'number',
-    group: 'queue',
+    group: 'priorityQueue',
     min: 0,
     max: 365,
     integer: true,
@@ -563,13 +574,26 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [coolingMaxDaysId]: {
     kind: 'number',
-    group: 'queue',
+    group: 'priorityQueue',
     min: 0,
     max: 365,
     integer: true,
     unit: 'days',
     title: 'Cooling: maximum',
     description: 'The longest cooling window, reached by cards with intervals of a year or more at the default share.',
+  },
+  [coolingNewCardDaysId]: {
+    kind: 'number',
+    group: 'priorityQueue',
+    min: 0,
+    max: 10,
+    integer: true,
+    unit: 'days',
+    title: 'Cooling: new cards',
+    description:
+      'How long a card you just created stays out of the Priority Queue before its first review — ' +
+      'SuperMemo counts creating an item as its first repetition, so it is never asked the same day. ' +
+      'Counted from the card\u2019s own creation time; 0 turns this off. At most 10 days.',
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',

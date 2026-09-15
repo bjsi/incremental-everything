@@ -93,7 +93,7 @@ import {
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
-import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
+import { loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist, updateCardPriorityCache } from '../lib/card_priority/cache';
 import {
   isHiddenSlotMigrated,
   isVisiblePrioritySlotRetired,
@@ -267,6 +267,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: pinSourceQuoteCommandId,
     name: 'Pin Source Quote',
     quickCode: 'psq',
+    keyboardShortcut: 'opt+shift+q',
     action: async () => {
       await pinSourceQuote(plugin);
     },
@@ -965,13 +966,24 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // Apply the auto-priority computed at the top (before the new cloze existed,
         // so the existing-cloze count was correct).
         await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual', false, { event: 'cloze' });
+        // The new cloze card cannot be read yet, but its facts are known: due now,
+        // created now, never shown. Writing them keeps the entry usable by the
+        // Priority Queue's cooling (which reads the per-card arrays, not the
+        // counts); the deferred re-read then replaces them with the real card.
+        const clozeCreatedAt = Date.now();
         await updateCardPriorityCache(plugin, clozeRem._id, true, {
           remId: clozeRem._id,
           priority: autoPriority.priority,
           source: 'manual',
           cardCount: 1,
           dueCards: 1,
+          dueCardsOverdue: 0,
+          cardsNextRep: [clozeCreatedAt],
+          cardsLastSeen: [null],
+          cardsType: ['cloze'],
+          cardsCreatedAt: [clozeCreatedAt],
         } as any);
+        rereadCardPriorityCacheWhenCardsExist(plugin, clozeRem._id);
 
         return { clozeRem, parentRem: rem, autoPriority };
       } finally {
@@ -1634,7 +1646,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Priority Queue',
     description:
       'Open the Priority Queue: a persistent review document topped up with your highest-priority due items and drained as you review them, with the Cooling list.',
-    keyboardShortcut: 'opt+shift+r',
+    // Opt+Shift+L, with Learn (Cmd+L); Opt+Shift+R is RemNote's Restore Last Closed Tab.
+    keyboardShortcut: 'opt+shift+l',
     quickCode: 'prq',
     action: async () => {
       const focused = await plugin.focus.getFocusedRem();
@@ -1670,9 +1683,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // Straight to Practice on the full-KB Priority Queue, for the keyboard.
   plugin.app.registerCommand({
     id: 'practice-priority-queue-kb',
-    name: 'Practice Priority Queue (Full Knowledge Base)',
+    name: 'Learn - Practice Priority Queue (Full Knowledge Base)',
     description: 'Opens the queue on the full-KB Priority Queue document — the same route as its Practice button.',
-    quickCode: 'prqgo',
+    quickCode: 'learn',
+    // Cmd+L / Ctrl+L, next to RemNote's mod+shift+l (Global Queue). RemNote binds
+    // no mod+l by default; the only listener is its CSS theme-preview lock.
+    keyboardShortcut: 'mod+l',
     action: async () => {
       if (await isQueueOpen(plugin)) {
         await plugin.app.toast('A queue is already open.');
@@ -3067,13 +3083,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  // Next item in the queue command (Ctrl+Right Arrow)
+  // Next item in the queue command (Cmd+Right on Mac, Ctrl+Right elsewhere)
   // Only works in the queue with an Incremental Rem active.
   // Replicates the Next button logic: PDF page history + handleNextRepetitionClick.
   plugin.app.registerCommand({
     id: nextInQueueCommandId,
     name: 'Next Item in Queue',
-    keyboardShortcut: 'cmd+right',
+    keyboardShortcut: 'mod+right',
     quickCode: 'next',
     action: async () => {
       const url = await plugin.window.getURL();

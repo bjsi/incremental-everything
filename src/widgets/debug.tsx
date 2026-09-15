@@ -2297,6 +2297,55 @@ function Debug() {
   };
 
   /** Real scan over the 200 highest-priority rems with due cards; publishes the cache the shields read. */
+  /**
+   * What Card.createdAt actually records, before a "recently created" cooling
+   * rule relies on it. For each card of the focused Rem: direction, createdAt,
+   * how far it sits from the Rem's own createdAt, the due date, and how many
+   * real repetitions it has. Two cases need checking on a fresh test Rem:
+   *   1. a cloze added later to a Rem that already has cards — does the new
+   *      cloze card get its own createdAt, or the Rem's / an older card's?
+   *   2. a direction switched off and back on — does the returning card keep
+   *      its original createdAt?
+   * Reads the Rem's own cards only (no card.getAll).
+   */
+  const handleProbeCardCreatedAt = async () => {
+    if (!rem) { await plugin.app.toast('No rem found!'); return; }
+    const cards = (await rem.getCards()) || [];
+    const remCreated = rem.createdAt;
+    const iso = (ms?: number | null) => (typeof ms === 'number' && ms > 0 ? new Date(ms).toISOString().replace('T', ' ').slice(0, 19) : '(none)');
+    const days = (ms: number) => (ms / 86_400_000).toFixed(3);
+    const VIEWED = new Set([0, 0.01, 0.5, 1, 1.5, 2]);
+    const rows = cards.map((c: any) => {
+      const history: any[] = c.repetitionHistory || [];
+      const realReps = history.filter((h) => h && VIEWED.has(h.score)).length;
+      const firstRep = history.filter((h) => h && typeof h.date === 'number').sort((a, b) => a.date - b.date)[0];
+      return {
+        cardId: c._id,
+        type: typeof c.type === 'string' ? c.type : `cloze:${c.type?.clozeId ?? '?'}`,
+        createdAt: iso(c.createdAt),
+        daysAfterRemCreated: typeof c.createdAt === 'number' ? days(c.createdAt - remCreated) : '(none)',
+        sameAsRemCreatedAt: c.createdAt === remCreated,
+        nextRepetitionTime: iso(c.nextRepetitionTime),
+        nextRepEqualsCreatedAt: c.nextRepetitionTime === c.createdAt,
+        realReps,
+        historyEntries: history.length,
+        firstHistoryEntry: firstRep ? `${iso(firstRep.date)} (score ${firstRep.score})` : '(none)',
+        ageDays: typeof c.createdAt === 'number' ? days(Date.now() - c.createdAt) : '(none)',
+      };
+    });
+    const distinctCreated = new Set(cards.map((c: any) => c.createdAt)).size;
+    console.group(`[CreatedAt probe] "${(rem.text || []).filter((t: any) => typeof t === 'string').join('').slice(0, 60)}" ${rem._id}`);
+    console.log(`Rem createdAt: ${iso(remCreated)} · ${cards.length} card(s) · ${distinctCreated} distinct card createdAt value(s)`);
+    console.table(rows);
+    console.log(
+      'Read it as: a card added later should show a createdAt AFTER the Rem\'s (daysAfterRemCreated > 0) and ' +
+        'distinct from its siblings. sameAsRemCreatedAt=true on a card you know is newer means createdAt is ' +
+        'not usable for "recently created". nextRepEqualsCreatedAt=true with realReps=0 is the expected new-card state.'
+    );
+    console.groupEnd();
+    await plugin.app.toast(`CreatedAt probe: ${cards.length} card(s), ${distinctCreated} distinct createdAt value(s) — see console`);
+  };
+
   const handleCoolingScanTopDue = async () => {
     const infos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
     const top = infos
@@ -4522,6 +4571,21 @@ function Debug() {
                  title="Run the cooling scan over the 200 highest-priority rems with due cards and publish the result to the session cache (what the shields will read). Prints verdicts + timing to the console"
                >
                  Cooling Scan (top 200 due)
+               </button>
+               <button
+                 onClick={handleProbeCardCreatedAt}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-secondary)',
+                   color: 'var(--rn-clr-content-primary)',
+                   border: '1px solid var(--rn-clr-border)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="Print each card of this rem with its createdAt, its offset from the rem's own createdAt, due date and real repetitions — to check whether a cloze added later, or a direction switched back on, gets its own creation time"
+               >
+                 Probe Card createdAt
                </button>
                <button
                  onClick={handleProbeCardEnablement}

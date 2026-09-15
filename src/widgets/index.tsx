@@ -1,4 +1,5 @@
 import { declareIndexPlugin, ReactRNPlugin } from '@remnote/plugin-sdk';
+import { registerStartupShieldCoolingScan } from '../lib/priority_review_document/shield_cooling_scan';
 import '../style.css';
 import '../App.css';
 import { allCardPriorityInfoKey } from '../lib/consts';
@@ -34,6 +35,7 @@ import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_agg
 import { registerJumpToRemHelper } from '../register/window';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS, registerHasImageCSS, registerPinReferenceCSS } from '../lib/ui_helpers';
 import { getIESetting } from '../lib/settings';
+import { StartupTaskBoard, waitForSessionFlag } from '../lib/startup_status';
 import { migrateIESettingsIfNeeded, settingIdsNeedingRegistration } from '../lib/settings_migration';
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -46,6 +48,9 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   (window as any).__plugin = plugin;
   registerJumpToRemHelper(plugin);
+
+  // Records the background startup work as it settles, for the hub's ▶ pulse.
+  const startup = new StartupTaskBoard(plugin);
 
 
   // Read BEFORE the powerups are registered: on a knowledge base whose card
@@ -92,6 +97,11 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerEventListeners(plugin, resetSessionItemCounter);
 
   registerIncrementalRemTracker(plugin);
+  // A full load was measured at 29s; the deadline only has to catch a load that died.
+  const incRemSettled = startup.track(
+    'incRemCache',
+    waitForSessionFlag(plugin, 'inc_rem_cache_fully_loaded', { timeoutMs: 15 * 60 * 1000 })
+  );
 
   // Fire-and-forget: clear synced graph-data entries whose Priority Review
   // Document graph Rem was deleted. Errors are logged inside the helper and
@@ -132,6 +142,11 @@ async function onActivate(plugin: ReactRNPlugin) {
   // mapping should be recomputed (cache load below, or a badge refresh).
   plugin.track(async (rp) => {
     const reloadStamp = await rp.storage.getSession(priorityBandColorsReloadKey); // reactive trigger
+    // Through `plugin`, not `rp`: cache warmth is recorded here, not subscribed
+    // to — each cache load bumps the reload key itself once it is warm.
+    const cachesWarm =
+      startup.get('cardCache') !== 'running' &&
+      !!(await plugin.storage.getSession<boolean>('inc_rem_cache_fully_loaded'));
     // Instrumentation (verbose-gated): `undefined` here means this is the
     // ACTIVATION-time run, i.e. the colours are being baked before either
     // priority cache is warm. Any later run carries the stamp of whatever
@@ -145,6 +160,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
     await registerTableBandBadgeCSS(plugin);
     await registerHighlightBandBadgeCSS(plugin);
+    if (cachesWarm) startup.settle('priorityBands', 'done');
   });
 
   await registerPluginHidingCSS(plugin);
@@ -181,15 +197,29 @@ async function onActivate(plugin: ReactRNPlugin) {
   const mayBuildCardPriorityCache =
     !useLightMode && (await getIESetting(plugin, enableFlashcardPrioritisationId));
 
+  let cardCacheSettled: Promise<void>;
   if (mayBuildCardPriorityCache) {
     // Run the full, expensive cache build, then recompute the band colours: the
     // percentile mapping is meaningless until this cache exists.
-    loadCardPriorityCache(plugin).then(
+    const cardCacheLoad = loadCardPriorityCache(plugin);
+    // Tracked BEFORE the bump below is chained, so the task is already settled
+    // when the band tracker re-runs and asks whether the caches are warm.
+    cardCacheSettled = startup.track('cardCache', cardCacheLoad);
+    cardCacheLoad.then(
       () => plugin.storage.setSession(priorityBandColorsReloadKey, Date.now()),
       (err) => console.error('CACHE: card priority cache build failed', err)
     );
+    // Pre-tagging is the build's phase 2, which runs on after the build resolves.
+    startup.track('pretagging', cardCacheLoad.then((load) => load.deferred));
+    // Once the cache has finished loading, judge cooling for the shield, so the
+    // first queue of this RemNote run already excludes cooling Rems.
+    startup.track('coolingScan', registerStartupShieldCoolingScan(plugin));
 
   } else {
+    cardCacheSettled = Promise.resolve();
+    startup.settle('cardCache', 'skipped');
+    startup.settle('pretagging', 'skipped');
+    startup.settle('coolingScan', 'skipped');
     // Empty cache. Readers treat "absent" as "no card priorities known", which is
     // the correct answer in both cases; the cascade falls back to per-rem
     // rem.getCards() rather than assuming nothing has cards.
@@ -219,11 +249,24 @@ async function onActivate(plugin: ReactRNPlugin) {
   // a live rendering bug in the user's tables, not a preference — with a "never
   // ask again" on the decline path. Deferred well past the opt-out prompt so two
   // modals can never land together, and a no-op in light mode.
-  setTimeout(() => {
-    checkCardPriorityHiddenSlotMigration(plugin).catch((err) =>
-      console.warn('Card priority hidden-slot migration check failed', err)
-    );
-  }, 20000);
+  const hiddenSlotCheck = new Promise<void>((resolve) => setTimeout(resolve, 20000)).then(() =>
+    checkCardPriorityHiddenSlotMigration(plugin)
+  );
+  hiddenSlotCheck.catch((err) => console.warn('Card priority hidden-slot migration check failed', err));
+  startup.track('hiddenSlotCheck', hiddenSlotCheck);
+
+  // The band stylesheets are normally re-registered warm by the caches' own
+  // bumps. Two paths never get there: an IncRem cache with no IncRems (which
+  // bumps nothing) finishing after the card cache, and a registration that
+  // threw. Bump once more for those; if even that run does not settle it, say so.
+  void Promise.all([cardCacheSettled, incRemSettled]).then(async () => {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    await sleep(5000);
+    if (startup.get('priorityBands') !== 'running') return;
+    await plugin.storage.setSession(priorityBandColorsReloadKey, Date.now());
+    await sleep(15000);
+    startup.settle('priorityBands', 'failed');
+  });
 }
 
 async function onDeactivate(_: ReactRNPlugin) { }

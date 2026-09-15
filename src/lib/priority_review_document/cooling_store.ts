@@ -1,5 +1,5 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { coolingCacheKey, coolingOverridesKeyPrefix, coolingIntervalPercentId, coolingMinDaysId, coolingMaxDaysId } from '../consts';
+import { coolingCacheKey, coolingOverridesKeyPrefix, coolingIntervalPercentId, coolingMinDaysId, coolingMaxDaysId, coolingNewCardDaysId, COOLING_NEW_CARD_DAYS_MAX } from '../consts';
 import { getIESettings } from '../settings';
 import {
   CoolingOverrides,
@@ -30,14 +30,18 @@ const FALLBACK_KB_ID = 'default';
 /** The cooling window parameters from the IE settings, with the defaults as fallback. */
 export async function getCoolingParams(plugin: RNPlugin): Promise<CoolingParams> {
   try {
-    const s = await getIESettings(plugin, [coolingIntervalPercentId, coolingMinDaysId, coolingMaxDaysId]);
+    const s = await getIESettings(plugin, [coolingIntervalPercentId, coolingMinDaysId, coolingMaxDaysId, coolingNewCardDaysId]);
     const pct = Number(s[coolingIntervalPercentId]);
     const min = Number(s[coolingMinDaysId]);
     const max = Number(s[coolingMaxDaysId]);
+    const newCard = Number(s[coolingNewCardDaysId]);
     return {
       intervalFraction: Number.isFinite(pct) ? Math.max(0, pct) / 100 : DEFAULT_COOLING_PARAMS.intervalFraction,
       minDays: Number.isFinite(min) ? Math.max(0, min) : DEFAULT_COOLING_PARAMS.minDays,
       maxDays: Number.isFinite(max) ? Math.max(0, max) : DEFAULT_COOLING_PARAMS.maxDays,
+      newCardDays: Number.isFinite(newCard)
+        ? Math.max(0, Math.min(COOLING_NEW_CARD_DAYS_MAX, Math.round(newCard)))
+        : DEFAULT_COOLING_PARAMS.newCardDays,
     };
   } catch {
     return DEFAULT_COOLING_PARAMS;
@@ -112,11 +116,36 @@ export async function setNeverCool(plugin: RNPlugin, remId: RemId, never: boolea
 
 // --- session cache ---------------------------------------------------------
 
+/**
+ * A due Rem that is not cooling itself but cannot be practised: its highest due
+ * ancestor (parent or grandparent) is cooling, so the Priority Queue holds it
+ * back until that window ends. Like a cooling Rem, it may not set the shield.
+ * Expires with the ancestor's cooling.
+ */
+export interface HeldByCoolingAncestor {
+  remId: RemId;
+  ancestorRemId: RemId;
+  until: number;
+}
+
 export interface CoolingCache {
   computedAt: number;
   /** Scope the scan ran for: null = full KB; otherwise the scope Rem. Informational. */
   scopeRemId: RemId | null;
   verdicts: CoolingVerdict[];
+  /** See {@link HeldByCoolingAncestor}. Absent in caches written before it existed. */
+  heldByCoolingAncestor?: HeldByCoolingAncestor[];
+}
+
+/**
+ * Everything the shields must not count, as of `now`: Rems cooling themselves
+ * and Rems held back by a cooling ancestor. Reads the cache only.
+ */
+export function shieldExclusionIds(cache: CoolingCache | null | undefined, now: number = Date.now()): Set<RemId> {
+  const ids = new Set<RemId>();
+  for (const v of cache?.verdicts ?? []) if (v.until > now) ids.add(v.remId);
+  for (const h of cache?.heldByCoolingAncestor ?? []) if (h.until > now) ids.add(h.remId);
+  return ids;
 }
 
 export async function writeCoolingCache(plugin: RNPlugin, cache: CoolingCache): Promise<void> {
@@ -175,15 +204,28 @@ export async function getCoolingRemIdSet(plugin: RNPlugin, now: number = Date.no
  */
 export async function mergeCoolingCache(
   plugin: RNPlugin,
-  scan: { computedAt: number; scopeRemId: RemId | null; checkedIds: ReadonlySet<RemId>; verdicts: CoolingVerdict[] }
+  scan: {
+    computedAt: number;
+    scopeRemId: RemId | null;
+    checkedIds: ReadonlySet<RemId>;
+    verdicts: CoolingVerdict[];
+    /** Held-back Rems this scan found, among `heldCheckedIds`. */
+    held?: HeldByCoolingAncestor[];
+    /** Rems this scan checked for a cooling ancestor; their old entries are replaced. */
+    heldCheckedIds?: ReadonlySet<RemId>;
+  }
 ): Promise<void> {
   const existing = await readCoolingCache(plugin);
   const kept = (existing?.verdicts ?? []).filter(
     (v) => v.until > scan.computedAt && !scan.checkedIds.has(v.remId)
   );
+  const keptHeld = (existing?.heldByCoolingAncestor ?? []).filter(
+    (h) => h.until > scan.computedAt && !scan.heldCheckedIds?.has(h.remId)
+  );
   await writeCoolingCache(plugin, {
     computedAt: scan.computedAt,
     scopeRemId: scan.scopeRemId,
     verdicts: [...scan.verdicts, ...kept],
+    heldByCoolingAncestor: [...(scan.held ?? []), ...keptHeld],
   });
 }

@@ -41,7 +41,20 @@ export type CoolingRelation =
   /** One of this Rem's own Alt+Z cloze children was graded. */
   | 'own-cloze-child'
   /** A child or grandchild card was graded, and its context line displayed this Rem's answer. */
-  | 'descendant';
+  | 'descendant'
+  /**
+   * This Rem is a descriptor with a due BACKWARD card, which answers with its
+   * concept — and a card of that concept (forward, backward or a cloze in it)
+   * was shown. RemNote buries the same pairing for an hour; this extends it.
+   */
+  | 'concept-reviewed'
+  /**
+   * The card itself was created recently and has never been shown. SuperMemo
+   * counts creating an item as its first repetition; this keeps a card you just
+   * wrote out of the queue for a fixed number of days (not the interval formula
+   * — a new card has no interval).
+   */
+  | 'just-created';
 
 export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'same-rem': 'another card of this Rem was reviewed',
@@ -49,6 +62,8 @@ export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'parent-extract': 'the parent extract was read',
   'own-cloze-child': 'one of its Alt+Z clozes was reviewed',
   descendant: 'a descendant card showed its answer as context',
+  'concept-reviewed': 'its concept was reviewed',
+  'just-created': 'a card of it was created',
 };
 
 export interface CoolingParams {
@@ -58,12 +73,15 @@ export interface CoolingParams {
   minDays: number;
   /** Ceiling of the window in days. */
   maxDays: number;
+  /** Fixed window for a never-shown card counted from its creation (0 = off). Defaults to 1. */
+  newCardDays?: number;
 }
 
 export const DEFAULT_COOLING_PARAMS: CoolingParams = {
   intervalFraction: 0.05,
   minDays: 1,
   maxDays: 15,
+  newCardDays: 1,
 };
 
 /** A due card of the candidate: what would be spoiled. */
@@ -89,6 +107,11 @@ export interface SpoilerSeenEvent {
    * within a session, and holding the candidate would only stall the pair.
    */
   stillDue: boolean;
+  /**
+   * A fixed window for this event, replacing the candidate's interval-derived
+   * one — used by `just-created`, whose length is its own setting.
+   */
+  windowDays?: number;
 }
 
 export interface CoolingCandidate {
@@ -107,6 +130,8 @@ export interface CoolingReason {
   seenAt: number;
   /** seenAt + window. */
   until: number;
+  /** The window this reason used, in days. */
+  windowDays: number;
 }
 
 export interface CoolingVerdict {
@@ -170,6 +195,55 @@ export interface CardLike {
   nextRepetitionTime?: number | null;
   lastRepetitionTime?: number | null;
   repetitionHistory?: { date: number; score: number }[] | null;
+  /** RemNote's card type ('forward' | 'backward' | { clozeId }), or the cache's 'cloze' tag. */
+  type?: unknown;
+  /** When the card record was created. Per card; never compare it to the Rem's createdAt. */
+  createdAt?: number | null;
+}
+
+/**
+ * True when a card was created within `days` of `now` and has never been shown.
+ * "Never shown" is read from its repetition history, not from its due date equal
+ * to its creation time: a direction switched on for the first time is due a few
+ * seconds after it is created (measured). A direction switched off and back on
+ * returns its ORIGINAL record, creation date and history included, so it is not
+ * mistaken for new.
+ */
+export function isRecentlyCreatedUnseen(card: CardLike, now: number, days: number): boolean {
+  if (days <= 0) return false;
+  if (typeof card.createdAt !== 'number' || card.createdAt <= 0) return false;
+  if (cardLastSeenAt(card) !== null) return false;
+  return now - card.createdAt < days * DAY_MS;
+}
+
+/** RemType.DESCRIPTOR in the SDK; kept as a literal so this module stays SDK-free. */
+export const REM_TYPE_DESCRIPTOR = 2;
+
+/** A card's direction as the cache stores it: 'forward', 'backward', 'cloze', or null. */
+export function cardTypeTag(type: unknown): 'forward' | 'backward' | 'cloze' | null {
+  if (type === 'forward' || type === 'backward' || type === 'cloze') return type;
+  if (type && typeof type === 'object') return 'cloze';
+  return null;
+}
+
+export function isBackwardCard(card: CardLike): boolean {
+  return cardTypeTag(card.type) === 'backward';
+}
+
+/**
+ * The concept a descriptor's backward card answers with: the nearest ancestor
+ * that is not itself a descriptor. Descriptors can nest — "pode ser transmitido
+ * por estações de navios?" under "transmitidos por quem" under "Recibos de
+ * socorro" answers with the grandparent — so the chain is walked past every
+ * descriptor. `ancestors` runs from the parent upwards; null when every Rem in
+ * it is a descriptor, or it is empty.
+ */
+export function pickConceptAncestor(ancestors: { _id: string; type?: number | null }[]): string | null {
+  for (const a of ancestors) {
+    if (!a) return null;
+    if (a.type !== REM_TYPE_DESCRIPTOR) return a._id;
+  }
+  return null;
 }
 
 /**
@@ -222,13 +296,19 @@ export function cardsFromCacheInfo(info: {
   remId: string;
   cardsNextRep?: (number | null)[];
   cardsLastSeen?: (number | null)[];
+  cardsType?: (string | null)[];
+  cardsCreatedAt?: (number | null)[];
 }): CardLike[] {
   const next = info.cardsNextRep ?? [];
   const seen = info.cardsLastSeen ?? [];
+  const types = info.cardsType ?? [];
+  const created = info.cardsCreatedAt ?? [];
   return next.map((nextRepetitionTime, i) => ({
     _id: `${info.remId}#${i}`,
     nextRepetitionTime,
     lastRepetitionTime: seen[i] ?? null,
+    type: types[i] ?? null,
+    createdAt: created[i] ?? null,
   }));
 }
 
@@ -271,7 +351,9 @@ export function evaluateCooling(
     // A timestamp from the future is a clock skew, not a review from tomorrow.
     const seenAt = Math.min(event.seenAt, now);
     if (seenAt <= releasedAt) continue;
-    const until = seenAt + windowMs;
+    const eventWindowDays = typeof event.windowDays === 'number' ? Math.max(0, event.windowDays) : windowDays;
+    if (eventWindowDays <= 0) continue;
+    const until = seenAt + eventWindowDays * DAY_MS;
     if (until <= now) continue;
     reasons.push({
       relation: event.relation,
@@ -280,6 +362,7 @@ export function evaluateCooling(
       cardId: event.cardId,
       seenAt,
       until,
+      windowDays: eventWindowDays,
     });
   }
   reasons.sort((a, b) => b.until - a.until);
@@ -297,7 +380,9 @@ export function evaluateCooling(
     label: candidate.label,
     priority: candidate.priority,
     until,
-    windowDays,
+    // The window of the reason that decides `until`, so the list shows the
+    // length that is actually holding the Rem.
+    windowDays: reasons.length ? reasons[0].windowDays : windowDays,
     intervalDays,
     reasons,
     extendedUntil: extensionApplies && extendedUntil >= reasonUntil ? extendedUntil : undefined,
@@ -316,7 +401,7 @@ export function pruneCoolingOverrides(
   now: number,
   params: CoolingParams = DEFAULT_COOLING_PARAMS
 ): CoolingOverrides {
-  const horizon = now - Math.max(params.minDays, params.maxDays) * DAY_MS;
+  const horizon = now - Math.max(params.minDays, params.maxDays, params.newCardDays ?? 0) * DAY_MS;
   const released: Record<string, number> = {};
   for (const [remId, at] of Object.entries(overrides.released ?? {})) {
     if (typeof at === 'number' && at > horizon) released[remId] = at;

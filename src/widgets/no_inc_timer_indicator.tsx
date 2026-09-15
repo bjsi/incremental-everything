@@ -1,10 +1,12 @@
 import { renderWidget } from '@remnote/plugin-sdk';
 import { NoIncTimerIndicator } from '../components/NoIncTimerIndicator';
+import { useHostShown } from '../components/useHostShown';
 
-// Compact queue only: the Beautiful variant does not render the QueueToolbar
-// location at all — queue_beautiful_bar carries this indicator there.
+// Compact queue only: QUEUE_VARIANT_CSS hides it in the Beautiful chrome, where
+// queue_beautiful_bar carries this indicator instead.
 function NoIncTimerIndicatorWidget() {
-  return <NoIncTimerIndicator />;
+  const shown = useHostShown();
+  return <NoIncTimerIndicator active={shown} />;
 }
 
 renderWidget(NoIncTimerIndicatorWidget);
