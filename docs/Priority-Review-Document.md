@@ -20,7 +20,7 @@ Small fills are the point. RemNote serves a document's cards in **random order**
 
 ## The Priority Queue popup
 
-Everything happens from one popup: **Priority Queue** in the Command Palette (quick code `prq`, shortcut `Alt+Shift+R`), the **Priority Queue** entry in any document's ⋯ menu and in the queue's ⋮ menu, or the **Priority Queue** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
+Everything happens from one popup: **Priority Queue** in the Command Palette (quick code `prq`, shortcut `Opt+Shift+L` / `Alt+Shift+L`), the **Priority Queue** entry in any document's ⋯ menu and in the queue's ⋮ menu, or the **Priority Queue** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
 
 ![The Priority Queue popup: scope, status card, fill target and shield slice, and the action buttons](assets/priority-queue-popup.png){ width="640" }
 

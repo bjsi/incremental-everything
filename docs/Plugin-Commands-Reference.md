@@ -112,7 +112,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 
 ## Special Operations
 
-- **[Priority Queue](Priority-Review-Document.md#the-priority-queue-popup)** (`Opt+Shift+R` / `Alt+Shift+R`) — `quick: prq`
+- **[Priority Queue](Priority-Review-Document.md#the-priority-queue-popup)** (`Opt+Shift+L` / `Alt+Shift+L`) — `quick: prq`
   Opens the Priority Queue popup for the focused document or the whole knowledge base: the persistent review document that is topped up to a fill target with your highest-priority due items and drained as you review them — refresh, drain, refill, practise, and the Cooling list. Also in the document menu, the queue menu, and on the **Priority Queue** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
 
 - **[Learn - Practice Priority Queue (Full Knowledge Base)](Priority-Review-Document.md#practise-it)** (`Cmd+L` / `Ctrl+L`) — `quick: learn`

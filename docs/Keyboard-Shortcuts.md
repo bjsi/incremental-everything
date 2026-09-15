@@ -7,7 +7,7 @@ The same shortcuts are listed **twice**, in two different orders — pick whiche
 - **[By function](#plugin-shortcuts)** — grouped by what you want to do (extract, prioritize, navigate the queue…). Use this when you know the *task* but not the key.
 - **[By key](#shortcuts-by-key)** — grouped by modifier (`Ctrl+…`, `Opt+…`, `Ctrl+Shift+…`…). Use this when you know the *key* but not what it does, or when you are looking for a free binding.
 
-Also on this page: **[keys inside plugin popups](#keys-inside-plugin-popups)**, **[native RemNote shortcuts](#important-native-remnote-shortcuts)** and **[macOS notes](#macos-notes)**. Every shortcut of RemNote itself, with the plugin's mixed into one keyboard map, is on **[RemNote Native Shortcuts](RemNote-Native-Shortcuts.md)**.
+Also on this page: **[keys inside plugin popups](#keys-inside-plugin-popups)**, **[native RemNote shortcuts](#important-native-remnote-shortcuts)**, **[macOS notes](#macos-notes)** and **[Windows notes](#windows-notes)**. Every shortcut of RemNote itself, with the plugin's mixed into one keyboard map, is on **[RemNote Native Shortcuts](RemNote-Native-Shortcuts.md)**.
 
 ---
 ## Plugin Shortcuts
@@ -43,15 +43,15 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
 | `Alt` + `P` | [Set Priority](Prioritization-&-Sorting.md#main-priority-popup) | Opens the full Priority popup with analytics, inheritance info, and scope navigation. | Editor and Queue |
-| `Ctrl` + `Opt` + `P` | Quick Set Priority | Opens the Light Priority popup for fast priority adjustments without heavy stats. | Editor and Queue |
-| `Ctrl` + `Opt` + `↑` | Quick Increase Priority Number | Increases priority number by the [Priority Step Size](Plugin-Settings-Reference.md#priority) (default 5), making item **less important**. | Editor and Queue |
-| `Ctrl` + `Opt` + `↓` | Quick Decrease Priority Number | Decreases priority number by the [Priority Step Size](Plugin-Settings-Reference.md#priority) (default 5), making item **more important**. | Editor and Queue |
+| `Ctrl` + `Opt` + `P` | Quick Set Priority | Opens the Light Priority popup for fast priority adjustments without heavy stats. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
+| `Ctrl` + `Opt` + `↑` | Quick Increase Priority Number | Increases priority number by the [Priority Step Size](Plugin-Settings-Reference.md#priority) (default 5), making item **less important**. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
+| `Ctrl` + `Opt` + `↓` | Quick Decrease Priority Number | Decreases priority number by the [Priority Step Size](Plugin-Settings-Reference.md#priority) (default 5), making item **more important**. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
 
 ### Batch Operations
 
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
-| `Alt` + `Shift` + `R` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Opens the Priority Queue popup: refresh, drain, refill and practise the persistent priority review document, and the Cooling list. | Editor Only |
+| `Alt` + `Shift` + `L` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Opens the Priority Queue popup: refresh, drain, refill and practise the persistent priority review document, and the Cooling list. | Editor Only |
 | (n/a) | Batch Priority Change (IncRems & Flashcards) | Opens popup to change priorities of Incremental Rems and Flashcards in bulk (Increase, Decrease, Spread evenly, Adjust proportionally). Access via Command Palette or Document Menu. | Editor Only |
 | `Alt` + `Shift` + `C` | Batch Assign Card Priority | Opens popup to assign card priorities in bulk for all flashcards tagged with the focused Rem. | Editor Only |
 
@@ -60,7 +60,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Opens the main view popup showing all Incremental Rems with filtering and sorting. | Global |
-| `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Routes to the right view: **Single History** for an Incremental Rem, **[Flashcard History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)** (all of the Rem's cards) for a flashcard, **Aggregated History** for a folder with incremental descendants. A Rem that is both offers a button across. | Editor and Queue |
+| `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Routes to the right view: **Single History** for an Incremental Rem, **[Flashcard History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)** (all of the Rem's cards) for a flashcard, **Aggregated History** for a folder with incremental descendants. A Rem that is both offers a button across. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
 | `Ctrl` + `Shift` + `I` | [Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities) | Adds/removes the `#ignore` tag on the focused Rem **or a multi-rem selection** (run from the Omnibar). Ignored rems are shrunk and dimmed (full opacity on hover/focus) and the tag chip is hidden — used during IR to mark already-read snippets that don't deserve becoming Incremental. | Editor Only |
 
 ### Editing Utilities
@@ -149,9 +149,9 @@ Function keys carry the utilities whose natural letter combination was already t
 | `Alt` + `Shift` + `C` | Batch Assign Card Priority | Editor |
 | `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open) | Editor |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Global |
+| `Alt` + `Shift` + `L` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Editor |
 | `Alt` + `Shift` + `O` | [Open Hovered Source in Floating Window](Utilities.md#floating-window-interaction-closing) | Editor and Queue |
 | `Alt` + `Shift` + `Q` | [Pin Source Quote](Source-Pins.md) | Editor |
-| `Alt` + `Shift` + `R` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Editor |
 | `Alt` + `Shift` + `V` | [Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Editor |
 | `Alt` + `Shift` + `X` | Extract with Priority | Editor and Queue |
 | `Alt` + `Shift` + `Z` | Create Cloze Deletion with Priority | Editor |
@@ -230,3 +230,16 @@ While not part of the plugin itself, these native RemNote shortcuts are crucial 
 - Shortcuts using `Alt` on Windows/Linux correspond to `Opt` (Option) on macOS.
 - Shortcuts using `Ctrl` remain `Ctrl` on macOS (not `Cmd`/`⌘`).
 - Example: `Ctrl+J` on macOS is `⌃+J`, not `⌘+J`.
+
+---
+## Windows Notes { #windows-notes }
+
+On Windows and Linux, RemNote's `Cmd` shortcuts use `Ctrl`, so these plugin shortcuts press the same keys as a RemNote default, and only one of the two runs. On macOS they do not conflict:
+
+| Shortcut | Plugin command | RemNote command (Windows / Linux) |
+| :--- | :--- | :--- |
+| `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Hide Parents & Siblings From Document |
+| `Ctrl` + `Alt` + `P` | [Quick Set Priority](Prioritization-&-Sorting.md#light-priority-popup) | Add All Properties |
+| `Ctrl` + `Alt` + `↑` / `↓` | [Quick Increase / Decrease Priority Number](Prioritization-&-Sorting.md#quick-priority-shortcuts) | Increase / Decrease Video Playback Speed on Learning Page |
+
+If you use the RemNote command, rebind either one in RemNote's keyboard-shortcut settings. [RemNote Native Shortcuts](RemNote-Native-Shortcuts.md#by-key) shows which combinations are free.

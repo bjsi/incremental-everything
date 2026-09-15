@@ -282,7 +282,7 @@ The same shortcuts are listed **twice**:
 | Close Tab (Browser Alternative) | `Cmd + Opt + W` | `Ctrl + Alt + W` |  |
 | Add New Tab (Desktop App Only) | `Cmd + T` | `Ctrl + T` | fixed, desktop global |
 | Close Tab (Desktop App Only) | `Cmd + W` | `Ctrl + W` | fixed, desktop global |
-| Restore Last Closed Tab | `Opt + Shift + R` | `Alt + Shift + R` | ⚠️ Same keys as *Priority Queue* (Mac & Windows) |
+| Restore Last Closed Tab | `Opt + Shift + R` | `Alt + Shift + R` |  |
 | Open Selected Bullet in New Tab | `Cmd + Opt + '` | `Ctrl + Alt + '` |  |
 | Rename Tab | `Cmd + F3` | `Ctrl + F3` |  |
 | Switch to Next Tab | `Cmd + Opt + →` | `Ctrl + Alt + →` |  |
@@ -599,11 +599,11 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 | `Opt + Shift + D` / `Alt + Shift + D` | Add Today's Document In New Pane | Global |  |
 | `Opt + Shift + F` / `Alt + Shift + F` | [Find Rem (insert reference / open in pane)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + I` / `Alt + Shift + I` | [Open Incremental Rems Main View](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
+| `Opt + Shift + L` / `Alt + Shift + L` | [Priority Queue](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + N` / `Alt + Shift + N` | Open Create Menu | Global |  |
 | `Opt + Shift + O` / `Alt + Shift + O` | [Open Hovered Source in Floating Window](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + Q` / `Alt + Shift + Q` | [Pin Source Quote](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
-| `Opt + Shift + R` / `Alt + Shift + R` | Restore Last Closed Tab | Tabs | ⚠️ Same keys as *Priority Queue* (Mac & Windows) |
-| `Opt + Shift + R` / `Alt + Shift + R` | [Priority Queue](Keyboard-Shortcuts.md) | **Incremental RemNote** | ⚠️ Same keys as *Restore Last Closed Tab* (Mac & Windows) |
+| `Opt + Shift + R` / `Alt + Shift + R` | Restore Last Closed Tab | Tabs |  |
 | `Opt + Shift + S` / `Alt + Shift + S` | Toggle Right Sidebar | Global |  |
 | `Opt + Shift + V` / `Alt + Shift + V` | [Paste Rem Sources](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + X` / `Alt + Shift + X` | Restart AI Chat (when in chat window) | Global | ⚠️ Same keys as *Extract with Priority* (Mac & Windows) |

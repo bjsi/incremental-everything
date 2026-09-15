@@ -1646,7 +1646,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Priority Queue',
     description:
       'Open the Priority Queue: a persistent review document topped up with your highest-priority due items and drained as you review them, with the Cooling list.',
-    keyboardShortcut: 'opt+shift+r',
+    // Opt+Shift+L, with Learn (Cmd+L); Opt+Shift+R is RemNote's Restore Last Closed Tab.
+    keyboardShortcut: 'opt+shift+l',
     quickCode: 'prq',
     action: async () => {
       const focused = await plugin.focus.getFocusedRem();

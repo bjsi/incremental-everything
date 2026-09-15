@@ -77,7 +77,7 @@ Here's the reality of serious learning: **you will always have more to learn tha
 
 The breakthrough feature is **[Priority Review Documents](Priority-Review-Document.md)**. When you have 5,000 due cards:
 
-1. Press `Opt+Shift+R` (Mac) / `Alt+Shift+R` (Windows/Linux)
+1. Press `Opt+Shift+L` (Mac) / `Alt+Shift+L` (Windows/Linux)
 2. Select your scope (document/folder or full KB)
 3. Choose item count (e.g., 100) and flashcard/IncRem ratio (e.g., 6:1)
 4. Review a manageable session of your **highest-priority** items

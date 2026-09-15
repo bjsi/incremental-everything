@@ -641,7 +641,7 @@ Finds the Rems in an anchor's orbit that generate no flashcards, and fixes the t
 📖 **Full documentation:** [Card Enablement Audit](Utilities.md#card-enablement-audit)
 
 ### 6.14. Priority Queue Popup
-**Trigger:** `Priority Queue` command (quick code `prq`, `Alt+Shift+R`), the **Document Menu** (⋯) of any document, the queue's ⋮ menu, or the **Priority Queue** button of the panel
+**Trigger:** `Priority Queue` command (quick code `prq`, `Opt+Shift+L` / `Alt+Shift+L`), the **Document Menu** (⋯) of any document, the queue's ⋮ menu, or the **Priority Queue** button of the panel
 
 The front door to the persistent review document, one per scope.
 

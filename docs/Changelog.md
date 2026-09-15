@@ -10,11 +10,23 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
 
+### ⚡ Improved - Priority Queue moved to Opt+Shift+L
+
+The **Priority Queue** popup now opens with `Opt+Shift+L` / `Alt+Shift+L`, next to Learn on `Cmd/Ctrl+L`, because `Alt+Shift+R` is RemNote's Restore Last Closed Tab.
+
+📖 [The Priority Queue popup](Priority-Review-Document.md#the-priority-queue-popup)
+
 ### 📚 Docs - every RemNote shortcut on one page
 
 A new **RemNote Native Shortcuts** page lists all of RemNote's default shortcuts by function and by key, with the plugin's shortcuts in the same keyboard map so you can see which combinations are free.
 
 📖 [RemNote Native Shortcuts](RemNote-Native-Shortcuts.md)
+
+### 📚 Docs - shortcuts that conflict on Windows
+
+The Keyboard Shortcuts page now lists the three plugin shortcuts that press the same keys as a RemNote command on Windows and Linux.
+
+📖 [Windows Notes](Keyboard-Shortcuts.md#windows-notes)
 
 ## v1.0.109 - September 15th, 2026
 
