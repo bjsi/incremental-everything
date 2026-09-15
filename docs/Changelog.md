@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.111 - September 15th, 2026
+
+### ⚡ Improved - Pin Source Quote runs over a multi-Rem selection
+
+Select several Rems and **Pin Source Quote** pins each one's source in turn, asking which view to use only once and reporting at the end what was pinned and what was not found.
+
+📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
+
 ## v1.0.110 - September 15th, 2026
 
 ### ⚡ Improved - Pin Source Quote has a shortcut

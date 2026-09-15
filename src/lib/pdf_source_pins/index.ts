@@ -4,6 +4,7 @@ import {
   ReactRNPlugin,
   RichTextElementRemInterface,
   RichTextInterface,
+  SelectionType,
 } from '@remnote/plugin-sdk';
 import { AI_OCR_HELPER_URL } from '../ai_ocr';
 import { HighlightColorName, sourceHighlightColorId } from '../consts';
@@ -12,6 +13,7 @@ import { safeRemTextToString } from '../pdfUtils';
 import { getIESetting } from '../settings';
 import DOMPurify from 'dompurify';
 import { broadestMatch, quoteCandidates } from './quote';
+import { getEffectiveSelection } from '../editor_selection';
 import { MessageDialog, showMessageDialog } from '../message_dialog';
 import { highlightDataFor, highlightSpan, mathPlaceholder, parseArticle, viewerHtml } from './html';
 import {
@@ -426,26 +428,43 @@ export async function appendPins(rem: PluginRem, ids: string[]) {
 }
 
 export interface PinQuoteRequest {
-  focusedRemId: string;
+  /** The Rem the pins are appended to. */
+  remId: string;
   sourceRemId: string;
-  /** Texts to try, broadest match wins (see quoteCandidates). The first is shown to the user. */
+  /** Texts to try, best match wins (see quoteCandidates). The first is shown to the user. */
   candidates: string[];
 }
 
 export type PinOutcome = { ok: true } | { ok: false; dialog: MessageDialog };
 
+const excerpt = (text: string, max = 200) => (text.length > max ? `${text.slice(0, max)}\u2026` : text);
+
+const errorDialog = (e: Error): MessageDialog => ({
+  tone: 'error',
+  title: 'Could not pin the source',
+  message: e instanceof SourcePinError ? e.message : `Pin Source Quote failed: ${e.message}`,
+});
+
+const notFoundDialog = (candidates: string[]): MessageDialog => ({
+  tone: 'info',
+  title: 'Passage not found',
+  message: 'This passage does not appear in the open source:',
+  quote: excerpt(candidates[0] ?? ''),
+  detail:
+    'Only text taken from the source matches \u2014 a paraphrase, translation or summary will not. ' +
+    'Check that the right PDF or article is open.',
+});
+
 /**
- * Pin the source of the request's text in `views` and append the pins to the
- * Rem. Every candidate is tried first without writing anything, and only the
- * broadest match is pinned. Success is reported in a toast. A failure is returned
- * as a dialog for the caller to show, since the caller may itself be a popup that
- * a second popup would replace.
+ * One Rem: try every candidate without writing anything, pin the best match and
+ * append its pins. Silent — the caller reports, so a run over many Rems does not
+ * raise a toast or a dialog per Rem.
  */
-export async function pinQuoteInViews(
+async function pinOneQuote(
   plugin: ReactRNPlugin,
   request: PinQuoteRequest,
   views: SourceView[]
-): Promise<PinOutcome> {
+): Promise<{ result?: SourcePinResult; error?: Error }> {
   const { candidates } = request;
   let result: SourcePinResult | undefined;
   try {
@@ -466,64 +485,127 @@ export async function pinQuoteInViews(
     }
   } catch (e) {
     console.error('[SourcePins]', e);
-    return {
-      ok: false,
-      dialog: {
-        tone: 'error',
-        title: 'Could not pin the source',
-        message: e instanceof SourcePinError ? e.message : `Pin Source Quote failed: ${(e as Error).message}`,
-      },
-    };
+    return { error: e as Error };
   }
   console.log('[SourcePins] Result', result);
+  if (!result?.found) return {};
+  const rem = await plugin.rem.findOne(request.remId);
+  if (rem) await appendPins(rem, result.pins);
+  return { result };
+}
 
-  if (!result?.found) {
-    const shown = candidates[0] ?? '';
-    return {
-      ok: false,
-      dialog: {
-        tone: 'info',
-        title: 'Passage not found',
-        message: 'This passage does not appear in the open source:',
-        quote: shown.length > 200 ? `${shown.slice(0, 200)}…` : shown,
-        detail:
-          'Only text taken from the source matches — a paraphrase, translation or summary will not. ' +
-          'Check that the right PDF or article is open.',
-      },
-    };
-  }
-  const fresh = await plugin.rem.findOne(request.focusedRemId);
-  if (fresh) await appendPins(fresh, result.pins);
-
-  const source = await plugin.rem.findOne(request.sourceRemId);
+/** One run's per-view counts, as the toast shows them: "PDF p.95: reused 0, created 1". */
+async function viewSummary(plugin: ReactRNPlugin, sourceRemId: string, result: SourcePinResult) {
+  const source = await plugin.rem.findOne(sourceRemId);
   const sourceIsPdf = source ? (await sourceViews(source)).includes('pdf') : false;
   const label = (v: ViewPinResult) =>
     v.view === 'pdf' ? `PDF p.${v.page ?? '?'}` : sourceIsPdf ? 'Text Reader' : 'Article';
-  const summary = result.views
+  return result.views
     .map((v) => (v.found ? `${label(v)}: reused ${v.reused.length}, created ${v.created.length}` : `${label(v)}: not found`))
-    .join(' · ');
-  await plugin.app.toast(`📌 ${summary}`);
+    .join(' \u00b7 ');
+}
+
+/**
+ * Pin the source of one Rem's text in `views`. Success is reported in a toast; a
+ * failure is returned as a dialog for the caller to show, since the caller may
+ * itself be a popup that a second popup would replace.
+ */
+export async function pinQuoteInViews(
+  plugin: ReactRNPlugin,
+  request: PinQuoteRequest,
+  views: SourceView[]
+): Promise<PinOutcome> {
+  const { result, error } = await pinOneQuote(plugin, request, views);
+  if (error) return { ok: false, dialog: errorDialog(error) };
+  if (!result) return { ok: false, dialog: notFoundDialog(request.candidates) };
+  await plugin.app.toast(`\ud83d\udccc ${await viewSummary(plugin, request.sourceRemId, result)}`);
   return { ok: true };
 }
 
 /**
- * Command: pin the source of the focused Rem's text in the PDF or web article
- * open in a pane. The front, the back and both joined are tried (without pins
- * or a leading list marker) and the broadest match is pinned — at the end of
- * the back when the Rem has one. A PDF that also has a Text Reader version asks
- * which view(s) to use.
+ * Pin the sources of several Rems (a multi-Rem selection), one after another.
+ * Rems whose passage is not found are collected and listed at the end rather
+ * than interrupting the run; a helper failure stops it, since every remaining
+ * Rem would fail the same way.
+ */
+export async function pinQuotesInViews(
+  plugin: ReactRNPlugin,
+  requests: PinQuoteRequest[],
+  views: SourceView[],
+  onProgress?: (done: number, total: number) => void
+): Promise<PinOutcome> {
+  if (requests.length === 1) return pinQuoteInViews(plugin, requests[0], views);
+
+  const missed: string[] = [];
+  let pinned = 0;
+  let created = 0;
+  let reused = 0;
+  for (let k = 0; k < requests.length; k++) {
+    onProgress?.(k, requests.length);
+    const { result, error } = await pinOneQuote(plugin, requests[k], views);
+    if (error) {
+      const dialog = errorDialog(error);
+      dialog.detail = `Stopped after ${k} of ${requests.length} Rems; ${pinned} pinned.`;
+      return { ok: false, dialog };
+    }
+    if (!result) missed.push(excerpt(requests[k].candidates[0] ?? '', 90));
+    else {
+      pinned++;
+      created += result.created.length;
+      reused += result.reused.length;
+    }
+  }
+  onProgress?.(requests.length, requests.length);
+
+  await plugin.app.toast(
+    `\ud83d\udccc ${pinned} of ${requests.length} Rems pinned \u2014 reused ${reused}, created ${created} highlight${created === 1 ? '' : 's'}.`
+  );
+  if (!missed.length) return { ok: true };
+  return {
+    ok: false,
+    dialog: {
+      tone: 'info',
+      title: `Passage not found for ${missed.length} of ${requests.length} Rems`,
+      message: 'The others were pinned. These were not found in the open source:',
+      quote: missed.slice(0, 8).map((m) => `\u2022 ${m}`).join('\n') + (missed.length > 8 ? `\n\u2022 \u2026and ${missed.length - 8} more` : ''),
+      detail: 'Only text taken from the source matches \u2014 a paraphrase, translation or summary will not.',
+    },
+  };
+}
+
+/**
+ * Command: pin the sources of the selected Rems' text — a multi-Rem selection
+ * takes precedence, else the focused Rem — in the PDF or web article open in a
+ * pane. For each Rem the front, the back and both joined are tried (without pins
+ * or a leading list marker) and the best match is pinned, at the end of the back
+ * when the Rem has one. A PDF that also has a Text Reader version asks which
+ * view(s) to use, once for the whole selection.
  */
 export async function pinSourceQuote(plugin: ReactRNPlugin) {
-  const focused = await plugin.focus.getFocusedRem();
-  if (!focused) {
-    await plugin.app.toast('Focus a Rem whose text is a passage from the open PDF or article.');
+  const selection = await getEffectiveSelection(plugin);
+  let rems: PluginRem[] = [];
+  if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+    rems = (await plugin.rem.findMany(selection.remIds)) || [];
+  } else {
+    const focused = await plugin.focus.getFocusedRem();
+    if (focused) rems = [focused];
+  }
+  if (!rems.length) {
+    await plugin.app.toast('Focus or select Rems whose text is a passage from the open PDF or article.');
     return;
   }
+
   const plain = (rt: RichTextInterface | undefined) =>
     plugin.richText.toString(((rt ?? []) as RichTextInterface).filter((el) => !isPin(el)));
-  const candidates = quoteCandidates(await plain(focused.text), await plain(focused.backText));
-  if (!candidates.length) {
-    await plugin.app.toast('The focused Rem has no text to look for.');
+  const withText: { remId: string; candidates: string[] }[] = [];
+  for (const rem of rems) {
+    const candidates = quoteCandidates(await plain(rem.text), await plain(rem.backText));
+    if (candidates.length) withText.push({ remId: rem._id, candidates });
+  }
+  if (!withText.length) {
+    await plugin.app.toast(
+      rems.length === 1 ? 'The focused Rem has no text to look for.' : 'The selected Rems have no text to look for.'
+    );
     return;
   }
 
@@ -531,13 +613,14 @@ export async function pinSourceQuote(plugin: ReactRNPlugin) {
     const rem = await plugin.rem.findOne(id);
     const views = rem ? await sourceViews(rem) : [];
     if (!views.length) continue;
-    const request: PinQuoteRequest = { focusedRemId: focused._id, sourceRemId: id, candidates };
+    const requests: PinQuoteRequest[] = withText.map((w) => ({ ...w, sourceRemId: id }));
     if (views.length > 1) {
-      await plugin.widget.openPopup(PIN_SOURCE_VIEWS_POPUP, { request });
-    } else {
-      const outcome = await pinQuoteInViews(plugin, request, views);
-      if (!outcome.ok) await showMessageDialog(plugin, outcome.dialog);
+      await plugin.widget.openPopup(PIN_SOURCE_VIEWS_POPUP, { requests });
+      return;
     }
+    if (requests.length > 1) await plugin.app.toast(`\ud83d\udccc Pinning ${requests.length} Rems\u2026`);
+    const outcome = await pinQuotesInViews(plugin, requests, views);
+    if (!outcome.ok) await showMessageDialog(plugin, outcome.dialog);
     return;
   }
   await plugin.app.toast('Open the source PDF or web article in a pane first.');

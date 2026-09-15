@@ -13,11 +13,12 @@ A **source pin** is a pin reference to the highlight that holds a passage: click
 ## Using it { #pin-source-quote }
 
 1. Open the source in a pane: a **PDF**, a **saved web article** (RemNote's reader view of a page), or a **PDF in Text Reader mode**.
-2. Focus the Rem whose text comes from that source.
+2. Focus the Rem whose text comes from that source, or select several Rems.
 3. Run **Pin Source Quote**: `Opt+Shift+Q` / `Alt+Shift+Q`, or quick code `psq`.
 
 A toast reports where the passage was found and what was reused or created — for example *📌 PDF p.95: reused 0, created 1*.
 
+- **Several Rems at once:** with a multi-Rem selection, each Rem is pinned in turn and a final toast reports how many were done. Rems whose passage was not found are listed together at the end instead of stopping the run, and a PDF with a Text Reader version asks [which view](#text-reader) once, for the whole selection.
 - **Front and back:** when the Rem has a back, the command looks for the front, the back, and both joined in either order — a heading on one side and its sentence on the other are often one passage — and pins the version that matches the most of its words. The pin goes at the **end of the back**; on a Rem without a back, at the end of the front.
 - The text must be **taken from the source**. Small differences are tolerated — a garbled character from the PDF's text layer, missing punctuation — but a paraphrase, summary or translation will not be found.
 - A **leading list marker** in your Rem ("3. ", "b) ", "• ") is ignored: the source shows it as list numbering, not as text.
