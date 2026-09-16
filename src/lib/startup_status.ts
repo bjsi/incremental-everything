@@ -21,9 +21,10 @@ export type StartupTaskId =
   | 'incRemCache'
   | 'coolingScan'
   | 'hiddenSlotCheck'
-  | 'priorityBands';
+  | 'priorityBands'
+  | 'priorityQueueRefresh';
 
-/** `skipped` = does not apply here (Light Mode, or flashcard prioritisation off). */
+/** `skipped` = does not apply here (Light Mode, flashcard prioritisation or auto-refresh off). */
 export type StartupTaskState = 'running' | 'done' | 'skipped' | 'failed';
 
 export interface StartupTasksStatus {
@@ -40,6 +41,7 @@ export const STARTUP_TASK_ORDER: StartupTaskId[] = [
   'coolingScan',
   'hiddenSlotCheck',
   'priorityBands',
+  'priorityQueueRefresh',
 ];
 
 export const STARTUP_TASK_LABELS: Record<StartupTaskId, string> = {
@@ -49,6 +51,7 @@ export const STARTUP_TASK_LABELS: Record<StartupTaskId, string> = {
   coolingScan: 'Cooling scan',
   hiddenSlotCheck: 'CardPriority hidden-slot check',
   priorityBands: 'Priority bands',
+  priorityQueueRefresh: 'Priority Queue refresh',
 };
 
 /** Finished, and nothing failed. */
@@ -72,7 +75,7 @@ export function describeStartupTasks(status: StartupTasksStatus | null | undefin
   if (failed.length > 0) return `⚠️ Startup finished with problems: ${failed.join(', ')} — see the console.`;
 
   const seconds = Math.round(((status.completedAt ?? Date.now()) - status.startedAt) / 1000);
-  return `✅ Startup finished in ${seconds}s — caches, pre-tagging, cooling scan, hidden-slot check and priority bands are ready.`;
+  return `✅ Startup finished in ${seconds}s — the plugin is fully ready.`;
 }
 
 /**

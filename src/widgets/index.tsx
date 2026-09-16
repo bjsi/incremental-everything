@@ -27,7 +27,8 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
-import { enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
+import { refreshAllPriorityQueuesAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
@@ -198,6 +199,8 @@ async function onActivate(plugin: ReactRNPlugin) {
     !useLightMode && (await getIESetting(plugin, enableFlashcardPrioritisationId));
 
   let cardCacheSettled: Promise<void>;
+  let pretaggingSettled: Promise<void>;
+  let coolingScanSettled: Promise<void>;
   if (mayBuildCardPriorityCache) {
     // Run the full, expensive cache build, then recompute the band colours: the
     // percentile mapping is meaningless until this cache exists.
@@ -210,13 +213,13 @@ async function onActivate(plugin: ReactRNPlugin) {
       (err) => console.error('CACHE: card priority cache build failed', err)
     );
     // Pre-tagging is the build's phase 2, which runs on after the build resolves.
-    startup.track('pretagging', cardCacheLoad.then((load) => load.deferred));
+    pretaggingSettled = startup.track('pretagging', cardCacheLoad.then((load) => load.deferred));
     // Once the cache has finished loading, judge cooling for the shield, so the
     // first queue of this RemNote run already excludes cooling Rems.
-    startup.track('coolingScan', registerStartupShieldCoolingScan(plugin));
+    coolingScanSettled = startup.track('coolingScan', registerStartupShieldCoolingScan(plugin));
 
   } else {
-    cardCacheSettled = Promise.resolve();
+    cardCacheSettled = pretaggingSettled = coolingScanSettled = Promise.resolve();
     startup.settle('cardCache', 'skipped');
     startup.settle('pretagging', 'skipped');
     startup.settle('coolingScan', 'skipped');
@@ -231,6 +234,23 @@ async function onActivate(plugin: ReactRNPlugin) {
     // persisting it would wipe a good copy on every mobile session and make the
     // next full-mode launch pay a cold build for it.
     await writeCardPriorityCache(plugin, []);
+  }
+
+  // The queue-exit auto-refresh, also run once at startup for every Priority
+  // Queue document. After the caches: in Full Mode a refresh takes its card facts
+  // from the card cache, and would otherwise pay for a card.getAll(). After the
+  // cooling scan too: both publish cooling, and the scan — which alone records the
+  // Rems held back by a cooling ancestor for the shield — skips itself once any
+  // cooling has been published. Not in Light Mode, for the same reason as at exit.
+  if (useLightMode || !(await getIESetting(plugin, autoRefreshPriorityQueueId))) {
+    startup.settle('priorityQueueRefresh', 'skipped');
+  } else {
+    startup.track(
+      'priorityQueueRefresh',
+      Promise.all([cardCacheSettled, pretaggingSettled, coolingScanSettled, incRemSettled]).then(() =>
+        refreshAllPriorityQueuesAtStartup(plugin)
+      )
+    );
   }
 
   // Turning the flashcard-prioritisation opt-in OFF leaves every tag it wrote in

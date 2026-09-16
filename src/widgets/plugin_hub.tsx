@@ -416,8 +416,8 @@ export function PluginHub() {
 
   /**
    * The ▶ button only starts pulsing once the startup work has finished — the
-   * caches, pre-tagging, the cooling scan, the hidden-slot check and the band
-   * stylesheets — so "is the plugin ready?" is answered here, not in the console.
+   * caches, pre-tagging, the cooling scan, the hidden-slot check, the band
+   * stylesheets and the Priority Queue refresh — so "is the plugin ready?" is answered here, not in the console.
    * It stays still if any of them failed; the tooltip says which.
    */
   const startupStatus = useTrackerPlugin(

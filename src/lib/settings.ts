@@ -542,12 +542,13 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   [autoRefreshPriorityQueueId]: {
     kind: 'boolean',
     group: 'priorityQueue',
-    title: 'Refresh the Priority Queue after each session',
+    title: 'Refresh the Priority Queues at startup and after each session',
     description:
-      'When you leave the queue after practising a Priority Queue document, drains the entries ' +
-      'you reviewed and tops the document back up to its fill target, so it is ready before the ' +
-      'next Practice. Never runs while a queue is open, and not in Light Mode — refresh from the ' +
-      'Priority Queue popup there.',
+      'When RemNote starts, once the caches are loaded, refreshes every Priority Queue document; ' +
+      'and when you leave the queue after practising one, refreshes that one. A refresh drains the ' +
+      'entries you reviewed and tops the document back up to its fill target, so it is ready ' +
+      'before the next Practice. Never runs while a queue is open, and not in Light Mode — refresh ' +
+      'from the Priority Queue popup there.',
   },
   [coolingIntervalPercentId]: {
     kind: 'number',
