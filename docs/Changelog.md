@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.112 - September 16th, 2026
+
+### ⚡ Improved - Priority Queues refresh at startup
+
+With **Refresh the Priority Queues at startup and after each session** on, every Priority Queue document is now also refreshed when RemNote starts, once the caches are loaded, and the ▶ button of the plugin panel waits for it before pulsing.
+
+📖 [Refresh at startup and after every session](Priority-Review-Document.md#refresh-after-every-session)
+
 ## v1.0.111 - September 15th, 2026
 
 ### ⚡ Improved - Pin Source Quote runs over a multi-Rem selection

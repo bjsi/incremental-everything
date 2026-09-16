@@ -41,9 +41,13 @@ The popup is keyboard-driven: `←` `→` move the selection ring across the con
 
 While you practise, the plugin knows where the items came from: the [Priority Shield](Prioritization-&-Sorting.md#priority-shield) and its history are computed against the **original scope** (the document you chose, or the whole knowledge base), not against the review document itself. See [Smart Scope](#smart-scope-priority-shield-integration).
 
-### Refresh after every session
+### Refresh at startup and after every session { #refresh-after-every-session }
 
-When you leave the queue after practising a Priority Queue document, the plugin refreshes it a couple of seconds later: what you reviewed is drained, what is now cooling is drained, and the document is topped back up. A toast reports the result. This is the **Refresh the Priority Queue after each session** setting, on by default.
+When you leave the queue after practising a Priority Queue document, the plugin refreshes it a couple of seconds later: what you reviewed is drained, what is now cooling is drained, and the document is topped back up. A toast reports the result.
+
+When RemNote starts, **every** Priority Queue document is refreshed once — the full-KB one and each document-scoped one — so the first Practice of the day finds them up to date. This waits for the caches and the cooling scan to finish, and the ▶ button of the [plugin panel](Getting-Started.md#when-learn-starts-pulsing) only starts pulsing once it is done. One toast reports the result for all of them. If you open a queue before it finishes, the documents not yet refreshed are left for later.
+
+Both are the **Refresh the Priority Queues at startup and after each session** setting, on by default.
 
 In [Light Mode](Full-Mode-x-Light-Mode.md), including on mobile, the automatic refresh does not run. Light Mode keeps no card cache, so a refresh there has to read every card in your knowledge base — once, shared by the drain, cooling and the new selection — which is the kind of work Light Mode exists to avoid after every session. Press **Refresh** or **▶ Practice** in the popup instead; both still work, cooling included. In Full Mode a refresh reads no cards at all: everything comes from the card cache.
 
