@@ -228,18 +228,27 @@ Without special handling, the selection would pick individual flashcard Rems on 
 
 ### How the Plugin Handles It
 
-Every time a flashcard Rem is selected, the plugin:
+A flashcard Rem is a cluster member when its **direct parent** carries the Card Cluster powerup. The plugin keeps every cluster in the document whole, at three moments:
 
-1. Looks up the Rem's **direct parent**.
-2. Checks whether the parent carries the Card Cluster powerup (using multiple code variants and a tag-name fallback, since RemNote does not expose the cluster powerup code in its public Plugin SDK).
-3. If a cluster is detected, **all sibling Rems** (other direct children of that parent) that currently have **due cards** are added alongside the triggering Rem — cooling or not, since cluster members are meant to be seen together.
+1. **When a flashcard Rem is drawn**, every sibling with a **due card** is added with it — cooling or not, since cluster members are meant to be seen together.
+2. **On every Refresh and Refill**, each flashcard entry the document holds is checked the same way — entries kept from earlier fills, new ones, and ancestors swapped in — and any due sibling missing from the document is added. A sibling that came due after its cluster entered the document is brought in this way.
+3. **When draining**, a cooling cluster member stays while another member of its cluster in the document is due and not cooling. A cluster whose due members are all cooling leaves together.
+
+A sibling held back by a [due ancestor](#ancestor-spoiler-protection) is not added: its siblings share that ancestor, so they are held back with it. Siblings whose cards are not due are not added either — RemNote still shows them in the cluster, the earlier ones as context.
 
 | Scenario | Behaviour |
 |---|---|
 | Only one cluster member meets the priority threshold | All due siblings are pulled in automatically |
-| Multiple cluster members independently meet the threshold | Each one triggers the cluster check; the deduplication set ensures no Rem is added twice |
+| Multiple cluster members independently meet the threshold | Each one triggers the cluster check; no Rem is added twice |
+| A sibling comes due after its cluster entered the document | The next Refresh or Refill adds it |
+| One cluster member is cooling, another is due | Both stay; the cluster is practised together |
 | No cluster members are due | Nothing extra is added |
 | Cluster siblings push the total above the fill target | Siblings are still included — a partial cluster would break the queue experience |
+
+The refresh logs what it did: `[CardCluster] N clusters in the document: added X due siblings, kept Y cooling members with their cluster`, and the status block adds *N Card Cluster siblings added*.
+
+> [!NOTE]
+> Card Cluster is RemNote's built-in powerup with the code `cc`, which the Plugin SDK does not list. Until RemNote turned clusters into that powerup (July 2026) they were a tag, and the plugin looked for the tag and for guessed codes; from then on it no longer recognised clusters, and a member could enter the Priority Queue without its siblings. Clusters are recognised by `cc` since v1.0.114.
 
 > [!NOTE]
 > The count in the status block reflects the **actual** number of entries, which may exceed the fill target when cluster siblings are added. This is intentional.

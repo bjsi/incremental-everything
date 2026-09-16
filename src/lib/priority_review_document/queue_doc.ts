@@ -33,10 +33,12 @@ import {
   writeEntries,
   writeGraph,
 } from './index';
-import { selectPriorityItems, SelectionResult, findDueAncestorSpoiler, AncestorInfo, ForcedAncestor } from './select';
+import { selectPriorityItems, SelectionResult, SelectedItem, findDueAncestorSpoiler, AncestorInfo, ForcedAncestor } from './select';
+import { ClusterFinder } from './cluster';
+import { coolingClusterMembersToKeep, missingClusterSiblings } from './cluster_rules';
 import { cleanPriorityReviewDocuments, PrdDocReport, scanPriorityReviewDocuments } from './clean';
 import { CoolingScanner } from './cooling_gather';
-import { CoolingVerdict } from './cooling';
+import { CoolingVerdict, isCardDue } from './cooling';
 import { readChildren } from './children';
 import { loadCardSource } from './card_source';
 
@@ -242,6 +244,8 @@ export interface RefreshResult {
   added: { total: number; flashcards: number; incRems: number; shieldSlice: number };
   /** The fill target split for the whole document (fill_split.ts). */
   slots?: FillSlots;
+  /** Due Card Cluster siblings added to complete clusters already in the document. */
+  clusterSiblingsAdded?: number;
   /** Refresh only: the IncRems drawn again — kept in place, or replaced by the new draw. */
   incRedraw?: { kept: number; replaced: number } | null;
   cooling: CoolingVerdict[];
@@ -369,10 +373,26 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     );
   }
 
+  // Card Clusters are kept whole (cluster_rules.ts): a cooling member stays while
+  // a sibling in the document is due and not cooling. Due-ness to the end of
+  // today, as the drain judges it.
+  const clusterFinder = new ClusterFinder(plugin);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  const hasDueCard = (id: string) =>
+    (cardSource.cardsByRem.get(id) ?? []).some((c) => isCardDue(c, endOfToday.getTime()));
+  const entryClusters = await clusterFinder.index(targetIds);
+  const coolingKeptForCluster = coolingClusterMembersToKeep(
+    scanner.coolingIds(),
+    targetIds,
+    entryClusters.parentOf,
+    hasDueCard
+  );
+
   progress('Draining reviewed, cooling and ancestor-held entries…');
   const scan = await scanPriorityReviewDocuments(plugin, undefined, {
     docIds: [doc._id],
-    coolingRemIds: scanner.coolingIds(),
+    coolingRemIds: new Set([...scanner.coolingIds()].filter((id) => !coolingKeptForCluster.has(id))),
     ancestorHeldRemIds: new Set(heldByAncestor.keys()),
     cardSource,
   });
@@ -465,9 +485,49 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     }
   }
   const kept = remaining.filter((e) => !removedEntryIds.has(e.entryRemId));
-  const newItems = selection.items.filter(
+  const drawnItems = selection.items.filter(
     (i) => !(i.type === 'incremental' && redrawableTargets.has(i.rem._id))
   );
+
+  // 3. Complete every Card Cluster the document now touches — kept entries,
+  //    new draws and swapped-in ancestors alike: each due sibling missing from
+  //    the document is added, cooling or not, past the fill target if need be.
+  //    The draw does this for what it draws; this covers what it never sees.
+  const clusterItems: SelectedItem[] = [];
+  if (mode !== 'drain') {
+    const fcTargets = [
+      ...kept.filter((e) => e.kind === 'fc').map((e) => e.targetRemId),
+      ...drawnItems.filter((i) => i.type === 'flashcard').map((i) => i.rem._id),
+    ].filter((id): id is RemId => !!id);
+    const clusters = await clusterFinder.index(fcTargets);
+    if (clusters.membersOf.size) {
+      const blocked = new Set<string>([
+        ...kept.map((e) => e.targetRemId).filter((id): id is RemId => !!id),
+        ...drawnItems.map((i) => i.rem._id),
+        ...heldByAncestor.keys(),
+      ]);
+      const memberIds = new Map([...clusters.membersOf].map(([parent, kids]) => [parent, kids.map((k) => k._id)]));
+      const missing = missingClusterSiblings(fcTargets, clusters.parentOf, memberIds, hasDueCard, blocked);
+      const remById = new Map([...clusters.membersOf.values()].flat().map((r) => [r._id, r]));
+      for (const id of missing) {
+        const rem = remById.get(id);
+        if (!rem) continue;
+        clusterItems.push({
+          rem,
+          type: 'flashcard',
+          priority: selection.priorityByRemId.get(id) ?? 100,
+          percentile: selection.cardPercentiles[id] ?? 100,
+        });
+      }
+      if (clusterItems.length || coolingKeptForCluster.size) {
+        console.log(
+          `[CardCluster] ${clusters.membersOf.size} clusters in the document: added ${clusterItems.length} due siblings, ` +
+            `kept ${coolingKeptForCluster.size} cooling members with their cluster`
+        );
+      }
+    }
+  }
+  const newItems = [...drawnItems, ...clusterItems];
 
   const addedFc = newItems.filter((i) => i.type === 'flashcard').length;
   const addedInc = newItems.length - addedFc;
@@ -524,6 +584,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     ` · added ${newItems.length}` +
     (selection.shieldSliceCount ? ` (${selection.shieldSliceCount} from the shield slice)` : '') +
     (incRedraw ? ` · IncRems re-drawn: kept ${incRedraw.kept}, replaced ${incRedraw.replaced}` : '') +
+    (clusterItems.length ? ` · ${clusterItems.length} Card Cluster siblings added` : '') +
     `\n` +
     `Cooling now: ${cooling.length} Rems` +
     (heldBack
@@ -556,6 +617,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     added: { total: newItems.length, flashcards: addedFc, incRems: addedInc, shieldSlice: selection.shieldSliceCount },
     slots,
     incRedraw,
+    clusterSiblingsAdded: clusterItems.length,
     cooling,
     selection,
     elapsedMs,

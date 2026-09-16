@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.114 - September 16th, 2026
+
+### 🐛 Fixed - Card Clusters were split in the Priority Queue
+
+Card Clusters are recognised again since RemNote turned them into a built-in powerup with the code `cc`, so a cluster member brings its due siblings into the Priority Queue, every refresh completes clusters already there, and a cooling member is no longer drained away from its cluster.
+
+📖 [Card Cluster Support](Priority-Review-Document.md#card-cluster-support)
+
 ## v1.0.113 - September 16th, 2026
 
 ### ✨ New - list the cards in the Mastery Drill
