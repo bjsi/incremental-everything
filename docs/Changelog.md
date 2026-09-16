@@ -10,6 +10,12 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list)
 
+### ⚡ Improved - `#cloze-extract` and `#ignore` styling reaches descendants
+
+The children of a Rem tagged `#cloze-extract` or `#ignore` are now dimmed in the editor like the Rem itself.
+
+📖 [Editor colour coding](Colour-Coding-Reference.md#editor)
+
 ## v1.0.112 - September 16th, 2026
 
 ### ⚡ Improved - Priority Queues refresh at startup

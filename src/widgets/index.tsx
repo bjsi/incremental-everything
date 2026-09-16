@@ -12,6 +12,7 @@ import { checkFlashcardPrioritisationOptOut } from '../lib/card_priority/opt_out
 import { checkCardPriorityHiddenSlotMigration } from '../lib/card_priority/hidden_slot_migration';
 import { isVisiblePrioritySlotRetired } from '../lib/card_priority/slot_access';
 import { registerEventListeners } from '../register/events';
+import { refreshTagSubtreeCSS } from '../lib/tag_subtree_css';
 import { registerPluginPowerups } from '../register/powerups';
 import { registerPluginSettings } from '../register/settings';
 import { registerWidgets } from '../register/widgets';
@@ -168,6 +169,9 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerClozeExtractCSS(plugin);
   await registerTagBadgeCSS(plugin);
   await registerIgnoreTagCSS(plugin);
+  // Descendants of #cloze-extract / #ignore Rems; kept current by the listeners
+  // in lib/tag_subtree_css. Not awaited: it walks the open panes.
+  void refreshTagSubtreeCSS(plugin);
   await registerHasImageCSS(plugin);
   await registerPinReferenceCSS(plugin);
 
