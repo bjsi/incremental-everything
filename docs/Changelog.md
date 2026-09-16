@@ -16,6 +16,12 @@ The children of a Rem tagged `#cloze-extract` or `#ignore` are now dimmed in the
 
 📖 [Editor colour coding](Colour-Coding-Reference.md#editor)
 
+### 🐛 Fixed - IncRems crowded flashcards out of the Priority Queue
+
+A Priority Queue now keeps your Flashcard Ratio across the whole document — 22 flashcard Rems and 3 IncRems at a fill target of 25 and "10 cards per rem" — and draws its IncRems again on every Refresh, instead of adding one with every top-up until they outnumbered the flashcards.
+
+📖 [Flashcard and IncRem slots](Priority-Review-Document.md#flashcard-and-increm-slots)
+
 ## v1.0.112 - September 16th, 2026
 
 ### ⚡ Improved - Priority Queues refresh at startup

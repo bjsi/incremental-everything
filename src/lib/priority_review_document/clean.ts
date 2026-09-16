@@ -93,6 +93,11 @@ export interface PrdEntry {
   status: EntryStatus;
   /** Set when the entry is no longer due but is being kept anyway. */
   keepReason?: KeepReason;
+  /**
+   * A due or unjudged INC entry with notes or text of your own on it. The
+   * Priority Queue's IncRem re-draw never removes one (queue_doc.ts).
+   */
+  carriesNotes?: boolean;
 }
 
 /** Why a document that holds nothing due cannot simply be deleted. */
@@ -568,7 +573,10 @@ export async function scanPriorityReviewDocuments(
           report.dueFlashcards++;
         } else {
           report.remainingIncEntries++;
-          if (carriesWritingOfYourOwn()) incEntryHoldsNotes = true;
+          if (carriesWritingOfYourOwn()) {
+            incEntryHoldsNotes = true;
+            entry.carriesNotes = true;
+          }
         }
         continue;
       }
@@ -577,7 +585,10 @@ export async function scanPriorityReviewDocuments(
         // off the card data, which is always there.
         report.unknownEntries.push(entry);
         report.remainingIncEntries++;
-        if (carriesWritingOfYourOwn()) incEntryHoldsNotes = true;
+        if (carriesWritingOfYourOwn()) {
+          incEntryHoldsNotes = true;
+          entry.carriesNotes = true;
+        }
         continue;
       }
 

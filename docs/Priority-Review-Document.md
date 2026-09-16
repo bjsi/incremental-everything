@@ -14,7 +14,7 @@ A document made of **Rem references** to your most important due items bypasses 
 * **One document per scope** — one for your whole knowledge base, one per document or folder you choose — instead of a new one every day.
 * **Refill** tops it up to a *fill target* (25 items by default) from the current priority ranking.
 * **Drain** removes the entries you have reviewed, and the ones that are [cooling](#cooling-spoiler-protection-across-sessions).
-* **Refresh** is both, and runs on its own when you leave the queue.
+* **Refresh** is both, draws the document's [IncRems again](#flashcard-and-increm-slots), and runs on its own when you leave the queue.
 
 Small fills are the point. RemNote serves a document's cards in **random order** — its queue provider for a normal document is literally named `random` — so a 100-item document can show its most important card last. The only control a plugin has over what comes *first* is how few items the document holds. Twenty-five items, most of them the top of your ranking (following your Sorting Criteria), is a session you can finish, and the next refresh prepares the next twenty-five.
 
@@ -26,7 +26,7 @@ Everything happens from one popup: **Priority Queue** in the Command Palette (qu
 
 * **Scope** — the document you came from, or the whole knowledge base. The popup opens on the document only when it already has a Priority Queue of its own, and on the whole knowledge base otherwise; the document stays one click away to build one. A review document is never offered as a scope: a queue built from a queue would only re-select what it already holds.
 * **Status** — what the document holds, how many flashcard Rems and IncRems are still due, how many entries a refresh would drain and how many of those are cooling, the last refresh, and the current settings. Below it, the **card shield now** and **after this document** — the priority the shield would reach once every entry is reviewed — for the KB or for the document scope, with cooling Rems already excluded.
-* **Fill target** — how many items the document is topped up to. `25`, `50` and `100` are one click; any number from 5 to 200 works. This is the size of one *burst*: one session works through one fill, and the refresh at the end prepares the next.
+* **Fill target** — how many items the document is topped up to. `25`, `50` and `100` are one click; any number from 5 to 200 works. This is the size of one *burst*: one session works through one fill, and the refresh at the end prepares the next. Your Flashcard Ratio divides it between [flashcard Rems and IncRems](#flashcard-and-increm-slots).
 * **Shield slice** — the share of each fill taken strictly by priority before your randomness applies. See [why it exists](#the-shield-slice). `0%` follows your [Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria) exactly.
 * **Skip paused documents** — leave out flashcard Rems inside paused documents, but always keep the ones at or below the priority you set (20 by default). See [Paused Document Filtering](#paused-document-filtering).
 * **Build / Refresh**, **Drain**, **Refill**, **▶ Practice**, **Open document**, **Cooling**, **Sorting…**.
@@ -57,7 +57,7 @@ Every refill runs the same selection:
 
 1.  **Filtering:** every Flashcard Rem and Incremental Rem in scope that is **due** (scheduled for today or earlier).
 2.  **Ranking:** by **priority** (0 is highest, 100 is lowest), with your [randomness](Prioritization-&-Sorting.md#sorting-criteria) applied through the priority-weighted lottery — after the [shield slice](#the-shield-slice) has been carved off.
-3.  **Mixing:** the two lists are interleaved at your **Flashcard Ratio** — with "10 cards per rem", roughly ten flashcard entries follow each incremental entry.
+3.  **Mixing:** each list fills its own [slots](#flashcard-and-increm-slots), interleaved at your **Flashcard Ratio** — with "10 cards per rem", roughly ten flashcard entries follow each incremental entry.
 4.  **Gates**, applied to each flashcard Rem as it is drawn, so their cost is bounded by the fill target rather than by the size of your knowledge base: already in the document, [paused](#paused-document-filtering), [due ancestor](#ancestor-spoiler-protection), [cooling](#cooling-spoiler-protection-across-sessions), and [Card Cluster](#card-cluster-support) expansion.
 
 The status block at the top of the document records what each refresh did, and the popup shows the Rems each gate held back, by name, after every action.
@@ -69,6 +69,17 @@ Above, a refresh drained 4 reviewed entries and added 4. Under the result line, 
 * **🧊 left out, cooling** — why the Rem is [cooling](#cooling-spoiler-protection-across-sessions) and the day it comes back: here, another card of the same Rem was reviewed 7 days ago, so it returns on Sep 17.
 * **🎭 held back by a due ancestor** — the blocking parent or grandparent and what happened to it. Here the parent is itself cooling, so nothing was swapped in and both wait; see [Ancestor Spoiler Protection](#ancestor-spoiler-protection).
 
+### Flashcard and IncRem slots
+
+The Flashcard Ratio divides the fill target for the **whole document**: IncRems get one slot for every *ratio + 1* items, rounded up, and flashcard Rems the rest. A fill target of 25 at "10 cards per rem" holds **22 flashcard Rems and 3 IncRems**. With "no cards" or "no incremental rems", everything goes to the other kind.
+
+The two kinds are refilled differently:
+
+* **Flashcard Rems stay until you review them.** A refresh only fills the flashcard slots that are empty.
+* **IncRems are drawn again on every Refresh.** The queue injects IncRems at your ratio however many the document holds, so an IncRem that was not reached has no claim on its slot. The draw runs your sorting criteria again, as the regular queue does each session: IncRems drawn again stay where they are, the others leave and are replaced, and they return to the pool of due IncRems for a later draw. An IncRem entry with notes or text of your own on it is never drawn away.
+
+**Refill** only fills empty slots, and **Drain** adds nothing. The status block shows the split on its *Holding* line and what the draw kept and replaced on its *Last refresh* line.
+
 ### The shield slice
 
 Your randomness setting marks a share of *positions* across the **whole** ranked due list, uniformly, and refills each marked position from a priority-weighted draw. It does not carve off the bottom of the list. So the first position is marked exactly as often as the ten-thousandth, and when it is, the most important due Rem is thrown into a pool of thousands and lands far down the list. At 40% randomness that happens to each of your top items four times in ten — see [what randomness does not guarantee](Prioritization-&-Sorting.md#what-it-does-not-guarantee).
@@ -79,7 +90,7 @@ The status block and the popup report how many of the added items came from the 
 
 ### The status block and the graph
 
-The document's first child is a code block that the refresh rewrites each time: scope, fill target and shield slice, what it holds, what the last refresh drained and added, how many Rems are cooling, how many were held back by a due ancestor or skipped as paused, and what is due in scope. Its second child is the **Priority Distribution Graph**, regenerated on every refresh over the document's current entries — absolute priorities and relative percentiles, IncRems and flashcard Rems — so you can see at a glance how concentrated at the top a fill is, and what your randomness setting does to it.
+The document's first child is a code block that the refresh rewrites each time: scope, fill target and shield slice, what it holds and how the fill target is split, what the last refresh drained and added and what the IncRem draw kept and replaced, how many Rems are cooling, how many were held back by a due ancestor or skipped as paused, and what is due in scope. Its second child is the **Priority Distribution Graph**, regenerated on every refresh over the document's current entries — absolute priorities and relative percentiles, IncRems and flashcard Rems — so you can see at a glance how concentrated at the top a fill is, and what your randomness setting does to it.
 
 Entries are always appended **below** these two, so the graph stays where it is.
 

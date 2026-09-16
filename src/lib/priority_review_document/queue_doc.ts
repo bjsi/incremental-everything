@@ -20,6 +20,7 @@ import {
 } from '../consts';
 import { CardPriorityInfo } from '../card_priority/types';
 import { getCardsPerRem } from '../sorting';
+import { FillSlots, splitFillTarget } from './fill_split';
 import {
   attachToReviewQueueTag,
   buildGraphData,
@@ -239,6 +240,10 @@ export interface RefreshResult {
   holding: { total: number; flashcards: number; incRems: number };
   drained: { reviewed: number; cooling: number; ancestor: number; missing: number; kept: number };
   added: { total: number; flashcards: number; incRems: number; shieldSlice: number };
+  /** The fill target split for the whole document (fill_split.ts). */
+  slots?: FillSlots;
+  /** Refresh only: the IncRems drawn again — kept in place, or replaced by the new draw. */
+  incRedraw?: { kept: number; replaced: number } | null;
   cooling: CoolingVerdict[];
   selection: SelectionResult | null;
   elapsedMs: number;
@@ -320,6 +325,8 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   progress('Reading card state…');
   const cardSource = await loadCardSource(plugin);
   const scanner = new CoolingScanner(plugin, { scopeRemId: info.scopeRemId, cardSource });
+  const cardRatio = await getCardsPerRem(plugin);
+  const slots = splitFillTarget(burst, cardRatio);
 
   // 1. Drain. The document's own targets are judged for cooling first, so an
   //    entry whose sibling was reviewed in the last session leaves with the
@@ -394,21 +401,43 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
       ? [...report.dueEntries, ...report.removableEntries, ...report.keptEntries, ...report.unknownEntries]
       : [...report.dueEntries, ...report.keptEntries, ...report.unknownEntries]
     : [];
-  const remainingTargets = new Set<RemId>(remaining.map((e) => e.targetRemId).filter((id): id is RemId => !!id));
   const remainingFc = remaining.filter((e) => e.kind === 'fc').length;
   const remainingInc = remaining.length - remainingFc;
 
-  // 2. Refill up to the target.
-  const toAdd = mode === 'drain' ? 0 : Math.max(0, burst - remaining.length);
-  progress(toAdd ? `Selecting ${toAdd} items…` : 'Computing the priority universe…');
-  const cardRatio = await getCardsPerRem(plugin);
+  // 2. Fill to the document's split (fill_split.ts). Flashcards stay until they
+  //    are reviewed, so only their empty slots are filled. IncRems are drawn
+  //    again on every Refresh: the queue injects them at the ratio whatever the
+  //    document holds, so an unserved IncRem has no claim on its slot, and a
+  //    fresh draw per refresh is what the regular queue does per session
+  //    (queue_prefetch.ts reruns the lottery). IncRems drawn again stay where
+  //    they are; entries with writing of your own on them are never drawn away.
+  //    Refill only fills empty slots; Drain adds nothing.
+  const redraw = mode === 'refresh';
+  const redrawable = redraw
+    ? (report?.dueEntries ?? []).filter((e) => e.kind === 'inc' && !!e.targetRemId && !e.carriesNotes)
+    : [];
+  const redrawableEntryIds = new Set(redrawable.map((e) => e.entryRemId));
+  const redrawableTargets = new Set(redrawable.map((e) => e.targetRemId as RemId));
+  const cardsToAdd = mode === 'drain' ? 0 : Math.max(0, slots.flashcards - remainingFc);
+  const incToSelect = mode === 'drain' ? 0 : Math.max(0, slots.incRems - (remainingInc - redrawable.length));
+  // Never re-selected: everything the document keeps, except the IncRems in the draw.
+  const excludeRemIds = new Set<RemId>(
+    remaining
+      .filter((e) => !redrawableEntryIds.has(e.entryRemId))
+      .map((e) => e.targetRemId)
+      .filter((id): id is RemId => !!id)
+  );
+
+  const toSelect = cardsToAdd + incToSelect;
+  progress(toSelect ? `Selecting ${toSelect} items…` : 'Computing the priority universe…');
   const selection = await selectPriorityItems(plugin, {
     scopeRemId: info.scopeRemId,
-    itemCount: toAdd,
+    incRemCount: incToSelect,
+    cardCount: cardsToAdd,
     cardRatio,
     filterPaused: skipPaused,
     pausedPriorityThreshold: pausedThreshold,
-    excludeRemIds: remainingTargets,
+    excludeRemIds,
     shieldSliceFraction: shieldSlice,
     coolingScanner: scanner,
     cardSource,
@@ -417,14 +446,37 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   });
   await scanner.publish();
 
-  const addedFc = selection.items.filter((i) => i.type === 'flashcard').length;
-  const addedInc = selection.items.length - addedFc;
+  // The re-draw: IncRems not drawn again leave; the ones drawn again are
+  // already in the document and are not written twice.
+  const drawnIncIds = new Set(selection.items.filter((i) => i.type === 'incremental').map((i) => i.rem._id));
+  const redrawnAway = redrawable.filter((e) => !drawnIncIds.has(e.targetRemId as RemId));
+  const incRedraw = redraw ? { kept: redrawable.length - redrawnAway.length, replaced: redrawnAway.length } : null;
+  const removedEntryIds = new Set<RemId>();
+  if (redrawnAway.length) {
+    progress(`Replacing ${redrawnAway.length} IncRems…`);
+    for (const e of redrawnAway) {
+      try {
+        const rem = await plugin.rem.findOne(e.entryRemId);
+        if (rem) await rem.remove();
+        removedEntryIds.add(e.entryRemId);
+      } catch (err) {
+        console.warn(`[Priority Queue] Could not remove IncRem entry ${e.entryRemId} for the re-draw:`, err);
+      }
+    }
+  }
+  const kept = remaining.filter((e) => !removedEntryIds.has(e.entryRemId));
+  const newItems = selection.items.filter(
+    (i) => !(i.type === 'incremental' && redrawableTargets.has(i.rem._id))
+  );
+
+  const addedFc = newItems.filter((i) => i.type === 'flashcard').length;
+  const addedInc = newItems.length - addedFc;
   // Entries are appended at the bottom; the status block and the graph must
   // already be in place (and in that order) so they stay on top.
   await ensureHeaderOrder(plugin, doc);
-  if (selection.items.length) {
-    progress(`Writing ${selection.items.length} entries…`);
-    await writeEntries(plugin, doc, selection.items);
+  if (newItems.length) {
+    progress(`Writing ${newItems.length} entries…`);
+    await writeEntries(plugin, doc, newItems);
   }
 
   // 3. Status block and graph, describing the document as it now is. The Rem
@@ -433,12 +485,12 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   doc = (await plugin.rem.findOne(doc._id)) ?? doc;
   const now = Date.now();
   const holding = {
-    total: remaining.length + selection.items.length,
-    flashcards: remainingFc + addedFc,
-    incRems: remainingInc + addedInc,
+    total: kept.length + newItems.length,
+    flashcards: kept.filter((e) => e.kind === 'fc').length + addedFc,
+    incRems: kept.filter((e) => e.kind === 'inc').length + addedInc,
   };
   const graphItems: GraphItem[] = [
-    ...remaining.map((e): GraphItem => {
+    ...kept.map((e): GraphItem => {
       const id = e.targetRemId;
       const priority = id ? selection.priorityByRemId.get(id) : undefined;
       const percentile = id
@@ -452,7 +504,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
         percentile: typeof percentile === 'number' ? percentile : 100,
       };
     }),
-    ...selection.items.map((i) => ({ type: i.type, priority: i.priority, percentile: i.percentile })),
+    ...newItems.map((i) => ({ type: i.type, priority: i.priority, percentile: i.percentile })),
   ];
 
   const s = selection.stats;
@@ -463,13 +515,15 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     `Priority Queue · fill target ${burst} · shield slice ${Math.round(shieldSlice * 100)}% · ` +
     (skipPaused ? `paused documents skipped above P${pausedThreshold}` : 'paused documents included') +
     `\n` +
-    `Holding: ${holding.total} items (${holding.flashcards} flashcard Rems, ${holding.incRems} IncRems)\n` +
+    `Holding: ${holding.total} items (${holding.flashcards} flashcard Rems, ${holding.incRems} IncRems) · ` +
+    `slots ${slots.flashcards} + ${slots.incRems} at the Flashcard Ratio\n` +
     `Last refresh: ${formatStamp(now)} — drained ${drained.reviewed} reviewed` +
     (drained.cooling ? `, ${drained.cooling} cooling` : '') +
     (drained.ancestor ? `, ${drained.ancestor} held by a due ancestor` : '') +
     (drained.missing ? `, ${drained.missing} missing` : '') +
-    ` · added ${selection.items.length}` +
+    ` · added ${newItems.length}` +
     (selection.shieldSliceCount ? ` (${selection.shieldSliceCount} from the shield slice)` : '') +
+    (incRedraw ? ` · IncRems re-drawn: kept ${incRedraw.kept}, replaced ${incRedraw.replaced}` : '') +
     `\n` +
     `Cooling now: ${cooling.length} Rems` +
     (heldBack
@@ -489,7 +543,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   const elapsedMs = Date.now() - startedAt;
   console.log(
     `[Priority Queue] ${mode} (${s.scopeName}): holding ${holding.total}, drained ${drained.reviewed + drained.cooling + drained.ancestor + drained.missing} ` +
-      `(${drained.cooling} cooling, ${drained.ancestor} ancestor-held), added ${selection.items.length} (${selection.shieldSliceCount} shield slice), ` +
+      `(${drained.cooling} cooling, ${drained.ancestor} ancestor-held), added ${newItems.length} (${selection.shieldSliceCount} shield slice)${incRedraw ? `, IncRems re-drawn: kept ${incRedraw.kept}, replaced ${incRedraw.replaced}` : ''}, ` +
       `${cooling.length} cooling in scope, card state from ${cardSource.kind === 'cache' ? 'the cache' : 'card.getAll()'}, in ${elapsedMs}ms`
   );
 
@@ -499,7 +553,9 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     burst,
     holding,
     drained,
-    added: { total: selection.items.length, flashcards: addedFc, incRems: addedInc, shieldSlice: selection.shieldSliceCount },
+    added: { total: newItems.length, flashcards: addedFc, incRems: addedInc, shieldSlice: selection.shieldSliceCount },
+    slots,
+    incRedraw,
     cooling,
     selection,
     elapsedMs,
