@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.113 - September 16th, 2026
+
+### ✨ New - list the cards in the Mastery Drill
+
+**List Cards** in the Mastery Drill toolbar shows every card in the drill and whether RemNote can still show it, so a card that was deleted or switched off — counted as *Remaining* but never served — can be found and removed.
+
+📖 [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list)
+
 ## v1.0.112 - September 16th, 2026
 
 ### ⚡ Improved - Priority Queues refresh at startup

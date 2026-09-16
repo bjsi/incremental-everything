@@ -13,12 +13,12 @@ import {
 import '../style.css';
 import '../App.css';
 import { PriorityBadge } from '../components';
+import { MasteryDrillCardList } from '../components/MasteryDrillCardList';
 import { getCardPriority, setCardPriority } from '../lib/card_priority';
 import { InlinePriorityEditor } from '../components/InlineEditors';
 import { useIESetting } from '../lib/settings';
 import { masteryDrillMinDelayMinutesId, oldItemThresholdId } from '../lib/consts';
-
-export type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+import { FinalDrillItem, drillItemCardId, isDrillItemInKb } from '../lib/mastery_drill_audit';
 
 function FinalDrill() {
   const plugin = usePlugin();
@@ -26,6 +26,8 @@ function FinalDrill() {
 
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [filteredIds, setFilteredIds] = useState<string[]>([]);
+  // Every item of this KB, cooling or not — what the card list shows.
+  const [kbItems, setKbItems] = useState<FinalDrillItem[]>([]);
   const [delayedCount, setDelayedCount] = useState<number>(0);
   const [oldItemsCount, setOldItemsCount] = useState<number>(0);
   const recheckTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -50,9 +52,8 @@ function FinalDrill() {
       const results: { cardId: string; priority: number }[] = [];
       for (const item of finalDrillIdsRaw) {
         if (cancelled) return;
-        const isRelevant = typeof item === 'string' ? isPrimary : item.kbId === currentKbId;
-        if (!isRelevant) continue;
-        const cardId = typeof item === 'string' ? item : item.cardId;
+        if (!isDrillItemInKb(item, currentKbId, isPrimary)) continue;
+        const cardId = drillItemCardId(item);
         const card = await plugin.card.findOne(cardId);
         if (!card?.remId || cancelled) continue;
         const rem = await plugin.rem.findOne(card.remId);
@@ -70,8 +71,7 @@ function FinalDrill() {
     const toRemoveIds = new Set(
       lowPriorityCardData.filter(({ priority }) => priority > lowPriorityThreshold).map(({ cardId }) => cardId)
     );
-    const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
-    await setFinalDrillIdsRaw(finalDrillIdsRaw.filter(item => !toRemoveIds.has(getCardId(item))));
+    await setFinalDrillIdsRaw(finalDrillIdsRaw.filter(item => !toRemoveIds.has(drillItemCardId(item))));
     setShowClearLowPriorityView(false);
   };
 
@@ -96,6 +96,7 @@ function FinalDrill() {
       const currentKbId = currentKb._id;
 
       const activeIds: string[] = [];
+      const relevantItems: FinalDrillItem[] = [];
       let delayed = 0;
       let oldCount = 0;
       let earliestUnblock: number | undefined;
@@ -104,10 +105,10 @@ function FinalDrill() {
       const minDelayMs = minDelayMinutes * 60 * 1000;
 
       for (const item of finalDrillIdsRaw) {
-        const isRelevant = typeof item === 'string' ? isPrimary : item.kbId === currentKbId;
-        if (!isRelevant) continue;
+        if (!isDrillItemInKb(item, currentKbId, isPrimary)) continue;
+        relevantItems.push(item);
 
-        const cardId = typeof item === 'string' ? item : item.cardId;
+        const cardId = drillItemCardId(item);
         const addedAt = typeof item === 'string' ? undefined : item.addedAt;
 
         if (addedAt) {
@@ -127,6 +128,7 @@ function FinalDrill() {
 
       if (!cancelled) {
         setFilteredIds(activeIds);
+        setKbItems(relevantItems);
         setDelayedCount(delayed);
         setOldItemsCount(oldCount);
         setIsLoaded(true);
@@ -331,7 +333,6 @@ function FinalDrill() {
 
   const confirmEditLater = async () => {
     const message = editLaterMessage.trim() || "Mastery Drill";
-    const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
 
     if (editLaterContext === 'editing') {
       if (!editingCardId) return;
@@ -341,7 +342,7 @@ function FinalDrill() {
         if (rem) {
           await rem.addPowerup(BuiltInPowerupCodes.EditLater);
           await rem.setPowerupProperty(BuiltInPowerupCodes.EditLater, "Message", [message]);
-          const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== editingCardId);
+          const newIds = finalDrillIdsRaw.filter(item => drillItemCardId(item) !== editingCardId);
           await setFinalDrillIdsRaw(newIds);
           await plugin.app.toast("Card marked for Edit Later and removed from drill.");
           setEditingRemId(null);
@@ -357,7 +358,7 @@ function FinalDrill() {
         if (rem) {
           await rem.addPowerup(BuiltInPowerupCodes.EditLater);
           await rem.setPowerupProperty(BuiltInPowerupCodes.EditLater, "Message", [message]);
-          const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== cardId);
+          const newIds = finalDrillIdsRaw.filter(item => drillItemCardId(item) !== cardId);
           await setFinalDrillIdsRaw(newIds);
           await plugin.queue.removeCurrentCardFromQueue(false);
           await plugin.app.toast("Card marked for Edit Later and removed from drill.");
@@ -399,11 +400,18 @@ function FinalDrill() {
       await plugin.app.toast("No current card found.");
       return;
     }
-    const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
-    const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== cardId);
+    const newIds = finalDrillIdsRaw.filter(item => drillItemCardId(item) !== cardId);
     await setFinalDrillIdsRaw(newIds);
     await plugin.queue.removeCurrentCardFromQueue(false);
     await plugin.app.toast("Card removed from Mastery Drill.");
+  };
+
+  const goToRem = async (remId: string) => {
+    const rem = await plugin.rem.findOne(remId);
+    if (!rem) return;
+    await plugin.window.openRem(rem);
+    await plugin.storage.setSession("finalDrillResumeTrigger", Date.now());
+    await plugin.widget.closePopup();
   };
 
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -411,6 +419,57 @@ function FinalDrill() {
   useEffect(() => {
     setTimeout(() => containerRef.current?.focus(), 100);
   }, []);
+
+  // The card list replaces the queue area while the queue itself stays mounted off-screen, so
+  // the window-level rating keys below must stand down while it is open — otherwise ←/→ in the
+  // list would move the hidden queue.
+  const [showCardList, setShowCardList] = useState(false);
+  const showCardListRef = useRef(false);
+  useEffect(() => {
+    showCardListRef.current = showCardList;
+  }, [showCardList]);
+
+  const closeCardList = () => {
+    setShowCardList(false);
+    setTimeout(() => containerRef.current?.focus(), 50);
+  };
+
+  const removeCardsFromDrill = async (cardIds: string[]) => {
+    const ids = new Set(cardIds);
+    await setFinalDrillIdsRaw(finalDrillIdsRaw.filter(item => !ids.has(drillItemCardId(item))));
+    // The queue behind the list keeps showing a removed card until it is rated; take it out now.
+    const currentId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
+    if (currentId && ids.has(currentId)) {
+      const live = await plugin.queue.getCurrentCard();
+      if (live?._id === currentId) await plugin.queue.removeCurrentCardFromQueue(false);
+    }
+    await plugin.app.toast(`Removed ${cardIds.length} card${cardIds.length !== 1 ? 's' : ''} from Mastery Drill.`);
+  };
+
+  const cardListView = showCardList && (
+    <MasteryDrillCardList
+      items={kbItems}
+      minDelayMinutes={minDelayMinutes}
+      onRemove={removeCardsFromDrill}
+      onGoToRem={goToRem}
+      onClose={closeCardList}
+    />
+  );
+
+  const listCardsButton = (
+    <button
+      onClick={() => setShowCardList(true)}
+      className="text-xs px-2 py-1 rounded whitespace-nowrap"
+      style={{
+        color: 'var(--rn-clr-content-primary)',
+        border: '1px solid var(--rn-clr-border-primary)',
+        backgroundColor: 'var(--rn-clr-background-primary)',
+      }}
+      title="List every card in the drill and check whether RemNote can show it (L)"
+    >
+      List Cards
+    </button>
+  );
 
   useEffect(() => {
     const SCORE_MAP: Record<string, QueueInteractionScore> = {
@@ -422,8 +481,15 @@ function FinalDrill() {
     };
 
     const handler = async (e: KeyboardEvent) => {
+      if (showCardListRef.current) return;
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      if ((e.key === 'l' || e.key === 'L') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        setShowCardList(true);
+        return;
+      }
 
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
@@ -741,6 +807,9 @@ function FinalDrill() {
 
   if (filteredIds.length === 0) {
     const isCoolingDown = delayedCount > 0;
+    if (showCardList) {
+      return <div className="h-full w-full flex flex-col">{cardListView}</div>;
+    }
     return (
       <div
         ref={containerRef}
@@ -760,6 +829,7 @@ function FinalDrill() {
             <p className="text-xs mt-2" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               The drill will refresh automatically when the first card is ready.
             </p>
+            <div className="mt-4">{listCardsButton}</div>
           </>
         ) : (
           <>
@@ -783,7 +853,11 @@ function FinalDrill() {
         {/* Row 1: Queue management */}
         <div className="flex items-center gap-2 px-2 pt-2 pb-1">
           <span className="font-bold text-lg whitespace-nowrap flex-shrink-0">Mastery Drill</span>
-          <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-800 whitespace-nowrap">
+          <span
+            onClick={() => setShowCardList(true)}
+            className="text-xs px-2 py-1 rounded bg-red-100 text-red-800 whitespace-nowrap cursor-pointer"
+            title="List every card in the drill (L)"
+          >
             {filteredIds.length} Remaining
           </span>
           {delayedCount > 0 && (
@@ -799,6 +873,7 @@ function FinalDrill() {
               {delayedCount} cooling
             </span>
           )}
+          {listCardsButton}
           <button
             onClick={() => setShowClearAllConfirm(true)}
             className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 whitespace-nowrap"
@@ -852,17 +927,9 @@ function FinalDrill() {
           <button
             onClick={async () => {
               const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
-              if (cardId) {
-                const card = await plugin.card.findOne(cardId);
-                if (card && card.remId) {
-                  const rem = await plugin.rem.findOne(card.remId);
-                  if (rem) {
-                    await plugin.window.openRem(rem);
-                    await plugin.storage.setSession("finalDrillResumeTrigger", Date.now());
-                    await plugin.widget.closePopup();
-                  }
-                }
-              }
+              if (!cardId) return;
+              const card = await plugin.card.findOne(cardId);
+              if (card?.remId) await goToRem(card.remId);
             }}
             className="px-3 py-1.5 text-sm rounded transition-colors shadow-sm font-medium whitespace-nowrap"
             style={{
@@ -957,6 +1024,8 @@ function FinalDrill() {
 
       <div
         className="flex-grow relative min-h-0 overflow-hidden"
+        // Collapsed while the card list takes its place (the Queue inside is moved off-screen).
+        style={showCardList ? { flex: '0 0 0px' } : undefined}
         onMouseDown={() => {
           // After a click inside the Queue embed the iframe may steal focus.
           // Re-focus our container so the window-level keydown listener keeps working.
@@ -966,13 +1035,25 @@ function FinalDrill() {
         {isLoaded && queueCardIds ? (
           // key={queueEpoch}: the only way to give the controller a card list it will actually
           // read is to remount the embed. See the resurrection guard above.
-          <Queue key={queueEpoch} cardIds={queueCardIds} width="100%" height="auto" />
+          //
+          // The wrapper moves off-screen while the card list is open. The embed is not drawn in
+          // this iframe: RemNote paints it in a layer ABOVE the iframe at the placeholder's
+          // position, so it would cover the list wherever the two overlap.
+          // The SDK re-reads that position on any attribute mutation in the plugin tree, so
+          // moving the wrapper moves the embed. Unmounting instead would end the drill session.
+          <div
+            className="h-full w-full"
+            style={showCardList ? { position: 'fixed', top: '200vh', left: 0 } : undefined}
+          >
+            <Queue key={queueEpoch} cardIds={queueCardIds} width="100%" height="auto" />
+          </div>
         ) : (
           <div className="h-full w-full flex items-center justify-center" style={{ color: 'var(--rn-clr-content-secondary)' }}>
             Loading…
           </div>
         )}
       </div>
+      {cardListView}
     </div>
   );
 }

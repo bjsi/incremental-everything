@@ -333,7 +333,7 @@ export class AncestorChainCache {
 }
 
 /** Top-down breadcrumb from a nearest-first name list, elided in the middle. */
-function formatBreadcrumb(names: string[], maxLabel = 24): string {
+export function formatBreadcrumb(names: string[], maxLabel = 24): string {
   const topDown = names
     .map((n) => (n.length > maxLabel ? `${n.slice(0, maxLabel)}…` : n))
     .reverse();

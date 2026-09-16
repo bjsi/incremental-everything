@@ -667,6 +667,7 @@ A focused sub-queue of flashcards rated *Forgot* or *Hard*, designed for deliber
 - Includes a built-in editor UI: **Edit Later** (defers editing via the Edit Later powerup), **Go to Rem**, and **Edit Previous** buttons.
 - **Old Items Warning**: cards lingering past the configured threshold (default 7 days) are flagged; clear them with a single click.
 - **Clear Queue**: empty the entire drill at any time.
+- **List Cards**: lists every card in the drill with a status saying whether RemNote can still show it, and removes the ones it cannot. See [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list).
 
 📖 **Full documentation:** [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
 
