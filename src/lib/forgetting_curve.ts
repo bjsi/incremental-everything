@@ -50,18 +50,35 @@ const SAMPLES_PER_SEGMENT = 48;
 /** Samples drawn across each forecast branch. */
 const SAMPLES_PER_BRANCH = 64;
 
-/**
- * How far below the target retention the Good branch is followed before the
- * forecast stops, in absolute retrievability. At the 90% default the chart ends
- * where Good reaches 88%.
- */
-const HORIZON_RETENTION_DROP = 0.02;
-
 export type CurveScale = 'log' | 'linear';
 
 export type CurveGrade = 'again' | 'hard' | 'good' | 'easy';
 
 export const CURVE_GRADES: CurveGrade[] = ['again', 'hard', 'good', 'easy'];
+
+/**
+ * Where the forecast stops — which branch is followed, and to what
+ * retrievability, expressed as an offset from the target.
+ *
+ * The two scales are asked different questions, so one horizon cannot serve
+ * both.
+ *
+ * A log axis compresses whatever you put at its right-hand end, so following
+ * the longest branch (Easy) all the way to the target costs almost no width and
+ * buys the whole of the next stability: you see where this card could be after
+ * one more good answer. Nothing earlier is squeezed to pay for it.
+ *
+ * A linear axis has no such mercy. Every day added to the right steals width
+ * from every day already drawn, so a horizon chosen for the far future flattens
+ * the repetitions that have actually happened into the first few pixels — the
+ * part being analysed. It therefore follows the representative branch (Good)
+ * and stops while it is still well clear of the target, keeping the plot on the
+ * current stability rather than on a future one.
+ */
+const HORIZON: Record<CurveScale, { grade: CurveGrade; offsetFromTarget: number }> = {
+    log: { grade: 'easy', offsetFromTarget: 0 },
+    linear: { grade: 'good', offsetFromTarget: 0.06 },
+};
 
 /**
  * One row of the chart's data array.
@@ -612,18 +629,18 @@ export function buildForgettingCurveSeries(
           }))
         : [];
 
-    // Stop the forecast a little past where Good crosses the target retention.
-    //
-    // Good is the branch that describes the card's normal trajectory, so it is
-    // the one worth seeing to its end; Easy is both the longest and the least
-    // representative, and cutting to it spent most of the plot on a curve the
-    // reader is not planning to follow. The small overshoot past the target
-    // (`HORIZON_RETENTION_DROP`) is so the crossing itself lands inside the
-    // chart with something after it, rather than exactly on the right edge.
-    const goodBranch = branches.find((b) => b.grade === 'good');
-    const horizonRetention = Math.max(targetRetention - HORIZON_RETENTION_DROP, 0.5);
-    const capDays = goodBranch
-        ? goodBranch.stability * intervalFactorForRetention(horizonRetention, decay, factor)
+    // Where the forecast stops, which depends on the scale — see `HORIZON`.
+    const horizon = HORIZON[scale];
+    const horizonBranch = branches.find((b) => b.grade === horizon.grade);
+    // The interval formula is only meaningful inside the band
+    // `intervalFactorForRetention` accepts, so a target near the top of the
+    // range cannot be pushed past it by the offset.
+    const horizonRetention = Math.min(
+        Math.max(targetRetention + horizon.offsetFromTarget, 0.5),
+        0.995,
+    );
+    const capDays = horizonBranch
+        ? horizonBranch.stability * intervalFactorForRetention(horizonRetention, decay, factor)
         : Math.max(...branches.map((b) => b.intervalDays), 1 / 24);
     const horizonDays = forecast ? nowDays + Math.max(capDays, 1 / 24) : nowDays;
 

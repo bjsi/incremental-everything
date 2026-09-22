@@ -164,18 +164,46 @@ describe('buildForgettingCurveSeries', () => {
         for (const g of CURVE_GRADES) assert.equal(junction[g], 100);
     });
 
-    it('stops the forecast two points past where Good crosses the target', () => {
+    it('runs the log forecast until Easy reaches the target retention', () => {
+        // A log axis compresses its right-hand end, so the longest branch can be
+        // followed to the target for almost no width — showing the whole of the
+        // next stability.
         for (const target of [0.9, 0.8]) {
-            const s = build(HISTORY, { targetRetention: target })!;
+            const s = build(HISTORY, { scale: 'log', targetRetention: target })!;
             const last = s.rows[s.rows.length - 1];
             assert.ok(
-                Math.abs((last.good as number) - (target - 0.02) * 100) < 0.5,
-                `Good should land 2pp under the target at the right edge (got ${last.good} for ${target})`,
+                Math.abs((last.easy as number) - target * 100) < 0.5,
+                `Easy should land on the target at the right edge (got ${last.easy} for ${target})`,
             );
-            // Good's own crossing is therefore on the chart, not on its edge.
+            // Good, being the slower branch, is already past it.
             assert.ok((last.good as number) < target * 100);
-            // Easy decays more slowly, so it is still above Good at the edge.
-            assert.ok((last.easy as number) > (last.good as number));
+        }
+    });
+
+    it('stops the linear forecast while Good is still 6 points clear of the target', () => {
+        // A linear axis pays for every extra day by squeezing the repetitions
+        // that have happened, so it stays on the current stability instead.
+        for (const target of [0.9, 0.8]) {
+            const s = build(HISTORY, { scale: 'linear', targetRetention: target })!;
+            const last = s.rows[s.rows.length - 1];
+            assert.ok(
+                Math.abs((last.good as number) - (target + 0.06) * 100) < 0.5,
+                `Good should stop 6pp above the target (got ${last.good} for ${target})`,
+            );
+            assert.ok((last.good as number) > target * 100, 'and therefore above the target itself');
+        }
+    });
+
+    it('gives the log scale the longer horizon of the two', () => {
+        const log = build(HISTORY, { scale: 'log' })!;
+        const linear = build(HISTORY, { scale: 'linear' })!;
+        assert.ok(
+            log.axisMaxDays > linear.axisMaxDays,
+            `log (${log.axisMaxDays}d) should outrun linear (${linear.axisMaxDays}d)`,
+        );
+        // Both still cover the card's whole history.
+        for (const s of [log, linear]) {
+            assert.ok(s.axisMaxDays >= s.reps[s.reps.length - 1].days);
         }
     });
 
