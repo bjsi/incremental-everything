@@ -282,11 +282,36 @@ const iconProps: React.SVGProps<SVGSVGElement> = {
   strokeLinejoin: 'round',
 };
 
+/**
+ * The plugin's own mark, drawn as line art: a desk globe on a stand.
+ *
+ * A bare wireframe sphere (Feather's globe, which this replaces) is the icon
+ * every app uses for "language" or "web", and it shares nothing with
+ * `public/logo.png` but the ball. What makes that logo recognisable at a glance
+ * is the *silhouette* around it — the meridian ring standing off to the right,
+ * the pedestal and the foot — so the row identifies itself as this plugin's
+ * rather than as a generic globe button.
+ *
+ * Two measurements do the work at 18px:
+ *
+ * - **The ring stands 3 units clear of the sphere** (r6 against r9). A wider
+ *   sphere looks better on its own, but the two strokes are ~0.6px each once
+ *   scaled down, so a narrower gap closes up and the pair renders as one thick
+ *   smudged circle.
+ * - **The stroke is 1.5, not the row's 1.75.** Six paths in the space the other
+ *   icons spend on three; at the shared weight they thicken into a blob.
+ */
 const GlobeIcon = () => (
-  <svg {...iconProps} aria-hidden>
-    <circle cx="12" cy="12" r="10" />
-    <line x1="2" y1="12" x2="22" y2="12" />
-    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  <svg {...iconProps} strokeWidth={1.5} aria-hidden>
+    {/* sphere, with a meridian and the equator so it reads as a globe */}
+    <circle cx="10.5" cy="10.5" r="6" />
+    <ellipse cx="10.5" cy="10.5" rx="2.5" ry="6" />
+    <line x1="4.5" y1="10.5" x2="16.5" y2="10.5" />
+    {/* the mounting ring, open to the left exactly as the logo's is */}
+    <path d="M10.5 1.5a9 9 0 0 1 0 18" />
+    {/* pedestal and foot */}
+    <path d="M10.5 19.5v2.2" />
+    <path d="M7 21.7h7" />
   </svg>
 );
 
@@ -351,8 +376,11 @@ const PlayIcon = () => (
  * tuned for a white arrow on blue.)
  */
 const COMPACT_ROW_CSS = `
+  .ie-hub-cell {
+    background: transparent;
+  }
   .ie-hub-cell:hover {
-    background: var(--rn-clr-background--hovered, rgba(100, 116, 139, 0.12));
+    background: var(--rn-clr-background--hovered, rgba(100, 116, 139, 0.14));
   }
   @keyframes ieHubArrowPulse {
     0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
@@ -383,7 +411,11 @@ const compactCellStyle: React.CSSProperties = {
   padding: 0,
   borderRadius: 6,
   border: '1px solid transparent',
-  background: 'transparent',
+  // NOTE: no `background` here, and it must stay that way. An inline style beats
+  // any stylesheet rule that is not `!important`, so setting the resting
+  // background here silently killed `.ie-hub-cell:hover` — the rule matched and
+  // lost on every hover, and the row had no hover feedback at all. Both states
+  // live in COMPACT_ROW_CSS instead.
   color: 'var(--rn-clr-content-secondary, #64748b)',
   cursor: 'pointer',
   display: 'flex',
@@ -508,16 +540,21 @@ function CompactRow(props: {
                 style={{
                   position: 'absolute',
                   top: -4,
-                  right: -6,
-                  minWidth: 14,
-                  height: 14,
-                  padding: '0 3px',
-                  borderRadius: 7,
+                  right: -7,
+                  // Sized down from 14/9px after seeing it on screen: a
+                  // two-digit count at that size spanned most of an 18px icon
+                  // and the target read as a crescent. A badge is allowed to
+                  // clip its icon's corner; it is not allowed to become the
+                  // icon.
+                  minWidth: 12,
+                  height: 12,
+                  padding: '0 2.5px',
+                  borderRadius: 6,
                   background: '#ef4444',
                   color: '#fff',
-                  fontSize: 9,
+                  fontSize: 8,
                   fontWeight: 700,
-                  lineHeight: '14px',
+                  lineHeight: '12px',
                   textAlign: 'center',
                   boxShadow: '0 0 0 1.5px var(--rn-clr-background-primary, #fff)',
                 }}
