@@ -269,6 +269,7 @@ Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused s
   - Unlike *SuperMemo*, these reviews **are recorded** in your repetition history.
 - Cards stay in the drill until you rate them **Good** or **Easy** inside the Mastery Drill.
 - A periodic notification widget appears in the Left Sidebar when ≥ 10 cards are pending, with a motivational phrase and a direct *Start Drill* button.
+- If the [Incremental RemNote panel is collapsed](Getting-Started.md#collapsed-panel), the notification is not shown as a card — the panel's 🎯 icon carries the drill instead, with the same count on a badge.
 
 !!! warning "Known limitation — [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters)"
     Inside a cluster, RemNote reports only the **cluster anchor** to plugins: the visible sibling advances on screen, but the card identity the plugin receives stays on the first one. The Mastery Drill inherits two consequences from that, both verified by measurement:
@@ -378,7 +379,7 @@ Three tabs are added to the right sidebar:
 3. Open the drill using the **`Mastery Drill`** command in the Command Palette (Quick Code: `dri`), or click *Start Drill* in the notification widget.
 4. The queue clears as you master cards (rate them Good or Easy).
 
-![Mastery Drill Notification](assets/drill-notification.png){ width="350" }
+![The Mastery Drill notification under the Incremental RemNote panel in the left sidebar, showing the number of cards ready for drill, a motivational phrase and the Start Drill button](assets/panel-hub-and-drill-expanded.png){ width="400" }
 
 ---
 

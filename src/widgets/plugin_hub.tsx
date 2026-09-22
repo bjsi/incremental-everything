@@ -32,11 +32,10 @@ import {
   getAcknowledgedTipIds,
   getDrawnTipIdThisSession,
   getLastShownMap,
-  markTipAnsweredThisSession,
+  pauseTipsAfterAnswer,
   pickTip,
   recordTipShown,
   setDrawnTipIdThisSession,
-  snoozeTips,
   tipAnsweredThisSession,
   tipsAreSnoozed,
 } from '../lib/onboarding_tips';
@@ -878,13 +877,12 @@ export function PluginHub() {
     const current = tip;
     if (!current) return;
     await acknowledgeTip(plugin, current.id);
-    await markTipAnsweredThisSession(plugin);
+    await pauseTipsAfterAnswer(plugin);
     setTip(null);
   }, [plugin, tip]);
 
   const handleCloseTip = useCallback(async () => {
-    await snoozeTips(plugin);
-    await markTipAnsweredThisSession(plugin);
+    await pauseTipsAfterAnswer(plugin);
     setTip(null);
   }, [plugin]);
 

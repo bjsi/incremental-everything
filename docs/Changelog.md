@@ -2,6 +2,32 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.115 - September 22nd, 2026
+
+### ✨ New - collapse the plugin panel to a row of icons
+
+The 🌐 globe collapses the Incremental RemNote panel to one row of icons — the Mastery Drill with its card count, shortcuts, settings, the Priority Review Queue Rem and ▶ — and expands it again, remembered per device.
+
+📖 [The collapsed panel](Getting-Started.md#collapsed-panel)
+
+### ⚡ Improved - ▶ can practise the document you are in
+
+`Shift`- or `Cmd`/`Ctrl`-click **▶** to practise the Priority Queue for the current scope instead of the whole knowledge base, or to open the popup with that scope filled in if it has no queue yet.
+
+📖 [The Incremental RemNote Panel](Getting-Started.md#the-incremental-plugin-panel)
+
+### 🐛 Fixed - onboarding tips behaved differently per answer, and leaked across knowledge bases
+
+**I Got It** now pauses the tip panel for the same two hours **✕** does — reloading after it no longer hands you a fresh tip — and both the pause and the one-tip-per-session limit are now kept per knowledge base instead of shared by all of them.
+
+📖 [Tips](Getting-Started.md#tips)
+
+### 🐛 Fixed - the sidebar panels wasted space on both sides
+
+The plugin's left-sidebar panels now use the sidebar's full width instead of sitting inside 64px of padding on each side, which cost the most on a narrow sidebar.
+
+📖 [The Incremental RemNote Panel](Getting-Started.md#the-incremental-plugin-panel)
+
 ## v1.0.114 - September 16th, 2026
 
 ### 🐛 Fixed - Card Clusters were split in the Priority Queue
@@ -545,7 +571,7 @@ Removing priorities from 223 Rems produced 223 toasts. The removals themselves w
 
 A fourth button on the sidebar tip opens the whole pile: acknowledged ones first, newest at the top with the date you answered them, then the ones still to come. Each row has its own **Learn More**, and each unanswered one its own **I Got It**. When no tip is on screen the panel shows a **💡 All tips** link instead.
 
-![The sidebar tip with its four buttons: I Got It, Learn More and All Tips, and the ✕ in the corner](assets/panel-hub-2.png){ width="400" }
+![The sidebar tip with its four buttons: I Got It, Learn More and All Tips, and the ✕ in the corner](assets/panel-hub-expanded-with-tip.png){ width="400" }
 
 📖 [All Tips](Getting-Started.md#all-tips)
 
