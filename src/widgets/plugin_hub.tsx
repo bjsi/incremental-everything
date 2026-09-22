@@ -257,6 +257,110 @@ function PanelTitle() {
 }
 
 /**
+ * The collapsed row's icons, as inline stroke SVGs in `currentColor`.
+ *
+ * Emoji were the first pass and they were the wrong material here. ⚙ and 👁
+ * render as full-colour emoji on macOS and as flat glyphs on Windows, so the
+ * row looked like a different control set per platform, and none of them sit at
+ * the same optical weight as RemNote's own Tutorials/Settings icons directly
+ * below — which is the company this row keeps. Stroked paths in `currentColor`
+ * inherit the cell's colour, so they follow the theme into dark mode for free,
+ * cost no asset fetch (the drill's old remote PNG cost one per render), and
+ * come out at a single consistent weight.
+ *
+ * Feather/Lucide geometry (MIT), 24px grid, so they line up with the native
+ * icons rather than merely sitting near them.
+ */
+const iconProps: React.SVGProps<SVGSVGElement> = {
+  width: 18,
+  height: 18,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.75,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+};
+
+const GlobeIcon = () => (
+  <svg {...iconProps} aria-hidden>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+const TargetIcon = () => (
+  <svg {...iconProps} aria-hidden>
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="6" />
+    <circle cx="12" cy="12" r="2" />
+  </svg>
+);
+
+const KeyboardIcon = () => (
+  <svg {...iconProps} aria-hidden>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10" />
+  </svg>
+);
+
+const GearIcon = () => (
+  <svg {...iconProps} aria-hidden>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
+const EyeIcon = () => (
+  <svg {...iconProps} aria-hidden>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+/**
+ * Filled rather than stroked, and the one cell that is not grey.
+ *
+ * The expanded panel makes ▶ its single filled cell because it is the daily
+ * driver, and dropping that distinction on collapse would hand the row six
+ * equal-looking buttons with no answer to "which one do I press?". Colour is a
+ * lighter way to say it than the expanded panel's filled blue box — it keeps
+ * the flat, unboxed look the rest of the row has while still being the thing
+ * your eye lands on.
+ */
+const PlayIcon = () => (
+  <svg {...iconProps} fill="currentColor" strokeWidth={1.25} aria-hidden>
+    <polygon points="6 3 20 12 6 21 6 3" />
+  </svg>
+);
+
+/**
+ * Scoped styling for the collapsed row.
+ *
+ * The hover background is a rule rather than the `hover:opacity-60` the
+ * expanded panel's small bordered buttons use: at 28px with no border, fading
+ * an icon reads as it being disabled, while a filled rounded square reads as a
+ * target — and matches how the native sidebar rows right below respond.
+ *
+ * The ▶ animation is compact-only and deliberately NOT the expanded panel's
+ * `hubPlayCellGlow`: that one glows the segmented control's filled box from the
+ * inside, which needs a box. Here the pulse lives in the arrow itself — scale
+ * plus a blue drop-shadow, so the glow comes off the glyph's own silhouette.
+ * (The expanded keyframes' white shadow would be invisible on this one; it is
+ * tuned for a white arrow on blue.)
+ */
+const COMPACT_ROW_CSS = `
+  .ie-hub-cell:hover {
+    background: var(--rn-clr-background--hovered, rgba(100, 116, 139, 0.12));
+  }
+  @keyframes ieHubArrowPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
+    50% { transform: scale(1.18); filter: drop-shadow(0 0 3.5px rgba(59, 130, 246, 0.85)); }
+  }
+`;
+
+/**
  * One cell of the collapsed row.
  *
  * Deliberately *not* {@link IconButton}: that one is bordered, because in the
@@ -264,25 +368,28 @@ function PanelTitle() {
  * a control. The collapsed row has no card — the icons sit straight on the
  * sidebar, next to RemNote's own Tutorials/Settings rows — so a border on each
  * would draw six boxes where the native chrome above and below draws none.
- * Hover carries the affordance instead.
+ *
+ * The cells FLEX (`1 1 0`) rather than sitting at a fixed width: spread evenly
+ * across whatever the sidebar currently is, they read as one row of the
+ * sidebar's own chrome instead of a huddle of buttons pushed against its left
+ * edge. The cap stops six icons from drifting apart into unrelated dots on a
+ * wide sidebar; the floor is what makes the row wrap instead of crushing them.
  */
 const compactCellStyle: React.CSSProperties = {
-  height: 22,
-  minWidth: 22,
-  padding: '0 3px',
-  borderRadius: 5,
+  height: 28,
+  flex: '1 1 0',
+  minWidth: 28,
+  maxWidth: 44,
+  padding: 0,
+  borderRadius: 6,
   border: '1px solid transparent',
   background: 'transparent',
   color: 'var(--rn-clr-content-secondary, #64748b)',
-  fontSize: 13,
-  lineHeight: '20px',
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 2,
-  flex: '0 0 auto',
-  position: 'relative',
+  transition: 'background 120ms ease',
 };
 
 function CompactCell(props: {
@@ -296,11 +403,27 @@ function CompactCell(props: {
       onClick={props.onClick}
       title={props.label}
       aria-label={props.label}
-      className="hover:opacity-60"
+      className="ie-hub-cell"
       style={{ ...compactCellStyle, ...props.style }}
     >
       {props.children}
     </button>
+  );
+}
+
+/**
+ * Wraps an icon so a badge or a dot can hang off its corner.
+ *
+ * The marker anchors to the *icon*, not to the cell: the cells flex, so a
+ * cell-anchored badge would drift further from the glyph the wider the sidebar
+ * got and end up floating in the gap between two icons.
+ */
+function IconWithMarker(props: { children: React.ReactNode; marker: React.ReactNode }) {
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', lineHeight: 0 }}>
+      {props.children}
+      {props.marker}
+    </span>
   );
 }
 
@@ -319,12 +442,11 @@ function CompactCell(props: {
  * marks the globe with a dot. Collapsing pauses the tips; it does not cancel
  * them.
  *
- * It wraps (`flex-wrap`) rather than overflowing: six cells need roughly 150px
- * and the sidebar goes narrower than that, so at the extreme it becomes two
- * short rows — still a fraction of the expanded panel.
+ * It wraps (`flex-wrap`) rather than overflowing: six cells need roughly 190px
+ * at their floor and the sidebar goes narrower than that, so at the extreme it
+ * becomes two short rows — still a fraction of the expanded panel.
  */
 function CompactRow(props: {
-  globeSrc: string;
   hasWaitingTip: boolean;
   drillCount: number | null;
   startupFinished: boolean;
@@ -336,8 +458,8 @@ function CompactRow(props: {
   onLearn: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-0.5 px-1 py-1 mb-1">
-      <style>{HUB_KEYFRAMES}</style>
+    <div className="flex flex-wrap items-center gap-0.5 px-1 py-1.5 mb-1">
+      <style>{COMPACT_ROW_CSS}</style>
 
       <CompactCell
         label={
@@ -347,68 +469,92 @@ function CompactRow(props: {
         }
         onClick={props.onExpand}
       >
-        <img src={props.globeSrc} alt="" style={{ width: 16, height: 16 }} />
-        {props.hasWaitingTip && (
-          <span
-            aria-hidden
-            style={{
-              position: 'absolute',
-              top: 1,
-              right: 1,
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: '#3b82f6',
-            }}
-          />
-        )}
+        <IconWithMarker
+          marker={
+            props.hasWaitingTip ? (
+              <span
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: -1,
+                  right: -1,
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: '#3b82f6',
+                  boxShadow: '0 0 0 2px var(--rn-clr-background-primary, #fff)',
+                }}
+              />
+            ) : null
+          }
+        >
+          <GlobeIcon />
+        </IconWithMarker>
       </CompactCell>
 
       {/* The count is the whole point of the drill notification — an unlabelled
           target says "there is a drill" where the card said "49 cards waiting".
-          Shown as text beside the icon rather than as a corner badge: at 22px a
-          badge is unreadable, and the row has the width for two more glyphs. */}
+          A corner badge rather than a number beside the glyph: the cells are
+          evenly spread, so a second element inside one would make that cell
+          visibly wider than its neighbours and break the rhythm of the row. */}
       {props.drillCount !== null && (
         <CompactCell
           label={`Mastery Drill — ${props.drillCount} cards ready`}
           onClick={props.onDrill}
         >
-          🎯
-          <span style={{ fontSize: 9.5, fontWeight: 700, color: '#ef4444' }}>
-            {props.drillCount > 99 ? '99+' : props.drillCount}
-          </span>
+          <IconWithMarker
+            marker={
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -6,
+                  minWidth: 14,
+                  height: 14,
+                  padding: '0 3px',
+                  borderRadius: 7,
+                  background: '#ef4444',
+                  color: '#fff',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  lineHeight: '14px',
+                  textAlign: 'center',
+                  boxShadow: '0 0 0 1.5px var(--rn-clr-background-primary, #fff)',
+                }}
+              >
+                {props.drillCount > 99 ? '99+' : props.drillCount}
+              </span>
+            }
+          >
+            <TargetIcon />
+          </IconWithMarker>
         </CompactCell>
       )}
 
       <CompactCell label="Keyboard shortcuts" onClick={props.onShortcuts}>
-        ⌨
+        <KeyboardIcon />
       </CompactCell>
       <CompactCell label="Open the plugin's settings" onClick={props.onSettings}>
-        ⚙
+        <GearIcon />
       </CompactCell>
       <CompactCell
         label="Open the “Priority Review Queue” Rem — every Priority Review Document you have made"
         onClick={props.onQueueRem}
       >
-        👁
+        <EyeIcon />
       </CompactCell>
       <CompactCell
         label="Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base"
         onClick={props.onLearn}
-        style={{
-          background: '#3b82f6',
-          color: '#fff',
-          fontSize: 11,
-          animation: props.startupFinished ? 'hubPlayCellGlow 2s ease-in-out infinite' : 'none',
-        }}
+        style={{ color: '#3b82f6' }}
       >
         <span
           style={{
-            display: 'inline-block',
-            animation: props.startupFinished ? 'hubPlayPulse 2s ease-in-out infinite' : 'none',
+            display: 'inline-flex',
+            animation: props.startupFinished ? 'ieHubArrowPulse 2s ease-in-out infinite' : 'none',
           }}
         >
-          ▶
+          <PlayIcon />
         </span>
       </CompactCell>
     </div>
@@ -815,7 +961,6 @@ export function PluginHub() {
   if (collapsed) {
     return (
       <CompactRow
-        globeSrc={`${plugin.rootURL}globe-icon.png`}
         hasWaitingTip={tipsReady && !!tip}
         drillCount={drillCount ?? null}
         startupFinished={startupFinished}
