@@ -8,7 +8,11 @@ This page documents the major changes and improvements for each version of the I
 
 The **Forgetting Curve** replays a card's history into the retrievability FSRS predicts and forecasts what each of the four answer buttons would do to it, over a staircase of the stability every repetition bought. It sits at the top of the Queue Dashboard for the card on screen, and in each card's section of the Flashcard Repetition History.
 
+![The Forgetting Curve on a logarithmic time axis: the retrievability panel with the history line running green above the 90% target and turning blue as it approaches it, four dashed forecast branches past "now", and below it the stability staircase labelled ×1.44, ×1.39, ×1.54, ×3.04 and ×1.04, both panels spanning 3 days to 14.4 years](assets/forgetting-curve-log-scale.png){ width="900" }
+
 The history line is coloured against your target retention — green above, blue at it, red below. Time runs logarithmically by default, so a card's first minutes and its later years are both legible; **Linear** shows real elapsed time instead and stops earlier, keeping the plot on the repetitions that have happened. Drag across either panel to zoom, scroll to zoom at the pointer, double-click to reset.
+
+![The Forgetting Curve in the Queue Dashboard being switched from Linear to Log, then the 🔬 button opening the Flashcard Repetition History popup, where the same card carries its own curve](assets/forgetting-curve.gif){ width="700" }
 
 📖 [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve)
 

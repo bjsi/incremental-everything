@@ -422,7 +422,11 @@ Every FSRS figure above describes the card *right now*. The **Forgetting Curve**
 
 It appears in two places — at the top of the [Queue Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) for the card on screen, and inside the [Flashcard Repetition History](#flashcard-repetition-history) popup for every card of a Rem.
 
+![The Forgetting Curve in the Queue Dashboard being switched from Linear to Log, then the 🔬 button opening the Flashcard Repetition History popup, where the same card carries its own curve](assets/forgetting-curve.gif){ width="700" }
+
 #### The two panels
+
+![The Forgetting Curve on a logarithmic time axis: the retrievability panel with the history line running green above the 90% target and turning blue as it approaches it, four dashed forecast branches past "now", and below it the stability staircase labelled ×1.44, ×1.39, ×1.54, ×3.04 and ×1.04, both panels spanning 3 days to 14.4 years](assets/forgetting-curve-log-scale.png){ width="900" }
 
 **Retrievability** (top). A solid line through the past, snapping back to 100% at each repetition and decaying between them, then four dashed branches from *now* — one per answer button, with **Good** drawn heavier because it is the answer that describes the card's normal trajectory. A dashed horizontal rule marks your [Requested Retention](#requested-retention), and a vertical rule of the matching colour marks each repetition.
 
@@ -437,6 +441,10 @@ The **Log** / **Linear** toggle changes the time axis, and the two answer differ
 **Log** is the default. A mature card spends minutes in learning and years in review; on a linear axis its first day is a single pixel and everything interesting about its early life is invisible. The log axis gives both ends room, and the forecast runs until **Easy** reaches your target retention — the whole of the next stability, which costs almost no width because a log axis compresses its right-hand end.
 
 **Linear** shows real elapsed time, so intervals are comparable by eye. It stops much earlier — where **Good** is still 6 points above target — because on a linear axis every day added to the right steals width from every day already drawn, and a horizon chosen for the far future would flatten the repetitions you are trying to read.
+
+![The same card on a linear time axis: its first six months are compressed against the left edge while the axis runs to 6.2 years, and a tooltip reads "2mo since first review, Retrievability 100.0%, Stability 1.1y"](assets/forgetting-curve-linear-scale.png){ width="900" }
+
+*The same card as above, on the linear axis: the repetitions that the log axis spread across half the chart are now crowded into its first fifth — which is the trade the toggle makes.*
 
 #### Zooming
 

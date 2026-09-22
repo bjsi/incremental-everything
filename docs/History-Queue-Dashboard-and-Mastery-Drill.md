@@ -125,6 +125,8 @@ The **Debug: Clear Flashcard History** command clears the list for the knowledge
 
 **Forgetting Curve:** Below the live session card, the [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) charts the card you are looking at — where its retrievability has been, and where each of the four answer buttons would send it. Set **Forgetting Curve** to *Hidden* in the settings below to remove it.
 
+![The Forgetting Curve in the Queue Dashboard being switched from Linear to Log, then the 🔬 button opening the Flashcard Repetition History popup, where the same card carries its own curve](assets/forgetting-curve.gif){ width="700" }
+
 ![Practiced Queue History Live](assets/uploaded/da7c68_queue-history-live.png){ width="500" }
 
 ### Metrics Collected
