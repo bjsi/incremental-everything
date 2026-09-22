@@ -11,6 +11,8 @@ import {
     buildForgettingCurveSeries,
     describeCurveMismatch,
     formatCurveDays,
+    rebuildTicks,
+    tickMinGap,
 } from './forgetting_curve';
 import {
     DEFAULT_REQUESTED_RETENTION,
@@ -194,16 +196,56 @@ describe('buildForgettingCurveSeries', () => {
 
             for (let i = 1; i < s.ticks.length; i++) {
                 const gap = s.ticks[i].value - s.ticks[i - 1].value;
-                // Overlapping labels: what the old shared candidate list did to
-                // the first pixels of a linear axis.
-                assert.ok(gap >= span * 0.069, `${scale}: ticks ${i - 1}/${i} too close (${gap})`);
-                // An unlabelled half-chart: what it did to the right-hand tail.
+                // An unlabelled half-chart: what the shared candidate list did
+                // to the right-hand tail of a linear axis.
                 assert.ok(gap <= span * 0.45, `${scale}: ticks ${i - 1}/${i} too far apart (${gap})`);
             }
 
             const labels = s.ticks.map((t) => t.label);
             assert.equal(new Set(labels).size, labels.length, `${scale}: no repeated tick labels`);
         }
+    });
+
+    it('spaces ticks by the width it is given, at every width', () => {
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(HISTORY, { scale })!;
+            const span = s.xDomain[1] - s.xDomain[0];
+            for (const width of [360, 560, 1200, 1850]) {
+                const ticks = rebuildTicks(s, width);
+                const minGap = span * tickMinGap(width);
+                for (let i = 1; i < ticks.length; i++) {
+                    const gap = ticks[i].value - ticks[i - 1].value;
+                    assert.ok(
+                        gap >= minGap * 0.999,
+                        `${scale} @${width}px: "${ticks[i - 1].label}"/"${ticks[i].label}" overlap (${gap} < ${minGap})`,
+                    );
+                }
+                assert.ok(
+                    Math.abs(ticks[ticks.length - 1].value - s.xDomain[1]) < 1e-9,
+                    `${scale} @${width}px: right edge marked`,
+                );
+                const labels = ticks.map((t) => t.label);
+                assert.equal(new Set(labels).size, labels.length, `${scale} @${width}px: labels unique`);
+            }
+        }
+    });
+
+    it('subdivides the crowded left of a linear axis when the width allows', () => {
+        const s = build(HISTORY, { scale: 'linear' })!;
+        // Every repetition of a mature card lands in the first fraction of a
+        // linear axis. A wide chart should put readable marks in there; a narrow
+        // one honestly cannot, and must not pretend otherwise.
+        const narrow = rebuildTicks(s, 360).map((t) => t.label);
+        const wide = rebuildTicks(s, 1850).map((t) => t.label);
+        assert.ok(wide.length > narrow.length, `wide gains ticks (${wide.length} vs ${narrow.length})`);
+
+        const firstCoarse = s.xDomain[1] * 0.2;
+        const inLeftZone = (labels: string[], width: number) =>
+            rebuildTicks(s, width).filter((t) => t.value > 0 && t.value <= firstCoarse).length;
+        assert.ok(
+            inLeftZone(wide, 1850) >= 2,
+            'a wide linear axis carries several marks in the short-term zone',
+        );
     });
 
     it('covers a short-lived card without flooding it with ticks', () => {

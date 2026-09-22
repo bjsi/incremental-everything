@@ -144,6 +144,9 @@ export interface ForgettingCurveSeries {
     /** The memory state the forecast branches were derived from. */
     state: FSRSState;
     scale: CurveScale;
+    /** Axis bounds in days, kept so ticks can be rebuilt at a measured width. */
+    floorDays: number;
+    axisMaxDays: number;
 }
 
 export interface BuildCurveOptions {
@@ -199,7 +202,8 @@ export function formatCurveDays(days: number): string {
     if (days < 14) return `${days < 3 ? days.toFixed(1) : Math.round(days)}d`;
     if (days < 28) return `${Math.round(days / 7)}w`;
     if (days < 365) return `${Math.round(days / DAYS_PER_MONTH)}mo`;
-    return `${(days / DAYS_PER_YEAR).toFixed(1)}y`;
+    const years = (days / DAYS_PER_YEAR).toFixed(1);
+    return `${years.endsWith('.0') ? years.slice(0, -2) : years}y`;
 }
 
 const DAYS_PER_MONTH = 365.25 / 12;
@@ -240,15 +244,58 @@ const NICE_STEPS: { step: number; unit: number; suffix: string }[] = [
     { step: DAYS_PER_YEAR * 50, unit: DAYS_PER_YEAR, suffix: 'y' },
 ];
 
-/** Roughly how many ticks a linear axis aims for. */
+/** Roughly how many evenly spaced ticks the linear axis's coarse tier aims for. */
 const TARGET_LINEAR_TICKS = 6;
 
+/** Width to reserve per tick label, in px, including breathing room. */
+const TICK_LABEL_PX = 46;
+
+/** Assumed plot width when the caller has not measured one. */
+const DEFAULT_PLOT_WIDTH_PX = 560;
+
+/** Bounds on the tick gap, as a fraction of the axis span, whatever the width. */
+const TICK_GAP_MIN = 0.015;
+const TICK_GAP_MAX = 0.12;
+
 /**
- * Minimum separation between two ticks, as a fraction of the axis span. A tick
- * label is around 26px wide; at the narrowest the chart is drawn, this keeps
- * two of them from touching.
+ * Most subdivisions the linear axis's fine tier will place inside the first
+ * coarse interval. Past this it stops being an aid and becomes a ruler.
  */
-const TICK_MIN_GAP = 0.07;
+const MAX_SUB_DIVISIONS = 6;
+
+/**
+ * Separation two tick labels need, as a fraction of the axis span, at a given
+ * plot width. Clamped at both ends: a very narrow chart would otherwise demand
+ * more than a third of itself per label, a very wide one would pack them in.
+ */
+export function tickMinGap(plotWidthPx: number): number {
+    const width = plotWidthPx > 0 ? plotWidthPx : DEFAULT_PLOT_WIDTH_PX;
+    return Math.min(Math.max(TICK_LABEL_PX / width, TICK_GAP_MIN), TICK_GAP_MAX);
+}
+
+/** The smallest round step that is at least `raw` days. */
+function pickStep(raw: number) {
+    return NICE_STEPS.find((n) => n.step >= raw) ?? NICE_STEPS[NICE_STEPS.length - 1];
+}
+
+/**
+ * Name a tick by multiples of its own step's unit, promoting whole years out of
+ * months.
+ *
+ * Multiples of the step are what keep consecutive labels distinct — a generic
+ * formatter on a one-week step names 28, 35 and 42 days all "1mo". The
+ * promotion is so a fine tier stepping in months does not say "24mo" directly
+ * beneath a coarse tier saying "3y".
+ */
+function stepLabel(days: number, nice: { unit: number; suffix: string }): string {
+    if (nice.suffix === 'mo') {
+        const years = days / DAYS_PER_YEAR;
+        if (years >= 1 && Math.abs(years - Math.round(years)) < 1e-6) {
+            return `${Math.round(years)}y`;
+        }
+    }
+    return `${Math.round(days / nice.unit)}${nice.suffix}`;
+}
 
 /**
  * Ticks for the x axis.
@@ -271,22 +318,49 @@ function buildTicks(
     minDays: number,
     maxDays: number,
     toX: (days: number) => number,
+    plotWidthPx = DEFAULT_PLOT_WIDTH_PX,
 ): CurveTick[] {
     const xMin = toX(scale === 'linear' ? 0 : minDays);
     const xMax = toX(maxDays);
     const span = xMax - xMin || 1;
-    const minGap = span * TICK_MIN_GAP;
+    const minGap = span * tickMinGap(plotWidthPx);
     const out: CurveTick[] = [];
 
     if (scale === 'linear') {
-        const raw = maxDays / TARGET_LINEAR_TICKS;
-        const nice = NICE_STEPS.find((n) => n.step >= raw) ?? NICE_STEPS[NICE_STEPS.length - 1];
-        for (let i = 0; i * nice.step <= maxDays * (1 + 1e-9); i++) {
-            const days = i * nice.step;
-            out.push({
-                value: toX(days),
-                label: i === 0 ? '0' : `${Math.round(days / nice.unit)}${nice.suffix}`,
-            });
+        const coarse = pickStep(maxDays / TARGET_LINEAR_TICKS);
+        for (let i = 0; i * coarse.step <= maxDays * (1 + 1e-9); i++) {
+            const days = i * coarse.step;
+            out.push({ value: toX(days), label: i === 0 ? '0' : stepLabel(days, coarse) });
+        }
+
+        // A second, finer tier over the first coarse interval.
+        //
+        // A linear axis spreads a card's whole life across a span sized by its
+        // forecast, so on a mature card every repetition lands in the first
+        // fraction of it and the coarse tier leaves that stretch with nothing
+        // between 0 and its first mark. Subdividing it puts readable marks where
+        // the events actually are, as many as the width honestly allows — which
+        // is also why this one respects the measured gap rather than a constant.
+        // `minGap` is already in axis units, which on a linear axis are days.
+        const slots = Math.floor(coarse.step / minGap) - 1;
+        if (slots >= 1) {
+            const target = coarse.step / Math.min(slots + 1, MAX_SUB_DIVISIONS);
+            // The fine step must divide the coarse one exactly, or the last
+            // subdivision lands a remainder short of the next coarse tick and
+            // the two labels collide there — the one place the even spacing of
+            // the tier cannot protect itself.
+            const fine = NICE_STEPS.find(
+                (n) =>
+                    n.step >= target &&
+                    n.step < coarse.step &&
+                    Math.abs(coarse.step / n.step - Math.round(coarse.step / n.step)) < 1e-6,
+            );
+            if (fine) {
+                for (let d = fine.step; d < coarse.step * (1 - 1e-9); d += fine.step) {
+                    out.push({ value: toX(d), label: stepLabel(d, fine) });
+                }
+                out.sort((a, b) => a.value - b.value);
+            }
         }
     } else {
         for (const candidate of TICK_CANDIDATES) {
@@ -590,7 +664,8 @@ export function buildForgettingCurveSeries(
     // floor of the plot, but never show more than the range that carries data.
     const yMin = Math.max(0, Math.min(minObserved, targetRetention * 100) - (100 - minObserved) * 0.2);
 
-    const ticks = buildTicks(scale, floorDays, Math.max(horizonDays, nowDays, floorDays * 2), toX);
+    const axisMaxDays = Math.max(horizonDays, nowDays, floorDays * 2);
+    const ticks = buildTicks(scale, floorDays, axisMaxDays, toX);
 
     return {
         rows,
@@ -605,7 +680,23 @@ export function buildForgettingCurveSeries(
         targetPercent: targetRetention * 100,
         state,
         scale,
+        floorDays,
+        axisMaxDays,
     };
+}
+
+/**
+ * Ticks for a series at a known plot width.
+ *
+ * The series ships a set built for an assumed width, because the maths runs
+ * before anything is laid out. Once the chart knows how wide it really is it
+ * calls this, and a wide chart earns more marks than a narrow one instead of
+ * every chart being spaced for the narrowest.
+ */
+export function rebuildTicks(series: ForgettingCurveSeries, plotWidthPx: number): CurveTick[] {
+    const toX = (days: number): number =>
+        series.scale === 'linear' ? days : Math.log10(Math.max(days, series.floorDays));
+    return buildTicks(series.scale, series.floorDays, series.axisMaxDays, toX, plotWidthPx);
 }
 
 // ---------------------------------------------------------------------------

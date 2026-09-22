@@ -23,7 +23,7 @@
  * says so when the two look like they disagree.
  */
 import { QueueInteractionScore } from '@remnote/plugin-sdk';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     CartesianGrid,
     ComposedChart,
@@ -42,6 +42,7 @@ import {
     CurveScale,
     ForgettingCurveSeries,
     formatCurveDays,
+    rebuildTicks,
 } from '../lib/forgetting_curve';
 import { scoreColor } from '../lib/rating_labels';
 import { formatStabilityDays } from '../lib/utils';
@@ -207,14 +208,39 @@ export function ForgettingCurveChart({
     headerRight,
     title = 'Forgetting Curve',
 }: ForgettingCurveChartProps) {
+    // How wide the plot actually is, so the axis can earn more marks on a wide
+    // chart than on a narrow one. The series ships ticks for an assumed width,
+    // because the maths runs before anything is laid out; this replaces them
+    // once the real width is known.
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [plotWidth, setPlotWidth] = useState(0);
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        const measure = (width: number) =>
+            setPlotWidth(Math.max(0, width - Y_AXIS_WIDTH - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT));
+        measure(el.clientWidth);
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) measure(entry.contentRect.width);
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    const ticks = useMemo(
+        () => (plotWidth > 0 ? rebuildTicks(series, plotWidth) : series.ticks),
+        [series, plotWidth],
+    );
+
     const tickFormatter = useMemo(() => {
-        const labels = new Map(series.ticks.map((t) => [t.value, t.label]));
+        const labels = new Map(ticks.map((t) => [t.value, t.label]));
         return (value: number) => labels.get(value) ?? formatCurveDays(
             series.scale === 'linear' ? value : Math.pow(10, value),
         );
-    }, [series]);
+    }, [ticks, series.scale]);
 
-    const tickValues = useMemo(() => series.ticks.map((t) => t.value), [series]);
+    const tickValues = useMemo(() => ticks.map((t) => t.value), [ticks]);
 
     // The stability panel plots one point per repetition, so the ×SInc labels
     // have somewhere to hang. The staircase itself comes from the curve rows,
@@ -298,7 +324,7 @@ export function ForgettingCurveChart({
     const grades = series.branches.map((b) => b.grade);
 
     return (
-        <div className="w-full">
+        <div className="w-full" ref={containerRef}>
             <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
                 <h3 className="text-sm font-bold uppercase rn-clr-content-tertiary tracking-wider">
                     {title}
