@@ -257,6 +257,25 @@ function PanelTitle() {
 }
 
 /**
+ * The ▶ tooltip, shared by both layouts.
+ *
+ * A modifier that changes what a button does has to be discoverable from the
+ * button, and naming the scope is the discoverable part: "the current scope"
+ * means nothing until you know it currently resolves to "Anatomy" — the scope
+ * follows the focused Rem, so it moves under the user between clicks.
+ */
+function learnLabel(scopeName: string | null | undefined): string {
+  const scoped = scopeName
+    ? `Shift/Cmd-click: the Priority Queue for “${scopeName}” instead`
+    : 'Shift/Cmd-click: the Priority Queue for the focused document instead';
+  return (
+    'Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base; ' +
+    'builds it first if there is none yet\n' +
+    scoped
+  );
+}
+
+/**
  * The collapsed row's icons, as inline stroke SVGs in `currentColor`.
  *
  * Emoji were the first pass and they were the wrong material here. ⚙ and 👁
@@ -426,7 +445,7 @@ const compactCellStyle: React.CSSProperties = {
 
 function CompactCell(props: {
   label: string;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   children: React.ReactNode;
   style?: React.CSSProperties;
 }) {
@@ -482,12 +501,13 @@ function CompactRow(props: {
   hasWaitingTip: boolean;
   drillCount: number | null;
   startupFinished: boolean;
+  scopeName: string | null | undefined;
   onExpand: () => void;
   onDrill: () => void;
   onShortcuts: () => void;
   onSettings: () => void;
   onQueueRem: () => void;
-  onLearn: () => void;
+  onLearn: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-0.5 px-1 py-1.5 mb-1">
@@ -580,8 +600,12 @@ function CompactRow(props: {
       >
         <EyeIcon />
       </CompactCell>
+      {/* The collapsed row has no "Priority Queue" cell and no Scope line, so
+          the scoped queue would be unreachable here — hence the modifier, and
+          hence the scope being named in the tooltip: it is the only place the
+          row can say what Shift-click is about to act on. */}
       <CompactCell
-        label="Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base"
+        label={learnLabel(props.scopeName)}
         onClick={props.onLearn}
         style={{ color: '#3b82f6' }}
       >
@@ -941,6 +965,50 @@ export function PluginHub() {
   }, [plugin]);
 
   /**
+   * Shift/Cmd-click on ▶ — the same thing, for the scope the panel is currently
+   * pointing at rather than the whole knowledge base.
+   *
+   * The difference from {@link practiceKbQueue} is what happens when there is
+   * no document yet. The full-KB queue *builds* one on the spot, because "the
+   * whole knowledge base" needs no decisions from the user. A scope does: which
+   * Rem, how big a burst, what the shield currently holds. So a missing scoped
+   * queue opens the Priority Queue popup with the scope already filled in —
+   * which is the same door the expanded panel's "Priority Queue" button opens,
+   * and the reason the collapsed row can do without a cell for it.
+   */
+  const practiceScopedQueue = useCallback(async () => {
+    try {
+      if (await isQueueOpen(plugin)) {
+        await plugin.app.toast('A queue is already open.');
+        return;
+      }
+      const scope = await resolveScope();
+      const existing = await findPriorityQueueDoc(plugin, scope.scopeRemId);
+      if (!existing?.doc) {
+        await plugin.storage.setSession('reviewDocContext', scope);
+        await plugin.widget.openPopup('priority_queue_popup');
+        return;
+      }
+      await practicePriorityQueue(plugin, existing.doc);
+    } catch (e) {
+      console.error('[Hub] Practice scoped Priority Queue failed:', e);
+      await plugin.app.toast('Could not open the Priority Queue — see the console.');
+    }
+  }, [plugin, resolveScope]);
+
+  /**
+   * `mod` the way the plugin's own shortcuts read it — Cmd on macOS, Ctrl
+   * elsewhere — plus Shift, which is the gesture people try first and which
+   * costs nothing to honour. Alt is left alone: RemNote and the OS both claim
+   * Alt-click in places.
+   */
+  const handleLearnClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) =>
+      e.shiftKey || e.metaKey || e.ctrlKey ? practiceScopedQueue() : practiceKbQueue(),
+    [practiceScopedQueue, practiceKbQueue]
+  );
+
+  /**
    * Opens the "Priority Review Queue" tag Rem — the one place every Priority
    * Review Document shows up, since the creator tags each document with it. Its
    * references list is the browsable index of past documents, and the queue can
@@ -1006,7 +1074,8 @@ export function PluginHub() {
         onShortcuts={() => openDocs('Keyboard-Shortcuts/')}
         onSettings={() => plugin.widget.openPopup('ie_settings')}
         onQueueRem={openPriorityReviewQueue}
-        onLearn={practiceKbQueue}
+        onLearn={handleLearnClick}
+        scopeName={scopeName}
       />
     );
   }
@@ -1134,7 +1203,7 @@ export function PluginHub() {
             so an outer box-shadow would be cut off at the rounded border.
           */}
           <button
-            onClick={practiceKbQueue}
+            onClick={handleLearnClick}
             style={{
               ...segmentIconStyle,
               width: 24,
@@ -1144,10 +1213,7 @@ export function PluginHub() {
               animation: startupFinished ? 'hubPlayCellGlow 2s ease-in-out infinite' : 'none',
             }}
             className="hover:opacity-90"
-            title={
-              'Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base; builds it first if there is none yet\n\n' +
-              describeStartupTasks(startupStatus)
-            }
+            title={learnLabel(scopeName) + '\n\n' + describeStartupTasks(startupStatus)}
             aria-label="Learn — practise the Priority Queue"
           >
             <span
