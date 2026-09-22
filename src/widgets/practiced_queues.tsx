@@ -35,7 +35,7 @@ import {
 } from "../lib/authoritative_aggregates";
 import { computeMonthlyShieldCatchUp, MonthlyShieldCatchUp } from "../lib/shield_history";
 import { CardForgettingCurve } from "../components/CardForgettingCurve";
-import { disableQueueDashboardCurveId, practicedQueuesVisibleKey } from "../lib/consts";
+import { practicedQueuesVisibleKey, showQueueDashboardCurveId } from "../lib/consts";
 import {
     CALIBRATION_PERIOD_LABELS,
     FIXED_FALLBACK,
@@ -444,7 +444,7 @@ function PracticedQueues() {
         0
     );
     const [activeSession] = useSessionStorageState<PracticedQueueSession | null>("activeQueueSession", null);
-    const hideForgettingCurve = useIESetting(disableQueueDashboardCurveId);
+    const showForgettingCurve = useIESetting(showQueueDashboardCurveId);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const speed = useSpeedThresholds();
 
@@ -794,7 +794,7 @@ function PracticedQueues() {
                     retrievability has been, and where each of the four answer
                     buttons would send it. Only meaningful while a session is
                     live, and only for a flashcard — an IncRem has no card. */}
-                {activeSession && !hideForgettingCurve && activeSession.currentCardId && (
+                {activeSession && showForgettingCurve && activeSession.currentCardId && (
                     <div className="mb-6">
                         <CardForgettingCurve
                             cardId={activeSession.currentCardId}

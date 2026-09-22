@@ -83,7 +83,7 @@ import {
   speedCalibrationPeriodId,
   SpeedCalibrationPeriod,
   speedCalibrationMarginSecondsId,
-  disableQueueDashboardCurveId,
+  showQueueDashboardCurveId,
   ieSettingsValuesKey,
 } from './consts';
 // Type-only: utils.ts imports getIESetting from this module, so a value import
@@ -162,7 +162,7 @@ export interface IESettings {
   [speedColorGreenCpmId]: number;
   [speedCalibrationPeriodId]: SpeedCalibrationPeriod;
   [speedCalibrationMarginSecondsId]: number;
-  [disableQueueDashboardCurveId]: boolean;
+  [showQueueDashboardCurveId]: boolean;
 }
 
 export type IESettingId = keyof IESettings;
@@ -234,7 +234,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [speedColorGreenCpmId]: 4,
   [speedCalibrationPeriodId]: 'year',
   [speedCalibrationMarginSecondsId]: 10,
-  [disableQueueDashboardCurveId]: false,
+  [showQueueDashboardCurveId]: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,19 @@ interface SettingSpecBase {
 }
 
 export type SettingSpec =
-  | (SettingSpecBase & { kind: 'boolean' })
+  | (SettingSpecBase & {
+      kind: 'boolean';
+      /**
+       * Words for the two states, replacing the default On / Off.
+       *
+       * A toggle reads as a sentence with its title, and some settings have no
+       * natural "on". Naming the states directly — Shown / Hidden — keeps the
+       * title free of a verb it would otherwise have to negate, which is how a
+       * checkbox ends up saying "Hide Forgetting Curve: Off".
+       */
+      onLabel?: string;
+      offLabel?: string;
+    })
   | (SettingSpecBase & {
       kind: 'number';
       min?: number;
@@ -834,17 +846,19 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'week', label: 'Last 1 week' },
     ],
   },
-  [disableQueueDashboardCurveId]: {
+  [showQueueDashboardCurveId]: {
     kind: 'boolean',
     group: 'queueDashboard',
     helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#forgetting-curve',
-    title: 'Hide Forgetting Curve',
+    title: 'Forgetting Curve',
+    onLabel: 'Shown',
+    offLabel: 'Hidden',
     description:
-      'Removes the current card\'s forgetting curve from the top of the Queue Dashboard. The ' +
-      'curve replays the card\'s history into the retrievability FSRS predicts and forecasts ' +
-      'what each answer button would do to it. Turn this on if you would rather not see it, or ' +
-      'if your cards are not scheduled with FSRS — the curve is drawn from the FSRS settings ' +
-      'above, not from the scheduler RemNote runs.',
+      'Draws the current card\'s forgetting curve at the top of the Queue Dashboard: its ' +
+      'history replayed into the retrievability FSRS predicts, and a forecast of what each ' +
+      'answer button would do to it. Hide it if you would rather not see it, or if your cards ' +
+      'are not scheduled with FSRS — the curve is drawn from the FSRS settings above, not from ' +
+      'the scheduler RemNote runs.',
   },
   [speedCalibrationMarginSecondsId]: {
     kind: 'number',

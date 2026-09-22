@@ -116,8 +116,8 @@ export const speedCalibrationMarginSecondsId = 'speed_calibration_margin_seconds
 export const speedCalibrationCacheKey = 'speed_calibration_cache_v1';
 
 // --- Queue Dashboard: forgetting curve ---
-/** Hides the current card's forgetting curve at the top of the dashboard. */
-export const disableQueueDashboardCurveId = 'disable_queue_dashboard_forgetting_curve';
+/** Whether the current card's forgetting curve is drawn at the top of the dashboard. */
+export const showQueueDashboardCurveId = 'show_queue_dashboard_forgetting_curve';
 /** Device-local: log or linear time axis on the forgetting curve. */
 export const forgettingCurveScaleKey = 'forgetting_curve_scale';
 

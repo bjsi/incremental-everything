@@ -77,7 +77,11 @@ const Y_AXIS_WIDTH = 38;
  * two plot areas drift apart and the shared x axis stops being shared.
  */
 const CHART_MARGIN_LEFT = 8;
-const CHART_MARGIN_RIGHT = 10;
+/**
+ * Wider than the left, because the axis now always carries a tick on the right
+ * edge and a centred "14.6y" needs half its width past the end of the plot.
+ */
+const CHART_MARGIN_RIGHT = 24;
 
 /**
  * The stability panel's margins. `top` is generous on purpose: the ×SInc

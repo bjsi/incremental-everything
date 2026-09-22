@@ -178,6 +178,48 @@ describe('buildForgettingCurveSeries', () => {
         }
     });
 
+    it('keeps axis ticks apart and always marks the right edge', () => {
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(HISTORY, { scale })!;
+            const span = s.xDomain[1] - s.xDomain[0];
+
+            assert.ok(s.ticks.length >= 2, `${scale}: more than one tick`);
+
+            // The end of the axis is where the forecast stops; it must be legible.
+            const last = s.ticks[s.ticks.length - 1];
+            assert.ok(
+                Math.abs(last.value - s.xDomain[1]) < 1e-9,
+                `${scale}: the last tick sits on the right edge`,
+            );
+
+            for (let i = 1; i < s.ticks.length; i++) {
+                const gap = s.ticks[i].value - s.ticks[i - 1].value;
+                // Overlapping labels: what the old shared candidate list did to
+                // the first pixels of a linear axis.
+                assert.ok(gap >= span * 0.069, `${scale}: ticks ${i - 1}/${i} too close (${gap})`);
+                // An unlabelled half-chart: what it did to the right-hand tail.
+                assert.ok(gap <= span * 0.45, `${scale}: ticks ${i - 1}/${i} too far apart (${gap})`);
+            }
+
+            const labels = s.ticks.map((t) => t.label);
+            assert.equal(new Set(labels).size, labels.length, `${scale}: no repeated tick labels`);
+        }
+    });
+
+    it('covers a short-lived card without flooding it with ticks', () => {
+        // Three reps inside twenty minutes: the axis is minutes wide, and the
+        // step has to shrink with it without producing a tick per minute.
+        const history = [
+            rep(0.02, QueueInteractionScore.AGAIN),
+            rep(0.015, QueueInteractionScore.GOOD),
+            rep(0.01, QueueInteractionScore.GOOD),
+        ];
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(history, { scale })!;
+            assert.ok(s.ticks.length >= 2 && s.ticks.length <= 12, `${scale}: ${s.ticks.length} ticks`);
+        }
+    });
+
     it('never clips the target retention line off the y axis', () => {
         const s = build(HISTORY, { targetRetention: 0.97 })!;
         assert.ok(s.yDomain[0] <= s.targetPercent);
@@ -217,8 +259,12 @@ describe('formatCurveDays', () => {
         assert.equal(formatCurveDays(6 / 24), '6h');
         assert.equal(formatCurveDays(1), '1.0d');
         assert.equal(formatCurveDays(7), '7d');
-        assert.equal(formatCurveDays(30), '4w');
+        assert.equal(formatCurveDays(21), '3w');
+        // Months start at four weeks, so a one-month axis step is not "4w".
+        assert.equal(formatCurveDays(365.25 / 12), '1mo');
         assert.equal(formatCurveDays(200), '7mo');
         assert.equal(formatCurveDays(400), '1.1y');
+        // Years keep a decimal: this labels the right edge, wherever it lands.
+        assert.equal(formatCurveDays(5337), '14.6y');
     });
 });

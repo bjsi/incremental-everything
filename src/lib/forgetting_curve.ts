@@ -182,16 +182,131 @@ const TICK_CANDIDATES: CurveTick[] = [
     { value: 3650, label: '10y' },
 ];
 
-/** Compact label for an elapsed span given in days. */
+/**
+ * Compact label for an elapsed span given in days.
+ *
+ * Weeks give way to months at four of them rather than at two: the axis ticks
+ * below step in whole months, and "4w" sitting where "1mo" belongs reads as a
+ * different quantity. Years keep a decimal because this is what labels the far
+ * end of the axis, which lands wherever the forecast happens to stop — "15y" on
+ * a tick drawn at 14.6y is a small lie the reader has no way to catch.
+ */
 export function formatCurveDays(days: number): string {
     if (!Number.isFinite(days)) return '—';
     if (days <= 0) return '0';
     if (days < 1 / 24) return `${Math.max(1, Math.round(days * 1440))}m`;
     if (days < 1) return `${Math.round(days * 24)}h`;
     if (days < 14) return `${days < 3 ? days.toFixed(1) : Math.round(days)}d`;
-    if (days < 60) return `${Math.round(days / 7)}w`;
-    if (days < 365) return `${Math.round(days / 30.44)}mo`;
-    return `${(days / 365.25).toFixed(days < 3650 ? 1 : 0)}y`;
+    if (days < 28) return `${Math.round(days / 7)}w`;
+    if (days < 365) return `${Math.round(days / DAYS_PER_MONTH)}mo`;
+    return `${(days / DAYS_PER_YEAR).toFixed(1)}y`;
+}
+
+const DAYS_PER_MONTH = 365.25 / 12;
+const DAYS_PER_YEAR = 365.25;
+
+/**
+ * Tick steps a reader recognises as round, each with the unit its multiples are
+ * named in. Labelling a linear axis by multiples of its own step is what keeps
+ * consecutive ticks distinct: a generic day-to-text formatter applied to a
+ * one-week step produces "4w" and then "1mo" for 28 and 35 days, which look
+ * like a jump backwards.
+ */
+const NICE_STEPS: { step: number; unit: number; suffix: string }[] = [
+    { step: 1 / 1440, unit: 1 / 1440, suffix: 'm' },
+    { step: 5 / 1440, unit: 1 / 1440, suffix: 'm' },
+    { step: 15 / 1440, unit: 1 / 1440, suffix: 'm' },
+    { step: 30 / 1440, unit: 1 / 1440, suffix: 'm' },
+    { step: 1 / 24, unit: 1 / 24, suffix: 'h' },
+    { step: 3 / 24, unit: 1 / 24, suffix: 'h' },
+    { step: 6 / 24, unit: 1 / 24, suffix: 'h' },
+    { step: 12 / 24, unit: 1 / 24, suffix: 'h' },
+    { step: 1, unit: 1, suffix: 'd' },
+    { step: 2, unit: 1, suffix: 'd' },
+    { step: 3, unit: 1, suffix: 'd' },
+    { step: 5, unit: 1, suffix: 'd' },
+    { step: 7, unit: 7, suffix: 'w' },
+    { step: 14, unit: 7, suffix: 'w' },
+    { step: DAYS_PER_MONTH, unit: DAYS_PER_MONTH, suffix: 'mo' },
+    { step: DAYS_PER_MONTH * 2, unit: DAYS_PER_MONTH, suffix: 'mo' },
+    { step: DAYS_PER_MONTH * 3, unit: DAYS_PER_MONTH, suffix: 'mo' },
+    { step: DAYS_PER_MONTH * 6, unit: DAYS_PER_MONTH, suffix: 'mo' },
+    { step: DAYS_PER_YEAR, unit: DAYS_PER_YEAR, suffix: 'y' },
+    { step: DAYS_PER_YEAR * 2, unit: DAYS_PER_YEAR, suffix: 'y' },
+    { step: DAYS_PER_YEAR * 3, unit: DAYS_PER_YEAR, suffix: 'y' },
+    { step: DAYS_PER_YEAR * 5, unit: DAYS_PER_YEAR, suffix: 'y' },
+    { step: DAYS_PER_YEAR * 10, unit: DAYS_PER_YEAR, suffix: 'y' },
+    { step: DAYS_PER_YEAR * 20, unit: DAYS_PER_YEAR, suffix: 'y' },
+    { step: DAYS_PER_YEAR * 50, unit: DAYS_PER_YEAR, suffix: 'y' },
+];
+
+/** Roughly how many ticks a linear axis aims for. */
+const TARGET_LINEAR_TICKS = 6;
+
+/**
+ * Minimum separation between two ticks, as a fraction of the axis span. A tick
+ * label is around 26px wide; at the narrowest the chart is drawn, this keeps
+ * two of them from touching.
+ */
+const TICK_MIN_GAP = 0.07;
+
+/**
+ * Ticks for the x axis.
+ *
+ * The two scales need different treatment, and using one list for both is what
+ * produced the two faults this replaces. `TICK_CANDIDATES` is spaced evenly in
+ * *log* time, so on a log axis it is already well distributed — but on a linear
+ * axis every candidate up to a month lands in the first few pixels of a
+ * multi-year card and they overprint each other, while the largest candidate
+ * that fits can sit far short of the right edge, leaving the entire tail of the
+ * chart unlabelled.
+ *
+ * So: log picks from the candidates and drops any that would crowd its
+ * neighbour; linear generates its own evenly spaced round steps. Both then
+ * guarantee a tick at the right edge, because the end of the axis is a time the
+ * reader needs — it is where the forecast stops.
+ */
+function buildTicks(
+    scale: CurveScale,
+    minDays: number,
+    maxDays: number,
+    toX: (days: number) => number,
+): CurveTick[] {
+    const xMin = toX(scale === 'linear' ? 0 : minDays);
+    const xMax = toX(maxDays);
+    const span = xMax - xMin || 1;
+    const minGap = span * TICK_MIN_GAP;
+    const out: CurveTick[] = [];
+
+    if (scale === 'linear') {
+        const raw = maxDays / TARGET_LINEAR_TICKS;
+        const nice = NICE_STEPS.find((n) => n.step >= raw) ?? NICE_STEPS[NICE_STEPS.length - 1];
+        for (let i = 0; i * nice.step <= maxDays * (1 + 1e-9); i++) {
+            const days = i * nice.step;
+            out.push({
+                value: toX(days),
+                label: i === 0 ? '0' : `${Math.round(days / nice.unit)}${nice.suffix}`,
+            });
+        }
+    } else {
+        for (const candidate of TICK_CANDIDATES) {
+            if (candidate.value < minDays || candidate.value > maxDays) continue;
+            const x = toX(candidate.value);
+            if (out.length > 0 && x - out[out.length - 1].value < minGap) continue;
+            out.push({ value: x, label: candidate.label });
+        }
+    }
+
+    // The right edge, always. When it falls too close to the last tick for both
+    // to fit, it takes that tick's place rather than crowding it.
+    const endTick = { value: xMax, label: formatCurveDays(maxDays) };
+    if (out.length === 0 || xMax - out[out.length - 1].value >= minGap) {
+        out.push(endTick);
+    } else {
+        out[out.length - 1] = endTick;
+    }
+
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -475,10 +590,7 @@ export function buildForgettingCurveSeries(
     // floor of the plot, but never show more than the range that carries data.
     const yMin = Math.max(0, Math.min(minObserved, targetRetention * 100) - (100 - minObserved) * 0.2);
 
-    const ticks = TICK_CANDIDATES.filter((t) => {
-        const x = toX(t.value);
-        return x >= xMin && x <= xMax;
-    }).map((t) => ({ value: toX(t.value), label: t.label }));
+    const ticks = buildTicks(scale, floorDays, Math.max(horizonDays, nowDays, floorDays * 2), toX);
 
     return {
         rows,
