@@ -12,7 +12,13 @@ import {
   practicePriorityQueue,
   refreshPriorityQueue,
 } from '../lib/priority_review_document/queue_doc';
-import { onboardingTipsWidgetId, pluginHubHiddenKey, startupTasksStatusKey } from '../lib/consts';
+import {
+  onboardingTipsWidgetId,
+  pluginHubCollapsedKey,
+  pluginHubHiddenKey,
+  startupTasksStatusKey,
+} from '../lib/consts';
+import { getMasteryDrillStatus, masteryDrillIsReady } from '../lib/mastery_drill_status';
 import {
   StartupTasksStatus,
   describeStartupTasks,
@@ -72,6 +78,22 @@ const openDocs = (path: string) => {
     setTimeout(() => document.body.removeChild(link), 100);
   }
 };
+
+/**
+ * The ▶ cell's "the plugin is ready" breathing, shared by both layouts — the
+ * collapsed row runs the same animation on its own ▶, so it lives at module
+ * scope rather than inside the expanded panel's JSX.
+ */
+const HUB_KEYFRAMES = `
+  @keyframes hubPlayPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)); }
+    50% { transform: scale(1.15); filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)); }
+  }
+  @keyframes hubPlayCellGlow {
+    0%, 100% { box-shadow: inset 0 0 0px rgba(191, 219, 254, 0); filter: brightness(1); }
+    50% { box-shadow: inset 0 0 6px rgba(191, 219, 254, 0.9); filter: brightness(1.15); }
+  }
+`;
 
 const containerStyle: React.CSSProperties = {
   backgroundColor: 'var(--rn-clr-background-elevation-10)',
@@ -234,6 +256,165 @@ function PanelTitle() {
   );
 }
 
+/**
+ * One cell of the collapsed row.
+ *
+ * Deliberately *not* {@link IconButton}: that one is bordered, because in the
+ * expanded panel it sits against a card background and needs an edge to read as
+ * a control. The collapsed row has no card — the icons sit straight on the
+ * sidebar, next to RemNote's own Tutorials/Settings rows — so a border on each
+ * would draw six boxes where the native chrome above and below draws none.
+ * Hover carries the affordance instead.
+ */
+const compactCellStyle: React.CSSProperties = {
+  height: 22,
+  minWidth: 22,
+  padding: '0 3px',
+  borderRadius: 5,
+  border: '1px solid transparent',
+  background: 'transparent',
+  color: 'var(--rn-clr-content-secondary, #64748b)',
+  fontSize: 13,
+  lineHeight: '20px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 2,
+  flex: '0 0 auto',
+  position: 'relative',
+};
+
+function CompactCell(props: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <button
+      onClick={props.onClick}
+      title={props.label}
+      aria-label={props.label}
+      className="hover:opacity-60"
+      style={{ ...compactCellStyle, ...props.style }}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+/**
+ * The hub, collapsed to a single row of icons.
+ *
+ * This is a *collapse*, not a second panel with its own feature set: everything
+ * the expanded panel offers is one click away behind the globe, which is why
+ * the row can get away with six cells and no labels. Sorting, the scope line
+ * and the tip card have no icon here on purpose — inventing one for each would
+ * put eight to ten cells in a column that can be dragged to about 130px, and
+ * the row would wrap into the stack of rows this mode exists to avoid.
+ *
+ * What does *not* get to disappear silently is an unanswered tip: the panel is
+ * the plugin's only teaching surface, so a collapsed hub with a tip waiting
+ * marks the globe with a dot. Collapsing pauses the tips; it does not cancel
+ * them.
+ *
+ * It wraps (`flex-wrap`) rather than overflowing: six cells need roughly 150px
+ * and the sidebar goes narrower than that, so at the extreme it becomes two
+ * short rows — still a fraction of the expanded panel.
+ */
+function CompactRow(props: {
+  globeSrc: string;
+  hasWaitingTip: boolean;
+  drillCount: number | null;
+  startupFinished: boolean;
+  onExpand: () => void;
+  onDrill: () => void;
+  onShortcuts: () => void;
+  onSettings: () => void;
+  onQueueRem: () => void;
+  onLearn: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-0.5 px-1 py-1 mb-1">
+      <style>{HUB_KEYFRAMES}</style>
+
+      <CompactCell
+        label={
+          props.hasWaitingTip
+            ? 'Incremental RemNote — expand the panel (a tip is waiting)'
+            : 'Incremental RemNote — expand the panel'
+        }
+        onClick={props.onExpand}
+      >
+        <img src={props.globeSrc} alt="" style={{ width: 16, height: 16 }} />
+        {props.hasWaitingTip && (
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: 1,
+              right: 1,
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: '#3b82f6',
+            }}
+          />
+        )}
+      </CompactCell>
+
+      {/* The count is the whole point of the drill notification — an unlabelled
+          target says "there is a drill" where the card said "49 cards waiting".
+          Shown as text beside the icon rather than as a corner badge: at 22px a
+          badge is unreadable, and the row has the width for two more glyphs. */}
+      {props.drillCount !== null && (
+        <CompactCell
+          label={`Mastery Drill — ${props.drillCount} cards ready`}
+          onClick={props.onDrill}
+        >
+          🎯
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: '#ef4444' }}>
+            {props.drillCount > 99 ? '99+' : props.drillCount}
+          </span>
+        </CompactCell>
+      )}
+
+      <CompactCell label="Keyboard shortcuts" onClick={props.onShortcuts}>
+        ⌨
+      </CompactCell>
+      <CompactCell label="Open the plugin's settings" onClick={props.onSettings}>
+        ⚙
+      </CompactCell>
+      <CompactCell
+        label="Open the “Priority Review Queue” Rem — every Priority Review Document you have made"
+        onClick={props.onQueueRem}
+      >
+        👁
+      </CompactCell>
+      <CompactCell
+        label="Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base"
+        onClick={props.onLearn}
+        style={{
+          background: '#3b82f6',
+          color: '#fff',
+          fontSize: 11,
+          animation: props.startupFinished ? 'hubPlayCellGlow 2s ease-in-out infinite' : 'none',
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-block',
+            animation: props.startupFinished ? 'hubPlayPulse 2s ease-in-out infinite' : 'none',
+          }}
+        >
+          ▶
+        </span>
+      </CompactCell>
+    </div>
+  );
+}
+
 function IconButton(props: {
   label: string;
   glyph: string;
@@ -341,6 +522,19 @@ function TipCard(props: {
 export function PluginHub() {
   const plugin = usePlugin();
 
+  /**
+   * Collapsed to the icon row. **Local** storage, not session and not a
+   * setting: how much room the panel may take is a question about this screen's
+   * sidebar width, so it should survive a restart but not follow the user to
+   * another device. There is no setting for it because the globe already is
+   * one — a checkbox saying the same thing could only drift out of step with
+   * whatever the user last clicked.
+   */
+  const collapsed = useTrackerPlugin(
+    async (rp) => (await rp.storage.getLocal<boolean>(pluginHubCollapsedKey)) ?? false,
+    []
+  );
+
   const [tip, setTip] = useState<OnboardingTip | null>(null);
   /** null until the first load resolves, so the panel does not flash a tip in. */
   const [tipsReady, setTipsReady] = useState(false);
@@ -355,6 +549,9 @@ export function PluginHub() {
   // nearly exhausted, like the same handful of tips coming back after they were
   // answered.
   useEffect(() => {
+    // The layout is not known yet on the first pass, and whether a tip may be
+    // stamped depends on it.
+    if (collapsed === undefined) return;
     let cancelled = false;
     (async () => {
       // Fire and forget: protecting the already-answered tips against a synced
@@ -391,9 +588,10 @@ export function PluginHub() {
       if (cancelled) return;
       setTip(next);
       setTipsReady(true);
-      if (next) {
+      if (next && !collapsed) {
         // Stamped only on a fresh draw, so a remount cannot push a tip to the
-        // back of the rotation the user never answered.
+        // back of the rotation the user never answered — and only once the tip
+        // is actually on screen, which a collapsed hub's is not.
         await setDrawnTipIdThisSession(plugin, next.id);
         await recordTipShown(plugin, next.id);
       }
@@ -401,7 +599,13 @@ export function PluginHub() {
     return () => {
       cancelled = true;
     };
-  }, [plugin]);
+    // `collapsed` is a dependency, not just a read: a collapsed hub draws a tip
+    // so the globe can carry its dot, but does NOT stamp it as shown. Stamping
+    // it would let the rotation advance past tips nobody was in a position to
+    // read — days of collapsed sessions would pace the pile away silently. The
+    // stamps are therefore owed on the transition to expanded, which is what
+    // re-running this effect there pays.
+  }, [plugin, collapsed]);
 
   /**
    * Whether the user has closed the whole panel. Session storage, not local:
@@ -413,6 +617,20 @@ export function PluginHub() {
     async (rp) => (await rp.storage.getSession<boolean>(pluginHubHiddenKey)) ?? false,
     []
   );
+
+  /**
+   * The drill's readiness, but only while collapsed — expanded, the Mastery
+   * Drill notification is mounted below and answers this for itself, and two
+   * widgets paying for the same synced read plus two KB lookups on every change
+   * is a cost the sidebar does not need. Deliberately reads the flag inside the
+   * tracker so it re-runs when the row appears.
+   */
+  const drillCount = useTrackerPlugin(async (rp) => {
+    const isCollapsed = (await rp.storage.getLocal<boolean>(pluginHubCollapsedKey)) ?? false;
+    if (!isCollapsed) return null;
+    const status = await getMasteryDrillStatus(rp);
+    return masteryDrillIsReady(status) ? status.readyCount : null;
+  }, []);
 
   /**
    * The ▶ button only starts pulsing once the startup work has finished — the
@@ -451,6 +669,22 @@ export function PluginHub() {
    */
   const openAllTips = useCallback(
     () => plugin.widget.openPopup(onboardingTipsWidgetId),
+    [plugin]
+  );
+
+  /**
+   * The globe both ways. Reading the stored value here rather than closing over
+   * the tracked one keeps the click honest if another pane's copy of the panel
+   * toggled it a moment ago — the sidebar slot is remounted often enough that
+   * two live copies are ordinary.
+   */
+  const toggleCollapsed = useCallback(async () => {
+    const current = (await plugin.storage.getLocal<boolean>(pluginHubCollapsedKey)) ?? false;
+    await plugin.storage.setLocal(pluginHubCollapsedKey, !current);
+  }, [plugin]);
+
+  const openMasteryDrill = useCallback(
+    () => plugin.widget.openPopup('mastery_drill'),
     [plugin]
   );
 
@@ -572,17 +806,57 @@ export function PluginHub() {
 
   if (hidden) return null;
 
+  // Held back until the stored state is known. `?? false` and render would be
+  // the cheaper read, but it paints the full panel first and snaps it shut a
+  // frame later on every remount of the sidebar slot — which is exactly the
+  // layout thrash a collapsed hub is asking to be rid of.
+  if (collapsed === undefined) return null;
+
+  if (collapsed) {
+    return (
+      <CompactRow
+        globeSrc={`${plugin.rootURL}globe-icon.png`}
+        hasWaitingTip={tipsReady && !!tip}
+        drillCount={drillCount ?? null}
+        startupFinished={startupFinished}
+        onExpand={toggleCollapsed}
+        onDrill={openMasteryDrill}
+        onShortcuts={() => openDocs('Keyboard-Shortcuts/')}
+        onSettings={() => plugin.widget.openPopup('ie_settings')}
+        onQueueRem={openPriorityReviewQueue}
+        onLearn={practiceKbQueue}
+      />
+    );
+  }
+
   return (
     <div style={containerStyle} className="flex flex-col gap-1.5 p-2 rounded-lg mb-2">
+      <style>{HUB_KEYFRAMES}</style>
       <div className="flex items-center justify-between gap-1">
         {/* Fills the row so the title's width is the space left by the icons,
             not the width of whichever text it currently holds. */}
         <div className="flex items-center gap-1 min-w-0" style={{ flex: '1 1 auto' }}>
-          <img
-            src={`${plugin.rootURL}globe-icon.png`}
-            alt=""
-            style={{ width: 16, height: 16, flex: '0 0 auto' }}
-          />
+          {/* The same globe that expands the row collapses the panel, so the
+              control the user learns in one state is the control in the other.
+              It is the only affordance for collapsing — no setting, no second
+              button in the icon strip on the right. */}
+          <button
+            onClick={toggleCollapsed}
+            title="Collapse to the icon row"
+            aria-label="Collapse the panel to its icon row"
+            className="hover:opacity-60"
+            style={{
+              flex: '0 0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
+          >
+            <img src={`${plugin.rootURL}globe-icon.png`} alt="" style={{ width: 16, height: 16 }} />
+          </button>
           <PanelTitle />
         </div>
         <div className="flex items-center gap-0.5">
@@ -703,16 +977,6 @@ export function PluginHub() {
               ▶
             </span>
           </button>
-          <style>{`
-            @keyframes hubPlayPulse {
-              0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)); }
-              50% { transform: scale(1.15); filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)); }
-            }
-            @keyframes hubPlayCellGlow {
-              0%, 100% { box-shadow: inset 0 0 0px rgba(191, 219, 254, 0); filter: brightness(1); }
-              50% { box-shadow: inset 0 0 6px rgba(191, 219, 254, 0.9); filter: brightness(1.15); }
-            }
-          `}</style>
         </div>
       </div>
 

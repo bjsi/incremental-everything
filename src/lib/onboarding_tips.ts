@@ -153,6 +153,13 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     docsPath: 'Prioritization-&-Sorting/#setting-priorities',
   },
   {
+    id: 'priority-number',
+    category: 'basics',
+    title: 'First Things First',
+    body: 'Think of priorities as a queue of importance. Lower numbers mean higher priority.',
+    docsPath: 'Prioritization-&-Sorting/#priority-value-absolute-priority',
+  },
+  {
     id: 'priority-inheritance',
     category: 'basics',
     title: 'Set priority once',

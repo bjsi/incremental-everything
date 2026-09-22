@@ -213,6 +213,17 @@ export const onboardingTipsWidgetId = 'onboarding_tips';
  */
 export const pluginHubHiddenKey = 'plugin-hub-hidden';
 /**
+ * The hub is collapsed to its icon row. **Local** storage on purpose, and the
+ * opposite contract to {@link pluginHubHiddenKey}: this one is a preference,
+ * and a per-device one. How much room the panel may take is a question about
+ * this screen and this sidebar width, so a laptop dragged down to 150px should
+ * not collapse the desktop too. Survives restarts; default (unset) is expanded.
+ *
+ * Read by the hub *and* by the Mastery Drill notification, which stands down
+ * while collapsed because the hub's 🎯 icon carries the drill instead.
+ */
+export const pluginHubCollapsedKey = 'plugin-hub-collapsed';
+/**
  * Session: which activation-time tasks (caches, pre-tagging, cooling scan,
  * hidden-slot check, band stylesheets) have settled. Written only by the index
  * widget; read by the hub to start its ▶ pulse. See lib/startup_status.ts.
