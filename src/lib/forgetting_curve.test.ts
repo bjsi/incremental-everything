@@ -134,6 +134,21 @@ describe('buildForgettingCurveSeries', () => {
         for (const g of CURVE_GRADES) assert.equal(junction[g], 100);
     });
 
+    it('stops the forecast where Easy crosses the target retention', () => {
+        for (const target of [0.9, 0.8]) {
+            const s = build(HISTORY, { targetRetention: target })!;
+            const last = s.rows[s.rows.length - 1];
+            assert.ok(
+                Math.abs((last.easy as number) - target * 100) < 0.5,
+                `Easy should land on the target at the right edge (got ${last.easy} for ${target})`,
+            );
+            // And nothing is cut short: every other branch is already past it.
+            for (const g of ['again', 'hard', 'good'] as const) {
+                assert.ok((last[g] as number) <= target * 100 + 1e-6);
+            }
+        }
+    });
+
     it('omits the branches when the forecast is switched off', () => {
         const s = build(HISTORY, { forecast: false })!;
         assert.equal(s.branches.length, 0);

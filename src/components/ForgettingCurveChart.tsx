@@ -70,6 +70,39 @@ const GRADE_LABEL: Record<CurveGrade, string> = {
 const PAST_COLOR = '#0ea5e9';
 const STABILITY_COLOR = '#6366f1';
 
+const Y_AXIS_WIDTH = 38;
+
+/**
+ * Horizontal margins, shared by both panels. They have to match exactly or the
+ * two plot areas drift apart and the shared x axis stops being shared.
+ */
+const CHART_MARGIN_LEFT = 8;
+const CHART_MARGIN_RIGHT = 10;
+
+/**
+ * The stability panel's margins. `top` is generous on purpose: the ×SInc
+ * labels are drawn above their dots, in two staggered rows, and recharts clips
+ * to the svg rather than to the plot area — so the margin is the only thing
+ * standing between a label on the topmost dot and being cut in half.
+ */
+const STABILITY_MARGIN = { top: 30, right: CHART_MARGIN_RIGHT, bottom: 4, left: CHART_MARGIN_LEFT };
+
+/** Left edge of the stability plot area, for keeping labels off the y axis. */
+const STABILITY_PLOT_LEFT = STABILITY_MARGIN.left + Y_AXIS_WIDTH;
+
+/**
+ * Minimum horizontal separation between two ×SInc labels, as a fraction of the
+ * x domain. Below this they overlap into an unreadable smear — which is exactly
+ * what a linear axis does to a card's early repetitions.
+ */
+const LABEL_MIN_GAP = 0.07;
+
+/** How many staggered rows the labels may use before one is dropped. */
+const LABEL_ROWS = 2;
+
+/** Vertical step between those rows, in px. */
+const LABEL_ROW_HEIGHT = 11;
+
 export interface ForgettingCurveChartProps {
     series: ForgettingCurveSeries;
     /** Height of the retrievability panel in px. */
@@ -198,11 +231,65 @@ export function ForgettingCurveChart({
         if (values.length === 0) return [0, 1];
         const lo = Math.min(...values);
         const hi = Math.max(...values);
+        const spread = hi - lo;
         // A card whose stability never moved would otherwise get a zero-height
-        // axis; keep at least half a decade so the staircase has somewhere to sit.
-        const pad = Math.max((hi - lo) * 0.25, 0.25);
-        return [lo - pad, hi + pad];
+        // axis; keep a quarter of a decade so the staircase has somewhere to sit.
+        return [lo - Math.max(spread * 0.15, 0.15), hi + Math.max(spread * 0.2, 0.25)];
     }, [repPoints]);
+
+    /**
+     * Which row each ×SInc label gets, or -1 for "too crowded to draw".
+     *
+     * Walking left to right, a label takes the highest row whose last label is
+     * far enough behind it. Two rows absorb most clustering; anything still
+     * colliding after that is dropped rather than drawn on top of its
+     * neighbour. Nothing is lost by dropping one — the repetition table in the
+     * history popup lists every SInc, and hovering the curve gives the
+     * stability either side of it.
+     */
+    const labelRows = useMemo(() => {
+        const span = series.xDomain[1] - series.xDomain[0] || 1;
+        const minGap = span * LABEL_MIN_GAP;
+        const lastAt = new Array(LABEL_ROWS).fill(-Infinity);
+        return series.reps.map((r) => {
+            if (r.sInc === null) return -1;
+            for (let row = 0; row < LABEL_ROWS; row++) {
+                if (r.x - lastAt[row] >= minGap) {
+                    lastAt[row] = r.x;
+                    return row;
+                }
+            }
+            return -1;
+        });
+    }, [series]);
+
+    // Recharts types label `content` props as `any`; narrow at the boundary.
+    const renderSIncLabel = (raw: any) => {
+        const { x, y, index } = raw as { x?: number; y?: number; index?: number };
+        if (typeof x !== 'number' || typeof y !== 'number' || typeof index !== 'number') return null;
+        const row = labelRows[index] ?? -1;
+        const text = repPoints[index]?.sIncLabel;
+        if (row < 0 || !text) return null;
+        // A label centred on the first repetition would hang off the left edge
+        // and be clipped, so anchor it to the plot edge instead.
+        const nearLeft = x < STABILITY_PLOT_LEFT + 16;
+        return (
+            <text
+                x={nearLeft ? STABILITY_PLOT_LEFT : x}
+                y={y - 9 - row * LABEL_ROW_HEIGHT}
+                textAnchor={nearLeft ? 'start' : 'middle'}
+                fontSize={9}
+                fill="currentColor"
+                // A halo, so a label crossing the staircase or a gridline stays
+                // readable without a solid box behind it.
+                stroke="var(--rn-clr-background-primary)"
+                strokeWidth={3}
+                paintOrder="stroke"
+            >
+                {text}
+            </text>
+        );
+    };
 
     const grades = series.branches.map((b) => b.grade);
 
@@ -282,7 +369,10 @@ export function ForgettingCurveChart({
             </div>
 
             <ResponsiveContainer width="100%" height={height} debounce={50}>
-                <ComposedChart data={series.rows} margin={{ top: 6, right: 10, bottom: 0, left: 0 }}>
+                <ComposedChart
+                    data={series.rows}
+                    margin={{ top: 6, right: CHART_MARGIN_RIGHT, bottom: 0, left: CHART_MARGIN_LEFT }}
+                >
                     <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
                     <XAxis
                         dataKey="x"
@@ -295,12 +385,18 @@ export function ForgettingCurveChart({
                     />
                     <YAxis
                         domain={series.yDomain}
-                        width={38}
+                        width={Y_AXIS_WIDTH}
                         tick={{ fontSize: 10 }}
                         tickFormatter={(v: number) => `${Math.round(v)}%`}
                         allowDataOverflow
                     />
-                    <Tooltip content={<CurveTooltip series={series} />} />
+                    <Tooltip
+                        content={<CurveTooltip series={series} />}
+                        // Keep it inside this chart: left free it drops out of
+                        // the plot and lands on top of the stability panel.
+                        allowEscapeViewBox={{ x: false, y: false }}
+                        wrapperStyle={{ zIndex: 30, pointerEvents: 'none' }}
+                    />
 
                     <ReferenceLine
                         y={series.targetPercent}
@@ -356,8 +452,8 @@ export function ForgettingCurveChart({
             </ResponsiveContainer>
 
             {showStability && repPoints.length > 0 && (
-                <ResponsiveContainer width="100%" height={Math.max(90, Math.round(height * 0.5))} debounce={50}>
-                    <ComposedChart data={series.rows} margin={{ top: 14, right: 10, bottom: 4, left: 0 }}>
+                <ResponsiveContainer width="100%" height={Math.max(130, Math.round(height * 0.62))} debounce={50}>
+                    <ComposedChart data={series.rows} margin={STABILITY_MARGIN}>
                         <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                         <XAxis
                             dataKey="x"
@@ -370,7 +466,7 @@ export function ForgettingCurveChart({
                         />
                         <YAxis
                             domain={sLogDomain}
-                            width={38}
+                            width={Y_AXIS_WIDTH}
                             tick={{ fontSize: 9 }}
                             tickFormatter={(v: number) => formatStabilityDays(Math.pow(10, v))}
                             allowDataOverflow
@@ -385,11 +481,7 @@ export function ForgettingCurveChart({
                             connectNulls={false}
                         />
                         <Scatter data={repPoints} dataKey="sLog" fill={STABILITY_COLOR} isAnimationActive={false}>
-                            <LabelList
-                                dataKey="sIncLabel"
-                                position="top"
-                                style={{ fontSize: 9, fill: 'currentColor' }}
-                            />
+                            <LabelList dataKey="sIncLabel" content={renderSIncLabel} />
                         </Scatter>
                     </ComposedChart>
                 </ResponsiveContainer>

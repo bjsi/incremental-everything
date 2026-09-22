@@ -327,9 +327,17 @@ export function buildForgettingCurveSeries(
           }))
         : [];
 
-    const horizonDays = forecast
-        ? nowDays + Math.max(...branches.map((b) => b.intervalDays * 1.4), 1 / 24)
-        : nowDays;
+    // Stop the forecast where Easy — the longest of the four — crosses the
+    // target retention. `intervalDays` is by construction the moment R reaches
+    // the target, so that crossing is the last thing on the chart worth looking
+    // at: past it every branch is below target and the curves only flatten.
+    // Cutting there is what keeps the plot area spent on the part that carries
+    // information, which matters most on a linear axis.
+    const easyBranch = branches.find((b) => b.grade === 'easy');
+    const capDays = easyBranch
+        ? easyBranch.intervalDays
+        : Math.max(...branches.map((b) => b.intervalDays), 1 / 24);
+    const horizonDays = forecast ? nowDays + Math.max(capDays, 1 / 24) : nowDays;
 
     // The log axis needs a positive floor. Derive it from the data so a card
     // with no sub-day steps does not waste three decades on minutes it never
