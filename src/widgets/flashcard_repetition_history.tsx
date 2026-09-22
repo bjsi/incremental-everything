@@ -1223,8 +1223,6 @@ function FlashcardRepetitionHistory() {
                                     <div style={{ marginTop: 4, marginBottom: 8 }}>
                                         <CardForgettingCurve
                                             history={card.history}
-                                            lastRepetitionTime={stats.lastPracticeDate?.getTime() ?? null}
-                                            nextRepetitionTime={card.nextRepetitionTime ?? null}
                                             height={200}
                                             emptyMessage={null}
                                         />

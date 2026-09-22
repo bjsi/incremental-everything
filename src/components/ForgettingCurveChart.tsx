@@ -18,9 +18,8 @@
  * samples in whichever coordinate is being plotted, so both ends stay legible.
  *
  * Presentational only — it takes a prebuilt series and renders it. Every figure
- * in it comes from the FSRS settings in the plugin's own settings, not from the
- * scheduler RemNote actually runs on the card; `warning` is where the caller
- * says so when the two look like they disagree.
+ * in it comes from the plugin's own FSRS settings, not from the scheduler
+ * RemNote actually runs on the card.
  */
 import { QueueInteractionScore } from '@remnote/plugin-sdk';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -135,8 +134,6 @@ export interface ForgettingCurveChartProps {
     height?: number;
     /** Draw the stability staircase under the curve. */
     showStability?: boolean;
-    /** Rendered above the chart in amber when the model may not match the scheduler. */
-    warning?: string | null;
     scale: CurveScale;
     onScaleChange?: (scale: CurveScale) => void;
     /** Trailing controls for the header row (e.g. a close button). */
@@ -328,7 +325,6 @@ export function ForgettingCurveChart({
     series,
     height = 220,
     showStability = true,
-    warning,
     scale,
     onScaleChange,
     headerRight,
@@ -696,12 +692,6 @@ export function ForgettingCurveChart({
                     {headerRight}
                 </div>
             </div>
-
-            {warning && (
-                <div className="mb-2 px-2 py-1 text-[11px] rounded border border-amber-400 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40">
-                    {warning}
-                </div>
-            )}
 
             {/* Legend. Compact enough to sit above the plot rather than steal
                 width from it, and it doubles as the key for the rep markers. */}

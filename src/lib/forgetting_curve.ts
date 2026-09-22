@@ -26,7 +26,7 @@
  *
  * All of this describes the plugin's *model* of the card. It is only RemNote's
  * scheduling if the configured weights and retention match the scheduler that
- * card is really on — see `describeCurveMismatch`.
+ * card is really on, which the plugin API gives no way to check.
  */
 import { QueueInteractionScore, RepetitionStatusInterface } from '@remnote/plugin-sdk';
 import {
@@ -826,45 +826,4 @@ export function rebuildTicks(
     }
 
     return buildTicks(series.scale, minDays, maxDays, toX, plotWidthPx);
-}
-
-// ---------------------------------------------------------------------------
-// Does this model actually describe the card's scheduler?
-// ---------------------------------------------------------------------------
-
-/**
- * Compare the next date the model predicts against the one RemNote actually
- * scheduled.
- *
- * The plugin has no way to read which scheduler a card is on, so every figure
- * here is computed from the weights and retention configured in plugin
- * settings. When the card is on Anki SM-2, on the legacy Exponential scheduler,
- * or on an FSRS scheduler with different weights, the curve is a plausible
- * picture of a card that is not this one. This is the cheap check that catches
- * it: if the interval RemNote gave is nowhere near the one the model implies,
- * say so rather than present the numbers as fact.
- *
- * Returns null when the two agree, or when there is nothing to compare.
- */
-export function describeCurveMismatch(
-    state: FSRSState,
-    lastRepetitionTime: number | null | undefined,
-    nextRepetitionTime: number | null | undefined,
-    /** Ratio beyond which the two are called different. 2 = off by a factor of two. */
-    tolerance = 2,
-): string | null {
-    if (!lastRepetitionTime || !nextRepetitionTime) return null;
-
-    const actualDays = (nextRepetitionTime - lastRepetitionTime) / MS_PER_DAY;
-    const modelledDays = state.s * state.intervalFactor;
-    if (!(actualDays > 0) || !(modelledDays > 0)) return null;
-
-    const ratio = actualDays / modelledDays;
-    if (ratio >= 1 / tolerance && ratio <= tolerance) return null;
-
-    return (
-        `RemNote scheduled ${formatCurveDays(actualDays)} for this card, but these settings ` +
-        `model ${formatCurveDays(modelledDays)}. The card is probably on a different scheduler ` +
-        `(Anki SM-2, or FSRS with other weights) — treat the curve as an estimate.`
-    );
 }

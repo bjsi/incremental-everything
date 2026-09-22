@@ -9,7 +9,6 @@ import { QueueInteractionScore, RepetitionStatusInterface } from '@remnote/plugi
 import {
     CURVE_GRADES,
     buildForgettingCurveSeries,
-    describeCurveMismatch,
     formatCurveDays,
     rebuildTicks,
     tickMinGap,
@@ -367,32 +366,6 @@ describe('buildForgettingCurveSeries', () => {
         const s = build(HISTORY, { targetRetention: 0.97 })!;
         assert.ok(s.yDomain[0] <= s.targetPercent);
         assert.equal(s.yDomain[1], 100);
-    });
-});
-
-describe('describeCurveMismatch', () => {
-    const state = computeFSRSState(HISTORY, null, DEFAULT_REQUESTED_RETENTION)!;
-    const lastRep = NOW - 200 * DAY;
-
-    it('stays quiet when the scheduler agrees', () => {
-        const modelled = state.s * state.intervalFactor;
-        assert.equal(describeCurveMismatch(state, lastRep, lastRep + modelled * DAY), null);
-    });
-
-    it('stays quiet inside the tolerance', () => {
-        const modelled = state.s * state.intervalFactor;
-        assert.equal(describeCurveMismatch(state, lastRep, lastRep + modelled * 1.5 * DAY), null);
-    });
-
-    it('speaks up when the interval is nowhere near', () => {
-        const modelled = state.s * state.intervalFactor;
-        const msg = describeCurveMismatch(state, lastRep, lastRep + modelled * 10 * DAY);
-        assert.ok(msg && msg.includes('different scheduler'));
-    });
-
-    it('has nothing to say without both dates', () => {
-        assert.equal(describeCurveMismatch(state, null, NOW), null);
-        assert.equal(describeCurveMismatch(state, lastRep, null), null);
     });
 });
 
