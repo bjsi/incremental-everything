@@ -8,11 +8,15 @@ This page documents the major changes and improvements for each version of the I
 
 The 🌐 globe collapses the Incremental RemNote panel to one row of icons — the Mastery Drill with its card count, shortcuts, settings, the Priority Review Queue Rem and ▶ — and expands it again, remembered per device.
 
+![The collapsed panel: the globe, the Mastery Drill with a count badge, keyboard shortcuts, settings, the Priority Review Queue Rem and Learn, in one row above Tutorials and Settings](assets/panel-hub-collapsed.png){ width="400" }
+
 📖 [The collapsed panel](Getting-Started.md#collapsed-panel)
 
 ### ⚡ Improved - ▶ can practise the document you are in
 
-`Shift`- or `Cmd`/`Ctrl`-click **▶** to practise the Priority Queue for the current scope instead of the whole knowledge base, or to open the popup with that scope filled in if it has no queue yet.
+`Shift`- or `Cmd`/`Ctrl`-click **▶** to practise the Priority Queue for the current scope instead of the whole knowledge base, or to open the popup with that scope filled in if it has no queue yet. The scope it will use is the one named under the button.
+
+![The panel with the Priority Queue group, the eye and the blue Learn button, and the scope named on the line below them](assets/panel-hub-expanded.png){ width="400" }
 
 📖 [The Incremental RemNote Panel](Getting-Started.md#the-incremental-plugin-panel)
 
@@ -25,6 +29,8 @@ The 🌐 globe collapses the Incremental RemNote panel to one row of icons — t
 ### 🐛 Fixed - the sidebar panels wasted space on both sides
 
 The plugin's left-sidebar panels now use the sidebar's full width instead of sitting inside 64px of padding on each side, which cost the most on a narrow sidebar.
+
+![The panel and the Mastery Drill notification below it, both spanning the width of the left sidebar](assets/panel-hub-and-drill-expanded.png){ width="380" }
 
 📖 [The Incremental RemNote Panel](Getting-Started.md#the-incremental-plugin-panel)
 
