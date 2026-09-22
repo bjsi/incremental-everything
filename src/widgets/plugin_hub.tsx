@@ -290,16 +290,35 @@ function learnLabel(scopeName: string | null | undefined): string {
  * Feather/Lucide geometry (MIT), 24px grid, so they line up with the native
  * icons rather than merely sitting near them.
  */
-const iconProps: React.SVGProps<SVGSVGElement> = {
-  width: 18,
-  height: 18,
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 1.75,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-};
+interface IconProps {
+  /** Rendered box, in px. 18 in the collapsed row, 13–14 in the expanded panel. */
+  size?: number;
+}
+
+/**
+ * SVG attributes for one icon at a given size, with the stroke expressed as the
+ * weight it should END UP at on screen rather than as a number on the 24px
+ * grid.
+ *
+ * The same icon appears at 18px in the collapsed row and at 13px in the
+ * expanded panel's header. A fixed `strokeWidth` would render the small copy
+ * at 0.72 of the large one's weight, so the two would not read as the same icon
+ * — the expanded set would look faded next to a row the user had just been
+ * looking at. Scaling the grid value by `24 / size` holds the painted line at
+ * `strokePx` whatever the box is.
+ */
+function iconAttrs(size: number, strokePx = 1.3): React.SVGProps<SVGSVGElement> {
+  return {
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: (strokePx * 24) / size,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  };
+}
 
 /**
  * The plugin's own mark, drawn as line art: a desk globe on a stand.
@@ -320,8 +339,8 @@ const iconProps: React.SVGProps<SVGSVGElement> = {
  * - **The stroke is 1.5, not the row's 1.75.** Six paths in the space the other
  *   icons spend on three; at the shared weight they thicken into a blob.
  */
-const GlobeIcon = () => (
-  <svg {...iconProps} strokeWidth={1.5} aria-hidden>
+const GlobeIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size, 1.125)} aria-hidden>
     {/* sphere, with a meridian and the equator so it reads as a globe */}
     <circle cx="10.5" cy="10.5" r="6" />
     <ellipse cx="10.5" cy="10.5" rx="2.5" ry="6" />
@@ -334,30 +353,30 @@ const GlobeIcon = () => (
   </svg>
 );
 
-const TargetIcon = () => (
-  <svg {...iconProps} aria-hidden>
+const TargetIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size)} aria-hidden>
     <circle cx="12" cy="12" r="10" />
     <circle cx="12" cy="12" r="6" />
     <circle cx="12" cy="12" r="2" />
   </svg>
 );
 
-const KeyboardIcon = () => (
-  <svg {...iconProps} aria-hidden>
+const KeyboardIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size)} aria-hidden>
     <rect x="2" y="4" width="20" height="16" rx="2" />
     <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10" />
   </svg>
 );
 
-const GearIcon = () => (
-  <svg {...iconProps} aria-hidden>
+const GearIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size)} aria-hidden>
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </svg>
 );
 
-const EyeIcon = () => (
-  <svg {...iconProps} aria-hidden>
+const EyeIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size)} aria-hidden>
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
     <circle cx="12" cy="12" r="3" />
   </svg>
@@ -373,8 +392,8 @@ const EyeIcon = () => (
  * the flat, unboxed look the rest of the row has while still being the thing
  * your eye lands on.
  */
-const PlayIcon = () => (
-  <svg {...iconProps} fill="currentColor" strokeWidth={1.25} aria-hidden>
+const PlayIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size, 0.94)} fill="currentColor" aria-hidden>
     <polygon points="6 3 20 12 6 21 6 3" />
   </svg>
 );
@@ -624,7 +643,8 @@ function CompactRow(props: {
 
 function IconButton(props: {
   label: string;
-  glyph: string;
+  /** A text glyph, or one of the SVG icons above sized for this 18px button. */
+  glyph: React.ReactNode;
   onClick: () => void;
   style?: React.CSSProperties;
 }) {
@@ -1111,14 +1131,19 @@ export function PluginHub() {
           <PanelTitle />
         </div>
         <div className="flex items-center gap-0.5">
+          {/* The same icons the collapsed row uses, at 13px for this 18px
+              button — collapsing and expanding should not feel like moving
+              between two different plugins. ? and ✕ stay as text: they are
+              typographic symbols that render identically everywhere, which is
+              exactly what ⌨ ⚙ 👁 were not. */}
           <IconButton
             label="Keyboard shortcuts"
-            glyph="⌨"
+            glyph={<KeyboardIcon size={13} />}
             onClick={() => openDocs('Keyboard-Shortcuts/')}
           />
           <IconButton
             label="Open the plugin's settings"
-            glyph="⚙"
+            glyph={<GearIcon size={13} />}
             onClick={() => plugin.widget.openPopup('ie_settings')}
           />
           <IconButton
@@ -1193,7 +1218,7 @@ export function PluginHub() {
             title="Open the “Priority Review Queue” Rem — every Priority Review Document you have made, ready to study from"
             aria-label="Open the Priority Review Queue Rem"
           >
-            👁
+            <EyeIcon size={14} />
           </button>
           {/*
             The daily driver, so it is the one filled cell in the panel. Once
