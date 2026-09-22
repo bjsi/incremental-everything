@@ -231,21 +231,32 @@ export function ForgettingCurveChart({
 
     // Zoom. `null` is the full axis; otherwise a visible range in plotted x
     // units, which both panels share because they share the axis.
-    const [zoom, setZoom] = useState<[number, number] | null>(null);
+    //
+    // The range is tagged with the series it was taken from, and discarded
+    // during render if it does not match. Clearing it in an effect is not
+    // enough: an effect runs *after* the render it belongs to, so switching
+    // scale drew one frame with a log range on a linear axis (or worse, the
+    // reverse — a linear range put through 10^x is Infinity, which used to hang
+    // the tick loop and take the whole widget down with it).
+    const [zoom, setZoom] = useState<{ series: ForgettingCurveSeries; range: [number, number] } | null>(
+        null,
+    );
     const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
 
-    // A new series is a different card, or the same card on the other scale;
-    // either way the old range means nothing on it.
+    const activeZoom = zoom && zoom.series === series ? zoom.range : null;
+
+    // Drop the stale entry once the render that ignored it is done, so the
+    // Reset control and the wheel handler see the same state the axis does.
     useEffect(() => {
-        setZoom(null);
+        setZoom((current) => (current && current.series === series ? current : null));
         setDrag(null);
     }, [series]);
 
-    const xDomain: [number, number] = zoom ?? series.xDomain;
+    const xDomain: [number, number] = activeZoom ?? series.xDomain;
 
     const ticks = useMemo(
-        () => (plotWidth > 0 ? rebuildTicks(series, plotWidth, zoom ?? undefined) : series.ticks),
-        [series, plotWidth, zoom],
+        () => (plotWidth > 0 ? rebuildTicks(series, plotWidth, activeZoom ?? undefined) : series.ticks),
+        [series, plotWidth, activeZoom],
     );
 
     const visibleRows = useMemo(
@@ -257,7 +268,7 @@ export function ForgettingCurveChart({
     // percent, so refit to what is actually on screen — keeping the target line
     // inside, since it is the thing the curve is read against.
     const yDomain = useMemo((): [number, number] => {
-        if (!zoom) return series.yDomain;
+        if (!activeZoom) return series.yDomain;
         const values: number[] = [];
         for (const row of visibleRows) {
             for (const key of ['r', ...CURVE_GRADES] as const) {
@@ -270,7 +281,7 @@ export function ForgettingCurveChart({
         const hi = Math.max(...values, series.targetPercent);
         const pad = Math.max((hi - lo) * 0.12, 0.5);
         return [Math.max(0, lo - pad), Math.min(100, hi + pad)];
-    }, [zoom, visibleRows, series]);
+    }, [activeZoom, visibleRows, series]);
 
     // Wheel zoom, anchored on the pointer so the moment under the cursor stays
     // put. Bound natively rather than through React's `onWheel`, which is
@@ -289,7 +300,8 @@ export function ForgettingCurveChart({
             const fraction = Math.min(Math.max((event.clientX - plotLeft) / plotWidth, 0), 1);
 
             setZoom((current) => {
-                const [lo, hi] = current ?? [fullLo, fullHi];
+                const [lo, hi] =
+                    current && current.series === series ? current.range : [fullLo, fullHi];
                 const anchor = lo + fraction * (hi - lo);
                 const scaled = (hi - lo) * (event.deltaY > 0 ? 1.25 : 1 / 1.25);
                 const span = Math.min(Math.max(scaled, fullSpan / 2000), fullSpan);
@@ -301,13 +313,13 @@ export function ForgettingCurveChart({
 
                 // Zoomed all the way back out: drop to null so the axis returns
                 // to the ticks and y range it was built with.
-                return next[1] - next[0] >= fullSpan * 0.999 ? null : next;
+                return next[1] - next[0] >= fullSpan * 0.999 ? null : { series, range: next };
             });
         };
 
         el.addEventListener('wheel', onWheel, { passive: false });
         return () => el.removeEventListener('wheel', onWheel);
-    }, [plotWidth, series.xDomain]);
+    }, [plotWidth, series]);
 
     const beginDrag = (e: { activeLabel?: string | number }) => {
         const x = Number(e?.activeLabel);
@@ -326,7 +338,9 @@ export function ForgettingCurveChart({
         const hi = Math.max(drag.from, drag.to);
         setDrag(null);
         // A click, or a selection too thin to be meant: leave the view alone.
-        if (hi - lo >= (series.xDomain[1] - series.xDomain[0]) * 0.005) setZoom([lo, hi]);
+        if (hi - lo >= (series.xDomain[1] - series.xDomain[0]) * 0.005) {
+            setZoom({ series, range: [lo, hi] });
+        }
     };
 
     const dragHandlers = {
@@ -360,7 +374,7 @@ export function ForgettingCurveChart({
     );
 
     const sLogDomain = useMemo((): [number, number] => {
-        const values = zoom
+        const values = activeZoom
             ? visibleRows
                   .map((r) => r.sLog)
                   .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
@@ -372,7 +386,7 @@ export function ForgettingCurveChart({
         // A card whose stability never moved would otherwise get a zero-height
         // axis; keep a quarter of a decade so the staircase has somewhere to sit.
         return [lo - Math.max(spread * 0.15, 0.15), hi + Math.max(spread * 0.2, 0.25)];
-    }, [repPoints, zoom, visibleRows]);
+    }, [repPoints, activeZoom, visibleRows]);
 
     /**
      * Which row each ×SInc label gets, or -1 for "too crowded to draw".
@@ -442,7 +456,7 @@ export function ForgettingCurveChart({
                     {title}
                 </h3>
                 <div className="flex items-center gap-2">
-                    {zoom && (
+                    {activeZoom && (
                         <button
                             onClick={() => setZoom(null)}
                             className="px-2 py-0.5 text-[10px] rounded-md border rn-clr-border-opaque rn-clr-content-secondary hover:rn-clr-background-secondary"

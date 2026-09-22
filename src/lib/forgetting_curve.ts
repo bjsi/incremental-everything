@@ -251,8 +251,44 @@ const NICE_STEPS: { step: number; unit: number; suffix: string }[] = [
     { step: DAYS_PER_YEAR * 50, unit: DAYS_PER_YEAR, suffix: 'y' },
 ];
 
+/**
+ * Label for the far end of the axis.
+ *
+ * Unlike every other tick, this one sits wherever the range happens to stop
+ * rather than on a round step, so it keeps a decimal when rounding would move
+ * it: a window ending at 3.4 days must not be labelled "3d" directly after the
+ * tick that really is three days. `formatCurveDays` stays rounder because it
+ * also writes prose, where "7mo" beats "6.6mo".
+ */
+function edgeLabel(days: number): string {
+    const withUnit = (value: number, suffix: string) => {
+        const rounded = Math.round(value);
+        return Math.abs(value - rounded) < 0.05
+            ? `${rounded}${suffix}`
+            : `${value.toFixed(1)}${suffix}`;
+    };
+    if (!Number.isFinite(days) || days <= 0) return formatCurveDays(days);
+    if (days < 1 / 24) return `${Math.max(1, Math.round(days * 1440))}m`;
+    if (days < 1) return withUnit(days * 24, 'h');
+    if (days < 14) return withUnit(days, 'd');
+    if (days < 28) return withUnit(days / 7, 'w');
+    if (days < 365) return withUnit(days / DAYS_PER_MONTH, 'mo');
+    return withUnit(days / DAYS_PER_YEAR, 'y');
+}
+
 /** Roughly how many evenly spaced ticks the linear axis's coarse tier aims for. */
 const TARGET_LINEAR_TICKS = 6;
+
+/**
+ * Hard ceiling on ticks from one generated series.
+ *
+ * Every loop below steps by a positive amount towards a bound, so in normal use
+ * this is never reached. It is here because these bounds come, ultimately, from
+ * a pointer: a range carried across a scale change once produced an infinite
+ * `maxDays`, and `i++` past `Number.MAX_SAFE_INTEGER` — or on `Infinity` — never
+ * advances. A bounded loop cannot hang the widget, whatever it is handed.
+ */
+const MAX_GENERATED_TICKS = 64;
 
 /** Width to reserve per tick label, in px, including breathing room. */
 const TICK_LABEL_PX = 46;
@@ -318,12 +354,11 @@ function roundStepTicks(
 ): CurveTick[] {
     const out: CurveTick[] = [];
     const nice = pickStep((maxDays - minDays) / TARGET_LINEAR_TICKS);
-    for (
-        let i = Math.ceil(minDays / nice.step - 1e-9);
-        i * nice.step <= maxDays * (1 + 1e-9);
-        i++
-    ) {
+    const first = Math.ceil(minDays / nice.step - 1e-9);
+    if (!Number.isFinite(first)) return out;
+    for (let i = first; out.length < MAX_GENERATED_TICKS; i++) {
         const days = i * nice.step;
+        if (days > maxDays * (1 + 1e-9)) break;
         out.push({ value: toX(days), label: days === 0 ? '0' : stepLabel(days, nice) });
     }
     return out;
@@ -352,8 +387,12 @@ function buildTicks(
     toX: (days: number) => number,
     plotWidthPx = DEFAULT_PLOT_WIDTH_PX,
 ): CurveTick[] {
+    // Bounds ultimately come from a pointer drag, so they are not trusted.
+    if (!Number.isFinite(minDays) || !Number.isFinite(maxDays) || !(maxDays > minDays)) return [];
+
     const xMin = toX(minDays);
     const xMax = toX(maxDays);
+    if (!Number.isFinite(xMin) || !Number.isFinite(xMax)) return [];
     const span = xMax - xMin || 1;
     const minGap = span * tickMinGap(plotWidthPx);
     const out: CurveTick[] = [];
@@ -389,7 +428,11 @@ function buildTicks(
                     Math.abs(coarse.step / n.step - Math.round(coarse.step / n.step)) < 1e-6,
             );
             if (fine) {
-                for (let d = fine.step; d < coarse.step * (1 - 1e-9); d += fine.step) {
+                for (
+                    let d = fine.step;
+                    d < coarse.step * (1 - 1e-9) && out.length < MAX_GENERATED_TICKS;
+                    d += fine.step
+                ) {
                     out.push({ value: toX(d), label: stepLabel(d, fine) });
                 }
                 out.sort((a, b) => a.value - b.value);
@@ -422,7 +465,7 @@ function buildTicks(
 
     // The right edge, always. When it falls too close to the last tick for both
     // to fit, it takes that tick's place rather than crowding it.
-    const endTick = { value: xMax, label: formatCurveDays(maxDays) };
+    const endTick = { value: xMax, label: edgeLabel(maxDays) };
     const previous = out[out.length - 1];
     // It takes the last tick's place when the two would not both fit, and also
     // when they round to the same words: a range ending just past a tick gets
@@ -758,11 +801,29 @@ export function rebuildTicks(
     const linear = series.scale === 'linear';
     const toX = (days: number): number =>
         linear ? days : Math.log10(Math.max(days, series.floorDays));
-    const fromX = (x: number): number => (linear ? x : Math.pow(10, x));
+
+    // On a log axis this is 10^x, which overflows to Infinity for an x that was
+    // never a log coordinate — a range carried over from the linear scale, say.
+    // Anything that does not come back finite means the domain does not belong
+    // to this series, so the full range is the honest answer.
+    const fromX = (x: number): number => {
+        if (!Number.isFinite(x)) return NaN;
+        const days = linear ? x : Math.pow(10, x);
+        return Number.isFinite(days) ? days : NaN;
+    };
 
     const lowest = linear ? 0 : series.floorDays;
-    const minDays = domain ? Math.max(fromX(domain[0]), lowest) : lowest;
-    const maxDays = domain ? Math.max(fromX(domain[1]), minDays * 1.0001) : series.axisMaxDays;
+    let minDays = lowest;
+    let maxDays = series.axisMaxDays;
+
+    if (domain) {
+        const from = fromX(domain[0]);
+        const to = fromX(domain[1]);
+        if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
+            minDays = Math.max(from, lowest);
+            maxDays = Math.max(to, minDays * 1.0001);
+        }
+    }
 
     return buildTicks(series.scale, minDays, maxDays, toX, plotWidthPx);
 }

@@ -281,6 +281,45 @@ describe('buildForgettingCurveSeries', () => {
         }
     });
 
+    it('survives a range handed to it from the other scale', () => {
+        // Switching scale while zoomed used to feed the old scale's coordinates
+        // to the new one for a single render. A linear x of ~800 (days) through
+        // the log axis's 10^x is Infinity, and the tick loop's `i++` never
+        // advances past that — it hung, and took the widget down with no error.
+        const linear = build(HISTORY, { scale: 'linear' })!;
+        const log = build(HISTORY, { scale: 'log' })!;
+
+        for (const [series, foreign] of [
+            [log, linear.xDomain],
+            [linear, log.xDomain],
+        ] as const) {
+            const ticks = rebuildTicks(series, 1200, foreign as [number, number]);
+            assert.ok(ticks.length > 0, `${series.scale}: still produces ticks`);
+            assert.ok(ticks.length <= 64, `${series.scale}: bounded (${ticks.length})`);
+            for (const t of ticks) {
+                assert.ok(Number.isFinite(t.value), `${series.scale}: finite tick ${t.label}`);
+            }
+        }
+    });
+
+    it('falls back to the full range for a domain it cannot make sense of', () => {
+        const s = build(HISTORY, { scale: 'log' })!;
+        const full = rebuildTicks(s, 1200);
+        for (const nonsense of [
+            [NaN, 10],
+            [0, Infinity],
+            [5, 1],
+            [Infinity, Infinity],
+        ] as [number, number][]) {
+            const ticks = rebuildTicks(s, 1200, nonsense);
+            assert.deepEqual(
+                ticks.map((t) => t.label),
+                full.map((t) => t.label),
+                `${JSON.stringify(nonsense)} should fall back to the whole axis`,
+            );
+        }
+    });
+
     it('covers a short-lived card without flooding it with ticks', () => {
         // Three reps inside twenty minutes: the axis is minutes wide, and the
         // step has to shrink with it without producing a tick per minute.
