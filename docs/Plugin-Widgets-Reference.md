@@ -576,13 +576,17 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 
 The plugin's hub, at the bottom of the left sidebar. Header controls: **⌨** ([Keyboard Shortcuts](Keyboard-Shortcuts.md)), **⚙** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation, **✕** hides the panel for the session — it returns on the next start, and the **Show Incremental RemNote Panel** command brings it back sooner.
 
-Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Queue** group of three — the label opens the [Priority Queue popup](#614-priority-queue-popup) with the document you currently have open as the offered scope (naming it under the button), **👁** opens the **Priority Review Queue** Rem that lists every Priority Queue document, and **▶** (**Learn**, `Cmd/Ctrl+L`) opens the queue on the full-KB Priority Queue, building it first if needed. **▶** starts pulsing once the plugin's startup work has finished; hover it to see what is still running — see [When ▶ starts pulsing](Getting-Started.md#when-learn-starts-pulsing).
+Two action buttons: **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and a **Priority Queue** group of three — the label opens the [Priority Queue popup](#614-priority-queue-popup) with the document you currently have open as the offered scope (naming it under the button), **👁** opens the **Priority Review Queue** Rem that lists every Priority Queue document, and **▶** (**Learn**, `Cmd/Ctrl+L`) opens the queue on the full-KB Priority Queue, building it first if needed — `Shift`- or `Cmd`/`Ctrl`-clicking it practises the named scope instead, or opens the popup with that scope filled in when it has no queue yet. **▶** starts pulsing once the plugin's startup work has finished; hover it to see what is still running — see [When ▶ starts pulsing](Getting-Started.md#when-learn-starts-pulsing).
 
-![The Incremental RemNote panel in the sidebar](assets/panel-hub-3.png){ width="500" }
+![The Incremental RemNote panel in the sidebar](assets/panel-hub-expanded.png){ width="500" }
 
-![The Incremental RemNote panel in the sidebar - Tip expanded](assets/panel-hub-2.png){ width="500" }
+![The Incremental RemNote panel in the sidebar - Tip expanded](assets/panel-hub-expanded-with-tip.png){ width="500" }
 
-Below the shortcuts it shows **one onboarding tip per session**, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile; the panel also goes quiet for two hours), **Learn More** (opens the tip's documentation section) and **All Tips** (opens the full list). Either answer closes the tip area until the next start — it never chains into a second tip, and never swaps the tip for another one mid-session. Tips still in the pile are offered in rotation, least recently seen first, so none repeats until the others have had their turn.
+Below the shortcuts it shows **one onboarding tip per session**, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile), **Learn More** (opens the tip's documentation section) and **All Tips** (opens the full list). Either answer closes the tip area until the next start and leaves the panel quiet for two hours, per knowledge base — it never chains into a second tip, and never swaps the tip for another one mid-session. Tips still in the pile are offered in rotation, least recently seen first, so none repeats until the others have had their turn.
+
+**Collapsed:** the 🌐 globe collapses the panel to one row of icons — globe (expands again, and carries a blue dot when a tip is waiting), **🎯** Mastery Drill with a badge of the cards ready, **⌨**, **⚙**, **👁** and **▶** — and expands it again. The choice is stored per device and survives a restart; there is no setting for it. While collapsed, the [Mastery Drill notification](#72-mastery-drill-notification) does not render as its own card, and tips are drawn but not counted as shown.
+
+![The Incremental RemNote panel collapsed to a row of icons](assets/panel-hub-collapsed.png){ width="500" }
 
 📖 **Full documentation:** [The Incremental RemNote Panel](Getting-Started.md#the-incremental-plugin-panel)
 
@@ -667,6 +671,7 @@ A focused sub-queue of flashcards rated *Forgot* or *Hard*, designed for deliber
 - Includes a built-in editor UI: **Edit Later** (defers editing via the Edit Later powerup), **Go to Rem**, and **Edit Previous** buttons.
 - **Old Items Warning**: cards lingering past the configured threshold (default 7 days) are flagged; clear them with a single click.
 - **Clear Queue**: empty the entire drill at any time.
+- **List Cards**: lists every card in the drill with a status saying whether RemNote can still show it, and removes the ones it cannot. See [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list).
 
 📖 **Full documentation:** [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
 
@@ -683,6 +688,7 @@ A periodic notification widget that appears in the Left Sidebar End when ≥ 10 
 - **Start Drill** button opens the Mastery Drill popup directly.
 - Dismiss button hides the notification; it reappears automatically every 2 hours.
 - Can be disabled entirely via the `Disable Mastery Drill Notification` setting.
+- Not rendered while the [Incremental RemNote Panel](Getting-Started.md#collapsed-panel) is collapsed — the panel's 🎯 icon carries the drill and its count instead.
 
 📖 **Full documentation:** [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
 

@@ -12,7 +12,13 @@ import {
   practicePriorityQueue,
   refreshPriorityQueue,
 } from '../lib/priority_review_document/queue_doc';
-import { onboardingTipsWidgetId, pluginHubHiddenKey, startupTasksStatusKey } from '../lib/consts';
+import {
+  onboardingTipsWidgetId,
+  pluginHubCollapsedKey,
+  pluginHubHiddenKey,
+  startupTasksStatusKey,
+} from '../lib/consts';
+import { getMasteryDrillStatus, masteryDrillIsReady } from '../lib/mastery_drill_status';
 import {
   StartupTasksStatus,
   describeStartupTasks,
@@ -26,11 +32,10 @@ import {
   getAcknowledgedTipIds,
   getDrawnTipIdThisSession,
   getLastShownMap,
-  markTipAnsweredThisSession,
+  pauseTipsAfterAnswer,
   pickTip,
   recordTipShown,
   setDrawnTipIdThisSession,
-  snoozeTips,
   tipAnsweredThisSession,
   tipsAreSnoozed,
 } from '../lib/onboarding_tips';
@@ -72,6 +77,22 @@ const openDocs = (path: string) => {
     setTimeout(() => document.body.removeChild(link), 100);
   }
 };
+
+/**
+ * The ▶ cell's "the plugin is ready" breathing, shared by both layouts — the
+ * collapsed row runs the same animation on its own ▶, so it lives at module
+ * scope rather than inside the expanded panel's JSX.
+ */
+const HUB_KEYFRAMES = `
+  @keyframes hubPlayPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)); }
+    50% { transform: scale(1.15); filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)); }
+  }
+  @keyframes hubPlayCellGlow {
+    0%, 100% { box-shadow: inset 0 0 0px rgba(191, 219, 254, 0); filter: brightness(1); }
+    50% { box-shadow: inset 0 0 6px rgba(191, 219, 254, 0.9); filter: brightness(1.15); }
+  }
+`;
 
 const containerStyle: React.CSSProperties = {
   backgroundColor: 'var(--rn-clr-background-elevation-10)',
@@ -234,9 +255,395 @@ function PanelTitle() {
   );
 }
 
+/**
+ * The ▶ tooltip, shared by both layouts.
+ *
+ * A modifier that changes what a button does has to be discoverable from the
+ * button, and naming the scope is the discoverable part: "the current scope"
+ * means nothing until you know it currently resolves to "Anatomy" — the scope
+ * follows the focused Rem, so it moves under the user between clicks.
+ */
+function learnLabel(scopeName: string | null | undefined): string {
+  const scoped = scopeName
+    ? `Shift/Cmd-click: the Priority Queue for “${scopeName}” instead`
+    : 'Shift/Cmd-click: the Priority Queue for the focused document instead';
+  return (
+    'Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base; ' +
+    'builds it first if there is none yet\n' +
+    scoped
+  );
+}
+
+/**
+ * The collapsed row's icons, as inline stroke SVGs in `currentColor`.
+ *
+ * Emoji were the first pass and they were the wrong material here. ⚙ and 👁
+ * render as full-colour emoji on macOS and as flat glyphs on Windows, so the
+ * row looked like a different control set per platform, and none of them sit at
+ * the same optical weight as RemNote's own Tutorials/Settings icons directly
+ * below — which is the company this row keeps. Stroked paths in `currentColor`
+ * inherit the cell's colour, so they follow the theme into dark mode for free,
+ * cost no asset fetch (the drill's old remote PNG cost one per render), and
+ * come out at a single consistent weight.
+ *
+ * Feather/Lucide geometry (MIT), 24px grid, so they line up with the native
+ * icons rather than merely sitting near them.
+ */
+interface IconProps {
+  /** Rendered box, in px. 18 in the collapsed row, 13–14 in the expanded panel. */
+  size?: number;
+}
+
+/**
+ * SVG attributes for one icon at a given size, with the stroke expressed as the
+ * weight it should END UP at on screen rather than as a number on the 24px
+ * grid.
+ *
+ * The same icon appears at 18px in the collapsed row and at 13px in the
+ * expanded panel's header. A fixed `strokeWidth` would render the small copy
+ * at 0.72 of the large one's weight, so the two would not read as the same icon
+ * — the expanded set would look faded next to a row the user had just been
+ * looking at. Scaling the grid value by `24 / size` holds the painted line at
+ * `strokePx` whatever the box is.
+ */
+function iconAttrs(size: number, strokePx = 1.3): React.SVGProps<SVGSVGElement> {
+  return {
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: (strokePx * 24) / size,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  };
+}
+
+/**
+ * The plugin's own mark, drawn as line art: a desk globe on a stand.
+ *
+ * A bare wireframe sphere (Feather's globe, which this replaces) is the icon
+ * every app uses for "language" or "web", and it shares nothing with
+ * `public/logo.png` but the ball. What makes that logo recognisable at a glance
+ * is the *silhouette* around it — the meridian ring standing off to the right,
+ * the pedestal and the foot — so the row identifies itself as this plugin's
+ * rather than as a generic globe button.
+ *
+ * Two measurements do the work at 18px:
+ *
+ * - **The ring stands 3 units clear of the sphere** (r6 against r9). A wider
+ *   sphere looks better on its own, but the two strokes are ~0.6px each once
+ *   scaled down, so a narrower gap closes up and the pair renders as one thick
+ *   smudged circle.
+ * - **The stroke is 1.5, not the row's 1.75.** Six paths in the space the other
+ *   icons spend on three; at the shared weight they thicken into a blob.
+ */
+const GlobeIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size, 1.125)} aria-hidden>
+    {/* sphere, with a meridian and the equator so it reads as a globe */}
+    <circle cx="10.5" cy="10.5" r="6" />
+    <ellipse cx="10.5" cy="10.5" rx="2.5" ry="6" />
+    <line x1="4.5" y1="10.5" x2="16.5" y2="10.5" />
+    {/* the mounting ring, open to the left exactly as the logo's is */}
+    <path d="M10.5 1.5a9 9 0 0 1 0 18" />
+    {/* pedestal and foot */}
+    <path d="M10.5 19.5v2.2" />
+    <path d="M7 21.7h7" />
+  </svg>
+);
+
+const TargetIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size)} aria-hidden>
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="6" />
+    <circle cx="12" cy="12" r="2" />
+  </svg>
+);
+
+const KeyboardIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size)} aria-hidden>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10" />
+  </svg>
+);
+
+const GearIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size)} aria-hidden>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
+const EyeIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size)} aria-hidden>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+/**
+ * Filled rather than stroked, and the one cell that is not grey.
+ *
+ * The expanded panel makes ▶ its single filled cell because it is the daily
+ * driver, and dropping that distinction on collapse would hand the row six
+ * equal-looking buttons with no answer to "which one do I press?". Colour is a
+ * lighter way to say it than the expanded panel's filled blue box — it keeps
+ * the flat, unboxed look the rest of the row has while still being the thing
+ * your eye lands on.
+ */
+const PlayIcon = ({ size = 18 }: IconProps) => (
+  <svg {...iconAttrs(size, 0.94)} fill="currentColor" aria-hidden>
+    <polygon points="6 3 20 12 6 21 6 3" />
+  </svg>
+);
+
+/**
+ * Scoped styling for the collapsed row.
+ *
+ * The hover background is a rule rather than the `hover:opacity-60` the
+ * expanded panel's small bordered buttons use: at 28px with no border, fading
+ * an icon reads as it being disabled, while a filled rounded square reads as a
+ * target — and matches how the native sidebar rows right below respond.
+ *
+ * The ▶ animation is compact-only and deliberately NOT the expanded panel's
+ * `hubPlayCellGlow`: that one glows the segmented control's filled box from the
+ * inside, which needs a box. Here the pulse lives in the arrow itself — scale
+ * plus a blue drop-shadow, so the glow comes off the glyph's own silhouette.
+ * (The expanded keyframes' white shadow would be invisible on this one; it is
+ * tuned for a white arrow on blue.)
+ */
+const COMPACT_ROW_CSS = `
+  .ie-hub-cell {
+    background: transparent;
+  }
+  .ie-hub-cell:hover {
+    background: var(--rn-clr-background--hovered, rgba(100, 116, 139, 0.14));
+  }
+  @keyframes ieHubArrowPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); }
+    50% { transform: scale(1.18); filter: drop-shadow(0 0 3.5px rgba(59, 130, 246, 0.85)); }
+  }
+`;
+
+/**
+ * One cell of the collapsed row.
+ *
+ * Deliberately *not* {@link IconButton}: that one is bordered, because in the
+ * expanded panel it sits against a card background and needs an edge to read as
+ * a control. The collapsed row has no card — the icons sit straight on the
+ * sidebar, next to RemNote's own Tutorials/Settings rows — so a border on each
+ * would draw six boxes where the native chrome above and below draws none.
+ *
+ * The cells FLEX (`1 1 0`) rather than sitting at a fixed width: spread evenly
+ * across whatever the sidebar currently is, they read as one row of the
+ * sidebar's own chrome instead of a huddle of buttons pushed against its left
+ * edge. The cap stops six icons from drifting apart into unrelated dots on a
+ * wide sidebar; the floor is what makes the row wrap instead of crushing them.
+ */
+const compactCellStyle: React.CSSProperties = {
+  height: 28,
+  flex: '1 1 0',
+  minWidth: 28,
+  maxWidth: 44,
+  padding: 0,
+  borderRadius: 6,
+  border: '1px solid transparent',
+  // NOTE: no `background` here, and it must stay that way. An inline style beats
+  // any stylesheet rule that is not `!important`, so setting the resting
+  // background here silently killed `.ie-hub-cell:hover` — the rule matched and
+  // lost on every hover, and the row had no hover feedback at all. Both states
+  // live in COMPACT_ROW_CSS instead.
+  color: 'var(--rn-clr-content-secondary, #64748b)',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'background 120ms ease',
+};
+
+function CompactCell(props: {
+  label: string;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <button
+      onClick={props.onClick}
+      title={props.label}
+      aria-label={props.label}
+      className="ie-hub-cell"
+      style={{ ...compactCellStyle, ...props.style }}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+/**
+ * Wraps an icon so a badge or a dot can hang off its corner.
+ *
+ * The marker anchors to the *icon*, not to the cell: the cells flex, so a
+ * cell-anchored badge would drift further from the glyph the wider the sidebar
+ * got and end up floating in the gap between two icons.
+ */
+function IconWithMarker(props: { children: React.ReactNode; marker: React.ReactNode }) {
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', lineHeight: 0 }}>
+      {props.children}
+      {props.marker}
+    </span>
+  );
+}
+
+/**
+ * The hub, collapsed to a single row of icons.
+ *
+ * This is a *collapse*, not a second panel with its own feature set: everything
+ * the expanded panel offers is one click away behind the globe, which is why
+ * the row can get away with six cells and no labels. Sorting, the scope line
+ * and the tip card have no icon here on purpose — inventing one for each would
+ * put eight to ten cells in a column that can be dragged to about 130px, and
+ * the row would wrap into the stack of rows this mode exists to avoid.
+ *
+ * What does *not* get to disappear silently is an unanswered tip: the panel is
+ * the plugin's only teaching surface, so a collapsed hub with a tip waiting
+ * marks the globe with a dot. Collapsing pauses the tips; it does not cancel
+ * them.
+ *
+ * It wraps (`flex-wrap`) rather than overflowing: six cells need roughly 190px
+ * at their floor and the sidebar goes narrower than that, so at the extreme it
+ * becomes two short rows — still a fraction of the expanded panel.
+ */
+function CompactRow(props: {
+  hasWaitingTip: boolean;
+  drillCount: number | null;
+  startupFinished: boolean;
+  scopeName: string | null | undefined;
+  onExpand: () => void;
+  onDrill: () => void;
+  onShortcuts: () => void;
+  onSettings: () => void;
+  onQueueRem: () => void;
+  onLearn: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-0.5 px-1 py-1.5 mb-1">
+      <style>{COMPACT_ROW_CSS}</style>
+
+      <CompactCell
+        label={
+          props.hasWaitingTip
+            ? 'Incremental RemNote — expand the panel (a tip is waiting)'
+            : 'Incremental RemNote — expand the panel'
+        }
+        onClick={props.onExpand}
+      >
+        <IconWithMarker
+          marker={
+            props.hasWaitingTip ? (
+              <span
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: -1,
+                  right: -1,
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: '#3b82f6',
+                  boxShadow: '0 0 0 2px var(--rn-clr-background-primary, #fff)',
+                }}
+              />
+            ) : null
+          }
+        >
+          <GlobeIcon />
+        </IconWithMarker>
+      </CompactCell>
+
+      {/* The count is the whole point of the drill notification — an unlabelled
+          target says "there is a drill" where the card said "49 cards waiting".
+          A corner badge rather than a number beside the glyph: the cells are
+          evenly spread, so a second element inside one would make that cell
+          visibly wider than its neighbours and break the rhythm of the row. */}
+      {props.drillCount !== null && (
+        <CompactCell
+          label={`Mastery Drill — ${props.drillCount} cards ready`}
+          onClick={props.onDrill}
+        >
+          <IconWithMarker
+            marker={
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -7,
+                  // Sized down from 14/9px after seeing it on screen: a
+                  // two-digit count at that size spanned most of an 18px icon
+                  // and the target read as a crescent. A badge is allowed to
+                  // clip its icon's corner; it is not allowed to become the
+                  // icon.
+                  minWidth: 12,
+                  height: 12,
+                  padding: '0 2.5px',
+                  borderRadius: 6,
+                  background: '#ef4444',
+                  color: '#fff',
+                  fontSize: 8,
+                  fontWeight: 700,
+                  lineHeight: '12px',
+                  textAlign: 'center',
+                  boxShadow: '0 0 0 1.5px var(--rn-clr-background-primary, #fff)',
+                }}
+              >
+                {props.drillCount > 99 ? '99+' : props.drillCount}
+              </span>
+            }
+          >
+            <TargetIcon />
+          </IconWithMarker>
+        </CompactCell>
+      )}
+
+      <CompactCell label="Keyboard shortcuts" onClick={props.onShortcuts}>
+        <KeyboardIcon />
+      </CompactCell>
+      <CompactCell label="Open the plugin's settings" onClick={props.onSettings}>
+        <GearIcon />
+      </CompactCell>
+      <CompactCell
+        label="Open the “Priority Review Queue” Rem — every Priority Review Document you have made"
+        onClick={props.onQueueRem}
+      >
+        <EyeIcon />
+      </CompactCell>
+      {/* The collapsed row has no "Priority Queue" cell and no Scope line, so
+          the scoped queue would be unreachable here — hence the modifier, and
+          hence the scope being named in the tooltip: it is the only place the
+          row can say what Shift-click is about to act on. */}
+      <CompactCell
+        label={learnLabel(props.scopeName)}
+        onClick={props.onLearn}
+        style={{ color: '#3b82f6' }}
+      >
+        <span
+          style={{
+            display: 'inline-flex',
+            animation: props.startupFinished ? 'ieHubArrowPulse 2s ease-in-out infinite' : 'none',
+          }}
+        >
+          <PlayIcon />
+        </span>
+      </CompactCell>
+    </div>
+  );
+}
+
 function IconButton(props: {
   label: string;
-  glyph: string;
+  /** A text glyph, or one of the SVG icons above sized for this 18px button. */
+  glyph: React.ReactNode;
   onClick: () => void;
   style?: React.CSSProperties;
 }) {
@@ -341,6 +748,19 @@ function TipCard(props: {
 export function PluginHub() {
   const plugin = usePlugin();
 
+  /**
+   * Collapsed to the icon row. **Local** storage, not session and not a
+   * setting: how much room the panel may take is a question about this screen's
+   * sidebar width, so it should survive a restart but not follow the user to
+   * another device. There is no setting for it because the globe already is
+   * one — a checkbox saying the same thing could only drift out of step with
+   * whatever the user last clicked.
+   */
+  const collapsed = useTrackerPlugin(
+    async (rp) => (await rp.storage.getLocal<boolean>(pluginHubCollapsedKey)) ?? false,
+    []
+  );
+
   const [tip, setTip] = useState<OnboardingTip | null>(null);
   /** null until the first load resolves, so the panel does not flash a tip in. */
   const [tipsReady, setTipsReady] = useState(false);
@@ -355,6 +775,9 @@ export function PluginHub() {
   // nearly exhausted, like the same handful of tips coming back after they were
   // answered.
   useEffect(() => {
+    // The layout is not known yet on the first pass, and whether a tip may be
+    // stamped depends on it.
+    if (collapsed === undefined) return;
     let cancelled = false;
     (async () => {
       // Fire and forget: protecting the already-answered tips against a synced
@@ -391,9 +814,10 @@ export function PluginHub() {
       if (cancelled) return;
       setTip(next);
       setTipsReady(true);
-      if (next) {
+      if (next && !collapsed) {
         // Stamped only on a fresh draw, so a remount cannot push a tip to the
-        // back of the rotation the user never answered.
+        // back of the rotation the user never answered — and only once the tip
+        // is actually on screen, which a collapsed hub's is not.
         await setDrawnTipIdThisSession(plugin, next.id);
         await recordTipShown(plugin, next.id);
       }
@@ -401,7 +825,13 @@ export function PluginHub() {
     return () => {
       cancelled = true;
     };
-  }, [plugin]);
+    // `collapsed` is a dependency, not just a read: a collapsed hub draws a tip
+    // so the globe can carry its dot, but does NOT stamp it as shown. Stamping
+    // it would let the rotation advance past tips nobody was in a position to
+    // read — days of collapsed sessions would pace the pile away silently. The
+    // stamps are therefore owed on the transition to expanded, which is what
+    // re-running this effect there pays.
+  }, [plugin, collapsed]);
 
   /**
    * Whether the user has closed the whole panel. Session storage, not local:
@@ -413,6 +843,20 @@ export function PluginHub() {
     async (rp) => (await rp.storage.getSession<boolean>(pluginHubHiddenKey)) ?? false,
     []
   );
+
+  /**
+   * The drill's readiness, but only while collapsed — expanded, the Mastery
+   * Drill notification is mounted below and answers this for itself, and two
+   * widgets paying for the same synced read plus two KB lookups on every change
+   * is a cost the sidebar does not need. Deliberately reads the flag inside the
+   * tracker so it re-runs when the row appears.
+   */
+  const drillCount = useTrackerPlugin(async (rp) => {
+    const isCollapsed = (await rp.storage.getLocal<boolean>(pluginHubCollapsedKey)) ?? false;
+    if (!isCollapsed) return null;
+    const status = await getMasteryDrillStatus(rp);
+    return masteryDrillIsReady(status) ? status.readyCount : null;
+  }, []);
 
   /**
    * The ▶ button only starts pulsing once the startup work has finished — the
@@ -433,13 +877,12 @@ export function PluginHub() {
     const current = tip;
     if (!current) return;
     await acknowledgeTip(plugin, current.id);
-    await markTipAnsweredThisSession(plugin);
+    await pauseTipsAfterAnswer(plugin);
     setTip(null);
   }, [plugin, tip]);
 
   const handleCloseTip = useCallback(async () => {
-    await snoozeTips(plugin);
-    await markTipAnsweredThisSession(plugin);
+    await pauseTipsAfterAnswer(plugin);
     setTip(null);
   }, [plugin]);
 
@@ -451,6 +894,22 @@ export function PluginHub() {
    */
   const openAllTips = useCallback(
     () => plugin.widget.openPopup(onboardingTipsWidgetId),
+    [plugin]
+  );
+
+  /**
+   * The globe both ways. Reading the stored value here rather than closing over
+   * the tracked one keeps the click honest if another pane's copy of the panel
+   * toggled it a moment ago — the sidebar slot is remounted often enough that
+   * two live copies are ordinary.
+   */
+  const toggleCollapsed = useCallback(async () => {
+    const current = (await plugin.storage.getLocal<boolean>(pluginHubCollapsedKey)) ?? false;
+    await plugin.storage.setLocal(pluginHubCollapsedKey, !current);
+  }, [plugin]);
+
+  const openMasteryDrill = useCallback(
+    () => plugin.widget.openPopup('mastery_drill'),
     [plugin]
   );
 
@@ -524,6 +983,50 @@ export function PluginHub() {
   }, [plugin]);
 
   /**
+   * Shift/Cmd-click on ▶ — the same thing, for the scope the panel is currently
+   * pointing at rather than the whole knowledge base.
+   *
+   * The difference from {@link practiceKbQueue} is what happens when there is
+   * no document yet. The full-KB queue *builds* one on the spot, because "the
+   * whole knowledge base" needs no decisions from the user. A scope does: which
+   * Rem, how big a burst, what the shield currently holds. So a missing scoped
+   * queue opens the Priority Queue popup with the scope already filled in —
+   * which is the same door the expanded panel's "Priority Queue" button opens,
+   * and the reason the collapsed row can do without a cell for it.
+   */
+  const practiceScopedQueue = useCallback(async () => {
+    try {
+      if (await isQueueOpen(plugin)) {
+        await plugin.app.toast('A queue is already open.');
+        return;
+      }
+      const scope = await resolveScope();
+      const existing = await findPriorityQueueDoc(plugin, scope.scopeRemId);
+      if (!existing?.doc) {
+        await plugin.storage.setSession('reviewDocContext', scope);
+        await plugin.widget.openPopup('priority_queue_popup');
+        return;
+      }
+      await practicePriorityQueue(plugin, existing.doc);
+    } catch (e) {
+      console.error('[Hub] Practice scoped Priority Queue failed:', e);
+      await plugin.app.toast('Could not open the Priority Queue — see the console.');
+    }
+  }, [plugin, resolveScope]);
+
+  /**
+   * `mod` the way the plugin's own shortcuts read it — Cmd on macOS, Ctrl
+   * elsewhere — plus Shift, which is the gesture people try first and which
+   * costs nothing to honour. Alt is left alone: RemNote and the OS both claim
+   * Alt-click in places.
+   */
+  const handleLearnClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) =>
+      e.shiftKey || e.metaKey || e.ctrlKey ? practiceScopedQueue() : practiceKbQueue(),
+    [practiceScopedQueue, practiceKbQueue]
+  );
+
+  /**
    * Opens the "Priority Review Queue" tag Rem — the one place every Priority
    * Review Document shows up, since the creator tags each document with it. Its
    * references list is the browsable index of past documents, and the queue can
@@ -572,28 +1075,73 @@ export function PluginHub() {
 
   if (hidden) return null;
 
+  // Held back until the stored state is known. `?? false` and render would be
+  // the cheaper read, but it paints the full panel first and snaps it shut a
+  // frame later on every remount of the sidebar slot — which is exactly the
+  // layout thrash a collapsed hub is asking to be rid of.
+  if (collapsed === undefined) return null;
+
+  if (collapsed) {
+    return (
+      <CompactRow
+        hasWaitingTip={tipsReady && !!tip}
+        drillCount={drillCount ?? null}
+        startupFinished={startupFinished}
+        onExpand={toggleCollapsed}
+        onDrill={openMasteryDrill}
+        onShortcuts={() => openDocs('Keyboard-Shortcuts/')}
+        onSettings={() => plugin.widget.openPopup('ie_settings')}
+        onQueueRem={openPriorityReviewQueue}
+        onLearn={handleLearnClick}
+        scopeName={scopeName}
+      />
+    );
+  }
+
   return (
     <div style={containerStyle} className="flex flex-col gap-1.5 p-2 rounded-lg mb-2">
+      <style>{HUB_KEYFRAMES}</style>
       <div className="flex items-center justify-between gap-1">
         {/* Fills the row so the title's width is the space left by the icons,
             not the width of whichever text it currently holds. */}
         <div className="flex items-center gap-1 min-w-0" style={{ flex: '1 1 auto' }}>
-          <img
-            src={`${plugin.rootURL}globe-icon.png`}
-            alt=""
-            style={{ width: 16, height: 16, flex: '0 0 auto' }}
-          />
+          {/* The same globe that expands the row collapses the panel, so the
+              control the user learns in one state is the control in the other.
+              It is the only affordance for collapsing — no setting, no second
+              button in the icon strip on the right. */}
+          <button
+            onClick={toggleCollapsed}
+            title="Collapse to the icon row"
+            aria-label="Collapse the panel to its icon row"
+            className="hover:opacity-60"
+            style={{
+              flex: '0 0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
+          >
+            <img src={`${plugin.rootURL}globe-icon.png`} alt="" style={{ width: 16, height: 16 }} />
+          </button>
           <PanelTitle />
         </div>
         <div className="flex items-center gap-0.5">
+          {/* The same icons the collapsed row uses, at 13px for this 18px
+              button — collapsing and expanding should not feel like moving
+              between two different plugins. ? and ✕ stay as text: they are
+              typographic symbols that render identically everywhere, which is
+              exactly what ⌨ ⚙ 👁 were not. */}
           <IconButton
             label="Keyboard shortcuts"
-            glyph="⌨"
+            glyph={<KeyboardIcon size={13} />}
             onClick={() => openDocs('Keyboard-Shortcuts/')}
           />
           <IconButton
             label="Open the plugin's settings"
-            glyph="⚙"
+            glyph={<GearIcon size={13} />}
             onClick={() => plugin.widget.openPopup('ie_settings')}
           />
           <IconButton
@@ -668,7 +1216,7 @@ export function PluginHub() {
             title="Open the “Priority Review Queue” Rem — every Priority Review Document you have made, ready to study from"
             aria-label="Open the Priority Review Queue Rem"
           >
-            👁
+            <EyeIcon size={14} />
           </button>
           {/*
             The daily driver, so it is the one filled cell in the panel. Once
@@ -678,7 +1226,7 @@ export function PluginHub() {
             so an outer box-shadow would be cut off at the rounded border.
           */}
           <button
-            onClick={practiceKbQueue}
+            onClick={handleLearnClick}
             style={{
               ...segmentIconStyle,
               width: 24,
@@ -688,10 +1236,7 @@ export function PluginHub() {
               animation: startupFinished ? 'hubPlayCellGlow 2s ease-in-out infinite' : 'none',
             }}
             className="hover:opacity-90"
-            title={
-              'Learn (Cmd/Ctrl+L) — practise the Priority Queue for the whole knowledge base; builds it first if there is none yet\n\n' +
-              describeStartupTasks(startupStatus)
-            }
+            title={learnLabel(scopeName) + '\n\n' + describeStartupTasks(startupStatus)}
             aria-label="Learn — practise the Priority Queue"
           >
             <span
@@ -703,16 +1248,6 @@ export function PluginHub() {
               ▶
             </span>
           </button>
-          <style>{`
-            @keyframes hubPlayPulse {
-              0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)); }
-              50% { transform: scale(1.15); filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)); }
-            }
-            @keyframes hubPlayCellGlow {
-              0%, 100% { box-shadow: inset 0 0 0px rgba(191, 219, 254, 0); filter: brightness(1); }
-              50% { box-shadow: inset 0 0 6px rgba(191, 219, 254, 0.9); filter: brightness(1.15); }
-            }
-          `}</style>
         </div>
       </div>
 

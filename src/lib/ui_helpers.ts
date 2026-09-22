@@ -20,6 +20,12 @@ import {
   showPinRingIndicatorsSettingId,
 } from './consts';
 import { getIESetting } from './settings';
+import {
+  CLOZE_EXTRACT_DIM_DECL,
+  CLOZE_EXTRACT_REVEAL_DECL,
+  IGNORE_SHRINK_DECL,
+  IGNORE_DIM_DECL,
+} from './tag_subtree_css';
 
 /**
  * Whether the pdfextract/incremental marker borders are currently drawn over
@@ -289,12 +295,11 @@ export async function registerTableBandBadgeCSS(plugin: ReactRNPlugin) {
 
 export async function registerIgnoreTagCSS(plugin: ReactRNPlugin) {
   const css = `
-    /* Shrink and dim rems tagged with #ignore so they read as archived snippets */
-    [data-rem-container-tags~="ignore"] .rem-text * {
-      font-size: 0.85rem !important;
+    /* Shrink and dim rems tagged with #ignore so they read as archived snippets.
+       Their descendants get the same rules from lib/tag_subtree_css. */
+    [data-rem-container-tags~="ignore"] .rem-text * {${IGNORE_SHRINK_DECL}
     }
-    [data-rem-container-tags~="ignore"] .rem-text:not(:focus-within):not(:hover) * {
-      opacity: 0.88;
+    [data-rem-container-tags~="ignore"] .rem-text:not(:focus-within):not(:hover) * {${IGNORE_DIM_DECL}
     }
 
     /* Hide the #ignore tag chip in the editor tag bar to declutter */
@@ -629,22 +634,17 @@ export async function registerClozeExtractCSS(plugin: ReactRNPlugin) {
       pointer-events: none;
     }
 
-    /* Editor: Make cloze-extract rems less conspicuous */
+    /* Editor: Make cloze-extract rems less conspicuous. Their descendants get
+       the same rules from lib/tag_subtree_css. */
     .rn-editor [data-rem-tags~="clozeextract"] .rem-text,
-    .rn-editor [data-rem-tags~="cloze-extract"] .rem-text {
-      opacity: 0.5;
-      filter: grayscale(40%);
-      zoom: 0.8;
-      transition: all 0.2s ease-in-out;
+    .rn-editor [data-rem-tags~="cloze-extract"] .rem-text {${CLOZE_EXTRACT_DIM_DECL}
     }
 
     /* Reveal full opacity when focused/hovered for readability */
     .rn-editor [data-rem-tags~="clozeextract"]:focus-within .rem-text,
     .rn-editor [data-rem-tags~="cloze-extract"]:focus-within .rem-text,
     .rn-editor [data-rem-tags~="clozeextract"]:hover .rem-text,
-    .rn-editor [data-rem-tags~="cloze-extract"]:hover .rem-text {
-      opacity: 1;
-      filter: grayscale(0%);
+    .rn-editor [data-rem-tags~="cloze-extract"]:hover .rem-text {${CLOZE_EXTRACT_REVEAL_DECL}
     }
 
     /* Dark-mode contrast fix for the "already-clozed" source mark that Create

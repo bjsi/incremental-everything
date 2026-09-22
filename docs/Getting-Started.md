@@ -30,7 +30,7 @@ For a deeper understanding, see [What is Incrementalism?](What-is-Incrementalism
 
 Once installed, the plugin adds a small **Incremental RemNote** 🌐 panel at the bottom of the left sidebar. It is the one fixed place to reach the plugin from, and where the onboarding tips live.
 
-![The Incremental RemNote panel in the sidebar: header controls, the Sorting button, the Priority Queue group with its eye and play actions, the scope line, and one onboarding tip with its I Got It, Learn More and All Tips buttons](assets/panel-hub-2.png){ width="400" }
+![The Incremental RemNote panel in the sidebar: header controls, the Sorting button, the Priority Queue group with its eye and play actions, and the scope line](assets/panel-hub-expanded.png){ width="400" }
 
 **In the header:**
 
@@ -50,9 +50,32 @@ Once installed, the plugin adds a small **Incremental RemNote** 🌐 panel at th
 |--------|--------------|
 | **Priority Queue** | Opens the [Priority Queue popup](Priority-Review-Document.md#the-priority-queue-popup) with the document you currently have open offered as the scope — the scope it will use is named under the button — and the whole knowledge base as the alternative |
 | 👁 | Opens the **Priority Review Queue** Rem — every Priority Queue document is tagged with it, so its references are the list of them. Go there to practise one from your phone |
-| ▶ | **Learn** (`Cmd/Ctrl+L`) — the plugin's main action. Opens the queue on the **full-KB** Priority Queue, building the document first if there is none yet. Document-scoped queues are practised from the popup |
+| ▶ | **Learn** (`Cmd/Ctrl+L`) — the plugin's main action. Opens the queue on the **full-KB** Priority Queue, building the document first if there is none yet. **`Shift`- or `Cmd`/`Ctrl`-click** practises the scope named under the button instead; if that scope has no queue yet, the popup opens with it already filled in |
 
 The 👁 button says so if you have no review documents yet: the tag is created by the first one.
+
+### The collapsed panel { #collapsed-panel }
+
+Click the **🌐 globe** in the panel header to collapse the panel to a single row of icons. Click the globe again to expand it. Useful when you keep the left sidebar narrow, or when you would rather give the room to your documents.
+
+![The collapsed panel: one row of icons at the bottom of the sidebar — the globe, the Mastery Drill with a count badge, keyboard shortcuts, settings, the Priority Review Queue Rem and Learn](assets/panel-hub-collapsed.png){ width="400" }
+
+| Icon | What it does |
+|------|--------------|
+| 🌐 | Expands the panel again. A **blue dot** on it means a tip is waiting |
+| 🎯 | Opens the [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md), with the number of cards ready to drill on a badge. Only appears when the drill is on and at least 10 cards are ready |
+| ⌨ | Opens the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page |
+| ⚙ | Opens the plugin's [settings popup](Plugin-Settings-Reference.md) |
+| 👁 | Opens the **Priority Review Queue** Rem |
+| ▶ | **Learn**, exactly as in the expanded panel — including `Shift`/`Cmd`-click for the current scope |
+
+The choice is remembered **per device** and survives a restart, so a laptop where you keep the sidebar narrow can stay collapsed while your desktop stays expanded. There is no setting for it: the globe is the setting.
+
+**What is not on the row.** **Sorting**, the **Priority Queue** button and the scope line have no icon here on purpose — at a sidebar narrow enough to want a collapsed panel, ten icons would wrap into the stack of rows that collapsing is meant to get rid of. Expand the panel to reach them. The one you would otherwise miss, the scoped queue, is covered by `Shift`/`Cmd`-clicking ▶.
+
+**The Mastery Drill notification stands down.** While the panel is collapsed, the drill does not appear as its own card in the sidebar — the 🎯 icon carries it, with the same count.
+
+**Tips pause rather than pass.** A tip is still drawn while collapsed, and the globe carries a blue dot when one is waiting, but it is not recorded as shown. Days spent collapsed therefore do not cycle the pile past tips you never had a chance to read; expand the panel and the tip is there. See [Tips](#tips) below.
 
 ### When ▶ starts pulsing { #when-learn-starts-pulsing }
 
@@ -71,12 +94,16 @@ In [Light Mode](Full-Mode-x-Light-Mode.md), or with [flashcard prioritisation](P
 
 ### Tips { #tips }
 
+![The panel with a tip on screen: the lightbulb title, the tip body, and the I Got It, Learn More and All Tips buttons, with ✕ in the tip's corner](assets/panel-hub-expanded-with-tip.png){ width="400" }
+
 The panel shows **one tip per session**. Answer it and the tip area is done until the next time you open RemNote — it will not hand you another one, and moving around RemNote will not swap it for a different one either. Each tip has four buttons:
 
 - **I Got It** — you know this one. It is never shown again. This is remembered per knowledge base and syncs across your devices.
-- **✕** — not now. The tip stays in the pile and can resurface later; the panel also goes quiet for two hours, so a reload does not immediately produce another one.
+- **✕** — not now. The tip stays in the pile and can resurface later.
 - **Learn More** — opens the documentation section for the feature the tip is about. Tips that are habits rather than features have no such button.
 - **All Tips** — opens the full list. See [All Tips](#all-tips) below.
+
+**I Got It** and **✕** both end the tip area for the session, and the panel then goes quiet for **two hours** — so a reload does not immediately produce another tip. Both the quiet period and the one-per-session limit are **per knowledge base**: answering a tip in one knowledge base does not silence the panel in another.
 
 A tip you have not retired **will** come back on another day — that is what ✕ means. But tips are offered in rotation, least recently seen first, so every other tip still in the pile gets its turn before any one of them repeats. This matters most near the end: with two or three tips left, a random draw would keep landing on the same one.
 

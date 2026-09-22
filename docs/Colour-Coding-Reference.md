@@ -32,11 +32,14 @@ It appears wherever a priority is shown as colour: the **table-cell badges** (`7
 | Left border, 3px | **amber** `#f59e0b` | Dismissed, with preserved history — spans the Rem **and its descendants** | Yellow Left Border for Dismissed Rems |
 | Text background | **blue** `#8ad0f3` (dark `#1e496b`) | A PDF/web highlight you have **extracted** from (`#pdfextract`) | — |
 | Text background | **green** `#75f8b2` (dark `#1a5c3a`) | A highlight that is itself an Incremental Rem | — |
-| Dimmed, shrunk text | — | Tagged `#ignore` — archived, still readable | — |
+| Dimmed, shrunk text | — | Tagged `#ignore` — archived, still readable; applies to the Rem **and its descendants** | — |
+| Faded, grayscaled, zoomed-out text | — | Tagged `#cloze-extract` — a cloze created with `Opt+Z`, safe to skip when reading; applies to the Rem **and its descendants** | — |
 | Yellow background + red text | — | Source text already used for a cloze (`Opt+Z`) | — |
 | Bookmark glyph in the [Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget) | **green** `#10b981` | The Rem has a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) — expand the widget to see where | — |
 
 Both left borders run down the whole block, so an outline reads as one unit rather than a marked first line above unmarked children. Two places keep a single-line marker instead: the document you are currently inside, which is marked on its title only — a bar down the entire page says nothing useful — and the queue, portals, hover previews and PDF highlights, where there is no block to span.
+
+The `#ignore` and `#cloze-extract` treatments also cover the Rem's descendants in the open document, updating a moment after you add, move or re-tag a Rem. Hovering or focusing a row brings it back to full strength. Rems shown through a portal from another document keep their normal look.
 
 ### Reference pin rings
 

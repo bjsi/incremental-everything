@@ -217,7 +217,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 ### Other utilities
 
 - **Toggle Ignore Tag** (`Ctrl+Shift+I`) — `quick: ign`
-  Adds or removes the `#ignore` tag on the **focused editor Rem**, or on a **multi-rem selection** (select several rems in the outline and run it from the Omnibar). The plugin registers CSS so ignored rems are rendered smaller and slightly dimmed (full opacity returns on hover/focus), and the `#ignore` chip itself is hidden from the editor tag bar to keep the document clean.
+  Adds or removes the `#ignore` tag on the **focused editor Rem**, or on a **multi-rem selection** (select several rems in the outline and run it from the Omnibar). The plugin registers CSS so ignored rems and their descendants are rendered smaller and slightly dimmed (full opacity returns on hover/focus), and the `#ignore` chip itself is hidden from the editor tag bar to keep the document clean.
   **Multi-rem behavior:** if **every** selected rem is already tagged, the tag is **removed** from all; otherwise it is **added** to those that lack it (so a mixed selection becomes uniformly tagged).
 
   **Use Case:** During [Incremental Reading](IR-Flow--Reading-Extracting-and-Clozing.md), use this to signal that a snippet has already been read but wasn't important enough to make Incremental — it stays in place for archive or future consultation, and the de-emphasized styling tells you not to re-process it next time you're exposed to it.

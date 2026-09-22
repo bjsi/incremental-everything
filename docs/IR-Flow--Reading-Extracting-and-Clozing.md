@@ -162,7 +162,7 @@ Both commands automatically assign a **Card Priority** to every new cloze, imple
    - A **back-reference pin** to the parent Rem is appended at the end of the child's text.
    - The parent's selection is marked with **yellow highlight + red font** to signal that this passage has already been cloze-extracted.
    - The new **cloze child Rem** is tagged with the **Remove Parent** powerup, so the parent (the extract) is hidden from queue display *only* while reviewing this specific cloze. Other flashcard descendants of the same parent (e.g. Descriptor children) still see the parent normally — see [Remove Parent](Utilities.md#remove-parent-rp-new) in Queue Display Utilities.
-   - The child Rem receives a **`cloze-extract` tag**. In the Queue, this tag renders a small violet **↑** badge (hover for a tooltip) to identify its origin. **In the Editor**, these tagged clozes deliberately appear **less conspicuous** (faded, grayscaled, and zoomed out). This visual cue signals that the Rem merely contains material copied from a parent Rem for priority scheduling purposes, so you can safely skip past it when reviewing your notes.
+   - The child Rem receives a **`cloze-extract` tag**. In the Queue, this tag renders a small violet **↑** badge (hover for a tooltip) to identify its origin. **In the Editor**, these tagged clozes — and any Rems nested under them — deliberately appear **less conspicuous** (faded, grayscaled, and zoomed out; hover or focus to read at full strength). This visual cue signals that the Rem merely contains material copied from a parent Rem for priority scheduling purposes, so you can safely skip past it when reviewing your notes.
 
 ### Visual result in the child Rem
 

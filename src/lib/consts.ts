@@ -176,7 +176,13 @@ export const onboardingTipsStateKey = 'onboarding-tips-state';
  * cannot be written back over the good record either.
  */
 export const onboardingTipsLocalMirrorKey = 'onboarding-tips-state-local';
-/** Local timestamp until which the tip panel stays quiet after a ✕ dismissal. */
+/**
+ * Local `{ [kbId]: timestamp }` — when the tip panel goes quiet until, after
+ * either answer to a tip. Partitioned by knowledge base like the
+ * acknowledgements and the last-shown map: the piles are per knowledge base, so
+ * answering in one must not silence the panel in another. A bare number here is
+ * the pre-partition shape and is ignored.
+ */
 export const onboardingTipsSnoozeKey = 'onboarding-tips-snooze-until';
 /**
  * Set once a tip has been answered in this session, in **session** storage.
@@ -186,12 +192,16 @@ export const onboardingTipsSnoozeKey = 'onboarding-tips-snooze-until';
  * slot remounts as the app is used, and each remount re-ran the draw. With most
  * of a category acknowledged the pool is small, so those re-draws land on the
  * same two or three tips and read as a tip you already answered coming back.
+ *
+ * Session `{ [kbId]: true }`; a bare boolean is the pre-partition shape.
  */
 export const onboardingTipsAnsweredSessionKey = 'onboarding-tips-answered-session';
 /**
  * The tip drawn in this session, so a remount re-shows THAT tip rather than
  * drawing another. Without it "one tip per session" only held once the tip was
  * answered — before that, every remount rolled again.
+ *
+ * Session `{ [kbId]: tipId }`; a bare string is the pre-partition shape.
  */
 export const onboardingTipsDrawnSessionKey = 'onboarding-tips-drawn-session';
 /**
@@ -212,6 +222,17 @@ export const onboardingTipsWidgetId = 'onboarding_tips';
  * {@link showPluginHubCommandId}.
  */
 export const pluginHubHiddenKey = 'plugin-hub-hidden';
+/**
+ * The hub is collapsed to its icon row. **Local** storage on purpose, and the
+ * opposite contract to {@link pluginHubHiddenKey}: this one is a preference,
+ * and a per-device one. How much room the panel may take is a question about
+ * this screen and this sidebar width, so a laptop dragged down to 150px should
+ * not collapse the desktop too. Survives restarts; default (unset) is expanded.
+ *
+ * Read by the hub *and* by the Mastery Drill notification, which stands down
+ * while collapsed because the hub's 🎯 icon carries the drill instead.
+ */
+export const pluginHubCollapsedKey = 'plugin-hub-collapsed';
 /**
  * Session: which activation-time tasks (caches, pre-tagging, cooling scan,
  * hidden-slot check, band stylesheets) have settled. Written only by the index

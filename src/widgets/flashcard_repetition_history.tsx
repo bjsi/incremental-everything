@@ -40,31 +40,7 @@ import {
     summarizePriorityHistory,
 } from '../lib/priority_history';
 import { LAPSE_COLOR, retentionColorHex, retentionPercent } from '../lib/retention';
-
-function scoreLabel(score: QueueInteractionScore): string {
-    switch (score) {
-        case QueueInteractionScore.AGAIN: return 'Again';
-        case QueueInteractionScore.HARD: return 'Hard';
-        case QueueInteractionScore.GOOD: return 'Good';
-        case QueueInteractionScore.EASY: return 'Easy';
-        case QueueInteractionScore.TOO_EARLY: return 'Too Early';
-        case QueueInteractionScore.VIEWED_AS_LEECH: return 'Leech';
-        case QueueInteractionScore.RESET: return 'Reset';
-        case QueueInteractionScore.MANUAL_DATE: return 'Manual Date';
-        case QueueInteractionScore.MANUAL_EASE: return 'Manual Ease';
-        default: return `Unknown (${score})`;
-    }
-}
-
-function scoreColor(score: QueueInteractionScore): string {
-    switch (score) {
-        case QueueInteractionScore.AGAIN: return '#ef4444';
-        case QueueInteractionScore.HARD: return '#f59e0b';
-        case QueueInteractionScore.GOOD: return '#22c55e';
-        case QueueInteractionScore.EASY: return '#3b82f6';
-        default: return 'var(--rn-clr-content-tertiary)';
-    }
-}
+import { scoreColor, scoreLabel } from '../lib/rating_labels';
 
 /** Format a delay in ms as a human-readable string (like RemNote's display) */
 function formatDelay(delayMs: number): string {

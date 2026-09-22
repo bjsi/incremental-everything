@@ -3,8 +3,12 @@ import { renderWidget, usePlugin, useTrackerPlugin } from "@remnote/plugin-sdk";
 import React, { useEffect, useState } from "react";
 import '../style.css';
 import '../App.css';
-import { getIESetting } from '../lib/settings';
-import { disableFinalDrillNotificationId, masteryDrillMinDelayMinutesId } from '../lib/consts';
+import { pluginHubCollapsedKey } from '../lib/consts';
+import {
+    MIN_QUEUE_SIZE_FOR_NOTIFICATION,
+    finalDrillResumeTriggerKey,
+    getMasteryDrillStatus,
+} from '../lib/mastery_drill_status';
 
 const MOTIVATIONAL_PHRASES = [
     "Deliberately practice the material you are struggling with.",
@@ -77,29 +81,21 @@ export const FinalDrillNotification = () => {
 
     const settings = useTrackerPlugin(
         async (reactivePlugin) => {
-            const disabled = await getIESetting(reactivePlugin, disableFinalDrillNotificationId);
-            const minDelayMinutes = await getIESetting(reactivePlugin, masteryDrillMinDelayMinutesId);
-            const ids = (await reactivePlugin.storage.getSynced("finalDrillIds")) as (string | { cardId: string; kbId?: string; addedAt?: number })[] || [];
+            // Checked before anything else: while the hub is collapsed its icon
+            // row carries the drill as a 🎯 with the same count on it, so this
+            // card stands down — that is what keeps a collapse a collapse, with
+            // one drill affordance rather than two. Returning here also means
+            // the collapsed case costs a single local read instead of a synced
+            // read plus two KB lookups that the hub is already paying for.
+            const hubCollapsed =
+                (await reactivePlugin.storage.getLocal<boolean>(pluginHubCollapsedKey)) ?? false;
+            if (hubCollapsed) return null;
 
-            const currentKb = await reactivePlugin.kb.getCurrentKnowledgeBaseData();
-            const isPrimary = await reactivePlugin.kb.isPrimaryKnowledgeBase();
-            const currentKbId = currentKb?._id;
-
-            const relevantItems = ids.filter(item =>
-                typeof item === 'string' ? isPrimary : item.kbId === currentKbId
+            const status = await getMasteryDrillStatus(reactivePlugin);
+            const resumeTrigger = await reactivePlugin.storage.getSession<number>(
+                finalDrillResumeTriggerKey
             );
-
-            const now = Date.now();
-            const minDelayMs = minDelayMinutes * 60 * 1000;
-            let readyCount = 0;
-            for (const item of relevantItems) {
-                const addedAt = typeof item === 'string' ? undefined : item.addedAt;
-                if (!addedAt || (now - addedAt) >= minDelayMs) readyCount++;
-            }
-
-            const resumeTrigger = await reactivePlugin.storage.getSession<number>("finalDrillResumeTrigger");
-
-            return { disabled, count: relevantItems.length, readyCount, resumeTrigger };
+            return { ...status, resumeTrigger };
         },
         []
     );
@@ -135,9 +131,12 @@ export const FinalDrillNotification = () => {
         };
     }, []);
 
-    const MIN_QUEUE_SIZE_FOR_NOTIFICATION = 10;
-
-    if (!settings || settings.disabled || settings.readyCount < MIN_QUEUE_SIZE_FOR_NOTIFICATION || dismissed) {
+    if (
+        !settings ||
+        settings.disabled ||
+        settings.readyCount < MIN_QUEUE_SIZE_FOR_NOTIFICATION ||
+        dismissed
+    ) {
         return null;
     }
 

@@ -269,6 +269,7 @@ Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused s
   - Unlike *SuperMemo*, these reviews **are recorded** in your repetition history.
 - Cards stay in the drill until you rate them **Good** or **Easy** inside the Mastery Drill.
 - A periodic notification widget appears in the Left Sidebar when ≥ 10 cards are pending, with a motivational phrase and a direct *Start Drill* button.
+- If the [Incremental RemNote panel is collapsed](Getting-Started.md#collapsed-panel), the notification is not shown as a card — the panel's 🎯 icon carries the drill instead, with the same count on a badge.
 
 !!! warning "Known limitation — [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters)"
     Inside a cluster, RemNote reports only the **cluster anchor** to plugins: the visible sibling advances on screen, but the card identity the plugin receives stays on the first one. The Mastery Drill inherits two consequences from that, both verified by measurement:
@@ -292,9 +293,43 @@ Cards rated *Again* or *Hard* enter the drill queue immediately but are held bac
 
 The drill toolbar (top row) provides several queue management tools:
 
+- **List Cards:** Lists every card in the drill and whether RemNote can show it — see [Card List](#card-list). Clicking the **Remaining** badge, or pressing **L**, opens it too.
 - **Clear Queue:** Empties the entire Mastery Drill queue at any time to start fresh.
 - **Clear Low Priority Cards:** Opens a distribution view showing how many drill cards fall into each of 20 priority buckets (0–5, 6–10, …, 96–100). Set a priority threshold and remove all cards above it in one click — useful when the queue has accumulated low-priority cards that aren't worth drilling urgently.
 - **Old Items Warning:** If items linger past the configured threshold (default: 7 days), a warning badge appears. Hover it to read an explanation of why stale items may be better left to the scheduler. Clear them with one click to keep sessions focused on fresh struggles.
+
+### Card List
+
+The drill toolbar counts a card as *Remaining* from its id alone, but RemNote only shows cards it can still practise. A card that was deleted, or switched off, stays in the count and never appears — the toolbar says **1 Remaining** while the queue says *You've finished practicing all your cards!*. **List Cards** shows what is actually in the drill.
+
+The list opens under the toolbar, in place of the queue. The queue is only hidden, so **← Back** (or **Esc**) returns to the same drill session.
+
+Each row shows the card's text, its type (e.g. *Cloze (…)*, *Forward Card*), where the Rem sits, its priority, when it entered the drill, the minutes left if it is still cooling, and its last rating. A status tag says whether RemNote will show it; hover the tag for what to do about it.
+
+| Status | Meaning |
+|---|---|
+| **OK** | RemNote will show the card. |
+| **Last rated Good** | The last rating was *Good* or *Easy*, so the card should already have left the drill. |
+| **Paused deck** | The card sits inside a paused deck. |
+| **Card deleted** | The card no longer exists — its Rem was deleted, or the cloze or back side it came from was edited away. |
+| **Rem deleted** | The card record survives but its Rem is gone. |
+| **Disabled by ancestor** | An ancestor carries *Disable Descendant Cards*. |
+| **In a table** | The Rem is in a table, where RemNote ships cards switched off. |
+| **Cards off on Rem** | *Enable Cards* is off on the Rem. |
+| **Direction off** | The Rem's flashcard direction no longer includes this card's direction. |
+| **Cloze/back removed** | The cloze or back side the card was made from is no longer in the Rem. |
+| **Card switched off** | The card was switched off on its own; open the Rem and run */Enable All Cloze Cards*, or click the greyed cloze → *Enable this card*. |
+| **Not surfaced** | RemNote does not show the card, and no Rem-level cause explains it. |
+
+Cards RemNote cannot show are listed first, and **Remove N unplayable** takes them all out at once. Per row, **Go to Rem** opens the Rem (closing the drill), **↗** opens it in a browser tab and keeps the list open, and **Remove** takes the card out of the drill.
+
+| Key | Action |
+|---|---|
+| **↑** / **↓** | Choose a card |
+| **Enter** | Go to the chosen card's Rem |
+| **Delete** | Remove the chosen card from the drill |
+| **Shift+Delete** | Remove every card RemNote cannot show |
+| **Esc** | Back to the drill |
 
 ### Editor Access
 
@@ -321,6 +356,7 @@ The Mastery Drill popup supports the standard RemNote queue keyboard shortcuts:
 | **4** | Easy (if answer revealed) — or reveal answer first |
 | **←** | Go back to the previous card |
 | **→** | Skip the current card (can be undone with ←) |
+| **L** | Open the [Card List](#card-list) |
 
 If the answer has not yet been revealed, the first rating keystroke reveals it. The second keystroke records the rating. Shortcuts are suppressed when focus is on a text input or editable field.
 
@@ -343,7 +379,7 @@ Three tabs are added to the right sidebar:
 3. Open the drill using the **`Mastery Drill`** command in the Command Palette (Quick Code: `dri`), or click *Start Drill* in the notification widget.
 4. The queue clears as you master cards (rate them Good or Easy).
 
-![Mastery Drill Notification](assets/drill-notification.png){ width="350" }
+![The Mastery Drill notification under the Incremental RemNote panel in the left sidebar, showing the number of cards ready for drill, a motivational phrase and the Start Drill button](assets/panel-hub-and-drill-expanded.png){ width="400" }
 
 ---
 

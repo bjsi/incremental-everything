@@ -73,8 +73,14 @@ export interface SelectedItem {
 
 export interface SelectionOptions {
   scopeRemId: string | null;
-  /** How many items to select. 0 is allowed: the universe is still computed. */
-  itemCount: number;
+  /** IncRems to select. 0 is allowed: the universe is still computed. */
+  incRemCount: number;
+  /**
+   * Flashcard Rems to select. Forced ancestors and Card Cluster siblings count
+   * toward it. The split between the two counts is the caller's (fill_split.ts).
+   */
+  cardCount: number;
+  /** Paces the interleave only: one IncRem, then up to this many cards. */
   cardRatio: number | 'no-cards' | 'no-rem';
   filterPaused: boolean;
   pausedPriorityThreshold: number;
@@ -91,7 +97,7 @@ export interface SelectionOptions {
    * Children already in the document that were drained because an ancestor of
    * theirs is due. Each ancestor is pulled in before the normal draw — the swap,
    * applied to entries the draw never sees again — and each child is reported
-   * as held back. Added even past `itemCount`, like a cluster: protection first.
+   * as held back. Added even past `cardCount`, like a cluster: protection first.
    */
   forceAncestors?: ForcedAncestor[];
   /**
@@ -257,7 +263,7 @@ export async function selectPriorityItems(
   plugin: RNPlugin,
   options: SelectionOptions
 ): Promise<SelectionResult> {
-  const { scopeRemId, itemCount, cardRatio, filterPaused, pausedPriorityThreshold } = options;
+  const { scopeRemId, incRemCount, cardCount, cardRatio, filterPaused, pausedPriorityThreshold } = options;
   const excludeRemIds = options.excludeRemIds ?? new Set<RemId>();
   const scanner = options.coolingScanner ?? null;
   const shieldFraction = Math.max(0, Math.min(1, options.shieldSliceFraction ?? 0));
@@ -314,11 +320,8 @@ export async function selectPriorityItems(
   const cardRandomness = await getCardRandomness(plugin);
   const weightK = await getWeightSelectionK(plugin);
 
-  const expectedInc =
-    cardRatio === 'no-cards' ? itemCount : cardRatio === 'no-rem' ? 0 : Math.ceil(itemCount / (cardRatio + 1));
-  const expectedCards = itemCount - expectedInc;
-  const incHead = Math.ceil(expectedInc * shieldFraction);
-  const cardHead = Math.ceil(expectedCards * shieldFraction);
+  const incHead = Math.ceil(incRemCount * shieldFraction);
+  const cardHead = Math.ceil(cardCount * shieldFraction);
 
   const incRanked = rankWithShieldSlice(dueIncRems as any[], incHead, incRemRandomness, weightK);
   const cardRanked = rankWithShieldSlice(cardsWithPriority, cardHead, cardRandomness, weightK);
@@ -327,8 +330,8 @@ export async function selectPriorityItems(
 
   // Cooling: judge the head of the card list in one batch up front; anything
   // drawn from beyond it (or an ancestor swapped in) is judged lazily.
-  if (scanner && itemCount > 0) {
-    const prescan = sortedCards.slice(0, itemCount * 3 + 25).map((c) => c.rem._id);
+  if (scanner && cardCount > 0) {
+    const prescan = sortedCards.slice(0, cardCount * 3 + 25).map((c) => c.rem._id);
     await scanner.scan(prescan);
   }
 
@@ -514,25 +517,22 @@ export async function selectPriorityItems(
     });
   }
 
+  // Each list fills to its own count; the ratio only interleaves them. A list
+  // that runs out of candidates leaves its slots empty rather than handing them
+  // to the other — the split is the document's, not the draw's.
+  const countOf = (type: SelectedItem['type']) => items.filter((i) => i.type === type).length;
+  const pace = typeof cardRatio === 'number' ? Math.max(1, cardRatio) : Infinity;
   let incRemIndex = 0;
   let cardIndex = 0;
-  if (typeof cardRatio === 'number') {
-    while (items.length < itemCount) {
-      let addedThisCycle = false;
-      if (incRemIndex < sortedIncRems.length) {
-        if (await addIncRem(incRemIndex)) { incRemIndex++; addedThisCycle = true; }
-      }
-      for (let i = 0; i < cardRatio && items.length < itemCount; i++) {
-        if (cardIndex < sortedCards.length) {
-          if (await addCard(cardIndex)) { cardIndex++; addedThisCycle = true; }
-        }
-      }
-      if (!addedThisCycle) break;
+  for (;;) {
+    let progressed = false;
+    if (countOf('incremental') < incRemCount && incRemIndex < sortedIncRems.length) {
+      if (await addIncRem(incRemIndex)) { incRemIndex++; progressed = true; }
     }
-  } else if (cardRatio === 'no-cards') {
-    for (let i = 0; items.length < itemCount && i < sortedIncRems.length; i++) await addIncRem(i);
-  } else {
-    for (let i = 0; items.length < itemCount && i < sortedCards.length; i++) await addCard(i);
+    for (let i = 0; i < pace && countOf('flashcard') < cardCount && cardIndex < sortedCards.length; i++) {
+      if (await addCard(cardIndex)) { cardIndex++; progressed = true; }
+    }
+    if (!progressed) break;
   }
 
   skippedPausedItems.sort((a, b) => a.priority - b.priority);

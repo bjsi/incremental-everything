@@ -45,6 +45,37 @@ const QUEUE_VARIANT_CSS = `
   }
 `;
 
+/* SidebarEnd widgets lose 64px per side to RemNote, not to anything we set.
+
+   The sidebar mounts its plugin slot as
+     <WidgetsAtLocation location={SidebarEnd} widgetClassName="px-8" />
+   and the renderer behind it puts that class on BOTH boxes it builds:
+
+     div.fade-in-first-load.relative.px-8   <- wrapper (overflow:hidden)
+       div.px-8                             <- mount div (display:flex)
+         iframe[data-plugin-id]
+
+   `.px-8` is 2rem, so the iframe starts 4rem in from each edge — on a sidebar
+   dragged down to ~200px there is more padding than widget. No other location
+   does this (QueueToolbar/UnderRemEditor pass "" or a w-full class), and the
+   dimensions we register cannot reach it: `width: '100%'` is 100% of the box
+   that has already been inset.
+
+   So take both paddings back and re-add the 0.5rem that the native chrome
+   directly above and below this slot uses (the updater banner's `mx-2`, the
+   status-badge stack's `px-2`), which lines our panels up with the sidebar's
+   own rows. Scoped by data-plugin-id so we only move our own widgets. */
+const SIDEBAR_END_PADDING_CSS = `
+  .fade-in-first-load.px-8:has(> div > iframe[data-plugin-id="incremental-everything"]) {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  .fade-in-first-load.px-8 > div.px-8:has(> iframe[data-plugin-id="incremental-everything"]) {
+    padding-left: 0;
+    padding-right: 0;
+  }
+`;
+
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
 
@@ -216,6 +247,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
   await plugin.app.registerCSS('queue-beautiful-bar', QUEUE_VARIANT_CSS);
+  await plugin.app.registerCSS('sidebar-end-padding', SIDEBAR_END_PADDING_CSS);
 
   // The Priority Queue popup: status, refresh/drain/refill/practise for the
   // persistent review document, and the Cooling list. Replaces the snapshot

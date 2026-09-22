@@ -83,6 +83,7 @@ import dayjs from 'dayjs';
 import { getIESetting } from '../lib/settings';
 import { recordRemChangeEvent } from '../lib/rem_change_tape';
 import { isOperationSuppressed } from '../lib/operation_suppression';
+import { registerTagSubtreeCSSListeners } from '../lib/tag_subtree_css';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -1486,6 +1487,7 @@ export function registerEventListeners(
 
   registerHoveredReferenceTracking(plugin);
   registerQueueDashboardRefocusListener(plugin);
+  registerTagSubtreeCSSListeners(plugin);
 }
 
 /**

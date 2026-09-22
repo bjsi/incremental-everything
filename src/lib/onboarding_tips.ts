@@ -21,9 +21,11 @@ import {
  *    base in synced storage *and* mirrored locally, so it survives reloads,
  *    follows the user across devices, and outlives a synced value that comes
  *    back empty. See {@link acknowledgeTip}.
- *  - **✕** — not now. The tip stays in the pile and can resurface later; the
- *    panel also goes quiet for {@link TIP_SNOOZE_MS}, so a reload inside that
- *    window does not immediately produce another tip.
+ *  - **✕** — not now. The tip stays in the pile and can resurface later.
+ *
+ * Both of those *answer* the tip, and both then pause the panel identically —
+ * see {@link pauseTipsAfterAnswer}. They differ in what happens to the tip, not
+ * in how long the panel stays quiet.
  *  - **Learn More** — opens the docs section for the feature, when the tip names
  *    one. Not every tip has a page (some are habits, not features), hence the
  *    optional `docsPath`.
@@ -151,6 +153,13 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     title: 'Priority runs the queue',
     body: 'Alt+P sets it. It is the one knob that changes what your day looks like.',
     docsPath: 'Prioritization-&-Sorting/#setting-priorities',
+  },
+  {
+    id: 'priority-number',
+    category: 'basics',
+    title: 'First Things First',
+    body: 'Think of priorities as a queue of importance. Lower numbers mean higher priority.',
+    docsPath: 'Prioritization-&-Sorting/#priority-value-absolute-priority',
   },
   {
     id: 'priority-inheritance',
@@ -557,11 +566,20 @@ export async function resetAcknowledgedTips(plugin: RNPlugin): Promise<void> {
   }
   await plugin.storage.setSynced(onboardingTipsStateKey, synced);
   await plugin.storage.setLocal(onboardingTipsLocalMirrorKey, local);
-  await plugin.storage.setLocal(onboardingTipsSnoozeKey, 0);
+  // This knowledge base's slots only — "start over" here must not clear the
+  // snooze or the session's tip in a knowledge base the user is not looking at.
+  const snooze = await readSnoozeMap(plugin);
+  delete snooze[kbId];
+  delete snooze[FALLBACK_KB_ID];
+  await plugin.storage.setLocal(onboardingTipsSnoozeKey, snooze);
   // Otherwise "start over" hands back an empty pile and a panel that has
   // already used up its one tip for the session.
-  await plugin.storage.setSession(onboardingTipsAnsweredSessionKey, false);
-  await plugin.storage.setSession(onboardingTipsDrawnSessionKey, '');
+  for (const key of [onboardingTipsAnsweredSessionKey, onboardingTipsDrawnSessionKey]) {
+    const byKb = await readSessionMap<unknown>(plugin, key);
+    delete byKb[kbId];
+    delete byKb[FALLBACK_KB_ID];
+    await plugin.storage.setSession(key, byKb);
+  }
   const lastShown =
     (await plugin.storage.getLocal<Record<string, Record<string, number>>>(
       onboardingTipsLastShownKey
@@ -575,13 +593,49 @@ export async function resetAcknowledgedTips(plugin: RNPlugin): Promise<void> {
  * session in front of you, and syncing it would silence the panel on a device
  * the user has not touched yet.
  */
+/**
+ * Reinterpret one of the tip keys as a per-knowledge-base map.
+ *
+ * The snooze and the two session keys each used to hold a single bare value
+ * shared by every knowledge base, which is wrong for the same reason the
+ * acknowledgements and the last-shown map are already partitioned: the piles are
+ * per knowledge base, so answering a tip in one should not silence the panel in
+ * another.
+ *
+ * A value left over from before that fix is a number, a boolean or a string
+ * rather than an object. It is dropped rather than migrated into the current
+ * knowledge base's slot: the only thing lost is up to two hours of quiet, and
+ * guessing which knowledge base an unlabelled timestamp belonged to would be
+ * wrong more often than right for anyone who uses more than one.
+ */
+function asKbMap<T>(stored: unknown): Record<string, T> {
+  if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return {};
+  return stored as Record<string, T>;
+}
+
+async function readSnoozeMap(plugin: RNPlugin): Promise<Record<string, number>> {
+  try {
+    return asKbMap<number>(await plugin.storage.getLocal(onboardingTipsSnoozeKey));
+  } catch {
+    return {};
+  }
+}
+
 export async function snoozeTips(plugin: RNPlugin): Promise<void> {
-  await plugin.storage.setLocal(onboardingTipsSnoozeKey, Date.now() + TIP_SNOOZE_MS);
+  const byKb = await readSnoozeMap(plugin);
+  byKb[await getKbId(plugin)] = Date.now() + TIP_SNOOZE_MS;
+  await plugin.storage.setLocal(onboardingTipsSnoozeKey, byKb);
 }
 
 export async function tipsAreSnoozed(plugin: RNPlugin): Promise<boolean> {
-  const until = (await plugin.storage.getLocal<number>(onboardingTipsSnoozeKey)) ?? 0;
-  return Date.now() < until;
+  const byKb = await readSnoozeMap(plugin);
+  return Date.now() < (byKb[await getKbId(plugin)] ?? 0);
+}
+
+/** When the panel goes quiet until, for this knowledge base. 0 = not snoozed. */
+export async function getTipSnoozeUntil(plugin: RNPlugin): Promise<number> {
+  const byKb = await readSnoozeMap(plugin);
+  return byKb[await getKbId(plugin)] ?? 0;
 }
 
 /**
@@ -595,26 +649,68 @@ export async function tipsAreSnoozed(plugin: RNPlugin): Promise<boolean> {
  * three survivors come round again and again and read as tips that were already
  * answered.
  *
- * Session storage, not local: the next start should offer a tip again. It is a
- * separate key from the snooze because the two mean different things — ✕ asks
- * for quiet across the next couple of hours *and* the next few starts, while
- * this only closes the current session.
+ * Session storage, not local, and a separate key from the snooze because the two
+ * cover different gaps. The snooze is a wall clock: it survives reloads and
+ * restarts, but it expires after {@link TIP_SNOOZE_MS}. This one has no clock:
+ * it holds for as long as the session does. Without it, a session left open
+ * longer than the snooze — an ordinary working day with RemNote in the
+ * background — would hand out a fresh tip every two hours, which is not what
+ * "one tip per session" says. Neither key subsumes the other, so both answers
+ * write both.
  */
+async function readSessionMap<T>(plugin: RNPlugin, key: string): Promise<Record<string, T>> {
+  try {
+    return asKbMap<T>(await plugin.storage.getSession(key));
+  } catch {
+    return {};
+  }
+}
+
 export async function tipAnsweredThisSession(plugin: RNPlugin): Promise<boolean> {
-  return (await plugin.storage.getSession<boolean>(onboardingTipsAnsweredSessionKey)) ?? false;
+  const byKb = await readSessionMap<boolean>(plugin, onboardingTipsAnsweredSessionKey);
+  return byKb[await getKbId(plugin)] ?? false;
 }
 
 export async function markTipAnsweredThisSession(plugin: RNPlugin): Promise<void> {
-  await plugin.storage.setSession(onboardingTipsAnsweredSessionKey, true);
+  const byKb = await readSessionMap<boolean>(plugin, onboardingTipsAnsweredSessionKey);
+  byKb[await getKbId(plugin)] = true;
+  await plugin.storage.setSession(onboardingTipsAnsweredSessionKey, byKb);
+}
+
+/**
+ * Close the tip area after the user has answered the tip, whichever answer it
+ * was.
+ *
+ * Both answers go through here so they cannot drift apart. They did: ✕ snoozed
+ * *and* marked the session, while **I Got It** only marked the session — so
+ * reloading after the softer answer ("not now") stayed quiet for two hours,
+ * while reloading after the harder one ("I know this, retire it") produced a
+ * fresh tip immediately. The panel promises one tip per session either way, and
+ * a reload is not a new session.
+ *
+ * What the two answers still do differently is everything about the *tip*:
+ * {@link acknowledgeTip} retires it for good, ✕ leaves it in the pile. This
+ * function is only about how long the panel stays quiet afterwards.
+ *
+ * Not called by the All Tips popup: that is deliberately the way out of the
+ * one-per-session pacing, so acknowledging five tips there must not silence the
+ * panel for two hours.
+ */
+export async function pauseTipsAfterAnswer(plugin: RNPlugin): Promise<void> {
+  await snoozeTips(plugin);
+  await markTipAnsweredThisSession(plugin);
 }
 
 /** The tip already drawn in this session, if the panel has mounted before. */
 export async function getDrawnTipIdThisSession(plugin: RNPlugin): Promise<string | null> {
-  return (await plugin.storage.getSession<string>(onboardingTipsDrawnSessionKey)) ?? null;
+  const byKb = await readSessionMap<string>(plugin, onboardingTipsDrawnSessionKey);
+  return byKb[await getKbId(plugin)] || null;
 }
 
 export async function setDrawnTipIdThisSession(plugin: RNPlugin, tipId: string): Promise<void> {
-  await plugin.storage.setSession(onboardingTipsDrawnSessionKey, tipId);
+  const byKb = await readSessionMap<string>(plugin, onboardingTipsDrawnSessionKey);
+  byKb[await getKbId(plugin)] = tipId;
+  await plugin.storage.setSession(onboardingTipsDrawnSessionKey, byKb);
 }
 
 /** Tip id → when it was last put on screen, for this knowledge base. */
@@ -778,7 +874,7 @@ export async function readTipsDiagnostics(plugin: RNPlugin): Promise<TipsDiagnos
     localPartitions: partitions(local),
     rows,
     remaining: ONBOARDING_TIPS.filter((t) => !(t.id in map)).length,
-    snoozedUntil: (await plugin.storage.getLocal<number>(onboardingTipsSnoozeKey)) ?? 0,
+    snoozedUntil: await getTipSnoozeUntil(plugin),
     drawnThisSession: await getDrawnTipIdThisSession(plugin),
     answeredThisSession: await tipAnsweredThisSession(plugin),
     rotation,

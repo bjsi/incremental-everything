@@ -894,7 +894,10 @@ export function PriorityQueuePopup() {
         {result.drained.ancestor > 0 && <>, <span className="font-bold">{result.drained.ancestor}</span> held by a due ancestor</>}
         {result.drained.missing > 0 && <>, {result.drained.missing} missing</>}, added{' '}
         <span className="font-bold">{result.added.total}</span>
-        {result.added.shieldSlice > 0 && <> ({result.added.shieldSlice} from the shield slice)</>}.{' '}
+        {result.added.shieldSlice > 0 && <> ({result.added.shieldSlice} from the shield slice)</>}
+        {result.incRedraw && result.incRedraw.replaced > 0 && (
+          <>, <span className="font-bold">{result.incRedraw.replaced}</span> IncRems replaced by a new draw</>
+        )}.{' '}
         <span style={faint}>{(result.elapsedMs / 1000).toFixed(1)}s</span>
       </div>
       {result.selection &&
