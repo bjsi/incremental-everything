@@ -28,6 +28,7 @@ import {
     CartesianGrid,
     ComposedChart,
     Line,
+    ReferenceArea,
     ReferenceLine,
     ResponsiveContainer,
     Scatter,
@@ -228,10 +229,112 @@ export function ForgettingCurveChart({
         return () => observer.disconnect();
     }, []);
 
+    // Zoom. `null` is the full axis; otherwise a visible range in plotted x
+    // units, which both panels share because they share the axis.
+    const [zoom, setZoom] = useState<[number, number] | null>(null);
+    const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
+
+    // A new series is a different card, or the same card on the other scale;
+    // either way the old range means nothing on it.
+    useEffect(() => {
+        setZoom(null);
+        setDrag(null);
+    }, [series]);
+
+    const xDomain: [number, number] = zoom ?? series.xDomain;
+
     const ticks = useMemo(
-        () => (plotWidth > 0 ? rebuildTicks(series, plotWidth) : series.ticks),
-        [series, plotWidth],
+        () => (plotWidth > 0 ? rebuildTicks(series, plotWidth, zoom ?? undefined) : series.ticks),
+        [series, plotWidth, zoom],
     );
+
+    const visibleRows = useMemo(
+        () => series.rows.filter((r) => r.x >= xDomain[0] && r.x <= xDomain[1]),
+        [series.rows, xDomain],
+    );
+
+    // Zoomed in, the full 0–100% y axis would show a flat line in its top few
+    // percent, so refit to what is actually on screen — keeping the target line
+    // inside, since it is the thing the curve is read against.
+    const yDomain = useMemo((): [number, number] => {
+        if (!zoom) return series.yDomain;
+        const values: number[] = [];
+        for (const row of visibleRows) {
+            for (const key of ['r', ...CURVE_GRADES] as const) {
+                const v = row[key];
+                if (typeof v === 'number' && Number.isFinite(v)) values.push(v);
+            }
+        }
+        if (values.length === 0) return series.yDomain;
+        const lo = Math.min(...values, series.targetPercent);
+        const hi = Math.max(...values, series.targetPercent);
+        const pad = Math.max((hi - lo) * 0.12, 0.5);
+        return [Math.max(0, lo - pad), Math.min(100, hi + pad)];
+    }, [zoom, visibleRows, series]);
+
+    // Wheel zoom, anchored on the pointer so the moment under the cursor stays
+    // put. Bound natively rather than through React's `onWheel`, which is
+    // registered passive and so cannot stop the popup scrolling underneath.
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el || plotWidth <= 0) return;
+
+        const onWheel = (event: WheelEvent) => {
+            event.preventDefault();
+            const [fullLo, fullHi] = series.xDomain;
+            const fullSpan = fullHi - fullLo;
+            if (!(fullSpan > 0)) return;
+
+            const plotLeft = el.getBoundingClientRect().left + CHART_MARGIN_LEFT + Y_AXIS_WIDTH;
+            const fraction = Math.min(Math.max((event.clientX - plotLeft) / plotWidth, 0), 1);
+
+            setZoom((current) => {
+                const [lo, hi] = current ?? [fullLo, fullHi];
+                const anchor = lo + fraction * (hi - lo);
+                const scaled = (hi - lo) * (event.deltaY > 0 ? 1.25 : 1 / 1.25);
+                const span = Math.min(Math.max(scaled, fullSpan / 2000), fullSpan);
+
+                let x0 = anchor - (anchor - lo) * (span / (hi - lo));
+                if (x0 < fullLo) x0 = fullLo;
+                if (x0 + span > fullHi) x0 = fullHi - span;
+                const next: [number, number] = [Math.max(x0, fullLo), Math.min(x0 + span, fullHi)];
+
+                // Zoomed all the way back out: drop to null so the axis returns
+                // to the ticks and y range it was built with.
+                return next[1] - next[0] >= fullSpan * 0.999 ? null : next;
+            });
+        };
+
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, [plotWidth, series.xDomain]);
+
+    const beginDrag = (e: { activeLabel?: string | number }) => {
+        const x = Number(e?.activeLabel);
+        if (Number.isFinite(x)) setDrag({ from: x, to: x });
+    };
+
+    const extendDrag = (e: { activeLabel?: string | number }) => {
+        if (!drag) return;
+        const x = Number(e?.activeLabel);
+        if (Number.isFinite(x)) setDrag((d) => (d ? { ...d, to: x } : d));
+    };
+
+    const commitDrag = () => {
+        if (!drag) return;
+        const lo = Math.min(drag.from, drag.to);
+        const hi = Math.max(drag.from, drag.to);
+        setDrag(null);
+        // A click, or a selection too thin to be meant: leave the view alone.
+        if (hi - lo >= (series.xDomain[1] - series.xDomain[0]) * 0.005) setZoom([lo, hi]);
+    };
+
+    const dragHandlers = {
+        onMouseDown: beginDrag,
+        onMouseMove: extendDrag,
+        onMouseUp: commitDrag,
+        onMouseLeave: commitDrag,
+    };
 
     const tickFormatter = useMemo(() => {
         const labels = new Map(ticks.map((t) => [t.value, t.label]));
@@ -257,7 +360,11 @@ export function ForgettingCurveChart({
     );
 
     const sLogDomain = useMemo((): [number, number] => {
-        const values = repPoints.map((p) => p.sLog);
+        const values = zoom
+            ? visibleRows
+                  .map((r) => r.sLog)
+                  .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+            : repPoints.map((p) => p.sLog);
         if (values.length === 0) return [0, 1];
         const lo = Math.min(...values);
         const hi = Math.max(...values);
@@ -265,7 +372,7 @@ export function ForgettingCurveChart({
         // A card whose stability never moved would otherwise get a zero-height
         // axis; keep a quarter of a decade so the staircase has somewhere to sit.
         return [lo - Math.max(spread * 0.15, 0.15), hi + Math.max(spread * 0.2, 0.25)];
-    }, [repPoints]);
+    }, [repPoints, zoom, visibleRows]);
 
     /**
      * Which row each ×SInc label gets, or -1 for "too crowded to draw".
@@ -324,12 +431,26 @@ export function ForgettingCurveChart({
     const grades = series.branches.map((b) => b.grade);
 
     return (
-        <div className="w-full" ref={containerRef}>
+        <div
+            className="w-full"
+            ref={containerRef}
+            onDoubleClick={() => setZoom(null)}
+            title="Drag across the chart to zoom, scroll to zoom at the pointer, double-click to reset"
+        >
             <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
                 <h3 className="text-sm font-bold uppercase rn-clr-content-tertiary tracking-wider">
                     {title}
                 </h3>
                 <div className="flex items-center gap-2">
+                    {zoom && (
+                        <button
+                            onClick={() => setZoom(null)}
+                            className="px-2 py-0.5 text-[10px] rounded-md border rn-clr-border-opaque rn-clr-content-secondary hover:rn-clr-background-secondary"
+                            title="Show the whole timeline again (or double-click the chart)"
+                        >
+                            Reset zoom
+                        </button>
+                    )}
                     {onScaleChange && (
                         <div className="flex rn-clr-border-opaque border rounded-md overflow-hidden text-[10px]">
                             {(['log', 'linear'] as CurveScale[]).map((s) => (
@@ -402,19 +523,20 @@ export function ForgettingCurveChart({
                 <ComposedChart
                     data={series.rows}
                     margin={{ top: 6, right: CHART_MARGIN_RIGHT, bottom: 0, left: CHART_MARGIN_LEFT }}
+                    {...dragHandlers}
                 >
                     <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
                     <XAxis
                         dataKey="x"
                         type="number"
-                        domain={series.xDomain}
+                        domain={xDomain}
                         ticks={tickValues}
                         tickFormatter={tickFormatter}
                         tick={{ fontSize: 10 }}
                         allowDataOverflow
                     />
                     <YAxis
-                        domain={series.yDomain}
+                        domain={yDomain}
                         width={Y_AXIS_WIDTH}
                         tick={{ fontSize: 10 }}
                         tickFormatter={(v: number) => `${Math.round(v)}%`}
@@ -478,17 +600,21 @@ export function ForgettingCurveChart({
                             name={GRADE_LABEL[g]}
                         />
                     ))}
+
+                    {drag && (
+                        <ReferenceArea x1={drag.from} x2={drag.to} strokeOpacity={0.3} fill="#8884d8" />
+                    )}
                 </ComposedChart>
             </ResponsiveContainer>
 
             {showStability && repPoints.length > 0 && (
                 <ResponsiveContainer width="100%" height={Math.max(130, Math.round(height * 0.62))} debounce={50}>
-                    <ComposedChart data={series.rows} margin={STABILITY_MARGIN}>
+                    <ComposedChart data={series.rows} margin={STABILITY_MARGIN} {...dragHandlers}>
                         <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                         <XAxis
                             dataKey="x"
                             type="number"
-                            domain={series.xDomain}
+                            domain={xDomain}
                             ticks={tickValues}
                             tickFormatter={tickFormatter}
                             tick={{ fontSize: 10 }}
@@ -513,6 +639,10 @@ export function ForgettingCurveChart({
                         <Scatter data={repPoints} dataKey="sLog" fill={STABILITY_COLOR} isAnimationActive={false}>
                             <LabelList dataKey="sIncLabel" content={renderSIncLabel} />
                         </Scatter>
+
+                        {drag && (
+                            <ReferenceArea x1={drag.from} x2={drag.to} strokeOpacity={0.3} fill="#8884d8" />
+                        )}
                     </ComposedChart>
                 </ResponsiveContainer>
             )}

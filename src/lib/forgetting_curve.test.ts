@@ -136,18 +136,18 @@ describe('buildForgettingCurveSeries', () => {
         for (const g of CURVE_GRADES) assert.equal(junction[g], 100);
     });
 
-    it('stops the forecast where Easy crosses the target retention', () => {
+    it('stops the forecast two points past where Good crosses the target', () => {
         for (const target of [0.9, 0.8]) {
             const s = build(HISTORY, { targetRetention: target })!;
             const last = s.rows[s.rows.length - 1];
             assert.ok(
-                Math.abs((last.easy as number) - target * 100) < 0.5,
-                `Easy should land on the target at the right edge (got ${last.easy} for ${target})`,
+                Math.abs((last.good as number) - (target - 0.02) * 100) < 0.5,
+                `Good should land 2pp under the target at the right edge (got ${last.good} for ${target})`,
             );
-            // And nothing is cut short: every other branch is already past it.
-            for (const g of ['again', 'hard', 'good'] as const) {
-                assert.ok((last[g] as number) <= target * 100 + 1e-6);
-            }
+            // Good's own crossing is therefore on the chart, not on its edge.
+            assert.ok((last.good as number) < target * 100);
+            // Easy decays more slowly, so it is still above Good at the edge.
+            assert.ok((last.easy as number) > (last.good as number));
         }
     });
 
@@ -246,6 +246,39 @@ describe('buildForgettingCurveSeries', () => {
             inLeftZone(wide, 1850) >= 2,
             'a wide linear axis carries several marks in the short-term zone',
         );
+    });
+
+    it('re-ticks a zoomed range without leaving it', () => {
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(HISTORY, { scale })!;
+            const [lo, hi] = s.xDomain;
+            // A window over the middle of the axis, as a drag-select would give.
+            const window: [number, number] = [lo + (hi - lo) * 0.35, lo + (hi - lo) * 0.6];
+            const ticks = rebuildTicks(s, 1200, window);
+
+            assert.ok(ticks.length >= 2, `${scale}: a zoomed range still gets ticks`);
+            for (const t of ticks) {
+                assert.ok(
+                    t.value >= window[0] - 1e-9 && t.value <= window[1] + 1e-9,
+                    `${scale}: tick "${t.label}" at ${t.value} escaped ${window}`,
+                );
+            }
+
+            const minGap = (window[1] - window[0]) * tickMinGap(1200);
+            for (let i = 1; i < ticks.length; i++) {
+                assert.ok(
+                    ticks[i].value - ticks[i - 1].value >= minGap * 0.999,
+                    `${scale}: zoomed ticks "${ticks[i - 1].label}"/"${ticks[i].label}" overlap`,
+                );
+            }
+
+            assert.ok(
+                Math.abs(ticks[ticks.length - 1].value - window[1]) < 1e-9,
+                `${scale}: the zoomed right edge is marked`,
+            );
+            const labels = ticks.map((t) => t.label);
+            assert.equal(new Set(labels).size, labels.length, `${scale}: zoomed labels unique`);
+        }
     });
 
     it('covers a short-lived card without flooding it with ticks', () => {

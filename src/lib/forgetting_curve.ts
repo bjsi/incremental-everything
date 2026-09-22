@@ -50,6 +50,13 @@ const SAMPLES_PER_SEGMENT = 48;
 /** Samples drawn across each forecast branch. */
 const SAMPLES_PER_BRANCH = 64;
 
+/**
+ * How far below the target retention the Good branch is followed before the
+ * forecast stops, in absolute retrievability. At the 90% default the chart ends
+ * where Good reaches 88%.
+ */
+const HORIZON_RETENTION_DROP = 0.02;
+
 export type CurveScale = 'log' | 'linear';
 
 export type CurveGrade = 'again' | 'hard' | 'good' | 'easy';
@@ -287,14 +294,39 @@ function pickStep(raw: number) {
  * promotion is so a fine tier stepping in months does not say "24mo" directly
  * beneath a coarse tier saying "3y".
  */
-function stepLabel(days: number, nice: { unit: number; suffix: string }): string {
+function stepLabel(days: number, nice: { step: number; unit: number; suffix: string }): string {
     if (nice.suffix === 'mo') {
         const years = days / DAYS_PER_YEAR;
         if (years >= 1 && Math.abs(years - Math.round(years)) < 1e-6) {
             return `${Math.round(years)}y`;
         }
+        // Past a year, months stop reading as a quantity — "39mo" next to "3y"
+        // is the same instant twice. A decimal year is only safe once the step
+        // is a quarter or more, below which consecutive ticks round together.
+        if (years >= 1 && nice.step >= DAYS_PER_MONTH * 3) {
+            return `${years.toFixed(1)}y`;
+        }
     }
     return `${Math.round(days / nice.unit)}${nice.suffix}`;
+}
+
+/** Evenly spaced round steps covering a range, as whole multiples of the step. */
+function roundStepTicks(
+    minDays: number,
+    maxDays: number,
+    toX: (days: number) => number,
+): CurveTick[] {
+    const out: CurveTick[] = [];
+    const nice = pickStep((maxDays - minDays) / TARGET_LINEAR_TICKS);
+    for (
+        let i = Math.ceil(minDays / nice.step - 1e-9);
+        i * nice.step <= maxDays * (1 + 1e-9);
+        i++
+    ) {
+        const days = i * nice.step;
+        out.push({ value: toX(days), label: days === 0 ? '0' : stepLabel(days, nice) });
+    }
+    return out;
 }
 
 /**
@@ -320,18 +352,15 @@ function buildTicks(
     toX: (days: number) => number,
     plotWidthPx = DEFAULT_PLOT_WIDTH_PX,
 ): CurveTick[] {
-    const xMin = toX(scale === 'linear' ? 0 : minDays);
+    const xMin = toX(minDays);
     const xMax = toX(maxDays);
     const span = xMax - xMin || 1;
     const minGap = span * tickMinGap(plotWidthPx);
     const out: CurveTick[] = [];
 
     if (scale === 'linear') {
-        const coarse = pickStep(maxDays / TARGET_LINEAR_TICKS);
-        for (let i = 0; i * coarse.step <= maxDays * (1 + 1e-9); i++) {
-            const days = i * coarse.step;
-            out.push({ value: toX(days), label: i === 0 ? '0' : stepLabel(days, coarse) });
-        }
+        const coarse = pickStep((maxDays - minDays) / TARGET_LINEAR_TICKS);
+        out.push(...roundStepTicks(minDays, maxDays, toX));
 
         // A second, finer tier over the first coarse interval.
         //
@@ -342,7 +371,11 @@ function buildTicks(
         // the events actually are, as many as the width honestly allows — which
         // is also why this one respects the measured gap rather than a constant.
         // `minGap` is already in axis units, which on a linear axis are days.
-        const slots = Math.floor(coarse.step / minGap) - 1;
+        // The fine tier answers a problem the origin has — every repetition of a
+        // mature card piled into the first fraction of the span — so it only
+        // applies to a view that contains the origin. A zoomed range is narrow
+        // enough that the coarse tier already resolves it.
+        const slots = minDays <= 0 ? Math.floor(coarse.step / minGap) - 1 : 0;
         if (slots >= 1) {
             const target = coarse.step / Math.min(slots + 1, MAX_SUB_DIVISIONS);
             // The fine step must divide the coarse one exactly, or the last
@@ -369,12 +402,32 @@ function buildTicks(
             if (out.length > 0 && x - out[out.length - 1].value < minGap) continue;
             out.push({ value: x, label: candidate.label });
         }
+        // The candidates are a decade ladder, so a window narrower than one rung
+        // catches almost none of them. Zoomed that far in the axis is close to
+        // linear anyway, so fall back to round steps across the window.
+        if (out.length < 3) {
+            out.length = 0;
+            out.push(...roundStepTicks(minDays, maxDays, toX));
+        }
     }
+
+    // Safety net. Both branches space their own ticks, but a log axis warps
+    // whatever is laid out in days, so re-check before anything is drawn.
+    out.sort((a, b) => a.value - b.value);
+    let kept = 0;
+    for (let i = 1; i < out.length; i++) {
+        if (out[i].value - out[kept].value >= minGap) out[++kept] = out[i];
+    }
+    out.length = Math.min(out.length, kept + 1);
 
     // The right edge, always. When it falls too close to the last tick for both
     // to fit, it takes that tick's place rather than crowding it.
     const endTick = { value: xMax, label: formatCurveDays(maxDays) };
-    if (out.length === 0 || xMax - out[out.length - 1].value >= minGap) {
+    const previous = out[out.length - 1];
+    // It takes the last tick's place when the two would not both fit, and also
+    // when they round to the same words: a range ending just past a tick gets
+    // the same label twice otherwise, which reads as a stutter.
+    if (!previous || (xMax - previous.value >= minGap && previous.label !== endTick.label)) {
         out.push(endTick);
     } else {
         out[out.length - 1] = endTick;
@@ -516,15 +569,18 @@ export function buildForgettingCurveSeries(
           }))
         : [];
 
-    // Stop the forecast where Easy — the longest of the four — crosses the
-    // target retention. `intervalDays` is by construction the moment R reaches
-    // the target, so that crossing is the last thing on the chart worth looking
-    // at: past it every branch is below target and the curves only flatten.
-    // Cutting there is what keeps the plot area spent on the part that carries
-    // information, which matters most on a linear axis.
-    const easyBranch = branches.find((b) => b.grade === 'easy');
-    const capDays = easyBranch
-        ? easyBranch.intervalDays
+    // Stop the forecast a little past where Good crosses the target retention.
+    //
+    // Good is the branch that describes the card's normal trajectory, so it is
+    // the one worth seeing to its end; Easy is both the longest and the least
+    // representative, and cutting to it spent most of the plot on a curve the
+    // reader is not planning to follow. The small overshoot past the target
+    // (`HORIZON_RETENTION_DROP`) is so the crossing itself lands inside the
+    // chart with something after it, rather than exactly on the right edge.
+    const goodBranch = branches.find((b) => b.grade === 'good');
+    const horizonRetention = Math.max(targetRetention - HORIZON_RETENTION_DROP, 0.5);
+    const capDays = goodBranch
+        ? goodBranch.stability * intervalFactorForRetention(horizonRetention, decay, factor)
         : Math.max(...branches.map((b) => b.intervalDays), 1 / 24);
     const horizonDays = forecast ? nowDays + Math.max(capDays, 1 / 24) : nowDays;
 
@@ -665,7 +721,7 @@ export function buildForgettingCurveSeries(
     const yMin = Math.max(0, Math.min(minObserved, targetRetention * 100) - (100 - minObserved) * 0.2);
 
     const axisMaxDays = Math.max(horizonDays, nowDays, floorDays * 2);
-    const ticks = buildTicks(scale, floorDays, axisMaxDays, toX);
+    const ticks = buildTicks(scale, scale === 'linear' ? 0 : floorDays, axisMaxDays, toX);
 
     return {
         rows,
@@ -693,10 +749,22 @@ export function buildForgettingCurveSeries(
  * calls this, and a wide chart earns more marks than a narrow one instead of
  * every chart being spaced for the narrowest.
  */
-export function rebuildTicks(series: ForgettingCurveSeries, plotWidthPx: number): CurveTick[] {
+export function rebuildTicks(
+    series: ForgettingCurveSeries,
+    plotWidthPx: number,
+    /** Visible range in plotted x units, when the reader has zoomed in. */
+    domain?: [number, number],
+): CurveTick[] {
+    const linear = series.scale === 'linear';
     const toX = (days: number): number =>
-        series.scale === 'linear' ? days : Math.log10(Math.max(days, series.floorDays));
-    return buildTicks(series.scale, series.floorDays, series.axisMaxDays, toX, plotWidthPx);
+        linear ? days : Math.log10(Math.max(days, series.floorDays));
+    const fromX = (x: number): number => (linear ? x : Math.pow(10, x));
+
+    const lowest = linear ? 0 : series.floorDays;
+    const minDays = domain ? Math.max(fromX(domain[0]), lowest) : lowest;
+    const maxDays = domain ? Math.max(fromX(domain[1]), minDays * 1.0001) : series.axisMaxDays;
+
+    return buildTicks(series.scale, minDays, maxDays, toX, plotWidthPx);
 }
 
 // ---------------------------------------------------------------------------
