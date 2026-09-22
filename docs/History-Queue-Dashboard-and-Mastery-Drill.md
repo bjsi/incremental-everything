@@ -123,6 +123,8 @@ The **Debug: Clear Flashcard History** command clears the list for the knowledge
 
 **Live Dashboard:** Displays real-time metrics for your currently active queue session, including current speed, retention rate, and the age of the exact card you are reviewing.
 
+**Forgetting Curve:** Below the live session card, the [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) charts the card you are looking at — where its retrievability has been, and where each of the four answer buttons would send it. Set **Forgetting Curve** to *Hidden* in the settings below to remove it.
+
 ![Practiced Queue History Live](assets/uploaded/da7c68_queue-history-live.png){ width="500" }
 
 ### Metrics Collected
@@ -389,6 +391,7 @@ Three tabs are added to the right sidebar:
 |---|---|---|
 | `Auto focus Queue Dashboard` | Off | When enabled, opens the Practiced Queues dashboard in the Right Sidebar automatically every time you enter a queue — no need to open the sidebar manually. It also **restores the dashboard after you press Next or Dismiss on an Incremental Rem**, bringing you back to the live session metrics once the sidebar was used for editing (Rem notes) or RemNote auto-focused its own pane (PDF/HTML). |
 | `Flashcard Response Time Limit` | 180 s | Caps recorded study time per card to prevent inflated stats when you step away from your device. |
+| `Forgetting Curve` | Shown | Draws the current card's [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) at the top of the dashboard. Set to *Hidden* to remove it. |
 | `Skip Mastery Drill` | Off | Master switch to disable all Mastery Drill features: hides the drill popup and sidebar notification widgets, removes the `Mastery Drill` command, and stops tracking *Again*/*Hard* cards. Flashcard and Practiced Queue history are not affected. |
 | `Old Items Threshold` | 7 days | Number of days after which a Mastery Drill item is flagged as stale. Hover the warning badge in the toolbar for an explanation. |
 | `Mastery Drill Minimum Delay` | 120 min | A card rated *Again* or *Hard* will not appear in the drill until at least this many minutes have passed. Prevents re-reviewing the same card too soon after the initial rating. |

@@ -68,8 +68,15 @@ const GRADE_LABEL: Record<CurveGrade, string> = {
     easy: 'Easy',
 };
 
-/** The past curve. Deliberately not one of the four grade colours. */
-const PAST_COLOR = '#0ea5e9';
+/**
+ * The past curve is coloured by where retrievability stands against the target:
+ * red below it, blue at it, green above. Muted next to the vivid grade palette
+ * used for the forecast branches, so a thick solid history line and a thin
+ * dashed "If Again" never read as the same thing.
+ */
+const CURVE_BELOW_TARGET = '#e05252';
+const CURVE_AT_TARGET = '#4682b4';
+const CURVE_ABOVE_TARGET = '#2e9e5b';
 const STABILITY_COLOR = '#6366f1';
 
 const Y_AXIS_WIDTH = 38;
@@ -127,6 +134,11 @@ const LABEL_TEXT_ASCENT = 12;
 
 /** Fixed so the stability plot's height is known arithmetic, not a guess. */
 const STABILITY_X_AXIS_HEIGHT = 22;
+
+/** Likewise for the retrievability plot, whose gradient needs pixel positions. */
+const CURVE_X_AXIS_HEIGHT = 24;
+const CURVE_MARGIN_TOP = 6;
+const CURVE_MARGIN_BOTTOM = 0;
 
 export interface ForgettingCurveChartProps {
     series: ForgettingCurveSeries;
@@ -434,6 +446,32 @@ export function ForgettingCurveChart({
         return out;
     }, [yDomain]);
 
+    /**
+     * The past curve's gradient, in the chart's own pixel space.
+     *
+     * An SVG gradient can only be positioned in user space, so the stops have to
+     * be placed at the pixel heights of R = 0 and R = 100 — which means knowing
+     * the plot's geometry rather than asking recharts for it. Hence the fixed
+     * axis height above: with the container height, the margins and the domain,
+     * the mapping is arithmetic. Running the vector between 0% and 100% (rather
+     * than between the visible bounds) is what lets the middle stop sit at
+     * exactly `targetPercent`, whatever the axis happens to be showing.
+     */
+    const gradientId = useMemo(
+        () => `forgetting-curve-${Math.random().toString(36).slice(2, 9)}`,
+        [],
+    );
+
+    const gradientEnds = useMemo(() => {
+        const plotTop = CURVE_MARGIN_TOP;
+        const plotBottom = height - CURVE_MARGIN_BOTTOM - CURVE_X_AXIS_HEIGHT;
+        const [lo, hi] = yPlotDomain;
+        const span = hi - lo || 1;
+        const pixelFor = (value: number) =>
+            plotBottom - ((value - lo) / span) * (plotBottom - plotTop);
+        return { y0: pixelFor(0), y100: pixelFor(100) };
+    }, [height, yPlotDomain]);
+
     const yTickFormatter = useMemo(() => {
         const narrow = yDomain[1] - yDomain[0] < 5;
         return (value: number) => `${narrow ? value.toFixed(1) : Math.round(value)}%`;
@@ -697,8 +735,17 @@ export function ForgettingCurveChart({
                 width from it, and it doubles as the key for the rep markers. */}
             <div className="flex items-center gap-3 flex-wrap text-[10px] rn-clr-content-tertiary mb-1">
                 <span className="flex items-center gap-1">
-                    <span style={{ width: 14, height: 2, background: PAST_COLOR, display: 'inline-block' }} />
-                    History
+                    <span
+                        style={{
+                            width: 14,
+                            height: 3,
+                            background: `linear-gradient(90deg, ${CURVE_BELOW_TARGET}, ${CURVE_AT_TARGET}, ${CURVE_ABOVE_TARGET})`,
+                            display: 'inline-block',
+                        }}
+                    />
+                    <span title="Coloured by retrievability: red below the target, blue at it, green above">
+                        History
+                    </span>
                 </span>
                 {grades.map((g) => (
                     <span key={g} className="flex items-center gap-1">
@@ -735,6 +782,23 @@ export function ForgettingCurveChart({
                     margin={{ top: 6, right: CHART_MARGIN_RIGHT, bottom: 0, left: CHART_MARGIN_LEFT }}
                     {...dragHandlers}
                 >
+                    <defs>
+                        <linearGradient
+                            id={gradientId}
+                            gradientUnits="userSpaceOnUse"
+                            x1={0}
+                            y1={gradientEnds.y0}
+                            x2={0}
+                            y2={gradientEnds.y100}
+                        >
+                            <stop offset="0%" stopColor={CURVE_BELOW_TARGET} />
+                            <stop
+                                offset={`${series.targetPercent}%`}
+                                stopColor={CURVE_AT_TARGET}
+                            />
+                            <stop offset="100%" stopColor={CURVE_ABOVE_TARGET} />
+                        </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.25} syncWithTicks />
                     <XAxis
                         dataKey="x"
@@ -743,6 +807,7 @@ export function ForgettingCurveChart({
                         ticks={tickValues}
                         tickFormatter={tickFormatter}
                         tick={{ fontSize: 10 }}
+                        height={CURVE_X_AXIS_HEIGHT}
                         allowDataOverflow
                     />
                     <YAxis
@@ -788,7 +853,7 @@ export function ForgettingCurveChart({
                     <Line
                         type="monotone"
                         dataKey="r"
-                        stroke={PAST_COLOR}
+                        stroke={`url(#${gradientId})`}
                         strokeWidth={1.8}
                         dot={false}
                         isAnimationActive={false}

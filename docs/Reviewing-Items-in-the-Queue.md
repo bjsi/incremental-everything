@@ -416,6 +416,42 @@ Clicking the 🔬 button (or pressing `Ctrl+Shift+H`) opens a detailed popup sho
 
 The heading summary also shows the current **SInc** for all three recall grades, color-coded: 🟠 Hard / 🟢 Good / 🔵 Easy. Hover for a tooltip with projected stability values.
 
+### Forgetting Curve
+
+Every FSRS figure above describes the card *right now*. The **Forgetting Curve** shows how it got there and where it is going: the card's whole history replayed into the retrievability FSRS predicts, and a forecast of what each of the four answer buttons would do to it.
+
+It appears in two places — at the top of the [Queue Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) for the card on screen, and inside the [Flashcard Repetition History](#flashcard-repetition-history) popup for every card of a Rem.
+
+#### The two panels
+
+**Retrievability** (top). A solid line through the past, snapping back to 100% at each repetition and decaying between them, then four dashed branches from *now* — one per answer button, with **Good** drawn heavier because it is the answer that describes the card's normal trajectory. A dashed horizontal rule marks your [Requested Retention](#requested-retention), and a vertical rule of the matching colour marks each repetition.
+
+The history line is coloured by where retrievability stands against that target: **green** above it, **blue** at it, **red** below. So a glance tells you whether the card has been caught near its scheduled moment or left to decay well past it — the same reading the dashed rule gives, without having to trace the line across to it.
+
+**Stability** (bottom). A staircase on a logarithmic axis, labelled with the **×SInc** each repetition bought — the same Stability Increase shown in the info bar, but for every review rather than the next one. This is the part a plain forgetting curve hides: two cards sitting at the same retrievability today can be on completely different paths. Where repetitions are too close together for their labels to fit, hovering a step gives the number and the stability either side of it.
+
+#### Log and linear time
+
+The **Log** / **Linear** toggle changes the time axis, and the two answer different questions.
+
+**Log** is the default. A mature card spends minutes in learning and years in review; on a linear axis its first day is a single pixel and everything interesting about its early life is invisible. The log axis gives both ends room, and the forecast runs until **Easy** reaches your target retention — the whole of the next stability, which costs almost no width because a log axis compresses its right-hand end.
+
+**Linear** shows real elapsed time, so intervals are comparable by eye. It stops much earlier — where **Good** is still 6 points above target — because on a linear axis every day added to the right steals width from every day already drawn, and a horizon chosen for the far future would flatten the repetitions you are trying to read.
+
+#### Zooming
+
+- **Drag** across either panel to zoom to that range.
+- **Scroll** to zoom around the pointer.
+- **Double-click**, or press **Reset zoom**, to go back.
+
+Both panels share the axis, so either one drives both, and the vertical scales refit to what is on screen.
+
+#### What the curve is, and is not
+
+The curve is computed by the plugin's own FSRS implementation, from the weights and retention in [FSRS settings](Plugin-Settings-Reference.md#fsrs) — **not** from the scheduler RemNote actually runs on the card, which the plugin API does not expose. It therefore describes your real scheduling only where those settings match it. If your cards use a per-document scheduler, or Anki SM-2, or FSRS with different weights, treat the curve as an estimate of that model rather than a record of RemNote's decisions.
+
+To hide it in the Queue Dashboard, set **Forgetting Curve** to *Hidden* in [Queue Dashboard settings](Plugin-Settings-Reference.md#queue-dashboard). In the Repetition History popup it follows **Display FSRS DSR Stats**.
+
 ### FSRS Configuration
 
 The plugin includes a built-in implementation of the [FSRS v6.1.1 algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm) that replays each card's repetition history to compute D, S, and R. This is necessary because RemNote does not expose FSRS state through its plugin SDK.

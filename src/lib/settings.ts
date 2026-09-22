@@ -849,7 +849,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   [showQueueDashboardCurveId]: {
     kind: 'boolean',
     group: 'queueDashboard',
-    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#forgetting-curve',
+    helpPath: 'Reviewing-Items-in-the-Queue/#forgetting-curve',
     title: 'Forgetting Curve',
     onLabel: 'Shown',
     offLabel: 'Hidden',

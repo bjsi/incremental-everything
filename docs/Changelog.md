@@ -2,6 +2,16 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.116 - September 22nd, 2026
+
+### ✨ New - forgetting curve for a card
+
+The **Forgetting Curve** replays a card's history into the retrievability FSRS predicts and forecasts what each of the four answer buttons would do to it, over a staircase of the stability every repetition bought. It sits at the top of the Queue Dashboard for the card on screen, and in each card's section of the Flashcard Repetition History.
+
+The history line is coloured against your target retention — green above, blue at it, red below. Time runs logarithmically by default, so a card's first minutes and its later years are both legible; **Linear** shows real elapsed time instead and stops earlier, keeping the plot on the repetitions that have happened. Drag across either panel to zoom, scroll to zoom at the pointer, double-click to reset.
+
+📖 [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve)
+
 ## v1.0.115 - September 22nd, 2026
 
 ### ✨ New - collapse the plugin panel to a row of icons
