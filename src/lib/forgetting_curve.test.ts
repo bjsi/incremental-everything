@@ -109,6 +109,35 @@ describe('buildForgettingCurveSeries', () => {
         }
     });
 
+    it('puts the new stability last among the rows sharing a repetition\'s x', () => {
+        const s = build(HISTORY)!;
+        for (const rep of s.reps) {
+            const atRep = s.rows.filter(
+                (r) => Math.abs(r.x - rep.x) < 1e-12 && typeof r.s === 'number',
+            );
+            assert.ok(atRep.length >= 1, `rep ${rep.index}: has a row`);
+
+            // Anything reading "the stability here" must take the LAST of these.
+            // The first is the closing sample of the segment this repetition
+            // ends, which still carries the previous stability — reading it is
+            // what made the tooltip report the previous repetition's value.
+            const last = atRep[atRep.length - 1];
+            assert.ok(
+                Math.abs((last.s as number) - rep.s) < 1e-9,
+                `rep ${rep.index}: last row at its x should be its own stability ` +
+                    `(got ${last.s}, expected ${rep.s})`,
+            );
+
+            if (rep.index > 1 && rep.sBefore !== null) {
+                assert.ok(atRep.length >= 2, `rep ${rep.index}: closes a segment too`);
+                assert.ok(
+                    Math.abs((atRep[0].s as number) - rep.sBefore) < 1e-9,
+                    `rep ${rep.index}: first row at its x closes the previous segment`,
+                );
+            }
+        }
+    });
+
     it('breaks the line at a Reset', () => {
         const history = [
             rep(400, QueueInteractionScore.GOOD),

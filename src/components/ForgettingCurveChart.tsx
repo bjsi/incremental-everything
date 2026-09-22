@@ -259,13 +259,16 @@ function StabilityTooltip({
     }
     if (!Number.isFinite(x)) return null;
 
+    // Every repetition has two rows at the same x: the closing sample of the
+    // segment it ends, carrying the OLD stability, and its own opening sample
+    // carrying the new one. `<=` takes the later of a tie, so a boundary
+    // resolves to the segment being entered rather than the one being left.
     let row: CurveRow | null = null;
     for (const candidate of series.rows) {
         if (typeof candidate.s !== 'number') continue;
-        if (row === null || Math.abs(candidate.x - x) < Math.abs(row.x - x)) row = candidate;
+        if (row === null || Math.abs(candidate.x - x) <= Math.abs(row.x - x)) row = candidate;
     }
 
-    const s = row && typeof row.s === 'number' ? row.s : null;
     const t = row ? row.t : null;
 
     let nearest: CurveRepMarker | null = null;
@@ -274,6 +277,10 @@ function StabilityTooltip({
     }
     const span = series.xDomain[1] - series.xDomain[0];
     const onRep = nearest !== null && Math.abs(nearest.x - x) <= span * 0.02;
+
+    // On a repetition, take the value from the repetition itself: it is what
+    // that review left the card with, and it cannot be the neighbour's.
+    const s = onRep && nearest ? nearest.s : row && typeof row.s === 'number' ? row.s : null;
 
     return (
         <div
