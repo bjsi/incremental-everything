@@ -83,6 +83,7 @@ import {
   speedCalibrationPeriodId,
   SpeedCalibrationPeriod,
   speedCalibrationMarginSecondsId,
+  disableQueueDashboardCurveId,
   ieSettingsValuesKey,
 } from './consts';
 // Type-only: utils.ts imports getIESetting from this module, so a value import
@@ -161,6 +162,7 @@ export interface IESettings {
   [speedColorGreenCpmId]: number;
   [speedCalibrationPeriodId]: SpeedCalibrationPeriod;
   [speedCalibrationMarginSecondsId]: number;
+  [disableQueueDashboardCurveId]: boolean;
 }
 
 export type IESettingId = keyof IESettings;
@@ -232,6 +234,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [speedColorGreenCpmId]: 4,
   [speedCalibrationPeriodId]: 'year',
   [speedCalibrationMarginSecondsId]: 10,
+  [disableQueueDashboardCurveId]: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -320,7 +323,8 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     label: 'Queue Dashboard',
     blurb:
       'How the Practiced Queues dashboard reads: the pace at which a speed reading turns red or ' +
-      'green, in the live session card, the History Log and the Sessions Summary.',
+      'green, in the live session card, the History Log and the Sessions Summary — and whether ' +
+      'the current card\'s forgetting curve is drawn at the top.',
     helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#speed-colour-coding',
   },
   integrations: { label: 'Integrations', blurb: 'Features ported from other plugins.' },
@@ -829,6 +833,18 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'month', label: 'Last 1 month' },
       { value: 'week', label: 'Last 1 week' },
     ],
+  },
+  [disableQueueDashboardCurveId]: {
+    kind: 'boolean',
+    group: 'queueDashboard',
+    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#forgetting-curve',
+    title: 'Hide Forgetting Curve',
+    description:
+      'Removes the current card\'s forgetting curve from the top of the Queue Dashboard. The ' +
+      'curve replays the card\'s history into the retrievability FSRS predicts and forecasts ' +
+      'what each answer button would do to it. Turn this on if you would rather not see it, or ' +
+      'if your cards are not scheduled with FSRS — the curve is drawn from the FSRS settings ' +
+      'above, not from the scheduler RemNote runs.',
   },
   [speedCalibrationMarginSecondsId]: {
     kind: 'number',
