@@ -32,7 +32,6 @@ import {
     ReferenceLine,
     ResponsiveContainer,
     Scatter,
-    LabelList,
     Tooltip,
     XAxis,
     YAxis,
@@ -40,6 +39,8 @@ import {
 import {
     CURVE_GRADES,
     CurveGrade,
+    CurveRepMarker,
+    CurveRow,
     CurveScale,
     ForgettingCurveSeries,
     formatCurveDays,
@@ -103,11 +104,30 @@ const STABILITY_PLOT_LEFT = STABILITY_MARGIN.left + Y_AXIS_WIDTH;
  */
 const LABEL_MIN_GAP = 0.07;
 
+/** Extra height above the data, as a fraction of its range — see `yPlotDomain`. */
+const Y_HEADROOM = 0.04;
+
+/** Labelled gridlines on the retrievability axis. */
+const Y_TICK_COUNT = 5;
+
 /** How many staggered rows the labels may use before one is dropped. */
 const LABEL_ROWS = 2;
 
 /** Vertical step between those rows, in px. */
 const LABEL_ROW_HEIGHT = 11;
+
+/** Baseline of a first-row label above its dot, in px. */
+const LABEL_BASE_OFFSET = 9;
+
+/**
+ * Height of the label text above its own baseline, in px, plus a little: the
+ * halo stroke widens it, and a label flush against the clip edge still looks
+ * cut even when it technically is not.
+ */
+const LABEL_TEXT_ASCENT = 12;
+
+/** Fixed so the stability plot's height is known arithmetic, not a guess. */
+const STABILITY_X_AXIS_HEIGHT = 22;
 
 export interface ForgettingCurveChartProps {
     series: ForgettingCurveSeries;
@@ -199,6 +219,104 @@ function CurveTooltip({
     );
 }
 
+/**
+ * The stability panel's tooltip.
+ *
+ * It exists so a ×SInc label that was too crowded to draw is still readable:
+ * hovering a repetition gives the number, and the stability either side of it.
+ * Without this, dropping a label would drop the value.
+ *
+ * It reads the pointer's position off `label` — the axis coordinate — and looks
+ * everything else up itself, rather than trusting `payload[0]`. This panel
+ * carries two series over two different arrays (the staircase over every sample,
+ * the dots over the repetitions), and recharts indexes the second by a position
+ * computed for the first: `payload[0].payload` was landing on whatever
+ * repetition happened to share that index, so hovering the third one reported
+ * the first.
+ */
+function StabilityTooltip({
+    active,
+    payload,
+    label,
+    series,
+}: {
+    active?: boolean;
+    payload?: TooltipEntry[];
+    label?: string | number;
+    series: ForgettingCurveSeries;
+}) {
+    if (!active) return null;
+
+    let x = Number(label);
+    if (!Number.isFinite(x)) {
+        for (const entry of payload ?? []) {
+            const candidate = (entry?.payload as Record<string, unknown> | undefined)?.x;
+            if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+                x = candidate;
+                break;
+            }
+        }
+    }
+    if (!Number.isFinite(x)) return null;
+
+    let row: CurveRow | null = null;
+    for (const candidate of series.rows) {
+        if (typeof candidate.s !== 'number') continue;
+        if (row === null || Math.abs(candidate.x - x) < Math.abs(row.x - x)) row = candidate;
+    }
+
+    const s = row && typeof row.s === 'number' ? row.s : null;
+    const t = row ? row.t : null;
+
+    let nearest: CurveRepMarker | null = null;
+    for (const rep of series.reps) {
+        if (nearest === null || Math.abs(rep.x - x) < Math.abs(nearest.x - x)) nearest = rep;
+    }
+    const span = series.xDomain[1] - series.xDomain[0];
+    const onRep = nearest !== null && Math.abs(nearest.x - x) <= span * 0.02;
+
+    return (
+        <div
+            className="rn-clr-background-primary rn-clr-border-opaque border rounded-md px-2 py-1.5 text-xs shadow-lg"
+            style={{ pointerEvents: 'none' }}
+        >
+            {t !== null && (
+                <div className="font-semibold">
+                    {new Date(t).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                    })}
+                </div>
+            )}
+            {s !== null && (
+                <div>
+                    <span className="rn-clr-content-secondary">Stability:</span>{' '}
+                    <strong>{formatStabilityDays(s)}</strong>
+                </div>
+            )}
+            {onRep && nearest && (
+                <div className="mt-1 pt-1 rn-clr-border-opaque border-t">
+                    <div style={{ color: scoreColor(nearest.score) }}>
+                        Repetition {nearest.index}
+                    </div>
+                    {nearest.sInc !== null && nearest.sBefore !== null ? (
+                        <div>
+                            <strong>×{nearest.sInc.toFixed(2)}</strong>{' '}
+                            <span className="rn-clr-content-tertiary">
+                                ({formatStabilityDays(nearest.sBefore)} →{' '}
+                                {formatStabilityDays(nearest.s)})
+                            </span>
+                        </div>
+                    ) : (
+                        <div className="rn-clr-content-tertiary">First review — nothing to grow from</div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function ForgettingCurveChart({
     series,
     height = 220,
@@ -283,6 +401,41 @@ export function ForgettingCurveChart({
         return [Math.max(0, lo - pad), Math.min(100, hi + pad)];
     }, [activeZoom, visibleRows, series]);
 
+    /**
+     * The axis is drawn a little taller than the data it holds.
+     *
+     * Every repetition puts a point at exactly 100%, and a domain that stops at
+     * 100 puts those points on the boundary of the plot — where recharts clips
+     * them, so each peak lost the upper half of its stroke and the highest
+     * points of the whole chart were the ones you could not see. The ticks stay
+     * on the real range, so the extra space is headroom and not a claim that
+     * retrievability goes above 100%.
+     */
+    const yPlotDomain = useMemo((): [number, number] => {
+        const [lo, hi] = yDomain;
+        return [lo, hi + Math.max((hi - lo) * Y_HEADROOM, 0.3)];
+    }, [yDomain]);
+
+    const yTicks = useMemo(() => {
+        const [lo, hi] = yDomain;
+        const decimals = hi - lo < 5 ? 1 : 0;
+        const seen = new Set<number>();
+        const out: number[] = [];
+        for (let i = 0; i < Y_TICK_COUNT; i++) {
+            const value = Number((lo + ((hi - lo) * i) / (Y_TICK_COUNT - 1)).toFixed(decimals));
+            if (!seen.has(value)) {
+                seen.add(value);
+                out.push(value);
+            }
+        }
+        return out;
+    }, [yDomain]);
+
+    const yTickFormatter = useMemo(() => {
+        const narrow = yDomain[1] - yDomain[0] < 5;
+        return (value: number) => `${narrow ? value.toFixed(1) : Math.round(value)}%`;
+    }, [yDomain]);
+
     // Wheel zoom, anchored on the pointer so the moment under the cursor stays
     // put. Bound natively rather than through React's `onWheel`, which is
     // registered passive and so cannot stop the popup scrolling underneath.
@@ -362,16 +515,61 @@ export function ForgettingCurveChart({
     // The stability panel plots one point per repetition, so the ×SInc labels
     // have somewhere to hang. The staircase itself comes from the curve rows,
     // which already carry the stability governing each segment.
-    const repPoints = useMemo(
-        () =>
-            series.reps.map((r) => ({
+    /**
+     * The repetition dots, each carrying the label it should draw and the row to
+     * draw it on — or -1 for "too crowded here to be legible".
+     *
+     * Walking left to right, a label takes the highest row whose last label is
+     * far enough behind it. Two rows absorb most clustering; anything still
+     * colliding after that is dropped rather than drawn on top of its
+     * neighbour, and zooming in recovers it, because the spacing is measured
+     * against the *visible* span rather than the whole axis.
+     *
+     * The row travels in the datum rather than in a parallel array because the
+     * shape that draws it is handed the datum, and nothing else: an index into a
+     * second list is one recharts internal away from pointing at the wrong dot.
+     */
+    const repPoints = useMemo(() => {
+        const span = xDomain[1] - xDomain[0] || 1;
+        const minGap = span * LABEL_MIN_GAP;
+        const lastAt = new Array(LABEL_ROWS).fill(-Infinity);
+        return series.reps.map((r) => {
+            let labelRow = -1;
+            if (r.sInc !== null) {
+                for (let row = 0; row < LABEL_ROWS; row++) {
+                    if (r.x - lastAt[row] >= minGap) {
+                        lastAt[row] = r.x;
+                        labelRow = row;
+                        break;
+                    }
+                }
+            }
+            return {
                 x: r.x,
                 sLog: r.sLog,
                 s: r.s,
                 sIncLabel: r.sInc !== null ? `×${r.sInc.toFixed(2)}` : '',
-            })),
-        [series],
+                labelRow,
+            };
+        });
+    }, [series, xDomain]);
+
+    // The stability panel's plot area, to the pixel. The ×SInc labels are drawn
+    // inside it — recharts clips a Scatter to the plot on whichever axis has
+    // `allowDataOverflow`, and this panel needs it on y so a zoomed range can
+    // refit — so the headroom they need has to be reserved in the *domain*, not
+    // in the margin. A margin is outside the clip and does nothing for them.
+    const stabilityHeight = Math.max(150, Math.round(height * 0.68));
+    const stabilityPlotHeight = Math.max(
+        40,
+        stabilityHeight - STABILITY_MARGIN.top - STABILITY_MARGIN.bottom - STABILITY_X_AXIS_HEIGHT,
     );
+
+    /** Pixels of headroom the tallest label actually in use needs. */
+    const labelReservePx = useMemo(() => {
+        const topRow = repPoints.reduce((highest, p) => Math.max(highest, p.labelRow), -1);
+        return topRow < 0 ? 0 : LABEL_BASE_OFFSET + topRow * LABEL_ROW_HEIGHT + LABEL_TEXT_ASCENT;
+    }, [repPoints]);
 
     const sLogDomain = useMemo((): [number, number] => {
         const values = activeZoom
@@ -384,61 +582,62 @@ export function ForgettingCurveChart({
         const hi = Math.max(...values);
         const spread = hi - lo;
         // A card whose stability never moved would otherwise get a zero-height
-        // axis; keep a quarter of a decade so the staircase has somewhere to sit.
-        return [lo - Math.max(spread * 0.15, 0.15), hi + Math.max(spread * 0.2, 0.25)];
-    }, [repPoints, activeZoom, visibleRows]);
+        // axis; keep a sliver of a decade so the staircase has somewhere to sit.
+        const bottomPad = Math.max(spread * 0.15, 0.15);
+
+        // Solve for the top pad that occupies exactly `labelReservePx` of the
+        // plot: pad / (spread + bottomPad + pad) = reserve / plotHeight.
+        const fraction = Math.min(labelReservePx / stabilityPlotHeight, 0.45);
+        const topPad = Math.max(
+            (fraction * (spread + bottomPad)) / (1 - fraction),
+            labelReservePx > 0 ? 0.25 : 0.1,
+        );
+        return [lo - bottomPad, hi + topPad];
+    }, [repPoints, activeZoom, visibleRows, labelReservePx, stabilityPlotHeight]);
 
     /**
-     * Which row each ×SInc label gets, or -1 for "too crowded to draw".
+     * The dot and its ×SInc, drawn together.
      *
-     * Walking left to right, a label takes the highest row whose last label is
-     * far enough behind it. Two rows absorb most clustering; anything still
-     * colliding after that is dropped rather than drawn on top of its
-     * neighbour. Nothing is lost by dropping one — the repetition table in the
-     * history popup lists every SInc, and hovering the curve gives the
-     * stability either side of it.
+     * This was a `LabelList` with a `content` function, which recharts feeds
+     * through `filterProps` and a `viewBox` guard before it ever reaches the
+     * renderer — so whether a label appeared depended on internals, and some of
+     * them silently did not. A `shape` gets the datum directly, so the label is
+     * drawn if and only if the dot is.
      */
-    const labelRows = useMemo(() => {
-        const span = series.xDomain[1] - series.xDomain[0] || 1;
-        const minGap = span * LABEL_MIN_GAP;
-        const lastAt = new Array(LABEL_ROWS).fill(-Infinity);
-        return series.reps.map((r) => {
-            if (r.sInc === null) return -1;
-            for (let row = 0; row < LABEL_ROWS; row++) {
-                if (r.x - lastAt[row] >= minGap) {
-                    lastAt[row] = r.x;
-                    return row;
-                }
-            }
-            return -1;
-        });
-    }, [series]);
+    const renderRepPoint = (raw: any) => {
+        const { cx, cy, payload } = raw as {
+            cx?: number;
+            cy?: number;
+            payload?: { sIncLabel?: string; labelRow?: number };
+        };
+        if (typeof cx !== 'number' || typeof cy !== 'number') return <g />;
 
-    // Recharts types label `content` props as `any`; narrow at the boundary.
-    const renderSIncLabel = (raw: any) => {
-        const { x, y, index } = raw as { x?: number; y?: number; index?: number };
-        if (typeof x !== 'number' || typeof y !== 'number' || typeof index !== 'number') return null;
-        const row = labelRows[index] ?? -1;
-        const text = repPoints[index]?.sIncLabel;
-        if (row < 0 || !text) return null;
+        const label = payload?.sIncLabel;
+        const row = payload?.labelRow ?? -1;
         // A label centred on the first repetition would hang off the left edge
         // and be clipped, so anchor it to the plot edge instead.
-        const nearLeft = x < STABILITY_PLOT_LEFT + 16;
+        const nearLeft = cx < STABILITY_PLOT_LEFT + 16;
+
         return (
-            <text
-                x={nearLeft ? STABILITY_PLOT_LEFT : x}
-                y={y - 9 - row * LABEL_ROW_HEIGHT}
-                textAnchor={nearLeft ? 'start' : 'middle'}
-                fontSize={9}
-                fill="currentColor"
-                // A halo, so a label crossing the staircase or a gridline stays
-                // readable without a solid box behind it.
-                stroke="var(--rn-clr-background-primary)"
-                strokeWidth={3}
-                paintOrder="stroke"
-            >
-                {text}
-            </text>
+            <g>
+                <circle cx={cx} cy={cy} r={3} fill={STABILITY_COLOR} />
+                {row >= 0 && label ? (
+                    <text
+                        x={nearLeft ? STABILITY_PLOT_LEFT : cx}
+                        y={cy - 9 - row * LABEL_ROW_HEIGHT}
+                        textAnchor={nearLeft ? 'start' : 'middle'}
+                        fontSize={9}
+                        fill="currentColor"
+                        // A halo, so a label crossing the staircase or a
+                        // gridline stays readable without a box behind it.
+                        stroke="var(--rn-clr-background-primary)"
+                        strokeWidth={3}
+                        paintOrder="stroke"
+                    >
+                        {label}
+                    </text>
+                ) : null}
+            </g>
         );
     };
 
@@ -539,7 +738,7 @@ export function ForgettingCurveChart({
                     margin={{ top: 6, right: CHART_MARGIN_RIGHT, bottom: 0, left: CHART_MARGIN_LEFT }}
                     {...dragHandlers}
                 >
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.25} syncWithTicks />
                     <XAxis
                         dataKey="x"
                         type="number"
@@ -550,10 +749,11 @@ export function ForgettingCurveChart({
                         allowDataOverflow
                     />
                     <YAxis
-                        domain={yDomain}
+                        domain={yPlotDomain}
+                        ticks={yTicks}
                         width={Y_AXIS_WIDTH}
                         tick={{ fontSize: 10 }}
-                        tickFormatter={(v: number) => `${Math.round(v)}%`}
+                        tickFormatter={yTickFormatter}
                         allowDataOverflow
                     />
                     <Tooltip
@@ -622,9 +822,9 @@ export function ForgettingCurveChart({
             </ResponsiveContainer>
 
             {showStability && repPoints.length > 0 && (
-                <ResponsiveContainer width="100%" height={Math.max(130, Math.round(height * 0.62))} debounce={50}>
+                <ResponsiveContainer width="100%" height={stabilityHeight} debounce={50}>
                     <ComposedChart data={series.rows} margin={STABILITY_MARGIN} {...dragHandlers}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} syncWithTicks />
                         <XAxis
                             dataKey="x"
                             type="number"
@@ -632,7 +832,13 @@ export function ForgettingCurveChart({
                             ticks={tickValues}
                             tickFormatter={tickFormatter}
                             tick={{ fontSize: 10 }}
+                            height={STABILITY_X_AXIS_HEIGHT}
                             allowDataOverflow
+                        />
+                        <Tooltip
+                            content={<StabilityTooltip series={series} />}
+                            allowEscapeViewBox={{ x: false, y: false }}
+                            wrapperStyle={{ zIndex: 30, pointerEvents: 'none' }}
                         />
                         <YAxis
                             domain={sLogDomain}
@@ -650,9 +856,13 @@ export function ForgettingCurveChart({
                             isAnimationActive={false}
                             connectNulls={false}
                         />
-                        <Scatter data={repPoints} dataKey="sLog" fill={STABILITY_COLOR} isAnimationActive={false}>
-                            <LabelList dataKey="sIncLabel" content={renderSIncLabel} />
-                        </Scatter>
+                        <Scatter
+                            data={repPoints}
+                            dataKey="sLog"
+                            fill={STABILITY_COLOR}
+                            isAnimationActive={false}
+                            shape={renderRepPoint}
+                        />
 
                         {drag && (
                             <ReferenceArea x1={drag.from} x2={drag.to} strokeOpacity={0.3} fill="#8884d8" />
