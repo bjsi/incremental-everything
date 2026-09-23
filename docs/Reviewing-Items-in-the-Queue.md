@@ -434,6 +434,8 @@ The history line is coloured by retrievability, on the same scale the info bar u
 
 **Stability** (bottom). A staircase on a logarithmic axis, labelled with the **×SInc** each repetition bought — the same Stability Increase shown in the info bar, but for every review rather than the next one. This is the part a plain forgetting curve hides: two cards sitting at the same retrievability today can be on completely different paths. Where repetitions are too close together for their labels to fit, hovering a step gives the number and the stability either side of it.
 
+Past *now* the staircase fans out into the same four branches, in the same colours, showing what each answer would leave the card's stability at. They run flat, because stability only moves when a card is reviewed. Their ×SInc is not written on the chart — four more labels there would crowd it — so hover anywhere in the forecast to read all four, each with the multiplier it applies.
+
 #### Log and linear time
 
 The **Log** / **Linear** toggle changes the time axis, and the two answer different questions.

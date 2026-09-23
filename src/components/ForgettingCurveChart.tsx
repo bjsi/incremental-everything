@@ -42,6 +42,7 @@ import {
     CurveRow,
     CurveScale,
     ForgettingCurveSeries,
+    STABILITY_BRANCH_KEY,
     formatCurveDays,
     rebuildTicks,
 } from '../lib/forgetting_curve';
@@ -214,7 +215,7 @@ function CurveTooltip({
                     <strong>{r.toFixed(1)}%</strong>
                 </div>
             )}
-            {s !== null && (
+            {s !== null && !isFuture && (
                 <div>
                     <span className="rn-clr-content-secondary">Stability:</span>{' '}
                     <strong>{formatStabilityDays(s)}</strong>
@@ -281,13 +282,28 @@ function StabilityTooltip({
     // segment it ends, carrying the OLD stability, and its own opening sample
     // carrying the new one. `<=` takes the later of a tie, so a boundary
     // resolves to the segment being entered rather than the one being left.
-    let row: CurveRow | null = null;
+    // Two searches, because they answer different questions. `nearestRow` is
+    // simply where the pointer is, and has to include the forecast: filtering to
+    // rows carrying a stability excluded every one of them — they hold only the
+    // branch keys — so the time never landed in the future and the per-grade
+    // block below could not fire. `rowWithStability` is the staircase's value,
+    // which exists only in the past.
+    let nearestRow: CurveRow | null = null;
+    let rowWithStability: CurveRow | null = null;
     for (const candidate of series.rows) {
+        if (nearestRow === null || Math.abs(candidate.x - x) <= Math.abs(nearestRow.x - x)) {
+            nearestRow = candidate;
+        }
         if (typeof candidate.s !== 'number') continue;
-        if (row === null || Math.abs(candidate.x - x) <= Math.abs(row.x - x)) row = candidate;
+        if (
+            rowWithStability === null ||
+            Math.abs(candidate.x - x) <= Math.abs(rowWithStability.x - x)
+        ) {
+            rowWithStability = candidate;
+        }
     }
 
-    const t = row ? row.t : null;
+    const t = nearestRow ? nearestRow.t : null;
 
     let nearest: CurveRepMarker | null = null;
     for (const rep of series.reps) {
@@ -298,7 +314,13 @@ function StabilityTooltip({
 
     // On a repetition, take the value from the repetition itself: it is what
     // that review left the card with, and it cannot be the neighbour's.
-    const s = onRep && nearest ? nearest.s : row && typeof row.s === 'number' ? row.s : null;
+    const s =
+        onRep && nearest
+            ? nearest.s
+            : rowWithStability && typeof rowWithStability.s === 'number'
+              ? rowWithStability.s
+              : null;
+    const isFuture = t !== null && t > series.nowT;
 
     return (
         <div
@@ -318,6 +340,29 @@ function StabilityTooltip({
                 <div>
                     <span className="rn-clr-content-secondary">Stability:</span>{' '}
                     <strong>{formatStabilityDays(s)}</strong>
+                </div>
+            )}
+            {isFuture && (
+                <div className="mt-1 pt-1 rn-clr-border-opaque border-t">
+                    {CURVE_GRADES.map((g) => {
+                        const branch = series.branches.find((b) => b.grade === g);
+                        if (!branch) return null;
+                        // Again has no SInc: a lapse replaces stability through
+                        // the post-forget formula rather than multiplying it.
+                        const inc =
+                            g === 'again' ? null : series.state.sInc[g as 'hard' | 'good' | 'easy'];
+                        return (
+                            <div key={g} style={{ color: GRADE_COLOR[g] }}>
+                                {GRADE_LABEL[g]}: <strong>{formatStabilityDays(branch.stability)}</strong>
+                                {inc !== null && (
+                                    <span className="rn-clr-content-tertiary">
+                                        {' '}
+                                        (×{inc.toFixed(2)})
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
             {onRep && nearest && (
@@ -645,28 +690,48 @@ export function ForgettingCurveChart({
     }, [repPoints]);
 
     const sLogDomain = useMemo((): [number, number] => {
-        const values = activeZoom
-            ? visibleRows
-                  .map((r) => r.sLog)
-                  .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
-            : repPoints.map((p) => p.sLog);
+        // Everything drawn on this panel — the staircase and the four branches,
+        // since Easy sits well above the steps and fitting to the steps alone
+        // would clip it away.
+        const values: number[] = [];
+        for (const row of visibleRows) {
+            for (const key of ['sLog', ...CURVE_GRADES.map((g) => STABILITY_BRANCH_KEY[g])] as const) {
+                const v = row[key];
+                if (typeof v === 'number' && Number.isFinite(v)) values.push(v);
+            }
+        }
+        if (values.length === 0) {
+            for (const p of repPoints) values.push(p.sLog);
+        }
         if (values.length === 0) return [0, 1];
+
         const lo = Math.min(...values);
-        const hi = Math.max(...values);
-        const spread = hi - lo;
+        const dataTop = Math.max(...values);
+        const spread = dataTop - lo;
         // A card whose stability never moved would otherwise get a zero-height
         // axis; keep a sliver of a decade so the staircase has somewhere to sit.
-        const bottomPad = Math.max(spread * 0.15, 0.15);
+        const floor = lo - Math.max(spread * 0.15, 0.15);
 
-        // Solve for the top pad that occupies exactly `labelReservePx` of the
-        // plot: pad / (spread + bottomPad + pad) = reserve / plotHeight.
+        // Headroom is needed above the topmost *labelled* step, not above
+        // everything on the panel. The branches carry no labels, and Easy can
+        // sit a decade or more above the staircase — padding in proportion to
+        // the whole range then pushed the ceiling into the hundreds of years and
+        // squashed the part worth reading into a sliver.
+        //
+        // So: let Easy be the ceiling whenever it is already high enough to
+        // clear the labels, and only pad past it when it is not. Solving
+        // (top − dotsTop) / (top − floor) = reserve / plotHeight for `top`.
+        const visibleDots = repPoints
+            .filter((p) => p.x >= xDomain[0] && p.x <= xDomain[1])
+            .map((p) => p.sLog);
+        const headroom = Math.max(spread * 0.03, 0.05);
+        if (visibleDots.length === 0) return [floor, dataTop + headroom];
+
         const fraction = Math.min(labelReservePx / stabilityPlotHeight, 0.45);
-        const topPad = Math.max(
-            (fraction * (spread + bottomPad)) / (1 - fraction),
-            labelReservePx > 0 ? 0.25 : 0.1,
-        );
-        return [lo - bottomPad, hi + topPad];
-    }, [repPoints, activeZoom, visibleRows, labelReservePx, stabilityPlotHeight]);
+        const dotsTop = Math.max(...visibleDots);
+        const neededForLabels = (dotsTop - fraction * floor) / (1 - fraction);
+        return [floor, Math.max(dataTop + headroom, neededForLabels)];
+    }, [repPoints, visibleRows, labelReservePx, stabilityPlotHeight, xDomain]);
 
     /**
      * The dot and its ×SInc, drawn together.
@@ -953,6 +1018,25 @@ export function ForgettingCurveChart({
                             isAnimationActive={false}
                             connectNulls={false}
                         />
+                        {/* What the next answer would leave the card at. Flat,
+                            because stability only moves when a card is reviewed,
+                            and in the branch colours so the two panels read as
+                            one forecast. */}
+                        {grades.map((g) => (
+                            <Line
+                                key={g}
+                                type="linear"
+                                dataKey={STABILITY_BRANCH_KEY[g]}
+                                stroke={GRADE_COLOR[g]}
+                                strokeWidth={g === 'good' ? 2.4 : 1.2}
+                                strokeOpacity={g === 'good' ? 1 : 0.55}
+                                strokeDasharray={g === 'good' ? '6 3' : '3 3'}
+                                dot={false}
+                                isAnimationActive={false}
+                                connectNulls
+                            />
+                        ))}
+
                         <Scatter
                             data={repPoints}
                             dataKey="sLog"
@@ -970,7 +1054,8 @@ export function ForgettingCurveChart({
 
             {showStability && (
                 <div className="text-[10px] rn-clr-content-tertiary mt-0.5 text-center">
-                    Stability after each repetition (log scale), labelled with the ×SInc it bought
+                    Stability after each repetition (log scale), labelled with the ×SInc it bought —
+                    and what the next answer would leave it at
                 </div>
             )}
         </div>

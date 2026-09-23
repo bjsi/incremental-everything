@@ -174,7 +174,31 @@ export interface CurveRow {
     hard?: number | null;
     good?: number | null;
     easy?: number | null;
+    /**
+     * log10 of the stability each grade would leave the card with, held from
+     * `now` to the end of the forecast.
+     *
+     * Constant, because stability only moves when a card is reviewed: the value
+     * is what that answer buys, and it keeps it until the review after. Separate
+     * keys from the retrievability branches above because recharts addresses a
+     * series by one flat key per row.
+     */
+    againSLog?: number | null;
+    hardSLog?: number | null;
+    goodSLog?: number | null;
+    easySLog?: number | null;
 }
+
+/** Row key carrying each grade's forecast stability. */
+export const STABILITY_BRANCH_KEY: Record<
+    CurveGrade,
+    'againSLog' | 'hardSLog' | 'goodSLog' | 'easySLog'
+> = {
+    again: 'againSLog',
+    hard: 'hardSLog',
+    good: 'goodSLog',
+    easy: 'easySLog',
+};
 
 /** A repetition, positioned on the same x scale as the curve. */
 export interface CurveRepMarker {
@@ -829,13 +853,17 @@ export function buildForgettingCurveSeries(
             s: state.s,
             sLog: toSLog(state.s),
         };
-        for (const b of branches) junction[b.grade] = 100;
+        for (const b of branches) {
+            junction[b.grade] = 100;
+            junction[STABILITY_BRANCH_KEY[b.grade]] = toSLog(b.stability);
+        }
         rows.push(junction);
 
         for (const d of sampleBranchDays(nowDays, horizonDays, SAMPLES_PER_BRANCH)) {
             const row: CurveRow = { x: toX(d), days: d, t: firstReviewTime + d * MS_PER_DAY };
             for (const b of branches) {
                 row[b.grade] = forgettingCurve(d - nowDays, b.stability, decay, factor) * 100;
+                row[STABILITY_BRANCH_KEY[b.grade]] = toSLog(b.stability);
             }
             rows.push(row);
         }
@@ -847,6 +875,7 @@ export function buildForgettingCurveSeries(
         };
         for (const b of branches) {
             tail[b.grade] = forgettingCurve(horizonDays - nowDays, b.stability, decay, factor) * 100;
+            tail[STABILITY_BRANCH_KEY[b.grade]] = toSLog(b.stability);
         }
         rows.push(tail);
     }
