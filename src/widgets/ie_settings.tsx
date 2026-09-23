@@ -162,7 +162,7 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
               style={{ width: 15, height: 15, cursor: 'pointer' }}
             />
             <span style={{ fontSize: 12, color: 'var(--rn-clr-content-secondary, #475569)' }}>
-              {value ? 'On' : 'Off'}
+              {value ? spec.onLabel ?? 'On' : spec.offLabel ?? 'Off'}
             </span>
           </label>
         );

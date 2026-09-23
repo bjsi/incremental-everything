@@ -32,6 +32,7 @@ import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { displayFsrsDsrId, fsrsWeightsId, powerupCode, dismissedPowerupCode } from '../lib/consts';
 import { useIESetting } from '../lib/settings';
 import { buildCardLabels, CardLabel } from '../lib/card_labels';
+import { CardForgettingCurve } from '../components/CardForgettingCurve';
 import {
     PriorityHistoryEntry,
     readCardPriorityHistory,
@@ -1211,6 +1212,20 @@ function FlashcardRepetitionHistory() {
                                         </span>
                                         {' · '}
                                         Next: {card.nextRepetitionTime ? new Date(card.nextRepetitionTime).toLocaleDateString() : '—'}
+                                    </div>
+                                )}
+
+                                {/* Forgetting curve. Gated on the same setting as the
+                                    D/S/R line above: it is the same model, drawn
+                                    instead of printed. `emptyMessage` is off because
+                                    the stats above already say the card is new. */}
+                                {showFsrsDsr && (
+                                    <div style={{ marginTop: 4, marginBottom: 8 }}>
+                                        <CardForgettingCurve
+                                            history={card.history}
+                                            height={200}
+                                            emptyMessage={null}
+                                        />
                                     </div>
                                 )}
 

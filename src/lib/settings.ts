@@ -83,6 +83,7 @@ import {
   speedCalibrationPeriodId,
   SpeedCalibrationPeriod,
   speedCalibrationMarginSecondsId,
+  showQueueDashboardCurveId,
   ieSettingsValuesKey,
 } from './consts';
 // Type-only: utils.ts imports getIESetting from this module, so a value import
@@ -161,6 +162,7 @@ export interface IESettings {
   [speedColorGreenCpmId]: number;
   [speedCalibrationPeriodId]: SpeedCalibrationPeriod;
   [speedCalibrationMarginSecondsId]: number;
+  [showQueueDashboardCurveId]: boolean;
 }
 
 export type IESettingId = keyof IESettings;
@@ -232,6 +234,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [speedColorGreenCpmId]: 4,
   [speedCalibrationPeriodId]: 'year',
   [speedCalibrationMarginSecondsId]: 10,
+  [showQueueDashboardCurveId]: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -320,7 +323,8 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     label: 'Queue Dashboard',
     blurb:
       'How the Practiced Queues dashboard reads: the pace at which a speed reading turns red or ' +
-      'green, in the live session card, the History Log and the Sessions Summary.',
+      'green, in the live session card, the History Log and the Sessions Summary — and whether ' +
+      'the current card\'s forgetting curve is drawn at the top.',
     helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#speed-colour-coding',
   },
   integrations: { label: 'Integrations', blurb: 'Features ported from other plugins.' },
@@ -367,7 +371,19 @@ interface SettingSpecBase {
 }
 
 export type SettingSpec =
-  | (SettingSpecBase & { kind: 'boolean' })
+  | (SettingSpecBase & {
+      kind: 'boolean';
+      /**
+       * Words for the two states, replacing the default On / Off.
+       *
+       * A toggle reads as a sentence with its title, and some settings have no
+       * natural "on". Naming the states directly — Shown / Hidden — keeps the
+       * title free of a verb it would otherwise have to negate, which is how a
+       * checkbox ends up saying "Hide Forgetting Curve: Off".
+       */
+      onLabel?: string;
+      offLabel?: string;
+    })
   | (SettingSpecBase & {
       kind: 'number';
       min?: number;
@@ -829,6 +845,20 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'month', label: 'Last 1 month' },
       { value: 'week', label: 'Last 1 week' },
     ],
+  },
+  [showQueueDashboardCurveId]: {
+    kind: 'boolean',
+    group: 'queueDashboard',
+    helpPath: 'Reviewing-Items-in-the-Queue/#forgetting-curve',
+    title: 'Forgetting Curve',
+    onLabel: 'Shown',
+    offLabel: 'Hidden',
+    description:
+      'Draws the current card\'s forgetting curve at the top of the Queue Dashboard: its ' +
+      'history replayed into the retrievability FSRS predicts, and a forecast of what each ' +
+      'answer button would do to it. Hide it if you would rather not see it, or if your cards ' +
+      'are not scheduled with FSRS — the curve is drawn from the FSRS settings above, not from ' +
+      'the scheduler RemNote runs.',
   },
   [speedCalibrationMarginSecondsId]: {
     kind: 'number',

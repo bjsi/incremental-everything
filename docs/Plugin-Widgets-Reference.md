@@ -88,6 +88,8 @@ A detailed popup covering **every card of one Rem**, enriched with FSRS analytic
 
 ![Flashcard Repetition History Popup](assets/flashcard-rep-history-2.png){ width="900" }
 
+Each card's section also carries its [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) — the card's history replayed into the retrievability FSRS predicts, with a forecast per answer button and the stability each repetition bought. It follows the **Display FSRS DSR Stats** setting.
+
 **Rem-wide totals** *(header)* — four tiles summing every card: **Cards** (with how many are new, or stale — overdue by more than twice their last interval), **Repetitions** (with total lapses in red parentheses), **Time Spent**, and **Retention** in the [Practiced Queues colours](Colour-Coding-Reference.md#retention). Retention is pooled — remembered ÷ graded across all cards — not an average of the per-card figures, so a two-answer card cannot swing it as hard as a forty-answer one.
 
 **One collapsible section per card.** A Rem with five clozes plus forward and backward is seven histories, so each card is a section you open and close, named the way RemNote's own *Bullet Information* panel names it:

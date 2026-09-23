@@ -115,6 +115,12 @@ export const speedCalibrationMarginSecondsId = 'speed_calibration_margin_seconds
 /** Device-local cache of the last calibration run (see lib/speed_color.ts). */
 export const speedCalibrationCacheKey = 'speed_calibration_cache_v1';
 
+// --- Queue Dashboard: forgetting curve ---
+/** Whether the current card's forgetting curve is drawn at the top of the dashboard. */
+export const showQueueDashboardCurveId = 'show_queue_dashboard_forgetting_curve';
+/** Device-local: log or linear time axis on the forgetting curve. */
+export const forgettingCurveScaleKey = 'forgetting_curve_scale';
+
 // Opt-in gate for the heavy flashcard-prioritisation machinery (KB-wide
 // pretagging, the inheritance cascade and the card-priority cache). Off by
 // default: most users want extracts and scheduling, and should not pay for
