@@ -47,8 +47,8 @@ const MIN_FLOOR_DAYS = 1 / 1440;
 /** Samples drawn across each inter-review segment of the past curve. */
 const SAMPLES_PER_SEGMENT = 48;
 
-/** Samples drawn across each forecast branch. */
-const SAMPLES_PER_BRANCH = 64;
+/** Samples drawn across each forecast branch, which now spans several decades. */
+const SAMPLES_PER_BRANCH = 128;
 
 export type CurveScale = 'log' | 'linear';
 
@@ -57,10 +57,31 @@ export type CurveGrade = 'again' | 'hard' | 'good' | 'easy';
 export const CURVE_GRADES: CurveGrade[] = ['again', 'hard', 'good', 'easy'];
 
 /**
- * Where the forecast stops — which branch is followed, and to what
- * retrievability, expressed as an offset from the target.
+ * How far the forecast is *computed*, as a retrievability the Easy branch — the
+ * longest-lived of the four — has to fall to.
  *
- * The two scales are asked different questions, so one horizon cannot serve
+ * This is not what the chart shows on opening; it is how far out it can be
+ * zoomed. It costs nothing at rest, because the view opens on `INITIAL_VIEW`
+ * instead — it only means that somebody who keeps scrolling out can follow
+ * every branch well past the next repetition and watch it decay, rather than
+ * hitting a wall where the data stops.
+ *
+ * Half is the coin-flip point: the memory is as likely gone as recalled, which
+ * is a natural end for a forgetting curve and a number a reader can interpret
+ * without being told. It is also as far as is worth going. FSRS v6 decays by a
+ * power law with a very heavy tail, so each step down costs a lot of axis —
+ * 70% arrives at 9× the stability, 50% at 90×, 40% at 387× — and past the half
+ * way point the curve is nearly flat, so the extra decades of width buy a
+ * longer and longer stretch of almost nothing. At 50% a fully zoomed-out log
+ * axis still spends about two thirds of its width on the card's real history.
+ */
+const HORIZON_RETENTION = 0.5;
+
+/**
+ * Where the forecast is *shown* on opening — which branch is followed, and to
+ * what retrievability, expressed as an offset from the target.
+ *
+ * The two scales are asked different questions, so one view cannot serve
  * both.
  *
  * A log axis compresses whatever you put at its right-hand end, so following
@@ -75,10 +96,53 @@ export const CURVE_GRADES: CurveGrade[] = ['again', 'hard', 'good', 'easy'];
  * and stops while it is still well clear of the target, keeping the plot on the
  * current stability rather than on a future one.
  */
-const HORIZON: Record<CurveScale, { grade: CurveGrade; offsetFromTarget: number }> = {
+const INITIAL_VIEW: Record<CurveScale, { grade: CurveGrade; offsetFromTarget: number }> = {
     log: { grade: 'easy', offsetFromTarget: 0 },
     linear: { grade: 'good', offsetFromTarget: 0.06 },
 };
+
+/**
+ * Elapsed days at which a memory of stability `s` has decayed to `retention`.
+ *
+ * The inversion of the forgetting curve. `intervalFactorForRetention` is the
+ * same formula, but it clamps its argument to the band where an *interval* is
+ * meaningful (50%–99.5%); the horizon deliberately reaches past that, so it
+ * cannot be borrowed here.
+ */
+function daysUntilRetention(
+    stability: number,
+    retention: number,
+    decay: number,
+    factor: number,
+): number {
+    const r = Math.min(Math.max(retention, 0.01), 0.999);
+    const days = (stability * (Math.pow(r, 1 / decay) - 1)) / factor;
+    return Number.isFinite(days) && days > 0 ? days : stability;
+}
+
+/**
+ * Sample points across a forecast branch, spaced geometrically in elapsed time
+ * since the review.
+ *
+ * Not in the plotted coordinate, as the past segments are, because a branch now
+ * runs orders of magnitude further than the window it opens in: spacing it
+ * evenly across a linear axis would put every sample in the far tail and draw
+ * the visible part as a straight line. A power-law curve bends hardest just
+ * after the review and is nearly flat afterwards, so geometric spacing puts the
+ * detail where the shape is — which is also where the reader is looking.
+ */
+function sampleBranchDays(nowDays: number, horizonDays: number, count: number): number[] {
+    const span = horizonDays - nowDays;
+    if (!(span > 0)) return [];
+    const lo = Math.log10(Math.max(span * 1e-5, MIN_FLOOR_DAYS));
+    const hi = Math.log10(span);
+    if (!(hi > lo)) return [];
+    const out: number[] = [];
+    for (let i = 1; i < count; i++) {
+        out.push(nowDays + Math.pow(10, lo + ((hi - lo) * i) / count));
+    }
+    return out;
+}
 
 /**
  * One row of the chart's data array.
@@ -154,12 +218,20 @@ export interface ForgettingCurveSeries {
     reps: CurveRepMarker[];
     branches: CurveBranch[];
     ticks: CurveTick[];
-    /** [min, max] for the x axis, in plotted units. */
+    /** [min, max] the x axis opens on, in plotted units. */
     xDomain: [number, number];
+    /**
+     * [min, max] the reader may zoom out to. Wider than `xDomain`: the forecast
+     * is computed well past the window it opens in, so scrolling out keeps
+     * finding curve instead of running off the end of the data.
+     */
+    xFullDomain: [number, number];
     /** [min, 100] for the y axis. */
     yDomain: [number, number];
     /** Plotted x of the present moment. */
     nowX: number;
+    /** Days since the first counted review, at the present moment. */
+    nowDays: number;
     nowT: number;
     /** Retrievability now, 0–100. */
     nowR: number;
@@ -170,6 +242,7 @@ export interface ForgettingCurveSeries {
     scale: CurveScale;
     /** Axis bounds in days, kept so ticks can be rebuilt at a measured width. */
     floorDays: number;
+    /** The full extent in days — what `xFullDomain` maps to. */
     axisMaxDays: number;
 }
 
@@ -207,6 +280,14 @@ const TICK_CANDIDATES: CurveTick[] = [
     { value: 730, label: '2y' },
     { value: 1825, label: '5y' },
     { value: 3650, label: '10y' },
+    // The forecast now reaches centuries when zoomed right out, and a ladder
+    // that stopped at ten years left that whole stretch unlabelled.
+    { value: 7305, label: '20y' },
+    { value: 18262, label: '50y' },
+    { value: 36525, label: '100y' },
+    { value: 73050, label: '200y' },
+    { value: 182625, label: '500y' },
+    { value: 365250, label: '1000y' },
 ];
 
 /**
@@ -629,20 +710,28 @@ export function buildForgettingCurveSeries(
           }))
         : [];
 
-    // Where the forecast stops, which depends on the scale — see `HORIZON`.
-    const horizon = HORIZON[scale];
-    const horizonBranch = branches.find((b) => b.grade === horizon.grade);
-    // The interval formula is only meaningful inside the band
-    // `intervalFactorForRetention` accepts, so a target near the top of the
-    // range cannot be pushed past it by the offset.
-    const horizonRetention = Math.min(
-        Math.max(targetRetention + horizon.offsetFromTarget, 0.5),
-        0.995,
-    );
-    const capDays = horizonBranch
-        ? horizonBranch.stability * intervalFactorForRetention(horizonRetention, decay, factor)
-        : Math.max(...branches.map((b) => b.intervalDays), 1 / 24);
-    const horizonDays = forecast ? nowDays + Math.max(capDays, 1 / 24) : nowDays;
+    // How far the forecast is computed — see `HORIZON_RETENTION`. Easy bounds it
+    // because it outlives the other three, so following it guarantees all four
+    // are drawn wherever the reader zooms to.
+    const easyBranch = branches.find((b) => b.grade === 'easy');
+    const horizonDays =
+        forecast && easyBranch
+            ? nowDays +
+              Math.max(daysUntilRetention(easyBranch.stability, HORIZON_RETENTION, decay, factor), 1 / 24)
+            : nowDays;
+
+    // How far it is shown on opening — see `INITIAL_VIEW`.
+    const view = INITIAL_VIEW[scale];
+    const viewBranch = branches.find((b) => b.grade === view.grade);
+    const viewRetention = Math.min(Math.max(targetRetention + view.offsetFromTarget, 0.5), 0.995);
+    const viewDays =
+        forecast && viewBranch
+            ? Math.min(
+                  nowDays +
+                      Math.max(daysUntilRetention(viewBranch.stability, viewRetention, decay, factor), 1 / 24),
+                  horizonDays,
+              )
+            : nowDays;
 
     // The log axis needs a positive floor. Derive it from the data so a card
     // with no sub-day steps does not waste three decades on minutes it never
@@ -743,7 +832,7 @@ export function buildForgettingCurveSeries(
         for (const b of branches) junction[b.grade] = 100;
         rows.push(junction);
 
-        for (const d of sampleDays(nowDays, horizonDays, SAMPLES_PER_BRANCH, scale, floorDays)) {
+        for (const d of sampleBranchDays(nowDays, horizonDays, SAMPLES_PER_BRANCH)) {
             const row: CurveRow = { x: toX(d), days: d, t: firstReviewTime + d * MS_PER_DAY };
             for (const b of branches) {
                 row[b.grade] = forgettingCurve(d - nowDays, b.stability, decay, factor) * 100;
@@ -766,10 +855,18 @@ export function buildForgettingCurveSeries(
 
     // --- Axes -------------------------------------------------------------
     const xMin = toX(scale === 'linear' ? 0 : floorDays);
-    const xMax = toX(Math.max(horizonDays, nowDays, floorDays * 2));
+    const axisMaxDays = Math.max(horizonDays, nowDays, floorDays * 2);
+    const viewMaxDays = Math.max(Math.min(viewDays, axisMaxDays), nowDays, floorDays * 2);
+    const xMax = toX(viewMaxDays);
+    const xFullMax = toX(axisMaxDays);
 
+    // Fitted to the opening view, not to everything computed. The rows run on
+    // for decades past it, and letting the far tail set the floor would squash
+    // the part being read into the top of the plot for the sake of a stretch
+    // nobody has scrolled to. Zooming out refits, in the chart.
     const observed: number[] = [];
     for (const row of rows) {
+        if (row.x > xMax) continue;
         for (const key of ['r', ...CURVE_GRADES] as const) {
             const v = row[key];
             if (typeof v === 'number' && Number.isFinite(v)) observed.push(v);
@@ -780,8 +877,7 @@ export function buildForgettingCurveSeries(
     // floor of the plot, but never show more than the range that carries data.
     const yMin = Math.max(0, Math.min(minObserved, targetRetention * 100) - (100 - minObserved) * 0.2);
 
-    const axisMaxDays = Math.max(horizonDays, nowDays, floorDays * 2);
-    const ticks = buildTicks(scale, scale === 'linear' ? 0 : floorDays, axisMaxDays, toX);
+    const ticks = buildTicks(scale, scale === 'linear' ? 0 : floorDays, viewMaxDays, toX);
 
     return {
         rows,
@@ -789,8 +885,10 @@ export function buildForgettingCurveSeries(
         branches,
         ticks,
         xDomain: [xMin, xMax],
+        xFullDomain: [xMin, xFullMax],
         yDomain: [Math.floor(yMin), 100],
         nowX: toX(nowDays),
+        nowDays,
         nowT: now,
         nowR,
         targetPercent: targetRetention * 100,
@@ -829,9 +927,12 @@ export function rebuildTicks(
         return Number.isFinite(days) ? days : NaN;
     };
 
+    // Defaults to the window the chart OPENS on, not to everything computed:
+    // the extent runs decades further, and a caller asking for "the ticks" wants
+    // the ones it is about to draw.
     const lowest = linear ? 0 : series.floorDays;
     let minDays = lowest;
-    let maxDays = series.axisMaxDays;
+    let maxDays = fromX(series.xDomain[1]);
 
     if (domain) {
         const from = fromX(domain[0]);

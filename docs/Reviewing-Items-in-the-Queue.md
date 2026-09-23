@@ -430,7 +430,7 @@ It appears in two places — at the top of the [Queue Dashboard](History-Queue-D
 
 **Retrievability** (top). A solid line through the past, snapping back to 100% at each repetition and decaying between them, then four dashed branches from *now* — one per answer button, with **Good** drawn heavier because it is the answer that describes the card's normal trajectory. A dashed horizontal rule marks your [Requested Retention](#requested-retention), and a vertical rule of the matching colour marks each repetition.
 
-The history line is coloured by where retrievability stands against that target: **green** above it, **blue** at it, **red** below. So a glance tells you whether the card has been caught near its scheduled moment or left to decay well past it — the same reading the dashed rule gives, without having to trace the line across to it.
+The history line is coloured by retrievability, on the same scale the info bar uses for its **R** value: green at 100%, through yellow, to fully red at 70% and anything below. So a glance tells you whether the card was caught near its scheduled moment or left to decay well past it, and a card the info bar calls red draws a red curve.
 
 **Stability** (bottom). A staircase on a logarithmic axis, labelled with the **×SInc** each repetition bought — the same Stability Increase shown in the info bar, but for every review rather than the next one. This is the part a plain forgetting curve hides: two cards sitting at the same retrievability today can be on completely different paths. Where repetitions are too close together for their labels to fit, hovering a step gives the number and the stability either side of it.
 
@@ -438,9 +438,9 @@ The history line is coloured by where retrievability stands against that target:
 
 The **Log** / **Linear** toggle changes the time axis, and the two answer different questions.
 
-**Log** is the default. A mature card spends minutes in learning and years in review; on a linear axis its first day is a single pixel and everything interesting about its early life is invisible. The log axis gives both ends room, and the forecast runs until **Easy** reaches your target retention — the whole of the next stability, which costs almost no width because a log axis compresses its right-hand end.
+**Log** is the default. A mature card spends minutes in learning and years in review; on a linear axis its first day is a single pixel and everything interesting about its early life is invisible. The log axis gives both ends room, and it opens on the window where **Easy** reaches your target retention — the whole of the next stability, which costs almost no width because a log axis compresses its right-hand end.
 
-**Linear** shows real elapsed time, so intervals are comparable by eye. It stops much earlier — where **Good** is still 6 points above target — because on a linear axis every day added to the right steals width from every day already drawn, and a horizon chosen for the far future would flatten the repetitions you are trying to read.
+**Linear** shows real elapsed time, so intervals are comparable by eye. It opens on a much narrower window — ending where **Good** is still 6 points above target — because on a linear axis every day added to the right steals width from every day already drawn, and a window chosen for the far future would flatten the repetitions you are trying to read.
 
 ![The same card on a linear time axis: its first six months are compressed against the left edge while the axis runs to 6.2 years, and a tooltip reads "2mo since first review, Retrievability 100.0%, Stability 1.1y"](assets/forgetting-curve-linear-scale.png){ width="900" }
 
@@ -449,10 +449,12 @@ The **Log** / **Linear** toggle changes the time axis, and the two answer differ
 #### Zooming
 
 - **Drag** across either panel to zoom to that range.
-- **Scroll** to zoom around the pointer.
-- **Double-click**, or press **Reset zoom**, to go back.
+- **Scroll** to zoom around the pointer — outwards as well as in.
+- **Double-click**, or press **Reset zoom**, to return to the opening window.
 
 Both panels share the axis, so either one drives both, and the vertical scales refit to what is on screen.
+
+Zooming out goes well past where the chart opens. The forecast is computed until **Easy** decays to 50% — the point at which that memory is as likely gone as recalled — so you can follow every branch far beyond the next repetition and watch the four separate. On a mature card that is a long way out: FSRS's curve is a power law with a heavy tail, and 50% arrives at roughly ninety times the stability, so do not be surprised to find the axis running into centuries.
 
 #### What the curve is, and is not
 

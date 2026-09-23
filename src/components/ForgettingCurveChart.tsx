@@ -46,7 +46,7 @@ import {
     rebuildTicks,
 } from '../lib/forgetting_curve';
 import { scoreColor } from '../lib/rating_labels';
-import { formatStabilityDays } from '../lib/utils';
+import { formatStabilityDays, getRetrievabilityColor } from '../lib/utils';
 
 /**
  * Branch colours. Deliberately the same four as `scoreColor`, so "the green
@@ -69,14 +69,17 @@ const GRADE_LABEL: Record<CurveGrade, string> = {
 };
 
 /**
- * The past curve is coloured by where retrievability stands against the target:
- * red below it, blue at it, green above. Muted next to the vivid grade palette
- * used for the forecast branches, so a thick solid history line and a thin
- * dashed "If Again" never read as the same thing.
+ * The past curve is coloured by retrievability, on the same scale the card info
+ * bar uses for its R value — `getRetrievabilityColor`, sampled into gradient
+ * stops. Same number, same colour, wherever the plugin shows it.
+ *
+ * A gradient anchored on the target instead put its red at 0%, so the colour
+ * only left blue in territory no real card reaches: a card sitting at 75% —
+ * which the info bar calls red — still drew as comfortably blue. Here red
+ * saturates at 70% and everything below it, so the curve goes red when the card
+ * is actually in trouble.
  */
-const CURVE_BELOW_TARGET = '#e05252';
-const CURVE_AT_TARGET = '#4682b4';
-const CURVE_ABOVE_TARGET = '#2e9e5b';
+const CURVE_GRADIENT_STOPS = [0, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1];
 const STABILITY_COLOR = '#6366f1';
 
 const Y_AXIS_WIDTH = 38;
@@ -115,6 +118,12 @@ const Y_HEADROOM = 0.04;
 
 /** Labelled gridlines on the retrievability axis. */
 const Y_TICK_COUNT = 5;
+
+/** Multiplier applied to the visible span by one notch of the wheel. */
+const ZOOM_STEP = 1.25;
+
+/** Tightest window the reader may zoom to, as a divisor of the opening span. */
+const MAX_ZOOM_IN = 50;
 
 /** How many staggered rows the labels may use before one is dropped. */
 const LABEL_ROWS = 2;
@@ -388,7 +397,7 @@ export function ForgettingCurveChart({
     const xDomain: [number, number] = activeZoom ?? series.xDomain;
 
     const ticks = useMemo(
-        () => (plotWidth > 0 ? rebuildTicks(series, plotWidth, activeZoom ?? undefined) : series.ticks),
+        () => (plotWidth > 0 ? rebuildTicks(series, plotWidth, activeZoom ?? series.xDomain) : series.ticks),
         [series, plotWidth, activeZoom],
     );
 
@@ -486,28 +495,40 @@ export function ForgettingCurveChart({
 
         const onWheel = (event: WheelEvent) => {
             event.preventDefault();
-            const [fullLo, fullHi] = series.xDomain;
+            // Zooming out runs to the full extent, which reaches far past the
+            // window the chart opens on — that is the point of the two ranges.
+            const [fullLo, fullHi] = series.xFullDomain;
+            const [openLo, openHi] = series.xDomain;
             const fullSpan = fullHi - fullLo;
-            if (!(fullSpan > 0)) return;
+            const openSpan = openHi - openLo;
+            if (!(fullSpan > 0) || !(openSpan > 0)) return;
 
             const plotLeft = el.getBoundingClientRect().left + CHART_MARGIN_LEFT + Y_AXIS_WIDTH;
             const fraction = Math.min(Math.max((event.clientX - plotLeft) / plotWidth, 0), 1);
 
             setZoom((current) => {
+                // Start from what is on screen. Falling back to the whole extent
+                // here meant the first notch of the wheel did not zoom out of
+                // the opening window — it replaced it with the far tail, at
+                // maximum span, from which nothing could widen further.
                 const [lo, hi] =
-                    current && current.series === series ? current.range : [fullLo, fullHi];
+                    current && current.series === series ? current.range : [openLo, openHi];
                 const anchor = lo + fraction * (hi - lo);
-                const scaled = (hi - lo) * (event.deltaY > 0 ? 1.25 : 1 / 1.25);
-                const span = Math.min(Math.max(scaled, fullSpan / 2000), fullSpan);
+                const scaled = (hi - lo) * (event.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
+                const span = Math.min(Math.max(scaled, openSpan / MAX_ZOOM_IN), fullSpan);
 
                 let x0 = anchor - (anchor - lo) * (span / (hi - lo));
                 if (x0 < fullLo) x0 = fullLo;
                 if (x0 + span > fullHi) x0 = fullHi - span;
                 const next: [number, number] = [Math.max(x0, fullLo), Math.min(x0 + span, fullHi)];
 
-                // Zoomed all the way back out: drop to null so the axis returns
-                // to the ticks and y range it was built with.
-                return next[1] - next[0] >= fullSpan * 0.999 ? null : { series, range: next };
+                // Back to the opening window: drop to null so the axis returns
+                // to the ticks and y range it was built with. Anything else —
+                // narrower or wider — is a view the reader chose.
+                const atOpening =
+                    Math.abs(next[0] - openLo) < openSpan * 1e-3 &&
+                    Math.abs(next[1] - openHi) < openSpan * 1e-3;
+                return atOpening ? null : { series, range: next };
             });
         };
 
@@ -528,13 +549,24 @@ export function ForgettingCurveChart({
 
     const commitDrag = () => {
         if (!drag) return;
-        const lo = Math.min(drag.from, drag.to);
-        const hi = Math.max(drag.from, drag.to);
+        let lo = Math.min(drag.from, drag.to);
+        let hi = Math.max(drag.from, drag.to);
         setDrag(null);
+
+        const openSpan = series.xDomain[1] - series.xDomain[0];
         // A click, or a selection too thin to be meant: leave the view alone.
-        if (hi - lo >= (series.xDomain[1] - series.xDomain[0]) * 0.005) {
-            setZoom({ series, range: [lo, hi] });
+        if (!(hi - lo >= openSpan * 0.005)) return;
+
+        // Honour the same floor the wheel does, so a stray thin drag cannot
+        // land on a window with nothing in it.
+        const minSpan = openSpan / MAX_ZOOM_IN;
+        if (hi - lo < minSpan) {
+            const middle = (lo + hi) / 2;
+            lo = middle - minSpan / 2;
+            hi = middle + minSpan / 2;
         }
+        const [fullLo, fullHi] = series.xFullDomain;
+        setZoom({ series, range: [Math.max(lo, fullLo), Math.min(hi, fullHi)] });
     };
 
     const dragHandlers = {
@@ -739,11 +771,13 @@ export function ForgettingCurveChart({
                         style={{
                             width: 14,
                             height: 3,
-                            background: `linear-gradient(90deg, ${CURVE_BELOW_TARGET}, ${CURVE_AT_TARGET}, ${CURVE_ABOVE_TARGET})`,
+                            background: `linear-gradient(90deg, ${CURVE_GRADIENT_STOPS.map(
+                                (r) => getRetrievabilityColor(r),
+                            ).join(', ')})`,
                             display: 'inline-block',
                         }}
                     />
-                    <span title="Coloured by retrievability: red below the target, blue at it, green above">
+                    <span title="Coloured by retrievability, on the same scale as the card info bar: red at 70% and below, green at 100%">
                         History
                     </span>
                 </span>
@@ -791,12 +825,13 @@ export function ForgettingCurveChart({
                             x2={0}
                             y2={gradientEnds.y100}
                         >
-                            <stop offset="0%" stopColor={CURVE_BELOW_TARGET} />
-                            <stop
-                                offset={`${series.targetPercent}%`}
-                                stopColor={CURVE_AT_TARGET}
-                            />
-                            <stop offset="100%" stopColor={CURVE_ABOVE_TARGET} />
+                            {CURVE_GRADIENT_STOPS.map((r) => (
+                                <stop
+                                    key={r}
+                                    offset={`${r * 100}%`}
+                                    stopColor={getRetrievabilityColor(r)}
+                                />
+                            ))}
                         </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.25} syncWithTicks />

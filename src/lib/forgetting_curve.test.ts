@@ -40,6 +40,12 @@ const HISTORY: RepetitionStatusInterface[] = [
 const build = (history: RepetitionStatusInterface[], over = {}) =>
     buildForgettingCurveSeries(history, { now: NOW, ...over });
 
+const DECAY = -FSRS_DEFAULT_WEIGHTS[20];
+const FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
+/** Retrievability of a memory of `stability` after `elapsedDays`. */
+const rAt = (elapsedDays: number, stability: number) =>
+    forgettingCurve(elapsedDays, stability, DECAY, FACTOR);
+
 describe('buildForgettingCurveSeries', () => {
     it('returns null when there is nothing to replay', () => {
         assert.equal(build([]), null);
@@ -164,46 +170,84 @@ describe('buildForgettingCurveSeries', () => {
         for (const g of CURVE_GRADES) assert.equal(junction[g], 100);
     });
 
-    it('runs the log forecast until Easy reaches the target retention', () => {
+    it('opens the log view where Easy reaches the target retention', () => {
         // A log axis compresses its right-hand end, so the longest branch can be
-        // followed to the target for almost no width — showing the whole of the
-        // next stability.
+        // followed to the target for almost no width.
         for (const target of [0.9, 0.8]) {
             const s = build(HISTORY, { scale: 'log', targetRetention: target })!;
-            const last = s.rows[s.rows.length - 1];
+            const easy = s.branches.find((b) => b.grade === 'easy')!;
+            const elapsed = Math.pow(10, s.xDomain[1]) - s.nowDays;
             assert.ok(
-                Math.abs((last.easy as number) - target * 100) < 0.5,
-                `Easy should land on the target at the right edge (got ${last.easy} for ${target})`,
+                Math.abs(rAt(elapsed, easy.stability) - target) < 0.005,
+                `Easy should be at the target on the opening edge (got ${rAt(elapsed, easy.stability)} for ${target})`,
             );
-            // Good, being the slower branch, is already past it.
-            assert.ok((last.good as number) < target * 100);
         }
     });
 
-    it('stops the linear forecast while Good is still 6 points clear of the target', () => {
+    it('opens the linear view while Good is still 6 points clear of the target', () => {
         // A linear axis pays for every extra day by squeezing the repetitions
-        // that have happened, so it stays on the current stability instead.
+        // that have happened, so it opens on the current stability instead.
         for (const target of [0.9, 0.8]) {
             const s = build(HISTORY, { scale: 'linear', targetRetention: target })!;
-            const last = s.rows[s.rows.length - 1];
+            const good = s.branches.find((b) => b.grade === 'good')!;
+            const elapsed = s.xDomain[1] - s.nowDays;
             assert.ok(
-                Math.abs((last.good as number) - (target + 0.06) * 100) < 0.5,
-                `Good should stop 6pp above the target (got ${last.good} for ${target})`,
+                Math.abs(rAt(elapsed, good.stability) - (target + 0.06)) < 0.005,
+                `Good should be 6pp above the target on the opening edge (got ${rAt(elapsed, good.stability)})`,
             );
-            assert.ok((last.good as number) > target * 100, 'and therefore above the target itself');
         }
     });
 
-    it('gives the log scale the longer horizon of the two', () => {
+    it('opens the log scale on a longer window than the linear one', () => {
         const log = build(HISTORY, { scale: 'log' })!;
         const linear = build(HISTORY, { scale: 'linear' })!;
-        assert.ok(
-            log.axisMaxDays > linear.axisMaxDays,
-            `log (${log.axisMaxDays}d) should outrun linear (${linear.axisMaxDays}d)`,
-        );
+        assert.ok(Math.pow(10, log.xDomain[1]) > linear.xDomain[1]);
         // Both still cover the card's whole history.
         for (const s of [log, linear]) {
-            assert.ok(s.axisMaxDays >= s.reps[s.reps.length - 1].days);
+            const viewEnd = s.scale === 'linear' ? s.xDomain[1] : Math.pow(10, s.xDomain[1]);
+            assert.ok(viewEnd >= s.reps[s.reps.length - 1].days);
+        }
+    });
+
+    it('computes far past the opening view, so zooming out keeps finding curve', () => {
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(HISTORY, { scale })!;
+            const easy = s.branches.find((b) => b.grade === 'easy')!;
+
+            // The extent runs until Easy is as likely forgotten as recalled.
+            assert.ok(
+                Math.abs(rAt(s.axisMaxDays - s.nowDays, easy.stability) - 0.5) < 0.005,
+                `${scale}: extent should reach 50% on Easy`,
+            );
+            // Which is well past where the chart opens.
+            assert.ok(
+                s.xFullDomain[1] > s.xDomain[1],
+                `${scale}: there must be something to zoom out to`,
+            );
+            // And the rows really go there, rather than the axis claiming range
+            // the data does not cover.
+            const last = s.rows[s.rows.length - 1];
+            assert.ok(Math.abs((last.easy as number) - 50) < 0.5, `${scale}: last row is the 50% point`);
+        }
+    });
+
+    it('gives both scales the same extent, since only the opening view differs', () => {
+        const log = build(HISTORY, { scale: 'log' })!;
+        const linear = build(HISTORY, { scale: 'linear' })!;
+        assert.ok(Math.abs(log.axisMaxDays - linear.axisMaxDays) < 1e-6);
+    });
+
+    it('samples the forecast densely inside the opening view', () => {
+        // The branches now span orders of magnitude more time than the window
+        // they open in. Spacing them evenly across that would leave the visible
+        // part with almost no points and draw it as a straight line — worst on
+        // the linear scale, where the opening window is a sliver of the extent.
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(HISTORY, { scale })!;
+            const inView = s.rows.filter(
+                (r) => r.x > s.nowX && r.x <= s.xDomain[1] && typeof r.good === 'number',
+            );
+            assert.ok(inView.length >= 20, `${scale}: only ${inView.length} forecast samples on screen`);
         }
     });
 
@@ -229,8 +273,13 @@ describe('buildForgettingCurveSeries', () => {
             for (let i = 1; i < s.rows.length; i++) {
                 assert.ok(s.rows[i].x >= s.rows[i - 1].x, `${scale}: rows are sorted`);
             }
+            // Against the full extent, not the opening view: the forecast is
+            // deliberately computed past what the chart shows at rest.
             for (const row of s.rows) {
-                assert.ok(row.x >= s.xDomain[0] - 1e-9 && row.x <= s.xDomain[1] + 1e-9, `${scale}: row inside domain`);
+                assert.ok(
+                    row.x >= s.xFullDomain[0] - 1e-9 && row.x <= s.xFullDomain[1] + 1e-9,
+                    `${scale}: row inside the extent`,
+                );
             }
             assert.ok(s.ticks.length > 0, `${scale}: has ticks`);
         }
@@ -282,6 +331,24 @@ describe('buildForgettingCurveSeries', () => {
                 );
                 const labels = ticks.map((t) => t.label);
                 assert.equal(new Set(labels).size, labels.length, `${scale} @${width}px: labels unique`);
+            }
+        }
+    });
+
+    it('labels the whole axis when zoomed right out', () => {
+        // The extent reaches centuries, so the candidate ladder has to as well:
+        // stopping at ten years left the entire tail of a log axis unlabelled.
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(HISTORY, { scale })!;
+            const ticks = rebuildTicks(s, 1850, s.xFullDomain);
+            const span = s.xFullDomain[1] - s.xFullDomain[0];
+            assert.ok(ticks.length >= 4, `${scale}: ${ticks.length} ticks across the extent`);
+            for (let i = 1; i < ticks.length; i++) {
+                const gap = ticks[i].value - ticks[i - 1].value;
+                assert.ok(
+                    gap <= span * 0.45,
+                    `${scale}: nothing between "${ticks[i - 1].label}" and "${ticks[i].label}"`,
+                );
             }
         }
     });
