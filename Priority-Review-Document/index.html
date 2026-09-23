@@ -1,0 +1,2868 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Priority-Review-Document/">
+      
+      
+        <link rel="prev" href="../Priorities-for-Flashcards/">
+      
+      
+        <link rel="next" href="../PDF-Incremental-Reading-Workflow/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>4b. Priority Queue - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-problem-why-do-i-need-this" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              4b. Priority Queue
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Queue
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-why-do-i-need-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem: Why do I need this?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-priority-queue-popup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Priority Queue popup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Priority Queue popup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#practise-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practise it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refresh-after-every-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refresh at startup and after every session
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-items-are-selected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Items Are Selected
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How Items Are Selected">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flashcard-and-increm-slots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flashcard and IncRem slots
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-shield-slice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shield slice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-status-block-and-the-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The status block and the graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cooling-spoiler-protection-across-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooling: spoiler protection across sessions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cooling: spoiler protection across sessions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-counts-as-a-spoiler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What counts as a spoiler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-long" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How long
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nothing-is-stored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nothing is stored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-cooling-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Cooling list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-priority-review-queue-in-your-sidebar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Priority Review Queue in your sidebar
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#paused-document-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paused Document Filtering
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Paused Document Filtering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-you-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What You See
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ancestor-spoiler-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ancestor Spoiler Protection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ancestor Spoiler Protection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-you-see_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What You See
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#card-cluster-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Card Cluster Support
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Card Cluster Support">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-plugin-handles-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the Plugin Handles It
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#smart-scope-priority-shield-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smart Scope &amp; Priority Shield Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cleaning-up-leftovers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning up leftovers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-card-state-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical: Card State Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Technical: Card State Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#card-states-in-remnote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Card States in RemNote
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-api-behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key API Behaviour
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-plugin-handles-each-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the Plugin Handles Each State
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-remgetcards-is-not-used-for-paused-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why rem.getCards() Is Not Used for Paused Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source References
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AI-Transcription-of-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Transcription of PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Source-Pins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source Pins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Repetition-History-and-Statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repetition History & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RemNote-Native-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RemNote Native Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Colour-Coding-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Colour Coding Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-why-do-i-need-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem: Why do I need this?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Solution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-priority-queue-popup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Priority Queue popup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Priority Queue popup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#practise-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practise it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refresh-after-every-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refresh at startup and after every session
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-items-are-selected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Items Are Selected
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How Items Are Selected">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flashcard-and-increm-slots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flashcard and IncRem slots
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-shield-slice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shield slice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-status-block-and-the-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The status block and the graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cooling-spoiler-protection-across-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooling: spoiler protection across sessions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cooling: spoiler protection across sessions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-counts-as-a-spoiler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What counts as a spoiler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-long" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How long
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nothing-is-stored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nothing is stored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-cooling-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Cooling list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-priority-review-queue-in-your-sidebar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Priority Review Queue in your sidebar
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#paused-document-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Paused Document Filtering
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Paused Document Filtering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-you-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What You See
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ancestor-spoiler-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ancestor Spoiler Protection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ancestor Spoiler Protection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-you-see_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What You See
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#card-cluster-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Card Cluster Support
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Card Cluster Support">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-plugin-handles-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the Plugin Handles It
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#smart-scope-priority-shield-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smart Scope &amp; Priority Shield Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cleaning-up-leftovers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning up leftovers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-card-state-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical: Card State Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Technical: Card State Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#card-states-in-remnote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Card States in RemNote
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-api-behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key API Behaviour
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-plugin-handles-each-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the Plugin Handles Each State
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-remgetcards-is-not-used-for-paused-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why rem.getCards() Is Not Used for Paused Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source References
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>4b. Priority Queue</h1>
+
+<p>The <strong>Priority Queue</strong> solves the "information overflow" problem inherent to Incremental Reading. It is one persistent review document per scope, kept topped up with your highest-priority due material — both Flashcards and Incremental Rems — and drained as you review it, so each session is a short list drawn from the top of your ranking, following your Sorting Criteria.</p>
+<hr />
+<h2 id="the-problem-why-do-i-need-this">The Problem: Why do I need this?<a class="headerlink" href="#the-problem-why-do-i-need-this" title="Permanent link">&para;</a></h2>
+<p>In the standard RemNote queue, plugins like <em>Incremental RemNote</em> can control when <strong>Incremental Rems</strong> (articles, videos, notes) appear. However, plugins <strong>cannot control the order of standard Flashcards</strong>. RemNote's native scheduler decides which flashcard comes next, regardless of the priority you set in this plugin.</p>
+<p>This creates a problem when you are overwhelmed. If you have 1000 due flashcards, but only time to review 50, you want to ensure those 50 are your <em>most important</em> ones. In the standard queue, you might spend your time reviewing low-priority trivia while critical exams or project knowledge remains unseen.</p>
+<h2 id="the-solution">The Solution<a class="headerlink" href="#the-solution" title="Permanent link">&para;</a></h2>
+<p>A document made of <strong>Rem references</strong> to your most important due items bypasses that limitation: practise the document and RemNote serves exactly those cards. The plugin used to build such a document as a one-off, timestamped snapshot. The Priority Queue is the same document <strong>kept alive</strong>:</p>
+<ul>
+<li><strong>One document per scope</strong> — one for your whole knowledge base, one per document or folder you choose — instead of a new one every day.</li>
+<li><strong>Refill</strong> tops it up to a <em>fill target</em> (25 items by default) from the current priority ranking.</li>
+<li><strong>Drain</strong> removes the entries you have reviewed, and the ones that are <a href="#cooling-spoiler-protection-across-sessions">cooling</a>.</li>
+<li><strong>Refresh</strong> is both, draws the document's <a href="#flashcard-and-increm-slots">IncRems again</a>, and runs on its own when you leave the queue.</li>
+</ul>
+<p>Small fills are the point. RemNote serves a document's cards in <strong>random order</strong> — its queue provider for a normal document is literally named <code>random</code> — so a 100-item document can show its most important card last. The only control a plugin has over what comes <em>first</em> is how few items the document holds. Twenty-five items, most of them the top of your ranking (following your Sorting Criteria), is a session you can finish, and the next refresh prepares the next twenty-five.</p>
+<h2 id="the-priority-queue-popup">The Priority Queue popup<a class="headerlink" href="#the-priority-queue-popup" title="Permanent link">&para;</a></h2>
+<p>Everything happens from one popup: <strong>Priority Queue</strong> in the Command Palette (quick code <code>prq</code>, shortcut <code>Opt+Shift+L</code> / <code>Alt+Shift+L</code>), the <strong>Priority Queue</strong> entry in any document's ⋯ menu and in the queue's ⋮ menu, or the <strong>Priority Queue</strong> button of the <a href="../Getting-Started/#the-incremental-plugin-panel">Incremental RemNote panel</a>.</p>
+<p><img alt="The Priority Queue popup: scope, status card, fill target and shield slice, and the action buttons" src="../assets/priority-queue-popup.png" width="640" /></p>
+<ul>
+<li><strong>Scope</strong> — the document you came from, or the whole knowledge base. The popup opens on the document only when it already has a Priority Queue of its own, and on the whole knowledge base otherwise; the document stays one click away to build one. A review document is never offered as a scope: a queue built from a queue would only re-select what it already holds.</li>
+<li><strong>Status</strong> — what the document holds, how many flashcard Rems and IncRems are still due, how many entries a refresh would drain and how many of those are cooling, the last refresh, and the current settings. Below it, the <strong>card shield now</strong> and <strong>after this document</strong> — the priority the shield would reach once every entry is reviewed — for the KB or for the document scope, with cooling Rems already excluded.</li>
+<li><strong>Fill target</strong> — how many items the document is topped up to. <code>25</code>, <code>50</code> and <code>100</code> are one click; any number from 5 to 200 works. This is the size of one <em>burst</em>: one session works through one fill, and the refresh at the end prepares the next. Your Flashcard Ratio divides it between <a href="#flashcard-and-increm-slots">flashcard Rems and IncRems</a>.</li>
+<li><strong>Shield slice</strong> — the share of each fill taken strictly by priority before your randomness applies. See <a href="#the-shield-slice">why it exists</a>. <code>0%</code> follows your <a href="../Prioritization-%26-Sorting/#sorting-criteria">Sorting Criteria</a> exactly.</li>
+<li><strong>Skip paused documents</strong> — leave out flashcard Rems inside paused documents, but always keep the ones at or below the priority you set (20 by default). See <a href="#paused-document-filtering">Paused Document Filtering</a>.</li>
+<li><strong>Build / Refresh</strong>, <strong>Drain</strong>, <strong>Refill</strong>, <strong>▶ Practice</strong>, <strong>Open document</strong>, <strong>Cooling</strong>, <strong>Sorting…</strong>.</li>
+</ul>
+<p>None of the actions runs while a queue is open — RemNote gathers a document's cards when you press Practice, so editing the document between sessions is safe and editing it during one is not. The popup says so and waits.</p>
+<p>The popup is keyboard-driven: <code>←</code> <code>→</code> move the selection ring across the controls, <code>Enter</code> activates, <code>Esc</code> closes. Fill target and shield slice are plain number fields; <code>Enter</code> or <code>Esc</code> inside one hands the keys back.</p>
+<h3 id="practise-it">Practise it<a class="headerlink" href="#practise-it" title="Permanent link">&para;</a></h3>
+<p><strong>▶ Practice</strong> opens the queue on the document — the same thing as its own Practice button. With no document yet, it builds one first. The <strong>▶</strong> button of the <a href="../Getting-Started/#the-incremental-plugin-panel">Incremental RemNote panel</a> and the command <strong>Learn - Practice Priority Queue (Full Knowledge Base)</strong> (<code>Cmd+L</code> / <code>Ctrl+L</code>, quick code <code>learn</code>) do the same for the whole knowledge base from anywhere. <strong>Learn</strong> is the plugin's main action, as in SuperMemo: open RemNote, press <code>Cmd/Ctrl+L</code>, and study what matters most.</p>
+<p>While you practise, the plugin knows where the items came from: the <a href="../Prioritization-%26-Sorting/#priority-shield">Priority Shield</a> and its history are computed against the <strong>original scope</strong> (the document you chose, or the whole knowledge base), not against the review document itself. See <a href="#smart-scope-priority-shield-integration">Smart Scope</a>.</p>
+<h3 id="refresh-after-every-session">Refresh at startup and after every session<a class="headerlink" href="#refresh-after-every-session" title="Permanent link">&para;</a></h3>
+<p>When you leave the queue after practising a Priority Queue document, the plugin refreshes it a couple of seconds later: what you reviewed is drained, what is now cooling is drained, and the document is topped back up. A toast reports the result.</p>
+<p>When RemNote starts, <strong>every</strong> Priority Queue document is refreshed once — the full-KB one and each document-scoped one — so the first Practice of the day finds them up to date. This waits for the caches and the cooling scan to finish, and the ▶ button of the <a href="../Getting-Started/#when-learn-starts-pulsing">plugin panel</a> only starts pulsing once it is done. One toast reports the result for all of them. If you open a queue before it finishes, the documents not yet refreshed are left for later.</p>
+<p>Both are the <strong>Refresh the Priority Queues at startup and after each session</strong> setting, on by default.</p>
+<p>In <a href="../Full-Mode-x-Light-Mode/">Light Mode</a>, including on mobile, the automatic refresh does not run. Light Mode keeps no card cache, so a refresh there has to read every card in your knowledge base — once, shared by the drain, cooling and the new selection — which is the kind of work Light Mode exists to avoid after every session. Press <strong>Refresh</strong> or <strong>▶ Practice</strong> in the popup instead; both still work, cooling included. In Full Mode a refresh reads no cards at all: everything comes from the card cache.</p>
+<h2 id="how-items-are-selected">How Items Are Selected<a class="headerlink" href="#how-items-are-selected" title="Permanent link">&para;</a></h2>
+<p>Every refill runs the same selection:</p>
+<ol>
+<li><strong>Filtering:</strong> every Flashcard Rem and Incremental Rem in scope that is <strong>due</strong> (scheduled for today or earlier).</li>
+<li><strong>Ranking:</strong> by <strong>priority</strong> (0 is highest, 100 is lowest), with your <a href="../Prioritization-%26-Sorting/#sorting-criteria">randomness</a> applied through the priority-weighted lottery — after the <a href="#the-shield-slice">shield slice</a> has been carved off.</li>
+<li><strong>Mixing:</strong> each list fills its own <a href="#flashcard-and-increm-slots">slots</a>, interleaved at your <strong>Flashcard Ratio</strong> — with "10 cards per rem", roughly ten flashcard entries follow each incremental entry.</li>
+<li><strong>Gates</strong>, applied to each flashcard Rem as it is drawn, so their cost is bounded by the fill target rather than by the size of your knowledge base: already in the document, <a href="#paused-document-filtering">paused</a>, <a href="#ancestor-spoiler-protection">due ancestor</a>, <a href="#cooling-spoiler-protection-across-sessions">cooling</a>, and <a href="#card-cluster-support">Card Cluster</a> expansion.</li>
+</ol>
+<p>The status block at the top of the document records what each refresh did, and the popup shows the Rems each gate held back, by name, after every action.</p>
+<p><img alt="The Priority Queue popup after a refresh: the result line, a blue panel with one Rem left out as cooling, and a purple panel with one Rem held back by a due ancestor that is cooling too" src="../assets/priority-queue-popup-cooling-ancestor-messages.png" width="640" /></p>
+<p>Above, a refresh drained 4 reviewed entries and added 4. Under the result line, each gate that held something back gets its own panel, one row per Rem with its priority:</p>
+<ul>
+<li><strong>🧊 left out, cooling</strong> — why the Rem is <a href="#cooling-spoiler-protection-across-sessions">cooling</a> and the day it comes back: here, another card of the same Rem was reviewed 7 days ago, so it returns on Sep 17.</li>
+<li><strong>🎭 held back by a due ancestor</strong> — the blocking parent or grandparent and what happened to it. Here the parent is itself cooling, so nothing was swapped in and both wait; see <a href="#ancestor-spoiler-protection">Ancestor Spoiler Protection</a>.</li>
+</ul>
+<h3 id="flashcard-and-increm-slots">Flashcard and IncRem slots<a class="headerlink" href="#flashcard-and-increm-slots" title="Permanent link">&para;</a></h3>
+<p>The Flashcard Ratio divides the fill target for the <strong>whole document</strong>: IncRems get one slot for every <em>ratio + 1</em> items, rounded up, and flashcard Rems the rest. A fill target of 25 at "10 cards per rem" holds <strong>22 flashcard Rems and 3 IncRems</strong>. With "no cards" or "no incremental rems", everything goes to the other kind.</p>
+<p>The two kinds are refilled differently:</p>
+<ul>
+<li><strong>Flashcard Rems stay until you review them.</strong> A refresh only fills the flashcard slots that are empty.</li>
+<li><strong>IncRems are drawn again on every Refresh.</strong> The queue injects IncRems at your ratio however many the document holds, so an IncRem that was not reached has no claim on its slot. The draw runs your sorting criteria again, as the regular queue does each session: IncRems drawn again stay where they are, the others leave and are replaced, and they return to the pool of due IncRems for a later draw. An IncRem entry with notes or text of your own on it is never drawn away.</li>
+</ul>
+<p><strong>Refill</strong> only fills empty slots, and <strong>Drain</strong> adds nothing. The status block shows the split on its <em>Holding</em> line and what the draw kept and replaced on its <em>Last refresh</em> line.</p>
+<h3 id="the-shield-slice">The shield slice<a class="headerlink" href="#the-shield-slice" title="Permanent link">&para;</a></h3>
+<p>Your randomness setting marks a share of <em>positions</em> across the <strong>whole</strong> ranked due list, uniformly, and refills each marked position from a priority-weighted draw. It does not carve off the bottom of the list. So the first position is marked exactly as often as the ten-thousandth, and when it is, the most important due Rem is thrown into a pool of thousands and lands far down the list. At 40% randomness that happens to each of your top items four times in ten — see <a href="../Prioritization-%26-Sorting/#what-it-does-not-guarantee">what randomness does not guarantee</a>.</p>
+<p>In a 100-item snapshot a displaced top item usually still landed inside the document, just later. In a 25-item fill there is no "later": the item is simply absent until the next refresh, and the Priority Shield stays where it was however hard you work. The shield slice says the lottery may not touch the first positions. With the default <code>20%</code>, the first 5 of a 25-item fill are the 5 most important due items, and your randomness runs over the other 20. Set it to <code>0%</code> to follow the Sorting Criteria exactly, or higher to protect more of the head.</p>
+<p>The status block and the popup report how many of the added items came from the slice.</p>
+<h3 id="the-status-block-and-the-graph">The status block and the graph<a class="headerlink" href="#the-status-block-and-the-graph" title="Permanent link">&para;</a></h3>
+<p>The document's first child is a code block that the refresh rewrites each time: scope, fill target and shield slice, what it holds and how the fill target is split, what the last refresh drained and added and what the IncRem draw kept and replaced, how many Rems are cooling, how many were held back by a due ancestor or skipped as paused, and what is due in scope. Its second child is the <strong>Priority Distribution Graph</strong>, regenerated on every refresh over the document's current entries — absolute priorities and relative percentiles, IncRems and flashcard Rems — so you can see at a glance how concentrated at the top a fill is, and what your randomness setting does to it.</p>
+<p>Entries are always appended <strong>below</strong> these two, so the graph stays where it is.</p>
+<p><img alt="Priority Review Doc Graph" src="../assets/priority-review-doc-graph.png" width="800" /></p>
+<h2 id="cooling-spoiler-protection-across-sessions">Cooling: spoiler protection across sessions<a class="headerlink" href="#cooling-spoiler-protection-across-sessions" title="Permanent link">&para;</a></h2>
+<p>RemNote's own bury rule keeps a card out of the queue while <em>another card of the same Rem</em> was seen in the last <strong>hour</strong>. Anki buries siblings until the next day. Neither is enough for a mature card: a descriptor whose answer was read as context yesterday, or an <code>Alt+Z</code> cloze whose sibling cloze was graded three days ago, is still a free recall — and FSRS rewards a free recall with years of unearned stability, as the <a href="#ancestor-spoiler-protection">ancestor case below</a> shows.</p>
+<p>A Rem is <strong>cooling</strong> when it still owes the queue a card, and a card that gives that answer away was graded recently and has since moved on. While cooling, it is left out of the Priority Queue and it is <strong>ineligible to set the Priority Shield</strong> — a Rem whose sibling you just reviewed cannot pin the shield at its priority however much else you clear.</p>
+<h3 id="what-counts-as-a-spoiler">What counts as a spoiler<a class="headerlink" href="#what-counts-as-a-spoiler" title="Permanent link">&para;</a></h3>
+<p>Five relations, each a distinct way one review puts another card's answer on screen:</p>
+<ul>
+<li><strong>Another card of the same Rem</strong> — the other direction, or another cloze in the same text. RemNote's hour-long bury, extended.</li>
+<li><strong>A sibling <code>Alt+Z</code> cloze under the same parent extract</strong>, or the <strong>parent extract itself</strong> read as an Incremental Rem. Each cloze quotes the whole sentence with one span blanked, so any one of them shows the others' answers.</li>
+<li><strong>One of the Rem's own <code>Alt+Z</code> clozes</strong>, when the Rem carries a card of its own as well.</li>
+<li><strong>A child or grandchild card</strong>, whose context line displayed this Rem's answer — the <a href="#ancestor-spoiler-protection">ancestor gate</a> extended across time, in the direction that actually spoils.</li>
+<li><strong>Its concept, for a descriptor's backward card.</strong> A descriptor's backward card shows the descriptor and asks for the concept it belongs to: the nearest ancestor that is not itself a descriptor, which is a grandparent or higher when descriptors are nested. Reviewing any card of that concept, forward, backward or a cloze in it, puts the answer on screen, so the descriptor waits. RemNote buries this pairing for an hour; cooling extends it for the whole window.</li>
+</ul>
+<p><strong>And one rule about the card itself: new cards.</strong> A card you have just created and never reviewed cools too, for a fixed number of days counted from the moment the card was created (<strong>Cooling: new cards</strong>, 1 day by default, up to 10, 0 to turn it off). SuperMemo counts creating an item as its first repetition, so a cloze you wrote while reading is never asked the same day, while its answer is still in view. The date is the card's own: a cloze added today to an old Rem counts as new, and a direction you switch off and back on keeps its original card and history, so it does not. A direction switched on for the first time is a new card.</p>
+<p>Card Cluster siblings never cool each other: a cluster is designed to be shown together, and RemNote treats it as one unit. A sibling rated <em>Again</em> that is still due does not cool anything either — RemNote's own rule already separates that pair within the hour.</p>
+<h3 id="how-long">How long<a class="headerlink" href="#how-long" title="Permanent link">&para;</a></h3>
+<p>The window belongs to the cooled card and scales with its own interval, because a mature card is both more damaged by a free recall and cheaper to delay:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cooling days = clamp( ceil( interval × 5% ), 1, 15 )
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Card interval</th>
+<th>Cooling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a new card</td>
+<td>1 day</td>
+</tr>
+<tr>
+<td>10 days</td>
+<td>1 day</td>
+</tr>
+<tr>
+<td>60 days</td>
+<td>3 days</td>
+</tr>
+<tr>
+<td>200 days</td>
+<td>10 days</td>
+</tr>
+<tr>
+<td>a year or more</td>
+<td>15 days</td>
+</tr>
+</tbody>
+</table>
+<p>Counted from the moment the spoiling card was seen, not from when the plugin noticed. The three parameters — the share of the interval, the minimum and the maximum — are in the <a href="../Plugin-Settings-Reference/#priority-queue">settings</a>.</p>
+<h3 id="nothing-is-stored">Nothing is stored<a class="headerlink" href="#nothing-is-stored" title="Permanent link">&para;</a></h3>
+<p>The cooling set is <strong>recomputed from your card data</strong> on every refresh, at every queue exit, and once when RemNote starts — it is a function of what is scheduled and when each card was last shown. In Full Mode both come from the card cache, which records when each card was last shown alongside when it is due; note <a href="../Priorities-for-Flashcards/#cache-blind-spot">what the cache cannot see</a>. That is what makes it correct on every device the moment your cards sync, impossible to disagree with reality, and immune to a wipe of the plugin's synced storage. The only thing persisted is what <em>you</em> decide about specific Rems (below), one small record per knowledge base.</p>
+<h3 id="the-cooling-list">The Cooling list<a class="headerlink" href="#the-cooling-list" title="Permanent link">&para;</a></h3>
+<p><strong>Cooling</strong> in the popup lists every Rem currently cooling, highest priority first: the reason and when it happened, the day it comes back, and the length of its window. Three actions per Rem:</p>
+<ul>
+<li><strong>Release</strong> — stop cooling now. A sibling reviewed <em>later</em> cools it again.</li>
+<li><strong>+7d</strong> — keep it cooling a week longer.</li>
+<li><strong>Never</strong> — exempt this Rem from cooling for good.</li>
+</ul>
+<p><code>↑</code> <code>↓</code> choose a row, <code>R</code>, <code>E</code>, <code>N</code> act on it, <code>Enter</code> opens the Rem, <code>Esc</code> goes back. <strong>Rescan</strong> re-judges the 200 highest-priority Rems with due cards on the spot.</p>
+<h2 id="the-priority-review-queue-in-your-sidebar">The Priority Review Queue in your sidebar<a class="headerlink" href="#the-priority-review-queue-in-your-sidebar" title="Permanent link">&para;</a></h2>
+<p>Every Priority Queue document is tagged <code>#Priority Review Queue</code>, and that tag Rem lists all of them: open it and the <strong>All Tagged Bullets</strong> table shows every one, on desktop and on your phone alike. The <strong>👁</strong> button of the panel opens it.</p>
+<p>The first time the plugin builds a review document, it <strong>pins that tag Rem to your left sidebar</strong>. This happens once per knowledge base, ever. If you unpin it, it stays unpinned — the plugin will not put it back. The reason is mobile: the plugin panel is not rendered on a phone, the sidebar is, and a pinned Priority Review Queue is one tap away from a document you refreshed at your desk.</p>
+<p>The documents themselves live as children of the tag Rem, so they stay together, and practising the tag Rem still gathers every one of them with its descendants.</p>
+<h2 id="paused-document-filtering">Paused Document Filtering<a class="headerlink" href="#paused-document-filtering" title="Permanent link">&para;</a></h2>
+<p>RemNote's <strong>Deck Status</strong> system lets you mark a document (deck) as <strong>Paused</strong>, which signals that you are temporarily not reviewing material from that source. Without any filtering, due flashcards inside paused documents would still be selected — consuming slots that belong to your active material.</p>
+<h3 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<p>As each candidate flashcard Rem is pulled into the mixing loop:</p>
+<ol>
+<li>The plugin walks the Rem's ancestor chain looking for a Rem that carries the <code>Deck</code> powerup.</li>
+<li>If it finds one, it reads the <code>Status</code> slot.</li>
+<li>If the status is <code>"Paused"</code>, the Rem is skipped and reported — <strong>unless</strong> its absolute priority is at or below the <strong>always keep</strong> priority, in which case it is always included.</li>
+</ol>
+<p>This check is <strong>lazy</strong>: it runs for each card as it is drawn, so the number of ancestor walks is bounded by the fill target, not by the number of due cards in your knowledge base.</p>
+<p>Both controls sit under the fill target in the popup: the <strong>Skip paused documents</strong> checkbox, on by default, and <strong>but always keep priority … or less</strong>, 20 by default. Like the fill target, they are stored on each Priority Queue document, so the full-KB queue and a document-scoped one can differ.</p>
+<h3 id="what-you-see">What You See<a class="headerlink" href="#what-you-see" title="Permanent link">&para;</a></h3>
+<p>After an action, an <strong>amber ⚠️ panel</strong> in the popup lists every skipped Rem with its priority. Rems below priority 20 are shown in red, and the header calls them out as <strong>HIGH PRIORITY</strong> — which only happens once you have lowered the always-keep priority below 20. The status block counts the skipped Rems, and the toast after the <a href="#refresh-after-every-session">automatic refresh</a> says how many were skipped and how many of them were high priority, since no popup is open then.</p>
+<hr />
+<h2 id="ancestor-spoiler-protection">Ancestor Spoiler Protection<a class="headerlink" href="#ancestor-spoiler-protection" title="Permanent link">&para;</a></h2>
+<p>A descriptor with flashcards can sit above another descriptor with flashcards. When you practise the <strong>child</strong>, RemNote shows the parent above the question as context — <strong>answer included</strong>. If the parent's own card was due too and simply happened to come up later in the session, you have already read its answer: it gets graded as a successful recall it never had to make, and a card with years of accumulated stability walks away with years more.</p>
+<p><img alt="A queue card for a second-level descriptor: the first-level descriptor above it is displayed in full, answer included, and both were due" src="../assets/PRD-card-spoiler-protection.png" width="800" /></p>
+<p>Above, the card being asked is the <strong>second-level</strong> descriptor — the stats bar belongs to <em>it</em>, not to the card it is about to give away. The <strong>first-level</strong> descriptor sits right on top of it with its answer, <em>encurtar caminho</em>, in plain sight, and it was due in the same session. When it came up a few minutes later it was graded <strong>Good</strong> (<em>Recalled With Effort</em>) in <strong>17 seconds</strong>, and its interval went from <strong>1.3 years to 8.1 years</strong> — next practice in 2034 — on the strength of a line that had already been read.</p>
+<p><img alt="The plugin's Flashcard Repetition History for the first-level descriptor, with repetitions 9 and 10 boxed: a 1.3-year interval becoming 8.1 years, and stability going from 4.1 to 7.9 years" src="../assets/PRD-card-spoiler-protection-consequence.png" width="800" /></p>
+<p>The <a href="../Reviewing-Items-in-the-Queue/#flashcard-repetition-history">Flashcard Repetition History</a> of that first-level card records the damage. Repetition 10 answered a card a little before (3.3 years since last repetition) the optimum time suggested by its calculated previous 4.1 years stability (Retrievability being estimated at 91.4%), and FSRS read that as a card far stronger than it was: stability <strong>4.1 → 7.9 years</strong>, a ×1.90 bump, and a decade of scheduling bought with no retrieval at all. Nothing in the history marks it as unearned — from here on, it is simply what the card knows about itself.</p>
+<p>RemNote does not prevent this natively, so the Priority Queue does.</p>
+<h3 id="how-it-works_1">How It Works<a class="headerlink" href="#how-it-works_1" title="Permanent link">&para;</a></h3>
+<p>As each candidate flashcard Rem is drawn, the plugin looks at its <strong>parent and grandparent</strong> — two levels, the range where the context line still carries an answer rather than a section or document title:</p>
+<ol>
+<li>If neither ancestor has a due card, the Rem is included as normal.</li>
+<li>If one does, the Rem is <strong>held back</strong>, and the blocking ancestor <strong>takes its place in the document</strong>.</li>
+<li>When <em>both</em> ancestors are due, the <strong>grandparent</strong> is the one swapped in — the highest blocker, not the nearest — so releasing it frees the parent for the next refresh, which in turn frees the original card. The tree drains top-down, one level per review.</li>
+<li>If the blocking ancestor is itself <a href="#cooling-spoiler-protection-across-sessions">cooling</a>, nothing is swapped in: both wait, and the popup says so. While it waits, the child cannot set the <a href="#smart-scope-priority-shield-integration">Priority Shield</a> either. A child whose due ancestor is <em>not</em> cooling keeps counting, because that ancestor can be reviewed right away.</li>
+</ol>
+<p>The swap is the point. Dropping the child on its own would leave the block standing: the parent might not be drawn this time, and the same pair would collide again at the next refresh. Practising the ancestor <strong>now</strong> is what makes the descendant free next time. The ancestor swapped in may be <strong>lower priority</strong> than the card it displaced — its priority is beside the point; it is in the way.</p>
+<p>Due-ness is read from the ancestor's <strong>actual cards</strong>, not from the plugin's priority cache, so a flashcard you created minutes ago still protects its descendants. A never-practised card counts as due — the case that matters most, since nothing has been recalled for the descendant to give away.</p>
+<p><strong>Entries already in the document are checked too.</strong> The draw only looks at a child's ancestors when it first picks the child, so every refresh also checks each flashcard entry the document already holds. A child whose parent or grandparent has come due since it was added is drained, and that ancestor is pulled in ahead of the normal fill, so it is reviewed first. The toast after the <a href="#refresh-after-every-session">automatic refresh</a> counts these, and the status block shows how many ancestors were swapped in.</p>
+<p>Once the ancestor <em>has</em> been reviewed, its descendant returns at a later refresh — and that is exactly when the reverse relation takes over: a descendant reviewed recently cools its ancestor, since the descendant's context line showed the ancestor's answer. The two rules are the same rule in the two directions of time.</p>
+<h3 id="what-you-see_1">What You See<a class="headerlink" href="#what-you-see_1" title="Permanent link">&para;</a></h3>
+<p>After an action, a <strong>purple 🎭 panel</strong> in the popup lists each held-back Rem with its priority, the blocking parent or grandparent, and what happened to that ancestor: swapped in, already in the document, cooling, or unavailable. The status block counts them.</p>
+<blockquote>
+<p>[!NOTE]
+This check is always on and has no threshold — unlike the paused filter, there is no priority high enough to make reading an answer before recalling it a good trade.</p>
+</blockquote>
+<hr />
+<h2 id="card-cluster-support">Card Cluster Support<a class="headerlink" href="#card-cluster-support" title="Permanent link">&para;</a></h2>
+<p>RemNote's <strong><a href="https://help.remnote.com/en/articles/10104223-card-clusters">Card Cluster</a></strong> powerup (activated via <code>/cluster</code>) lets you group closely related flashcards under a shared parent so they are always reviewed together in the queue. When you practice a cluster, RemNote shows the sibling cards in order — the ones before the active card in grey for context, and the remaining ones as empty boxes.</p>
+<h3 id="the-problem">The Problem<a class="headerlink" href="#the-problem" title="Permanent link">&para;</a></h3>
+<p>Without special handling, the selection would pick individual flashcard Rems on priority alone. If a clustered parent had three children — all due — but only one ranked among the top by priority, the other two siblings would be absent from the document. When RemNote encountered that isolated Rem in the queue, it would have no cluster siblings to display, silently breaking the cluster experience.</p>
+<h3 id="how-the-plugin-handles-it">How the Plugin Handles It<a class="headerlink" href="#how-the-plugin-handles-it" title="Permanent link">&para;</a></h3>
+<p>A flashcard Rem is a cluster member when its <strong>direct parent</strong> carries the Card Cluster powerup. The plugin keeps every cluster in the document whole, at three moments:</p>
+<ol>
+<li><strong>When a flashcard Rem is drawn</strong>, every sibling with a <strong>due card</strong> is added with it — cooling or not, since cluster members are meant to be seen together.</li>
+<li><strong>On every Refresh and Refill</strong>, each flashcard entry the document holds is checked the same way — entries kept from earlier fills, new ones, and ancestors swapped in — and any due sibling missing from the document is added. A sibling that came due after its cluster entered the document is brought in this way.</li>
+<li><strong>When draining</strong>, a cooling cluster member stays while another member of its cluster in the document is due and not cooling. A cluster whose due members are all cooling leaves together.</li>
+</ol>
+<p>A sibling held back by a <a href="#ancestor-spoiler-protection">due ancestor</a> is not added: its siblings share that ancestor, so they are held back with it. Siblings whose cards are not due are not added either — RemNote still shows them in the cluster, the earlier ones as context.</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Only one cluster member meets the priority threshold</td>
+<td>All due siblings are pulled in automatically</td>
+</tr>
+<tr>
+<td>Multiple cluster members independently meet the threshold</td>
+<td>Each one triggers the cluster check; no Rem is added twice</td>
+</tr>
+<tr>
+<td>A sibling comes due after its cluster entered the document</td>
+<td>The next Refresh or Refill adds it</td>
+</tr>
+<tr>
+<td>One cluster member is cooling, another is due</td>
+<td>Both stay; the cluster is practised together</td>
+</tr>
+<tr>
+<td>No cluster members are due</td>
+<td>Nothing extra is added</td>
+</tr>
+<tr>
+<td>Cluster siblings push the total above the fill target</td>
+<td>Siblings are still included — a partial cluster would break the queue experience</td>
+</tr>
+</tbody>
+</table>
+<p>The refresh logs what it did: <code>[CardCluster] N clusters in the document: added X due siblings, kept Y cooling members with their cluster</code>, and the status block adds <em>N Card Cluster siblings added</em>.</p>
+<blockquote>
+<p>[!NOTE]
+Card Cluster is RemNote's built-in powerup with the code <code>cc</code>, which the Plugin SDK does not list. Until RemNote turned clusters into that powerup (July 2026) they were a tag, and the plugin looked for the tag and for guessed codes; from then on it no longer recognised clusters, and a member could enter the Priority Queue without its siblings. Clusters are recognised by <code>cc</code> since v1.0.114.</p>
+<p>[!NOTE]
+The count in the status block reflects the <strong>actual</strong> number of entries, which may exceed the fill target when cluster siblings are added. This is intentional.</p>
+</blockquote>
+<hr />
+<h2 id="smart-scope-priority-shield-integration">Smart Scope &amp; Priority Shield Integration<a class="headerlink" href="#smart-scope-priority-shield-integration" title="Permanent link">&para;</a></h2>
+<p>Even though you are reviewing a generated list, the plugin knows where the items came from.</p>
+<ul>
+<li><strong>Original Scope Awareness:</strong> While reviewing a Priority Queue document, the plugin "pretends" you are reviewing the original source.</li>
+<li><strong><a href="../Prioritization-%26-Sorting/#priority-shield">Priority Shield</a>:</strong> The Priority Shield (the stats below the answer buttons) calculates your protection against the <strong>original scope</strong> — the document you chose, or the whole knowledge base — never against the review document itself. <em>Example:</em> a Priority Queue scoped to "Biology 101" shows how well you are protecting priorities within "Biology 101".</li>
+<li><strong>Cooling Rems are not counted.</strong> A Rem whose spoiler sibling you reviewed recently cannot set the shield, live or in the history graph — the set is recomputed once when RemNote starts and at every queue exit, so the siblings you just reviewed are already accounted for, and the first queue after a restart counts the same Rems as the last one. Neither can a Rem held back because its parent or grandparent is due and cooling: the Priority Queue will not serve it until that window ends.</li>
+<li><strong>Stats Tracking:</strong> The history graph records your progress against the original document or the whole knowledge base, keeping your long-term stats accurate.</li>
+</ul>
+<h2 id="cleaning-up-leftovers">Cleaning up leftovers<a class="headerlink" href="#cleaning-up-leftovers" title="Permanent link">&para;</a></h2>
+<p>The <strong>Clean Priority Review Documents</strong> command (quick code <code>clean</code>) is the manual counterpart of Drain, across every document tagged <code>#Priority Review Queue</code> at once: it works out which entries still have something due and removes the rest after you confirm, per document. It also handles any timestamped snapshot documents built by earlier versions of the plugin, and offers to delete those once no flashcard in them is due.</p>
+<p>A Priority Queue document is never deleted by it — it is emptied and refilled, not thrown away — and the same rules protect your own writing everywhere: an entry with notes written under it, an entry you typed next to, or a bullet of your own in the document is never touched, and a document holding any of these is never deleted.</p>
+<p>"Due" here means <strong>due at any point up to the end of today</strong>, not due at this exact second. A card you answered <em>Forgot</em> an hour ago is sitting in a learning step ten minutes out: it is not due right now, but it is coming back in this very session, and deleting its entry would take it out of the document that is meant to bring it back.</p>
+<p><img alt="Cleaning a PRD" src="../assets/clean-PRD.png" width="650" /></p>
+<div class="admonition note">
+<p class="admonition-title">Incremental Rems need the queue to have been opened once</p>
+<p><code>INC</code> entries are judged against the plugin's Incremental Rem cache. If that cache has not been built yet in this session, an unbuilt cache is indistinguishable from <em>every incremental Rem has been reviewed</em> — so the command says so and leaves all <code>INC</code> entries alone. Open the queue once and run it again.</p>
+</div>
+<hr />
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The daily loop:</strong> open the popup, press <strong>Refresh</strong> (or trust the automatic one from your last session), press <strong>Practice</strong>, finish the fill. Leave the queue; the document is ready again before you are. Repeat as long as you have energy — each fill is the current top of your ranking, and each one raises your <a href="../Prioritization-%26-Sorting/#priority-shield">Priority Shield</a>.</li>
+<li><strong>The "Overwhelmed" workflow:</strong> 1000+ due cards is not a problem the queue can solve by itself. A fill target of 25 or 50 on the full knowledge base is a session you can finish, and finishing it is what moves the shield.</li>
+<li><strong>The "Deep Dive" workflow:</strong> to focus on one project, open that document, pick it as the scope, and work through its Priority Queue until the document-scoped shield reads clear.</li>
+<li><strong>Watch the Cooling list.</strong> It is the list of Rems the plugin is deliberately not asking you about. If a Rem there surprises you, <strong>Release</strong> it.</li>
+<li><strong>Maintain Priority Hygiene:</strong> to make sure the Priority Queue catches your most critical content, set priorities on your key documents and flashcards, and run "<strong><a href="../Priorities-for-Flashcards/#manual-full-kb-sweep-update-all-inherited-card-priorities">Update all inherited Card Priorities</a></strong>" periodically (e.g., weekly), so every flashcard — even those you haven't manually touched — inherits the correct priority from its parent document.</li>
+</ul>
+<hr />
+<h2 id="technical-card-state-detection">Technical: Card State Detection<a class="headerlink" href="#technical-card-state-detection" title="Permanent link">&para;</a></h2>
+<p>This section documents how the plugin distinguishes between <strong>active</strong>, <strong>paused</strong>, and <strong>disabled</strong> flashcard rems, which RemNote SDK call to use for each, and exactly where the plugin applies (or omits) the resulting filters.</p>
+<h3 id="card-states-in-remnote">Card States in RemNote<a class="headerlink" href="#card-states-in-remnote" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Description</th>
+<th>How to detect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Active</strong></td>
+<td>Card is in the normal review cycle. <code>nextRepetitionTime</code> is a future timestamp.</td>
+<td><code>card.nextRepetitionTime &gt; Date.now()</code></td>
+</tr>
+<tr>
+<td><strong>Due</strong></td>
+<td>Card is overdue or due today. <code>nextRepetitionTime</code> is a past timestamp.</td>
+<td><code>(card.nextRepetitionTime ?? Infinity) &lt;= Date.now()</code></td>
+</tr>
+<tr>
+<td><strong>Disabled</strong></td>
+<td>Card has been explicitly disabled by the user (toggle off). <code>nextRepetitionTime</code> is <code>null</code>.</td>
+<td><code>card.nextRepetitionTime === null</code></td>
+</tr>
+<tr>
+<td><strong>Paused (deck)</strong></td>
+<td>The card's source document has been paused via the Deck Status system. The card itself still has a valid (often past-due) <code>nextRepetitionTime</code>.</td>
+<td>Walk ancestor chain: find the rem with <code>hasPowerup(BuiltInPowerupCodes.Deck)</code>, read <code>getPowerupProperty(BuiltInPowerupCodes.Deck, 'Status')</code> → <code>"Paused"</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="key-api-behaviour">Key API Behaviour<a class="headerlink" href="#key-api-behaviour" title="Permanent link">&para;</a></h3>
+<p><strong><code>plugin.card.getAll()</code></strong> returns <em>all</em> cards in the knowledge base, regardless of state — active, due, disabled, and paused-deck cards alike. This is the call used when building the priority cache at startup, and the one read the cooling scan pays once per refresh.</p>
+<p><strong><code>rem.getCards()</code></strong> returns the cards for a specific rem but behaves differently depending on rem state:</p>
+<ul>
+<li>For a <strong>normal rem</strong>: returns the rem's cards as expected.</li>
+<li>For a rem inside a <strong>paused document</strong>: returns <code>[]</code> — the SDK silently suppresses the cards. This makes <code>rem.getCards()</code> an <em>unreliable</em> source for building the full card universe; use <code>plugin.card.getAll()</code> instead.</li>
+<li>For a rem with <strong>disabled cards</strong>: also returns <code>[]</code>.</li>
+</ul>
+<h3 id="how-the-plugin-handles-each-state">How the Plugin Handles Each State<a class="headerlink" href="#how-the-plugin-handles-each-state" title="Permanent link">&para;</a></h3>
+<h4 id="disabled-cards-nextrepetitiontime-null">Disabled cards (<code>nextRepetitionTime === null</code>)<a class="headerlink" href="#disabled-cards-nextrepetitiontime-null" title="Permanent link">&para;</a></h4>
+<p>Disabled cards are implicitly excluded everywhere the plugin evaluates "due cards". The pattern:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">(</span><span class="nx">card</span><span class="p">.</span><span class="nx">nextRepetitionTime</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="kc">Infinity</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="nx">now</span>
+</code></pre></div>
+<p>maps <code>null</code> to <code>Infinity</code>, so a disabled card never satisfies the <code>&lt;= now</code> condition. This is an <strong>implicit</strong> exclusion — there is no explicit disabled-card filter — but it produces the correct result in every context where the plugin counts or selects due cards.</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Effect on disabled cards</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Due-card priority cache</strong> (<code>card_priority/index.ts</code>)</td>
+<td>Excluded — <code>?? Infinity</code> never satisfies <code>&lt;= now</code>. Not counted in <code>dueCards</code> or <code>dueCardsOverdue</code>.</td>
+</tr>
+<tr>
+<td><strong><code>getDueCardsWithPriorities</code></strong></td>
+<td>Excluded — uses the same <code>?? Infinity</code> filter to build the <code>remDueCardCount</code> map.</td>
+</tr>
+<tr>
+<td><strong>Priority Queue selection</strong></td>
+<td>Excluded — flows through <code>getDueCardsWithPriorities</code>, so they never reach the mixing loop.</td>
+</tr>
+<tr>
+<td><strong>Cooling</strong></td>
+<td>A disabled card cannot be spoiled (never due) and, having no viewing after it was disabled, does not spoil.</td>
+</tr>
+<tr>
+<td><strong>Priority Shield (widget)</strong></td>
+<td>Excluded from due count; cached <code>dueCards</code> field is always 0 for disabled cards.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="paused-deck-cards-nextrepetitiontime-is-a-valid-past-timestamp">Paused-deck cards (<code>nextRepetitionTime</code> is a valid past timestamp)<a class="headerlink" href="#paused-deck-cards-nextrepetitiontime-is-a-valid-past-timestamp" title="Permanent link">&para;</a></h4>
+<p>Paused cards <em>do</em> have a valid <code>nextRepetitionTime</code> in the past, so they pass the <code>&lt;= now</code> filter and are treated as due unless explicitly checked. The plugin uses the <strong>ancestor-chain walk</strong> described above (<code>isInPausedDocument</code>) to detect them.</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Effect on paused-deck cards</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Due-card priority cache</strong></td>
+<td><strong>Included</strong> — <code>nextRepetitionTime</code> is valid, so the <code>?? Infinity</code> filter does not exclude them. Their <code>CardPriorityInfo</code> entry enters the cache, stamped <code>paused</code> by the paused-deck scan.</td>
+</tr>
+<tr>
+<td><strong>Priority Shield (widget)</strong></td>
+<td>Suppressed through the <code>paused</code> stamp.</td>
+</tr>
+<tr>
+<td><strong>Priority Queue selection</strong></td>
+<td><strong>Filtered out</strong> via the lazy <code>isInPausedDocument</code> ancestor walk. Rems at or below the always-keep priority (20 by default) bypass the filter and are always included.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="why-remgetcards-is-not-used-for-paused-detection">Why <code>rem.getCards()</code> Is Not Used for Paused Detection<a class="headerlink" href="#why-remgetcards-is-not-used-for-paused-detection" title="Permanent link">&para;</a></h3>
+<p>A paused rem returns <code>[]</code> from <code>rem.getCards()</code>, which looks identical to a disabled rem or simply a rem with no cards. There is no way to distinguish between these three cases from the return value alone. The Deck powerup <code>Status</code> slot is the authoritative signal for pause state, and the ancestor walk is the only reliable way to retrieve it.</p>
+<h3 id="source-references">Source References<a class="headerlink" href="#source-references" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Topic</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/lib/priority_review_document/select.ts</code></td>
+<td>The selection: ranking, shield slice, mixing, and the four gates</td>
+</tr>
+<tr>
+<td><code>src/lib/priority_review_document/queue_doc.ts</code></td>
+<td>The persistent document: find-or-create, refresh / drain / refill, status block, Practice route</td>
+</tr>
+<tr>
+<td><code>src/lib/priority_review_document/cooling.ts</code></td>
+<td>The cooling rule, pure and fixture-tested (<code>npm test</code>)</td>
+</tr>
+<tr>
+<td><code>src/lib/priority_review_document/cooling_gather.ts</code></td>
+<td>Turning cards and the tree into the facts the rule judges</td>
+</tr>
+<tr>
+<td><code>src/lib/priority_review_document/clean.ts</code></td>
+<td>Drain, and the Clean command</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
