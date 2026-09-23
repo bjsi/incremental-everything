@@ -30,7 +30,6 @@ import {
     ReferenceArea,
     ReferenceLine,
     ResponsiveContainer,
-    Scatter,
     Tooltip,
     XAxis,
     YAxis,
@@ -336,7 +335,7 @@ function StabilityTooltip({
                     })}
                 </div>
             )}
-            {s !== null && (
+            {s !== null && !isFuture && (
                 <div>
                     <span className="rn-clr-content-secondary">Stability:</span>{' '}
                     <strong>{formatStabilityDays(s)}</strong>
@@ -663,6 +662,7 @@ export function ForgettingCurveChart({
                 }
             }
             return {
+                index: r.index,
                 x: r.x,
                 sLog: r.sLog,
                 s: r.s,
@@ -733,31 +733,46 @@ export function ForgettingCurveChart({
         return [floor, Math.max(dataTop + headroom, neededForLabels)];
     }, [repPoints, visibleRows, labelReservePx, stabilityPlotHeight, xDomain]);
 
+    const repByIndex = useMemo(
+        () => new Map(repPoints.map((p) => [p.index, p])),
+        [repPoints],
+    );
+
     /**
      * The dot and its ×SInc, drawn together.
      *
      * This was a `LabelList` with a `content` function, which recharts feeds
      * through `filterProps` and a `viewBox` guard before it ever reaches the
      * renderer — so whether a label appeared depended on internals, and some of
-     * them silently did not. A `shape` gets the datum directly, so the label is
-     * drawn if and only if the dot is.
+     * them silently did not. Drawing both from one renderer means the label
+     * appears if and only if the dot does.
+     *
+     * It runs for every row, because the series spans them all; the rows that
+     * are not a repetition carry no value and are skipped.
      */
     const renderRepPoint = (raw: any) => {
-        const { cx, cy, payload } = raw as {
+        const { cx, cy, payload, index } = raw as {
             cx?: number;
             cy?: number;
-            payload?: { sIncLabel?: string; labelRow?: number };
+            index?: number;
+            payload?: { repIndex?: number | null };
         };
-        if (typeof cx !== 'number' || typeof cy !== 'number') return <g />;
+        // Recharts types a dot renderer as returning an element, never null, so
+        // the rows that are not a repetition return an empty group.
+        const nothing = <g key={`no-rep-${index}`} />;
+        if (typeof cx !== 'number' || typeof cy !== 'number' || !Number.isFinite(cy)) return nothing;
 
-        const label = payload?.sIncLabel;
-        const row = payload?.labelRow ?? -1;
+        const rep = typeof payload?.repIndex === 'number' ? repByIndex.get(payload.repIndex) : undefined;
+        if (!rep) return nothing;
+
+        const label = rep.sIncLabel;
+        const row = rep.labelRow;
         // A label centred on the first repetition would hang off the left edge
         // and be clipped, so anchor it to the plot edge instead.
         const nearLeft = cx < STABILITY_PLOT_LEFT + 16;
 
         return (
-            <g>
+            <g key={`rep-${rep.index}`}>
                 <circle cx={cx} cy={cy} r={3} fill={STABILITY_COLOR} />
                 {row >= 0 && label ? (
                     <text
@@ -1037,12 +1052,13 @@ export function ForgettingCurveChart({
                             />
                         ))}
 
-                        <Scatter
-                            data={repPoints}
-                            dataKey="sLog"
-                            fill={STABILITY_COLOR}
+                        <Line
+                            dataKey="repSLog"
+                            stroke="none"
+                            dot={renderRepPoint}
+                            activeDot={false}
                             isAnimationActive={false}
-                            shape={renderRepPoint}
+                            connectNulls={false}
                         />
 
                         {drag && (

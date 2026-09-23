@@ -187,6 +187,20 @@ export interface CurveRow {
     hardSLog?: number | null;
     goodSLog?: number | null;
     easySLog?: number | null;
+    /**
+     * The repetition dot, on the row that opens a repetition's segment and
+     * nowhere else.
+     *
+     * The dots used to be a `Scatter` with its own short array. Recharts builds
+     * the axis's categorical domain — which is what its tooltip resolves a
+     * pointer position against — from the graphical items' data, so those seven
+     * entries became the only positions the tooltip could report: anywhere in
+     * the forecast it answered with the last repetition. Carrying the dots on
+     * the shared rows keeps one array behind every series on the panel.
+     */
+    repSLog?: number | null;
+    /** 1-based index of that repetition, for looking its label up. */
+    repIndex?: number | null;
 }
 
 /** Row key carrying each grade's forecast stability. */
@@ -820,7 +834,13 @@ export function buildForgettingCurveSeries(
         const next = events[i + 1];
         const endDays = next ? toDays(next.t) : nowDays;
 
-        pushRow(startDays, { r: 100, s: event.s, sLog: toSLog(event.s) });
+        pushRow(startDays, {
+            r: 100,
+            s: event.s,
+            sLog: toSLog(event.s),
+            repSLog: toSLog(event.s),
+            repIndex,
+        });
         for (const d of sampleDays(startDays, endDays, SAMPLES_PER_SEGMENT, scale, floorDays)) {
             pushRow(d, {
                 r: forgettingCurve(d - startDays, event.s, decay, factor) * 100,
