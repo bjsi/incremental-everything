@@ -12,6 +12,12 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Log and linear time](Reviewing-Items-in-the-Queue.md#log-and-linear-time)
 
+### 🐛 Fixed
+
+**AI Transcribe**: Fixed transcription and Pin Source Quote failing with "unknown url type: local" on PDFs that RemNote now passes by their local file path — download the helper again to get the fix.
+
+📖 [AI Transcription setup](AI-Transcription-of-PDF-Highlights.md#setup)
+
 ## v1.0.126 - September 26th, 2026
 
 ### ✨ New - Logos Bible Software integration (macOS)

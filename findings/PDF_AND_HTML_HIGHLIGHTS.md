@@ -28,6 +28,8 @@ Highlights sit under the PDF's **Highlights** container, grouped under one **"Pa
 
 The PDF Rem's `UploadedFile` `URL` is `%LOCAL_FILE%<name>`: a placeholder for `https://remnote-user-data.s3.amazonaws.com/<name>`, which is publicly fetchable. The desktop copy is `~/remnote/remnote-<kbId>/files/<name>`, one folder per knowledge base.
 
+As of Sep 2026 some PDFs hand the plugin a second form instead: `local://` followed by the URL-encoded absolute path of that desktop copy (`local://%2FUsers%2F…%2Fremnote-<kbId>%2Ffiles%2F<name>.pdf`), seen from both the dev and the marketplace build. Take the file name from it and resolve as for the placeholder; `scripts/ai_ocr_helper.py` `fetch()` does.
+
 ## Text highlights vs area highlights
 
 Both use the same powerup and the same two slots. The difference is what they hold:

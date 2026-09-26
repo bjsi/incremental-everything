@@ -139,6 +139,12 @@ def fetch(url, suffix):
     name = None
     if url.startswith(LOCAL_FILE):
         name = url[len(LOCAL_FILE):]
+    elif url.startswith('local://'):
+        # Newer desktop builds (seen Sep 2026) hand over the local copy's absolute
+        # path instead: local://%2FUsers%2F…%2Fremnote-<kbId>%2Ffiles%2F<name>.
+        # Only the name is used, so the lookup stays in the requesting KB's folder
+        # (falling back to the download) rather than opening a path from the request.
+        name = Path(urllib.parse.unquote(url[len('local://'):])).name
     elif url.startswith(REMNOTE_FILES_URL):
         name = urllib.parse.urlsplit(url).path.lstrip('/')
     if name:
