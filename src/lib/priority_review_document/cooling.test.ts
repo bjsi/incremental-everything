@@ -23,6 +23,8 @@ import {
   pruneCoolingOverrides,
   CoolingCandidate,
   SpoilerSeenEvent,
+  RATED_CARD_MIN_GAP_MS,
+  withSessionRatings,
 } from './cooling';
 
 const NOW = Date.UTC(2026, 8, 11, 12, 0, 0);
@@ -353,5 +355,37 @@ describe('just-created cooling', () => {
       NOW
     );
     assert.equal(v, null);
+  });
+});
+
+describe('withSessionRatings', () => {
+  const unseen = { _id: 'c1', nextRepetitionTime: daysAgo(3), repetitionHistory: [] };
+  it('adds a rating the read does not have yet, not due for an hour', () => {
+    const at = NOW - 1000;
+    const [card] = withSessionRatings([unseen], new Map([['c1', at]]));
+    assert.equal(cardLastSeenAt(card), at);
+    assert.equal(card.nextRepetitionTime, at + RATED_CARD_MIN_GAP_MS);
+    assert.equal(isCardDue(card, NOW), false);
+  });
+  it('keeps a card whose history already holds the rating', () => {
+    const stored = { ...unseen, repetitionHistory: [{ date: NOW - 1200, score: 1 }], nextRepetitionTime: NOW + 40 * DAY_MS };
+    const [card] = withSessionRatings([stored], new Map([['c1', NOW - 1000]]));
+    assert.equal(card, stored);
+  });
+  it('leaves cards the session did not rate alone', () => {
+    const [card] = withSessionRatings([unseen], new Map([['other', NOW]]));
+    assert.equal(card, unseen);
+  });
+  it('a sibling rated moments ago cools the Rem at once', () => {
+    const [sibling] = withSessionRatings([{ ...unseen, _id: 'sib' }], new Map([['sib', NOW - 500]]));
+    const v = evaluateCooling(
+      {
+        remId: 'r',
+        dueCards: [{ cardId: 'c2', intervalDays: 0 }],
+        seen: [{ relation: 'same-rem', sourceRemId: 'r', cardId: 'sib', seenAt: cardLastSeenAt(sibling)!, stillDue: isCardDue(sibling, NOW) }],
+      },
+      NOW
+    );
+    assert.ok(v);
   });
 });

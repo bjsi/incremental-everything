@@ -684,7 +684,8 @@ function logScan(result: PrdScanResult) {
               doc.remainingIncEntries ? ' (its remaining entries are all incremental)' : ''
             }`
           : doc.undeletableReason
-            ? ` — no flashcards due, but it ${UNDELETABLE_REASON_LABELS[doc.undeletableReason]}`
+            ? // A Priority Queue document is kept whatever it holds; the others only get here empty.
+              `${doc.dueFlashcards ? ' — it' : ' — no flashcards due, but it'} ${UNDELETABLE_REASON_LABELS[doc.undeletableReason]}`
             : '')
     );
     const row = (e: PrdEntry) => ({

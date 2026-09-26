@@ -169,7 +169,8 @@ function incRemLastReadAt(inc: IncrementalRem | undefined): number | null {
 }
 
 export class CoolingScanner {
-  readonly now: number;
+  /** The clock verdicts are judged at. Moves forward on {@link rejudge}. */
+  now: number;
   /** Set on load: the explicit option, else the IE settings, else the defaults. */
   params: CoolingParams;
   /** Every Rem this scanner has judged, cooling or not. */
@@ -438,6 +439,26 @@ export class CoolingScanner {
       });
     }
     return found;
+  }
+
+  /**
+   * Judges one Rem again, with its cards as they are now and the clock moved to
+   * now — for a scanner kept open through a queue session
+   * (queue_cooling_skip.ts), where cards are rated while it runs.
+   */
+  async rejudge(remId: RemId, cards: CardLike[]): Promise<CoolingVerdict | null> {
+    await this.load();
+    this.now = Date.now();
+    this.cardsByRem.set(remId, cards);
+    this.checkedIds.delete(remId);
+    this.verdicts.delete(remId);
+    return this.verdictFor(remId);
+  }
+
+  /** Replaces one Rem's card facts — after one of its cards was rated in the queue. */
+  async updateCards(remId: RemId, cards: CardLike[]): Promise<void> {
+    await this.load();
+    this.cardsByRem.set(remId, cards);
   }
 
   /** One Rem, lazily — used for ancestors the spoiler swap wants to pull in. */

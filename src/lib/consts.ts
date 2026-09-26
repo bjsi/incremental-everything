@@ -671,3 +671,6 @@ export const coolingMaxDaysId = 'cooling-max-days';
 // just wrote from being graded while its answer is still in view.
 export const coolingNewCardDaysId = 'cooling-new-card-days';
 export const COOLING_NEW_CARD_DAYS_MAX = 10;
+// Queue setting: skip a card in RemNote's own spaced-repetition queues while its
+// Rem is cooling (lib/queue_cooling_skip.ts). The Learn New queue is always covered.
+export const coolingInQueuesId = 'cooling-in-queues';

@@ -47,6 +47,7 @@ import {
   coolingMinDaysId,
   coolingMaxDaysId,
   coolingNewCardDaysId,
+  coolingInQueuesId,
   displayWeightedShieldId,
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
@@ -123,6 +124,7 @@ export interface IESettings {
   [coolingMinDaysId]: number;
   [coolingMaxDaysId]: number;
   [coolingNewCardDaysId]: number;
+  [coolingInQueuesId]: boolean;
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
@@ -201,6 +203,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [coolingMinDaysId]: 1,
   [coolingMaxDaysId]: 15,
   [coolingNewCardDaysId]: 1,
+  [coolingInQueuesId]: true,
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
@@ -573,8 +576,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     group: 'priorityQueue',
     title: 'Refresh the Priority Queues at startup and after each session',
     description:
-      'When RemNote starts, once the caches are loaded, refreshes every Priority Queue document; ' +
-      'and when you leave the queue after practising one, refreshes that one. A refresh drains the ' +
+      'When RemNote starts, once the caches are loaded, refreshes the full-KB Priority Queue; and ' +
+      'when you leave the queue after practising any Priority Queue, refreshes that one. Document ' +
+      'queues are not refreshed at startup: each waits for its own session. A refresh drains the ' +
       'entries you reviewed and tops the document back up to its fill target, so it is ready ' +
       'before the next Practice. Never runs while a queue is open, and not in Light Mode — refresh ' +
       'from the Priority Queue popup there.',
@@ -624,6 +628,16 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'How long a card you just created stays out of the Priority Queue before its first review — ' +
       'SuperMemo counts creating an item as its first repetition, so it is never asked the same day. ' +
       'Counted from the card\u2019s own creation time; 0 turns this off. At most 10 days.',
+  },
+  [coolingInQueuesId]: {
+    kind: 'boolean',
+    group: 'priorityQueue',
+    title: 'Cooling: skip cooling cards in every queue',
+    description:
+      'Skips a card in RemNote\u2019s own spaced-repetition queues (a document, the daily queue) while ' +
+      'its Rem is cooling, with a toast saying why. The card flashes briefly before it goes; it stays ' +
+      'due and returns once cooling ends. Practice All, In Order and Card Clusters are left alone, ' +
+      'and so is Light Mode. The Learn New queue is always covered, whatever this says.',
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',

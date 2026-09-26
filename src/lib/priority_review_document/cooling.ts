@@ -313,6 +313,36 @@ export function cardsFromCacheInfo(info: {
 }
 
 /**
+ * How soon RemNote makes a rated card due again, at the least: every rating in
+ * a 90-day sample (Sep 2026) scheduled the next one 60 minutes or more ahead —
+ * Forgot and Skip exactly an hour, Hard/Good/Easy a day or more.
+ */
+export const RATED_CARD_MIN_GAP_MS = 60 * 60_000;
+
+/**
+ * Adds the ratings a queue session just saw to cards read back from RemNote.
+ * A plugin read does not wait for pending writes, so the card rated a moment ago
+ * can still look unseen and due — and its sibling would not cool. `ratedAt`
+ * maps card id → when the session saw it rated; a card whose history already
+ * holds that rating is returned as it is.
+ */
+export function withSessionRatings(cards: CardLike[], ratedAt: ReadonlyMap<string, number>): CardLike[] {
+  if (ratedAt.size === 0) return cards;
+  return cards.map((card) => {
+    const at = ratedAt.get(card._id);
+    if (at === undefined) return card;
+    const seen = cardLastSeenAt(card);
+    // The stored rating is dated a moment before the event that reported it.
+    if (seen !== null && seen >= at - 5_000) return card;
+    return {
+      ...card,
+      repetitionHistory: [...(card.repetitionHistory ?? []), { date: at, score: 1 }],
+      nextRepetitionTime: Math.max(card.nextRepetitionTime ?? 0, at + RATED_CARD_MIN_GAP_MS),
+    };
+  });
+}
+
+/**
  * The queue's due predicate: `?? Infinity` so a card with no schedule
  * (disabled, table row, markup removed) never reads as due.
  */

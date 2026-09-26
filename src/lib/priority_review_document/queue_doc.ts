@@ -644,72 +644,55 @@ async function ensureHeaderOrder(plugin: RNPlugin, doc: PluginRem): Promise<void
 
 
 /**
- * The startup counterpart of the queue-exit auto-refresh: every Priority Queue
- * document is refreshed once, one after another, so the first Practice of a
- * RemNote run finds them drained and topped up. The caller decides when — after
- * the caches, so a Full Mode refresh reads no cards — and whether (the setting,
- * Light Mode).
+ * The startup counterpart of the queue-exit auto-refresh, for the full-KB
+ * Priority Queue only, so the first Practice of a RemNote run finds it drained
+ * and topped up. Document-scoped queues are left alone: each costs a scope build
+ * (tens of seconds on a large document), many are practised rarely, and each is
+ * refreshed anyway when a session on it ends, or from the popup. The caller
+ * decides when — after the caches, so a Full Mode refresh reads no cards — and
+ * whether (the setting, Light Mode).
  *
- * The queue guard stays on: a queue opened during startup blocks the refresh of
- * whatever is left, and the exit refresh covers the document that was practised.
- * Resolves `false` if any refresh threw.
+ * The queue guard stays on: a queue opened during startup blocks the refresh.
+ * Resolves `false` if the refresh threw.
  */
-export async function refreshAllPriorityQueuesAtStartup(plugin: RNPlugin): Promise<boolean> {
+export async function refreshKbPriorityQueueAtStartup(plugin: RNPlugin): Promise<boolean> {
   const tag = '[Startup] Priority Queue auto-refresh';
   const docs = await listPriorityQueueDocs(plugin);
-  if (!docs.length) {
-    console.log(`${tag}: nothing to refresh, no Priority Queue documents yet`);
+  if (!docs.some((info) => !info.scopeRemId)) {
+    console.log(`${tag}: nothing to refresh, no full-KB Priority Queue yet`);
     return true;
   }
 
-  let ok = true;
-  let refreshed = 0;
-  let ready = 0;
-  let paused = 0;
-  let highPaused = 0;
-  const seenScopes = new Set<string>();
-  for (const info of docs) {
-    // refreshPriorityQueue finds its document by scope, so a second document on
-    // the same scope would only refresh the first one again.
-    const scopeKey = info.scopeRemId ?? PRIORITY_QUEUE_KB_SCOPE;
-    if (seenScopes.has(scopeKey)) continue;
-    seenScopes.add(scopeKey);
-
-    const startedAt = Date.now();
-    try {
-      const result = await refreshPriorityQueue(plugin, { scopeRemId: info.scopeRemId });
-      if (result.blocked) {
-        console.log(`${tag}: stopped, a queue is open`);
-        break;
-      }
-      refreshed++;
-      ready += result.holding.total;
-      const skipped = result.selection?.skippedPausedItems ?? [];
-      paused += skipped.length;
-      highPaused += skipped.filter((s) => s.priority < 20).length;
-      console.log(
-        `${tag}: ${info.scopeRemId ?? 'full KB'} done in ${Date.now() - startedAt}ms, ` +
-          `holding ${result.holding.total}, drained ${result.drained.reviewed} reviewed, ` +
-          `${result.drained.cooling} cooling, ${result.drained.ancestor} ancestor-held, ` +
-          `${result.drained.missing} missing, added ${result.added.total}, ${skipped.length} paused skipped`
-      );
-    } catch (e) {
-      ok = false;
-      console.error(`${tag}: failed for ${info.scopeRemId ?? 'full KB'}`, e);
+  const docQueues = docs.filter((info) => !!info.scopeRemId).length;
+  const startedAt = Date.now();
+  try {
+    const result = await refreshPriorityQueue(plugin, { scopeRemId: null });
+    if (result.blocked) {
+      console.log(`${tag}: stopped, a queue is open`);
+      return true;
     }
-  }
-
-  if (refreshed) {
+    const skipped = result.selection?.skippedPausedItems ?? [];
+    const highPaused = skipped.filter((s) => s.priority < 20).length;
+    console.log(
+      `${tag}: full KB done in ${Date.now() - startedAt}ms, ` +
+        `holding ${result.holding.total}, drained ${result.drained.reviewed} reviewed, ` +
+        `${result.drained.cooling} cooling, ${result.drained.ancestor} ancestor-held, ` +
+        `${result.drained.missing} missing, added ${result.added.total}, ${skipped.length} paused skipped ` +
+        `(${docQueues} document queue${docQueues === 1 ? '' : 's'} left for their own sessions)`
+    );
     await plugin.app.toast(
-      `Priority Queue${refreshed === 1 ? '' : 's'} refreshed at startup: ${ready} items ready` +
-        (paused
-          ? `. ⚠️ ${paused} skipped in paused documents` +
+      `Priority Queue refreshed at startup: ${result.holding.total} items ready` +
+        (skipped.length
+          ? `. ⚠️ ${skipped.length} skipped in paused documents` +
             (highPaused ? `, ${highPaused} of them HIGH PRIORITY` : '') +
             ' — open the Priority Queue popup and Refresh to see them.'
           : '.')
     );
+    return true;
+  } catch (e) {
+    console.error(`${tag}: failed for the full KB`, e);
+    return false;
   }
-  return ok;
 }
 
 /** Opens Practice for the document: RemNote's own Practice button is this route. */

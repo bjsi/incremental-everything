@@ -38,6 +38,27 @@ The queue controller chains providers:
 
 The order of portals in a document is irrelevant. The only order control a plugin has is the **size** of the document it queues (small bursts).
 
+## "Need to Learn" cards and the Learn New queue
+
+Read from the 1.28.19 bundle and the local database, 2026-09-26.
+
+**Storage.** Neither a powerup nor a slot. Two raw document fields, both named `ny`:
+- the card doc's `ny` (`NOT_YET_LEARNED`), which marks the card as waiting in Learn New;
+- the Rem doc's `ny` (`IS_OR_WAS_NEED_TO_LEARN_CARD`), a sticky "came from AI/import" marker. It is not required for Learn New: in this KB, 1,262 cards carry `ny` but only 6 of their Rems do.
+
+A card created with the flag has no `ny,u` timestamp. `card.isNotYetLearned()` is simply `!!card.ny`. Document and Practice All queues (`allCramItems`) drop these cards unless called with `includeNeedToLearnCards`.
+
+**Leaving Learn New.** A card loses `ny` only when it is answered **Hard, Good or Easy**. Forgot, Skip (written as a `TOO_EARLY` rep) and Reset keep it. Learn New answers are stored as `isCram: true` reps with the page's `subQueueId`. The only native way to clear the flag without answering is the **"Need to Learn" switch** in a Rem's flashcard menu (`Hierarchy Editor Rem Card Menu`). It rewrites every card of that one Rem, and there is no bulk version.
+
+**Why siblings run back to back.** The page is `/need_to_learn/:examId/:documentId/:order?` (`NeedToLearnQueuePage`), which mounts `QueueMain` with **`skipCheckpoints: true`**. The bury provider's constructor sets `practiceBuriedCards = r.skipCheckpoints`, so this flag, meant to hide daily-goal checkpoints, also turns off same-Rem burying. The selector sends one document at a time, often a handful of cards from one or two Rems. With "In Order", the cards also come in cloze order.
+
+**From a plugin.**
+- The plugin **can't read or write `ny`**. The SDK `Card` copies only `_id`, `remId`, `type`, `createdAt`, `history`, `activeNextTime` and `timesWrongInRow`, and no bridge method sets the field. `updateCardRepetitionStatus(GOOD)` would clear it, but only by recording a fake review.
+- It **can tell it is in Learn New**: `plugin.window.getURL()` starts with `/need_to_learn/`. Flashcard widgets and queue events work there, as the Priority badge and live session recording show.
+- So a plugin-side bury is possible. `src/lib/queue_cooling_skip.ts` (Sep 2026) does it with the Priority Queue's cooling engine, in Learn New and in spaced-repetition queues. The skipped card keeps `ny` and returns in a later batch. Still to measure: whether a skip here also writes Practice All-style `finishedCards` progress.
+- Cooling covers RemNote's hour-long bury without a rule of its own. Every rating in a 90-day sample of this KB scheduled the card's next repetition at least 60 min ahead: Forgot and Skip exactly an hour, Hard/Good/Easy a day or more. A just-rated sibling is therefore "not due", which is cooling's condition, for at least that hour.
+- The clean fix is on RemNote's side: keep `bury_protection` on in this queue, and add `card.isNotYetLearned()` / `setNotYetLearned()` to the SDK.
+
 ## Launching a queue
 
 The SDK has no `startQueue`, but `plugin.window.setURL(url)` is implemented as `FlowRouter.go(FlowRouter.coerce(url))`, and RemNote's own `rem.practice()` is `FlowRouter.go("Flashcards.subQueue", {id})`:
