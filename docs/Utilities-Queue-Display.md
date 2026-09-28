@@ -177,6 +177,12 @@ The properties are gone from the question stage…
 
 ---
 
+## Beautiful Queue { #beautiful-queue }
+
+Hide Parent, Hide Grandparent, Remove Parent and Remove Grandparent work in both queue variants, Compact and Beautiful. In Beautiful, a descriptor card (the "↔ Recall the description" cards of a concept) is drawn beside its concept rather than under it; the powerups still hide the right ancestor there — the concept as the parent, the Rem above it as the grandparent.
+
+---
+
 ## Queue Support
 
 All commands above can be triggered directly while reviewing a flashcard in the Queue, without needing to switch to the editor:

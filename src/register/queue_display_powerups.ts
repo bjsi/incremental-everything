@@ -106,6 +106,28 @@ const CORE_CSS = `
   margin-left: 0px !important;
 }
 
+/* ===== Remove Parent / Remove Grandparent — Beautiful descriptor cards =====
+   Beautiful lifts a descriptor question OUT of its concept parent: the question
+   sits in a wrapper div that follows the parent, inside the grandparent:
+     .indented-rem                      ← grandparent
+       .indented-rem                    ← parent (concept), no question inside
+       div.mt-3
+         .indented-rem.rn-question-rem
+   The "> .rn-question-rem" chains above never match that, so the parent is
+   reached with "+ div > …" and the grandparent with "> div > …". Confirmed
+   2026-09-28 against live DOM. */
+.rn-queue__content .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="remove-parent"]),
+.rn-queue__content .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="removeparent"]),
+.rn-queue__content .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="remove-grandparent"]) > .rn-queue-rem,
+.rn-queue__content .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="removegrandparent"]) > .rn-queue-rem {
+  display: none !important;
+}
+
+.rn-queue__content .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="remove-grandparent"]),
+.rn-queue__content .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="removegrandparent"]) {
+  margin-left: 0px !important;
+}
+
 /* ===== Hide Front Extras =====
    Slots a table/template is configured to show on the FRONT of its cards render
    as ".extra-card-detail" INSIDE the ancestor ".indented-rem", as a sibling of
@@ -253,6 +275,38 @@ const LEGACY_CSS = `
 .rn-queue__content--answer-hidden .indented-rem:has(> .indented-rem > .rn-question-rem[data-queue-rem-container-tags~="hidegrandparent"]) > .rn-queue-rem > .rn-bullet-container:after,
 .rn-queue__content--answer-hidden .indented-rem:has(> .indented-rem > .rn-question-rem[data-queue-rem-container-tags~="hide-grandparent"]) > .rn-queue-rem > .rem-bullet__document:after,
 .rn-queue__content--answer-hidden .indented-rem:has(> .indented-rem > .rn-question-rem[data-queue-rem-container-tags~="hidegrandparent"]) > .rn-queue-rem > .rem-bullet__document:after {
+  content: "Hidden in queue";
+  opacity: .3;
+  white-space: nowrap;
+  position: absolute;
+  left: 25px;
+  top: 0;
+}
+
+/* ===== Hide Parent / Hide Grandparent — Beautiful descriptor cards =====
+   Same hoisted layout as Remove Parent / Remove Grandparent in CORE_CSS: the
+   question is the parent's next sibling ("+ div > …") and a grandchild-by-wrapper
+   of the grandparent ("> div > …"). A concept ancestor puts its text in
+   .queue-beautiful-concept-descriptor-line, not a bare .RichTextViewer, so the
+   whole row except the bullet goes and the bullet carries the placeholder. */
+.rn-queue__content--answer-hidden .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > :not(.rn-bullet-container),
+.rn-queue__content--answer-hidden .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hideparent"]) > .rn-queue-rem > :not(.rn-bullet-container),
+.rn-queue__content--answer-hidden .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hide-grandparent"]) > .rn-queue-rem > :not(.rn-bullet-container),
+.rn-queue__content--answer-hidden .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hidegrandparent"]) > .rn-queue-rem > :not(.rn-bullet-container) {
+  display: none !important;
+}
+
+.rn-queue__content--answer-hidden .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rn-bullet-container,
+.rn-queue__content--answer-hidden .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hideparent"]) > .rn-queue-rem > .rn-bullet-container,
+.rn-queue__content--answer-hidden .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hide-grandparent"]) > .rn-queue-rem > .rn-bullet-container,
+.rn-queue__content--answer-hidden .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hidegrandparent"]) > .rn-queue-rem > .rn-bullet-container {
+  position: relative;
+}
+
+.rn-queue__content--answer-hidden .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rn-bullet-container:after,
+.rn-queue__content--answer-hidden .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hideparent"]) > .rn-queue-rem > .rn-bullet-container:after,
+.rn-queue__content--answer-hidden .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hide-grandparent"]) > .rn-queue-rem > .rn-bullet-container:after,
+.rn-queue__content--answer-hidden .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hidegrandparent"]) > .rn-queue-rem > .rn-bullet-container:after {
   content: "Hidden in queue";
   opacity: .3;
   white-space: nowrap;

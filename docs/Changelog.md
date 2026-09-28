@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.130 - September 28th, 2026
+
+### 🐛 Fixed
+
+**Queue Display**: Fixed Hide Parent, Hide Grandparent, Remove Parent and Remove Grandparent not hiding anything on descriptor cards in the Beautiful queue.
+
+📖 [Beautiful Queue](Utilities-Queue-Display.md#beautiful-queue)
+
 ## v1.0.129 - September 28th, 2026
 
 ### ✨ New - Cooling in RemNote's own queues
