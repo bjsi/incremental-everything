@@ -701,7 +701,7 @@ A periodic notification widget that appears in the Left Sidebar End when ≥ 10 
 ### 7.3. Mastery Drill Bar
 *(Queue, below the top bar)*
 
-Shown only while the Mastery Drill runs in the regular queue. **Remove from Drill** takes the card on screen out of the drill; **Card List** opens the card list below. When RemNote has hidden drill cards ("Time to Take a Break"), the bar says to press **Keep Practicing**.
+Shown only while the Mastery Drill runs in the regular queue. **Remove from Drill** takes the card on screen out of the drill; **Card List** opens the card list below. When RemNote hides drill cards ("Time to Take a Break"), the drill presses **Keep Practicing** itself; if that fails, the bar says to press it (or **Esc**).
 
 📖 **Full documentation:** [Where the Drill Runs](History-Queue-Dashboard-and-Mastery-Drill.md#where-the-drill-runs)
 

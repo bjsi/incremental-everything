@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.131 - September 28th, 2026
+
+### ⚡ Improved - the Mastery Drill gets past "Time to Take a Break"
+
+**Mastery Drill**: When RemNote hides drill cards because the drill skipped another card of the same Rem, the drill now presses **Keep Practicing** itself and carries on with them, instead of ending at "Time to Take a Break".
+
+📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#the-regular-queue-drill)
+
 ## v1.0.130 - September 28th, 2026
 
 ### ⚡ Improved - Descriptor cards keep their concept

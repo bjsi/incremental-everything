@@ -69,7 +69,7 @@ function MasteryDrillQueueBar() {
       {state.buried && (
         <div style={{ marginTop: '2px', fontSize: '11px' }}>
           RemNote hid some drill cards because a related card was just skipped. At "Time to Take a Break",
-          press <b>Keep Practicing</b> to get them. It only affects this drill.
+          press <b>Keep Practicing</b> (or Esc) to get them. It only affects this drill.
         </div>
       )}
     </div>

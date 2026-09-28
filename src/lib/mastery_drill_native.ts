@@ -28,7 +28,8 @@ import { NativeDrillState, nativeDrillStartRequestKey, nativeDrillStateKey } fro
  *     reaches the bridge first.
  *   - A skip counts as "seen" for RemNote's bury rule, so a drill card whose sibling
  *     was skipped can be buried; RemNote then shows "Time to Take a Break", whose
- *     Keep Practicing serves them (for this queue only). The drill bar says so.
+ *     Keep Practicing serves them (for this queue only). The drill presses it itself
+ *     through queue.rateCurrentCard (see pressKeepPracticing).
  *   - Practice All remembers progress per document id and asks "Continue where you
  *     left off?". A new document per session never has progress.
  * Ratings go through the normal QueueCompleteCard handler, which already adds a card
@@ -45,6 +46,42 @@ const DEFER_MS = 1000;
 const MAX_LOADS_PER_CARD = 6;
 /** The drill document is deleted this long after the queue closes, off RemNote's teardown. */
 const DOC_DELETE_DELAY_MS = 3000;
+/**
+ * RemNote's "Time to Take a Break" (buried cards) screen, restyled while the drill shows it.
+ * The drill presses Keep Practicing itself (pressKeepPracticing); this restyle is the fallback
+ * for when that fails, making the button the obvious choice and saying why. Hooks read from the bundle: the checkpoint root
+ * carries `queue-message--daily-target-checkpoint`; Keep Practicing is its "stop learning"
+ * button (`Queue Checkpoint Abort Button`, Escape), Go To Flashcard Home the "continue" one.
+ * The note is a full-width item of the buttons' own flex row (`div.gap-4`), so it wraps to
+ * the line right under them.
+ */
+const BURY_CSS_ID = 'mastery-drill-native-bury-screen';
+const buryScreenCss = (hiddenDrillCards: number) => `
+.queue-message--daily-target-checkpoint [data-test="Queue Checkpoint Abort Button"] {
+  background: var(--rn-clr-background-accent, #3b82f6) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+.queue-message--daily-target-checkpoint [data-test="Queue Checkpoint Continue Button"] {
+  background: transparent !important;
+  color: var(--rn-clr-content-secondary) !important;
+  border: 1px solid var(--rn-clr-border-primary) !important;
+}
+.queue-message--daily-target-checkpoint div.gap-4:has([data-test="Queue Checkpoint Abort Button"]) {
+  flex-wrap: wrap !important;
+}
+.queue-message--daily-target-checkpoint div.gap-4:has([data-test="Queue Checkpoint Abort Button"])::after {
+  content: "Mastery Drill: ${hiddenDrillCards > 0 ? `${hiddenDrillCards} drill card${hiddenDrillCards === 1 ? ' was' : 's were'}` : 'drill cards were'} hidden because the plugin skipped another card of the same Rem (skipped cards are never shown). Press Keep Practicing, or Esc, to drill them.";
+  flex-basis: 100%;
+  max-width: 34rem;
+  margin: 12px auto 0;
+  font-size: 18px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--rn-clr-content-primary);
+  text-align: center;
+}`;
 
 // Module state of the index realm. The GetNextCard callback reads it synchronously.
 let drillDocId: RemId | null = null;
@@ -67,6 +104,10 @@ interface Session {
   rated: number;
   skipMs: number[];
   buried: boolean;
+  /** The buried-cards screen restyle is registered; dropped on the next card. */
+  buryScreenStyled: boolean;
+  /** Times the drill pressed Keep Practicing itself this session. */
+  keepPracticingPresses: number;
   tripped: boolean;
 }
 
@@ -169,6 +210,7 @@ function endSession(plugin: RNPlugin, reason: string) {
   if (!s) return;
   session = null;
   void plugin.app.registerCSS(MASK_CSS_ID, '');
+  void plugin.app.registerCSS(BURY_CSS_ID, '');
   void publishState(plugin, { active: false, buried: false });
   const sorted = [...s.skipMs].sort((a, b) => a - b);
   console.log(
@@ -194,6 +236,34 @@ function endSession(plugin: RNPlugin, reason: string) {
   }, DOC_DELETE_DELAY_MS);
 }
 
+/**
+ * Presses Keep Practicing on RemNote's buried-cards screen. `queue.rateCurrentCard` answers
+ * a card, but on a checkpoint screen it calls the screen's handlers instead (read from the
+ * bundle): Good/Easy → onContinueLearning (Go To Flashcard Home), Again/Hard →
+ * onStopLearning, which on this screen is Keep Practicing — it sets the bury provider's
+ * practiceBuriedCards for this queue only, so the hidden cards are served.
+ *
+ * Rating Again with a real card on screen would record a lapse, so the screen type is read
+ * again right before, and the press is attempted at most twice per session.
+ */
+async function pressKeepPracticing(plugin: RNPlugin, s: Session, hidden: number): Promise<boolean> {
+  if (s.keepPracticingPresses >= 2) return false;
+  s.keepPracticingPresses++;
+  try {
+    if ((await plugin.queue.getCurrentQueueScreenType()) !== QueueItemType.PracticeBuried || session !== s) return false;
+    await plugin.queue.rateCurrentCard(QueueInteractionScore.AGAIN);
+    console.log(`${LOG} pressed Keep Practicing on RemNote's buried-cards screen; ${hidden} drill cards not served yet.`);
+    void plugin.app.toast(
+      `Mastery Drill: RemNote had hidden ${hidden > 0 ? hidden : 'some'} drill card${hidden === 1 ? '' : 's'} ` +
+        `(a related card was skipped). Continuing with ${hidden === 1 ? 'it' : 'them'}.`
+    );
+    return true;
+  } catch (e) {
+    console.warn(`${LOG} could not press Keep Practicing:`, e);
+    return false;
+  }
+}
+
 export function registerNativeDrillListeners(plugin: RNPlugin) {
   plugin.event.addListener(AppEvents.StorageSessionChange, nativeDrillStartRequestKey, () => {
     void startNativeDrill(plugin);
@@ -215,6 +285,8 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
       rated: 0,
       skipMs: [],
       buried: false,
+      buryScreenStyled: false,
+      keepPracticingPresses: 0,
       tripped: false,
     };
     // Registered from the index realm (this listener runs there): the only place registerCSS works.
@@ -241,11 +313,26 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     // Removing on it would remove the NEXT real card. One of them is the bury screen.
     if (!cardId) {
       const screen = await plugin.queue.getCurrentQueueScreenType();
-      if (screen === QueueItemType.PracticeBuried && !s.buried) {
-        s.buried = true;
-        void publishState(plugin, { active: true, buried: true });
+      if (screen === QueueItemType.PracticeBuried && session === s) {
+        // Drill cards the queue has not served yet: the ones RemNote is holding back.
+        const hidden = [...s.allowed].filter((id) => !s.loadsByCard.has(id)).length;
+        if (await pressKeepPracticing(plugin, s, hidden)) return;
+        s.buryScreenStyled = true;
+        void plugin.app.registerCSS(BURY_CSS_ID, buryScreenCss(hidden));
+        if (!s.buried) {
+          s.buried = true;
+          void publishState(plugin, { active: true, buried: true });
+        }
+        void plugin.app.toast(
+          `Mastery Drill: RemNote hid ${hidden > 0 ? hidden : 'some'} drill card${hidden === 1 ? '' : 's'}. Press Keep Practicing (or Esc) to drill ${hidden === 1 ? 'it' : 'them'}.`
+        );
+        console.log(`${LOG} RemNote's buried-cards screen is up; ${hidden} drill cards not served yet.`);
       }
       return;
+    }
+    if (s.buryScreenStyled) {
+      s.buryScreenStyled = false;
+      void plugin.app.registerCSS(BURY_CSS_ID, '');
     }
 
     const loads = (s.loadsByCard.get(cardId) ?? 0) + 1;
@@ -269,6 +356,10 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
       console.error(`${LOG} skip failed for ${cardId}:`, e);
     }
     s.skipMs.push(Date.now() - receivedAt);
+    console.log(
+      `${LOG} skipped ${cardId} (${build?.readyCardIds.has(cardId) ? 'drill card already rated' : 'not a ready drill card'}) ` +
+        `in ${Date.now() - receivedAt} ms`
+    );
   });
 
   plugin.event.addListener(AppEvents.QueueCompleteCard, undefined, (data: any) => {
