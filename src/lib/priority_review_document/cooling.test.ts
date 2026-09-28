@@ -373,8 +373,16 @@ describe('withSessionRatings', () => {
     assert.equal(card, stored);
   });
   it('leaves cards the session did not rate alone', () => {
-    const [card] = withSessionRatings([unseen], new Map([['other', NOW]]));
-    assert.equal(card, unseen);
+    const cards = withSessionRatings([unseen], new Map([['other', NOW]]));
+    assert.equal(cards[0], unseen);
+  });
+  it('adds a rating whose card has no fact of its own (card-cache facts have no real ids)', () => {
+    const cacheFact = { _id: 'r#0', nextRepetitionTime: daysAgo(3) };
+    const cards = withSessionRatings([cacheFact], new Map([['realCardId', NOW - 500]]));
+    assert.equal(cards.length, 2);
+    assert.equal(cards[0], cacheFact);
+    assert.equal(cardLastSeenAt(cards[1]), NOW - 500);
+    assert.equal(isCardDue(cards[1], NOW), false);
   });
   it('a sibling rated moments ago cools the Rem at once', () => {
     const [sibling] = withSessionRatings([{ ...unseen, _id: 'sib' }], new Map([['sib', NOW - 500]]));

@@ -383,18 +383,21 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
   // per-card panel state (currentCardId/prevCardId + lifetime stats) so the UI tracks
   // the sibling actually on screen rather than being stuck on the cluster anchor.
   setInterval(async () => {
-    if (!currentSession) return;
+    const session = currentSession;
+    if (!session) return;
     try {
       const vis = await plugin.storage.getSession<string>('clusterVisibleCardId');
-      if (!vis || vis === currentSession.currentCardId) return;
+      // The queue may have closed during the read: saveCurrentSession nulls the session.
+      if (currentSession !== session) return;
+      if (!vis || vis === session.currentCardId) return;
 
-      currentSession.prevCardFirstRep = currentSession.currentCardFirstRep;
-      currentSession.prevCardTotalTime = currentSession.currentCardTotalTime;
-      currentSession.prevCardRepCount = currentSession.currentCardRepCount;
-      currentSession.prevCardId = currentSession.currentCardId;
-      currentSession.currentCardId = vis;
+      session.prevCardFirstRep = session.currentCardFirstRep;
+      session.prevCardTotalTime = session.currentCardTotalTime;
+      session.prevCardRepCount = session.currentCardRepCount;
+      session.prevCardId = session.currentCardId;
+      session.currentCardId = vis;
 
-      await loadCardStats(plugin, currentSession, vis);
+      await loadCardStats(plugin, session, vis);
       await syncLiveSession(plugin);
     } catch (error) {
       console.error('ERROR in cluster sibling-transition poll:', error);

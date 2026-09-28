@@ -169,7 +169,7 @@ function incRemLastReadAt(inc: IncrementalRem | undefined): number | null {
 }
 
 export class CoolingScanner {
-  /** The clock verdicts are judged at. Moves forward on {@link rejudge}. */
+  /** The clock verdicts are judged at. Moves forward on {@link refresh}. */
   now: number;
   /** Set on load: the explicit option, else the IE settings, else the defaults. */
   params: CoolingParams;
@@ -442,23 +442,36 @@ export class CoolingScanner {
   }
 
   /**
-   * Judges one Rem again, with its cards as they are now and the clock moved to
-   * now — for a scanner kept open through a queue session
-   * (queue_cooling_skip.ts), where cards are rated while it runs.
+   * Judges the given Rems again at the current time, from what the scanner has
+   * already read — for a scanner kept open through a queue session
+   * (queue_cooling_skip.ts), whose card facts change as cards are rated. The
+   * tree reads are memoised, so Rems judged before cost no read at all.
    */
-  async rejudge(remId: RemId, cards: CardLike[]): Promise<CoolingVerdict | null> {
+  async refresh(remIds: Iterable<RemId>): Promise<void> {
     await this.load();
     this.now = Date.now();
-    this.cardsByRem.set(remId, cards);
-    this.checkedIds.delete(remId);
-    this.verdicts.delete(remId);
-    return this.verdictFor(remId);
+    const ids = [...remIds];
+    for (const id of ids) {
+      this.checkedIds.delete(id);
+      this.verdicts.delete(id);
+    }
+    await this.scan(ids);
   }
 
   /** Replaces one Rem's card facts — after one of its cards was rated in the queue. */
   async updateCards(remId: RemId, cards: CardLike[]): Promise<void> {
     await this.load();
     this.cardsByRem.set(remId, cards);
+  }
+
+  /** One Rem's card facts as the scanner judges them. Empty before the facts are loaded. */
+  cardsOf(remId: RemId): CardLike[] {
+    return this.cardsByRem.get(remId) ?? [];
+  }
+
+  /** A Rem through the scanner's memo: no read once the Rem has been judged. */
+  remOf(remId: RemId): Promise<PluginRem | null> {
+    return this.reader.one(remId);
   }
 
   /** One Rem, lazily — used for ancestors the spoiler swap wants to pull in. */

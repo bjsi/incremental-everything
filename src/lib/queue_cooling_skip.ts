@@ -1,9 +1,9 @@
 import { AppEvents, PluginRem, RemId, RNPlugin } from '@remnote/plugin-sdk';
-import { coolingInQueuesId } from './consts';
+import { coolingInQueuesId, currentScopeRemIdsKey } from './consts';
 import { getIESetting } from './settings';
 import { shouldUseLightMode } from './mobileUtils';
 import { QueueRouteKind, queueRouteKind } from './queue_route';
-import { COOLING_RELATION_LABELS, CoolingVerdict, withSessionRatings } from './priority_review_document/cooling';
+import { COOLING_RELATION_LABELS, CoolingVerdict, isCardDue, withSessionRatings } from './priority_review_document/cooling';
 import { CoolingScanner } from './priority_review_document/cooling_gather';
 import { getCoolingParams } from './priority_review_document/cooling_store';
 import { loadCardSource } from './priority_review_document/card_source';
@@ -40,11 +40,22 @@ import { hasCardClusterPowerup } from './priority_review_document/cluster';
  * The "just created" rule stays with the Priority Queue: in a queue it would
  * skip every card written today.
  *
- * HOW: one CoolingScanner per session, its card facts loaded once. Each card
- * that loads is judged again with its Rem's cards read fresh. Ratings seen in
- * the session are laid over what the reads return, since a plugin read does not
- * wait for RemNote's pending writes. The same safeguards as the drill: id-less
- * loads ignored, no removal once the user has moved on, and a loop guard.
+ * HOW: decided ahead, looked up on load — like the drill, whose live checks
+ * were too slow for its mask.
+ *   - One CoolingScanner per session, its card facts (card cache, or one
+ *     card.getAll()) loaded once.
+ *   - Ahead: when the plugin's own QueueEnter has written the queue's scope
+ *     (currentScopeRemIdsKey), every Rem in it with a due card is judged in the
+ *     background, cluster membership of the cooling ones included, up to
+ *     MAX_JUDGED_AHEAD. The tree reads are memoised by the scanner.
+ *   - On load: QueueLoadCard carries only the card id, so one read finds the
+ *     Rem; the verdict is then a lookup. A Rem not judged ahead (the daily
+ *     queue has no scope; a scan still running) is judged live, and flashes.
+ *   - On a rating: it is laid over the Rem's facts (a plugin read would not see
+ *     it yet, and cache facts carry no card ids), and every judged Rem is judged
+ *     again from memory — no read — so the Rem and its relatives cool at once.
+ * The same safeguards as the drill: id-less loads ignored, no removal once the
+ * user has moved on, and a loop guard.
  */
 
 const LOG = '[QueueCooling]';
@@ -56,13 +67,21 @@ const FIRST_CARD_HOLD_MS = 2500;
 const DEFER_MS = 1000;
 /** A card loading more often than this means something is looping: skipping stops. */
 const MAX_LOADS_PER_CARD = 6;
+/** Rems with a due card beyond which the scope is not judged ahead (about 1.5 s per 200). */
+const MAX_JUDGED_AHEAD = 500;
 
 type SessionKind = Exclude<QueueRouteKind, 'other'>;
 
 interface Session {
   kind: SessionKind;
   path: string;
+  /** The queue's document; the daily queue has none, and so no scope to judge ahead. */
+  subQueueId: string | null;
+  enteredAt: number;
   scanner: Promise<CoolingScanner | null>;
+  scopeTaken: boolean;
+  /** Re-judging after a rating: a load waits for it, it reads nothing. */
+  pending: Promise<void>;
   /** The card on screen, cleared once it is rated. */
   currentCardId: string | null;
   remByCard: Map<string, RemId>;
@@ -72,6 +91,8 @@ interface Session {
   loadsByCard: Map<string, number>;
   clusterByParent: Map<RemId, Promise<boolean>>;
   checkMs: number[];
+  /** Loads answered from a verdict judged ahead, vs judged live. */
+  judgedAhead: number;
   /** True until the first card's check ends and the hold drops to MASK_DELAY_MS. */
   firstCardHold: boolean;
   tripped: boolean;
@@ -79,6 +100,12 @@ interface Session {
 }
 
 let session: Session | null = null;
+/**
+ * The queue scope the plugin's QueueEnter last wrote, and when — it may land before our session
+ * opens. The host broadcasts every setSession with its value (StorageSessionChange), so the ids
+ * arrive with the event and need no read back.
+ */
+let lastScope: { at: number; ids: RemId[] } | null = null;
 /** The QueueEnter work in flight; a load waits for it so the first card is judged too. */
 let entering: Promise<void> = Promise.resolve();
 
@@ -107,7 +134,7 @@ async function openScanner(plugin: RNPlugin): Promise<CoolingScanner | null> {
   }
 }
 
-async function startSession(plugin: RNPlugin): Promise<void> {
+async function startSession(plugin: RNPlugin, enteredAt: number, subQueueId: string | null): Promise<void> {
   const path = await plugin.window.getURL();
   // RemNote fires QueueEnter twice as a queue opens; keep what the first one started.
   if (session && session.path === path) return;
@@ -120,10 +147,14 @@ async function startSession(plugin: RNPlugin): Promise<void> {
     if (await shouldUseLightMode(plugin)) return;
   }
 
-  session = {
+  const s: Session = {
     kind,
     path,
+    subQueueId,
+    enteredAt,
     scanner: openScanner(plugin),
+    scopeTaken: false,
+    pending: Promise.resolve(),
     currentCardId: null,
     remByCard: new Map(),
     ratedAt: new Map(),
@@ -131,12 +162,81 @@ async function startSession(plugin: RNPlugin): Promise<void> {
     loadsByCard: new Map(),
     clusterByParent: new Map(),
     checkMs: [],
+    judgedAhead: 0,
     firstCardHold: kind === 'learn-new',
     tripped: false,
     toastShown: false,
   };
+  session = s;
   if (kind === 'learn-new') setMask(plugin, FIRST_CARD_HOLD_MS);
   console.log(`${LOG} ${kind} session on ${path}`);
+  if (subQueueId && lastScope && lastScope.at >= enteredAt) void takeScope(plugin, s, lastScope.ids);
+}
+
+/** Takes this queue's scope once the plugin's QueueEnter has written it, and judges it ahead. */
+async function takeScope(plugin: RNPlugin, s: Session, ids: RemId[]): Promise<void> {
+  if (s.scopeTaken || !s.subQueueId || session !== s || ids.length === 0) return;
+  s.scopeTaken = true;
+  try {
+    await judgeAhead(plugin, s, ids);
+  } catch (e) {
+    console.warn(`${LOG} judging ahead failed; cards are judged as they load:`, e);
+  }
+}
+
+async function judgeAhead(plugin: RNPlugin, s: Session, scopeIds: RemId[]): Promise<void> {
+  const started = Date.now();
+  const scanner = await s.scanner;
+  if (!scanner) return;
+  const now = Date.now();
+  const candidates = scopeIds.filter((id) => scanner.cardsOf(id).some((c) => isCardDue(c, now)));
+  if (candidates.length > MAX_JUDGED_AHEAD) {
+    console.log(`${LOG} ${candidates.length} Rems with due cards in scope: too many to judge ahead, judged as they load.`);
+    return;
+  }
+  await scanner.refresh(candidates);
+  // Cluster membership of the cooling ones, so a load needs no read for that either.
+  await Promise.all(
+    candidates
+      .filter((id) => scanner.verdicts.has(id))
+      .map(async (id) => {
+        const rem = await scanner.remOf(id);
+        if (rem) await inCluster(plugin, s, rem);
+      })
+  );
+  console.log(
+    `${LOG} judged ${candidates.length} Rems ahead (${scopeIds.length} in scope) in ${Date.now() - started} ms: ` +
+      `${candidates.filter((id) => scanner.verdicts.has(id)).length} cooling`
+  );
+
+  // Their card ids too, so a card that loads needs no read to find its Rem. Right after a
+  // rating that read queues behind the traffic the rating starts (600–860 ms measured), which
+  // is what outran the mask.
+  const idsStarted = Date.now();
+  let mapped = 0;
+  for (let i = 0; i < candidates.length && session === s; i += 8) {
+    await Promise.all(
+      candidates.slice(i, i + 8).map(async (remId) => {
+        try {
+          const rem = await scanner.remOf(remId);
+          for (const card of (await rem?.getCards()) || []) {
+            s.remByCard.set(card._id, remId);
+            mapped++;
+          }
+        } catch {
+          /* that Rem's cards are found by a read when they load */
+        }
+      })
+    );
+  }
+  console.log(`${LOG} mapped ${mapped} card ids to their Rems in ${Date.now() - idsStarted} ms`);
+}
+
+/** The Rem's cards rated in this session, card id → when. */
+function ratingsOf(s: Session, remId: RemId): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [cardId, at] of s.ratedAt) if (s.remByCard.get(cardId) === remId) out.set(cardId, at);
+  return out;
 }
 
 /**
@@ -159,7 +259,7 @@ function endSession(plugin: RNPlugin, reason: string) {
   if (s.kind === 'learn-new') void plugin.app.registerCSS(MASK_CSS_ID, '');
   const sorted = [...s.checkMs].sort((a, b) => a - b);
   console.log(
-    `${LOG} ${s.kind} session ended (${reason}): ${s.checkMs.length} cards checked ` +
+    `${LOG} ${s.kind} session ended (${reason}): ${s.checkMs.length} cards checked, ${s.judgedAhead} from verdicts judged ahead ` +
       `(median ${sorted[Math.floor(sorted.length / 2)] ?? 0} ms, max ${sorted[sorted.length - 1] ?? 0} ms), ` +
       `${s.skipped.size} skipped` +
       (s.kind === 'learn-new'
@@ -211,17 +311,26 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
   const started = Date.now();
   const scanner = await s.scanner;
   if (!scanner) return;
-  const card = await plugin.card.findOne(cardId);
-  const remId = card?.remId as RemId | undefined;
-  if (!remId) return;
-  s.remByCard.set(cardId, remId);
-  const rem = await plugin.rem.findOne(remId);
-  if (!rem) return;
-  const cards = withSessionRatings((await rem.getCards()) || [], s.ratedAt);
-  const verdict = await scanner.rejudge(remId, cards);
+  await s.pending;
+  const waited = Date.now() - started;
+  let remId = s.remByCard.get(cardId);
+  const mappedAhead = !!remId;
+  if (!remId) {
+    // The one read a load needs: QueueLoadCard carries the card id only.
+    remId = (await plugin.card.findOne(cardId))?.remId as RemId | undefined;
+    if (!remId) return;
+    s.remByCard.set(cardId, remId);
+  }
+  const ahead = scanner.checkedIds.has(remId);
+  if (ahead) s.judgedAhead++;
+  else await scanner.refresh([remId]);
+  const found = scanner.verdicts.get(remId);
+  const verdict = found && found.until > Date.now() ? found : null;
   s.checkMs.push(Date.now() - started);
   if (!verdict) return;
-  if (await inCluster(plugin, s, rem)) {
+  const decided = Date.now() - started;
+  const rem = await scanner.remOf(remId);
+  if (rem && (await inCluster(plugin, s, rem))) {
     console.log(`${LOG} "${verdict.label ?? remId}" is cooling but left in: a Card Cluster is shown as one unit.`);
     return;
   }
@@ -231,11 +340,15 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
     return;
   }
   s.skipped.add(cardId);
+  const removing = Date.now();
   await plugin.queue.removeCurrentCardFromQueue(false);
+  const timing =
+    `waited ${waited} ms for re-judging, decided at ${decided} ms (Rem ${mappedAhead ? 'known' : 'read'}), ` +
+    `removal took ${Date.now() - removing} ms`;
   const reason = verdict.reasons[0];
   console.log(
     `${LOG} ${s.kind === 'learn-new' ? 'Learn New' : 'queue'}: skipped "${verdict.label ?? '(no text)'}" ` +
-      `(card ${cardId}, Rem ${remId}) after ${Date.now() - started} ms — ` +
+      `(card ${cardId}, Rem ${remId}) after ${Date.now() - started} ms, ${ahead ? 'judged ahead' : 'judged live'} [${timing}] — ` +
       (reason
         ? `${COOLING_RELATION_LABELS[reason.relation]} ${ago(reason.seenAt)}` +
           (reason.sourceRemId !== remId ? ` ("${reason.sourceLabel ?? reason.sourceRemId}")` : '')
@@ -248,11 +361,22 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
 }
 
 export function registerQueueCoolingListeners(plugin: RNPlugin) {
-  plugin.event.addListener(AppEvents.QueueEnter, undefined, () => {
+  plugin.event.addListener(AppEvents.QueueEnter, undefined, (data: any) => {
+    const enteredAt = Date.now();
+    const subQueueId: string | null = data?.subQueueId ?? null;
     // Chained, so the second of RemNote's two QueueEnters sees the session the first opened.
     entering = entering
-      .then(() => startSession(plugin))
+      .then(() => startSession(plugin, enteredAt, subQueueId))
       .catch((e) => console.warn(`${LOG} QueueEnter failed:`, e));
+  });
+
+  // The plugin's own QueueEnter writes the queue's scope once it has built it (a second or so).
+  plugin.event.addListener(AppEvents.StorageSessionChange, currentScopeRemIdsKey, (value: any) => {
+    const ids: unknown = Array.isArray(value) ? value : value?.value;
+    if (!Array.isArray(ids)) return;
+    lastScope = { at: Date.now(), ids: ids as RemId[] };
+    const s = session;
+    if (s && s.subQueueId && !s.scopeTaken) void takeScope(plugin, s, lastScope.ids);
   });
 
   plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async (data: any) => {
@@ -289,15 +413,18 @@ export function registerQueueCoolingListeners(plugin: RNPlugin) {
     if (!s || !cardId || s.skipped.has(cardId)) return;
     s.ratedAt.set(cardId, Date.now());
     if (s.currentCardId === cardId) s.currentCardId = null;
-    // The rating reaches the scanner's facts at once, so a sibling Rem loading next cools
-    // even before RemNote has stored it.
     const remId = s.remByCard.get(cardId);
     if (!remId) return;
-    void s.scanner.then(async (scanner) => {
-      if (!scanner) return;
-      const facts = await scanner.cardFacts();
-      await scanner.updateCards(remId, withSessionRatings(facts.get(remId) ?? [], s.ratedAt));
-    });
+    // The rating reaches the facts at once and every judged Rem is judged again from memory,
+    // so the Rem and its relatives cool before the next card has loaded.
+    s.pending = s.pending
+      .then(async () => {
+        const scanner = await s.scanner;
+        if (!scanner) return;
+        await scanner.updateCards(remId, withSessionRatings(scanner.cardsOf(remId), ratingsOf(s, remId)));
+        await scanner.refresh([...scanner.checkedIds]);
+      })
+      .catch((e) => console.warn(`${LOG} re-judging after a rating failed:`, e));
   });
 
   plugin.event.addListener(AppEvents.QueueExit, undefined, () => {
