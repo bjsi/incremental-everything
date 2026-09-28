@@ -632,12 +632,15 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   [coolingInQueuesId]: {
     kind: 'boolean',
     group: 'priorityQueue',
-    title: 'Cooling: skip cooling cards in every queue',
+    helpPath: 'Priority-Review-Document/#cooling-in-remnotes-own-queues',
+    title: 'Cooling in RemNote\u2019s queues',
+    onLabel: 'All queues',
+    offLabel: 'Learn New only',
     description:
-      'Skips a card in RemNote\u2019s own spaced-repetition queues (a document, the daily queue) while ' +
-      'its Rem is cooling, with a toast saying why. The card flashes briefly before it goes; it stays ' +
-      'due and returns once cooling ends. Practice All, In Order and Card Clusters are left alone, ' +
-      'and so is Light Mode. The Learn New queue is always covered, whatever this says.',
+      'Where a card of a cooling Rem is skipped. Learn New Cards is always covered. With All queues, ' +
+      'RemNote\u2019s spaced-repetition queues are too (a document, the daily queue), with a toast ' +
+      'saying why; the card flashes briefly before it goes, stays due, and returns once cooling ends. ' +
+      'Practice All Flashcards (shuffled or in order), Card Clusters and Light Mode are left alone.',
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',

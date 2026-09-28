@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.129 - September 28th, 2026
+
+### ✨ New - Cooling in RemNote's own queues
+
+**Cooling**: Cards of a cooling Rem are now skipped in RemNote's own queues too — including **Learn New Cards**, where the clozes of one Rem used to run back to back.
+
+📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
+### ⚡ Improved - Faster startup
+
+**Priority Queue**: Only the full-KB Priority Queue is refreshed at startup; document queues are refreshed after their own sessions.
+
+📖 [Refresh at startup and after every session](Priority-Review-Document.md#refresh-after-every-session)
+
 ## v1.0.128 - September 26th, 2026
 
 ### ⚡ Improved - Forgetting Curve log axis starts at 12 hours

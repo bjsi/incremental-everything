@@ -45,7 +45,7 @@ While you practise, the plugin knows where the items came from: the [Priority Sh
 
 When you leave the queue after practising a Priority Queue document, the plugin refreshes it a couple of seconds later: what you reviewed is drained, what is now cooling is drained, and the document is topped back up. A toast reports the result.
 
-When RemNote starts, **every** Priority Queue document is refreshed once — the full-KB one and each document-scoped one — so the first Practice of the day finds them up to date. This waits for the caches and the cooling scan to finish, and the ▶ button of the [plugin panel](Getting-Started.md#when-learn-starts-pulsing) only starts pulsing once it is done. One toast reports the result for all of them. If you open a queue before it finishes, the documents not yet refreshed are left for later.
+When RemNote starts, the **full-KB** Priority Queue is refreshed once, so the first Practice of the day finds it up to date. This waits for the caches and the cooling scan to finish, and the ▶ button of the [plugin panel](Getting-Started.md#when-learn-starts-pulsing) only starts pulsing once it is done. A toast reports the result. Document-scoped Priority Queues are not refreshed at startup — each can take many seconds on a large document, and some are rarely used. Each one is refreshed after its own sessions, or from the popup.
 
 Both are the **Refresh the Priority Queues at startup and after each session** setting, on by default.
 
@@ -100,7 +100,7 @@ Entries are always appended **below** these two, so the graph stays where it is.
 
 RemNote's own bury rule keeps a card out of the queue while *another card of the same Rem* was seen in the last **hour**. Anki buries siblings until the next day. Neither is enough for a mature card: a descriptor whose answer was read as context yesterday, or an `Alt+Z` cloze whose sibling cloze was graded three days ago, is still a free recall — and FSRS rewards a free recall with years of unearned stability, as the [ancestor case below](#ancestor-spoiler-protection) shows.
 
-A Rem is **cooling** when it still owes the queue a card, and a card that gives that answer away was graded recently and has since moved on. While cooling, it is left out of the Priority Queue and it is **ineligible to set the Priority Shield** — a Rem whose sibling you just reviewed cannot pin the shield at its priority however much else you clear.
+A Rem is **cooling** when it still owes the queue a card, and a card that gives that answer away was graded recently and has since moved on. While cooling, it is left out of the Priority Queue, [skipped in RemNote's own queues](#cooling-in-remnotes-own-queues), and **ineligible to set the Priority Shield** — a Rem whose sibling you just reviewed cannot pin the shield at its priority however much else you clear.
 
 ### What counts as a spoiler
 
@@ -112,7 +112,7 @@ Five relations, each a distinct way one review puts another card's answer on scr
 * **A child or grandchild card**, whose context line displayed this Rem's answer — the [ancestor gate](#ancestor-spoiler-protection) extended across time, in the direction that actually spoils.
 * **Its concept, for a descriptor's backward card.** A descriptor's backward card shows the descriptor and asks for the concept it belongs to: the nearest ancestor that is not itself a descriptor, which is a grandparent or higher when descriptors are nested. Reviewing any card of that concept, forward, backward or a cloze in it, puts the answer on screen, so the descriptor waits. RemNote buries this pairing for an hour; cooling extends it for the whole window.
 
-**And one rule about the card itself: new cards.** A card you have just created and never reviewed cools too, for a fixed number of days counted from the moment the card was created (**Cooling: new cards**, 1 day by default, up to 10, 0 to turn it off). SuperMemo counts creating an item as its first repetition, so a cloze you wrote while reading is never asked the same day, while its answer is still in view. The date is the card's own: a cloze added today to an old Rem counts as new, and a direction you switch off and back on keeps its original card and history, so it does not. A direction switched on for the first time is a new card.
+**And one rule about the card itself: new cards.** In the Priority Queue only, a card you have just created and never reviewed cools too, for a fixed number of days counted from the moment the card was created (**Cooling: new cards**, 1 day by default, up to 10, 0 to turn it off). SuperMemo counts creating an item as its first repetition, so a cloze you wrote while reading is never asked the same day, while its answer is still in view. The date is the card's own: a cloze added today to an old Rem counts as new, and a direction you switch off and back on keeps its original card and history, so it does not. A direction switched on for the first time is a new card.
 
 Card Cluster siblings never cool each other: a cluster is designed to be shown together, and RemNote treats it as one unit. A sibling rated *Again* that is still due does not cool anything either — RemNote's own rule already separates that pair within the hour.
 
@@ -147,6 +147,28 @@ The cooling set is **recomputed from your card data** on every refresh, at every
 * **Never** — exempt this Rem from cooling for good.
 
 `↑` `↓` choose a row, `R`, `E`, `N` act on it, `Enter` opens the Rem, `Esc` goes back. **Rescan** re-judges the 200 highest-priority Rems with due cards on the spot.
+
+### Cooling in RemNote's own queues { #cooling-in-remnotes-own-queues }
+
+Cooling also works outside the Priority Queue: when a card of a cooling Rem comes up in one of RemNote's own queues, the plugin skips it. It stays due and comes back once its cooling ends.
+
+| Queue | Cooling |
+|---|---|
+| **Learn New Cards** | Always |
+| **Practice with Spaced Repetition** on a document, the daily queue, a Priority Queue document | With **Cooling in RemNote's queues** set to **All queues** (the default), in Full Mode |
+| Practice All Flashcards (shuffled or in order), no-SRS, Mastery Drill | Never — there you asked for every card |
+
+**Learn New Cards** is where it matters most. The cards RemNote generates with AI, and the ones you import, wait there as *Need to Learn* until you choose **Learn New Cards**. That queue has RemNote's hour-long bury switched off, so the clozes of one Rem run back to back, and with **In Order** each one is shown right after its sibling. With cooling, once you rate one cloze, the others of that Rem wait for a later batch. The first skip of a session shows a toast.
+
+In the other queues each skip shows a toast with the reason, e.g. *Cooling: skipped a card — a sibling Alt+Z cloze was reviewed 2 days ago.* The skipped card may flash briefly before it goes. In Learn New Cards every card fades in half a second late, so the skipped ones are never seen.
+
+A few things work as they do in the Priority Queue:
+
+* **Release** and **Never** in the [Cooling list](#the-cooling-list) apply here too.
+* **Card Cluster** members are never skipped: a cluster is shown as one unit.
+* **Cooling: new cards** does not apply: in the daily queue it would skip every card you wrote today, and Learn New Cards exists to learn new cards.
+
+In Light Mode only Learn New Cards is covered: judging the other queues would mean reading every card in the knowledge base each time a queue opens.
 
 ## The Priority Review Queue in your sidebar
 

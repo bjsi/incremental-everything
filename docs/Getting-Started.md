@@ -86,7 +86,7 @@ After you open RemNote, the plugin keeps working in the background for a while â
 - the cooling scan for the Card Shield
 - the CardPriority hidden-slot check
 - the priority band colours
-- the [Priority Queue refresh](Priority-Review-Document.md#refresh-after-every-session), which runs once the caches and the cooling scan are done
+- the [full-KB Priority Queue refresh](Priority-Review-Document.md#refresh-after-every-session), which runs once the caches and the cooling scan are done
 
 Hover **â–¶** to see what is still running. If it never starts pulsing, one of these failed or took too long: the tooltip names it, and the console has the details.
 
