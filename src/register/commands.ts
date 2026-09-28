@@ -14,6 +14,7 @@ import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote } from '../lib/pdf_source_pins';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
+import { isHintNode } from '../lib/richTextSanitize';
 import {
   powerupCode,
   currentIncRemKey,
@@ -767,9 +768,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                       : '⇔'; // fallback
       const remType = rem.type;
 
-      // Inherited cloze/card hint properties from the original rem must be stripped from
-      // the new cloze rem. Otherwise RemNote treats orphaned hints as belonging to the
-      // newly-created cloze and renders them in the wrong position.
+      // Hint nodes themselves are dropped in processSection (isHintNode); this clears
+      // any hint/cloze-state flags left on the remaining nodes, so RemNote does not
+      // treat them as belonging to the newly-created cloze.
       const stripInheritedHintProps = (n: any) => {
         delete n[RICH_TEXT_FORMATTING.CLOZE_HINT];
         delete n[RICH_TEXT_FORMATTING.CARD_HINT_FRONT];
@@ -796,6 +797,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
           // Text-only positions: non-'m' nodes have length 0 (immune to RemNote's i:'q' cursor-width).
           const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 0;
+          // Hints ("less/more") are not part of the sentence — leave them out of the
+          // cloze rem, but keep counting their length: the section offsets include it.
+          if (isHintNode(item)) {
+            currIdx += nodeLen;
+            continue;
+          }
           const nodeStart = currIdx;
           const nodeEnd   = currIdx + nodeLen;
           // For zero-length nodes use a point check; for text nodes use the range overlap check.

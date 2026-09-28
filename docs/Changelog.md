@@ -10,6 +10,12 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#the-regular-queue-drill)
 
+### 🐛 Fixed
+
+**Create Cloze**: Fixed `Alt+Z` copying cloze hints (e.g. "less/more") into the new cloze Rem as ordinary text; Find Rem's "Text with Pin" is fixed too.
+
+📖 [Create Cloze](IR-Flow--Reading-Extracting-and-Clozing.md#create-cloze-altz-altshiftz)
+
 ## v1.0.130 - September 28th, 2026
 
 ### ⚡ Improved - Descriptor cards keep their concept

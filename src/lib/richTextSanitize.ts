@@ -110,3 +110,21 @@ export const sanitizeRichTextForSetText = (richText: RichTextInterface): RichTex
     }
   });
 };
+
+/**
+ * True for a text node that is a hint rather than part of the sentence.
+ * RemNote stores a cloze hint as its own node right after the clozed text —
+ * `{ i: 'm', text: 'less/more', 'cloze-hint': true }` — and card hints the same
+ * way. When copying a Rem's text elsewhere, drop these nodes: removing only the
+ * flag would turn the hint into ordinary text.
+ */
+export const isHintNode = (item: unknown): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  const n = item as any;
+  return n.i === 'm' && !!(
+    n[RICH_TEXT_FORMATTING.CLOZE_HINT] ||
+    n[RICH_TEXT_FORMATTING.CARD_HINT_FRONT] ||
+    n[RICH_TEXT_FORMATTING.CARD_HINT_BACK] ||
+    n[RICH_TEXT_FORMATTING.MULTILINE_CARD_HINT]
+  );
+};
