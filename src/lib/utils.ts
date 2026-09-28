@@ -516,5 +516,5 @@ export function getRetrievabilityColor(r: number): string {
 export function screenFittedHeight(min: number, max = 1500): number {
   const available = typeof window !== 'undefined' ? window.screen?.availHeight : undefined;
   if (typeof available !== 'number' || !Number.isFinite(available)) return min;
-  return Math.min(Math.max(Math.round(available * 0.75), min), max);
+  return Math.min(Math.max(Math.round(available * 0.8), min), max);
 }
