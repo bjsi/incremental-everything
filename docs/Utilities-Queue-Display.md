@@ -61,6 +61,10 @@ Tag any Rem with **Remove from Queue** (using the command). Its content will be 
 - **Hide in Queue (`hiq`):** content is hidden, but the bullet point structure remains visible with a "Hidden in queue" ghosted label. Use when you want to acknowledge the structural presence of a parent but obscure its text.
 - **Remove from Queue (`rfq`):** the Rem is completely removed from the visual hierarchy (`display: none`), and any children are shifted left to fill its space. Use to erase an intermediate parent level entirely as if it never existed.
 
+### Descriptor cards keep their concept { #descriptor-cards-keep-their-concept }
+
+A concept's descriptor cards ("Receptor MSK ↔ …") are about the concept itself, so Hide in Queue and Remove from Queue on the concept never hide it on those cards; it shows in full, with no "Hidden in queue" label. They still apply to every other card below the concept, and to the Rems above it. Hide Parent, Remove Parent and No Hierarchy placed on the descriptor card itself still hide the concept.
+
 ---
 
 ## No Hierarchy (`nh`)

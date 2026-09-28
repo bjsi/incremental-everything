@@ -39,6 +39,19 @@ export const NO_HIERARCHY_POWERUP_CODE = 'noHierarchy';
 export const HIDE_PARENT_POWERUP_CODE = 'hideParent';
 export const HIDE_GRANDPARENT_POWERUP_CODE = 'hideGrandparent';
 
+/* A descriptor card's concept is the card's subject ("Receptor MSK ↔ ?"), so
+   Hide in Queue / Remove from Queue on the concept — meant for the OTHER cards
+   below it — never apply while one of its own descriptors is being asked.
+   Without this, Beautiful kept the concept's name (it sits in
+   .queue-beautiful-concept-descriptor-line, which Hide in Queue does not
+   target) but drew the "Hidden in queue" label over it.
+   Beautiful lifts the question out of the concept into the next sibling wrapper
+   (see Remove Parent / Remove Grandparent below); Compact keeps it as a direct
+   child. Appended to every Hide in Queue / Remove from Queue subject. */
+const NOT_DESCRIPTOR_CONCEPT =
+  ':not(:has(+ div:not(.indented-rem) > .rn-question-rem > .descriptor_rem_type))' +
+  ':not(:has(> .rn-question-rem > .descriptor_rem_type))';
+
 /* CORE CSS — covers Remove Parent, Remove Grandparent, and Remove from Queue.
 
    Why Remove from Queue is here (not in LEGACY_CSS):
@@ -57,13 +70,13 @@ export const HIDE_GRANDPARENT_POWERUP_CODE = 'hideGrandparent';
    between powerup-applied tags and legacy tag-rem-applied tags. */
 const CORE_CSS = `
 /* ===== Remove from Queue ===== */
-.rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem) > .rn-queue-rem,
-.rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem) > .rn-queue-rem {
+.rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem,
+.rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem {
   display: none;
 }
 
-.rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem),
-.rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem),
+.rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT},
+.rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT},
 .rn-breadcrumb-item[data-rem-tags~="remove-from-queue"],
 .rn-breadcrumb-item[data-rem-tags~="removefromqueue"] {
   margin-left: 0px !important;
@@ -175,29 +188,33 @@ const CORE_CSS = `
 /* LEGACY CSS — Hide in Queue, No Hierarchy, Hide Parent, Hide Grandparent.
    Remove from Queue's CSS lives in CORE_CSS (always-on) — see comment there. */
 const LEGACY_CSS = `
-/* ===== Hide in Queue ===== */
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .RichTextViewer,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem) > .RichTextViewer,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .rn-flashcard-delimiter,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem) > .rn-flashcard-delimiter,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .rn-queue-rem > .RichTextViewer,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem) > .rn-queue-rem > .RichTextViewer,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .rem-bullet__document,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem) > .rem-bullet__document {
+/* ===== Hide in Queue =====
+   Beautiful writes a concept's name in .queue-beautiful-concept-descriptor-line
+   instead of a bare .RichTextViewer, hence the extra target. */
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .RichTextViewer,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .RichTextViewer,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-flashcard-delimiter,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-flashcard-delimiter,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .RichTextViewer,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .RichTextViewer,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rem-bullet__document,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rem-bullet__document,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .queue-beautiful-concept-descriptor-line,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .queue-beautiful-concept-descriptor-line {
   display: none;
 }
 
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .rn-queue-rem > .rn-bullet-container,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem) > .rn-queue-rem > .rn-bullet-container,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .rn-queue-rem > .rem-bullet__document,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem) > .rn-queue-rem > .rem-bullet__document {
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .rn-bullet-container,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .rn-bullet-container,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .rem-bullet__document,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .rem-bullet__document {
   position: relative;
 }
 
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .rn-queue-rem > .rn-bullet-container:after,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem) > .rn-queue-rem > .rn-bullet-container:after,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .rn-queue-rem > .rem-bullet__document:after,
-.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem) > .rn-queue-rem > .rem-bullet__document:after {
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .rn-bullet-container:after,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .rn-bullet-container:after,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .rem-bullet__document:after,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .rn-queue-rem > .rem-bullet__document:after {
   content: "Hidden in queue";
   opacity: .3;
   white-space: nowrap;

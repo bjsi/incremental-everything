@@ -4,7 +4,17 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.130 - September 28th, 2026
 
+### ⚡ Improved - Descriptor cards keep their concept
+
+**Queue Display**: A concept tagged Hide in Queue or Remove from Queue now stays visible on its own descriptor cards, in both the Compact and Beautiful queues.
+
+📖 [Descriptor cards keep their concept](Utilities-Queue-Display.md#descriptor-cards-keep-their-concept)
+
 ### 🐛 Fixed
+
+**Queue Display**: Fixed the "Hidden in queue" label overlapping the concept's name on descriptor cards in the Beautiful queue.
+
+📖 [Descriptor cards keep their concept](Utilities-Queue-Display.md#descriptor-cards-keep-their-concept)
 
 **Queue Display**: Fixed Hide Parent, Hide Grandparent, Remove Parent and Remove Grandparent not hiding anything on descriptor cards in the Beautiful queue.
 
