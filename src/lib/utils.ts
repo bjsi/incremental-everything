@@ -495,3 +495,26 @@ export function getRetrievabilityColor(r: number): string {
   const hue = Math.round(((clampedR - 0.70) / 0.30) * 120);
   return `hsl(${hue}, 80%, 45%)`;
 }
+
+/**
+ * A popup height that follows the screen instead of being fixed.
+ *
+ * A number chosen once for one monitor is wrong on every other: 900px fills a
+ * laptop edge to edge and wastes half a desktop display. This takes three
+ * quarters of the screen, which leaves room for the window chrome and RemNote's
+ * own margins, and clamps it so neither end can be absurd.
+ *
+ * It reads the *display*, not the RemNote window, because that is the only
+ * signal a plugin iframe has: the frame's own viewport is either fixed by the
+ * registration or driven by its content, and the host window is cross-origin.
+ * So a small window on a large monitor can still ask for more height than it
+ * has — hence a factor well short of 1, and a maximum.
+ *
+ * Read once, when widgets are registered. Moving the window to another display
+ * will not resize a popup until the plugin reloads.
+ */
+export function screenFittedHeight(min: number, max = 1500): number {
+  const available = typeof window !== 'undefined' ? window.screen?.availHeight : undefined;
+  if (typeof available !== 'number' || !Number.isFinite(available)) return min;
+  return Math.min(Math.max(Math.round(available * 0.75), min), max);
+}

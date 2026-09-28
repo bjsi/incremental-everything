@@ -110,7 +110,7 @@ Verified in both directions on the same card: with the cloze present the probe r
 `markupStillPresent=false` while the card record and its 3 reps persist.
 
 `collectClozeIds()` and `markupStillPresent()` in
-[`src/lib/card_analytics_export.ts`](src/lib/card_analytics_export.ts) implement this.
+[`src/lib/card_analytics_export.ts`](../src/lib/card_analytics_export.ts) implement this.
 
 #### Where RemNote actually keeps it: `dci`
 
@@ -147,7 +147,7 @@ Three consequences, each of which cost us a wrong assumption at some point:
    escape hatch. MCP `read_docs_raw` does not expose it either.
 
 So the state is **derived**, by `derivedDisabledClozeIds()` in
-[`src/lib/card_analytics_export.ts`](src/lib/card_analytics_export.ts): a cloze id is in `dci`
+[`src/lib/card_analytics_export.ts`](../src/lib/card_analytics_export.ts): a cloze id is in `dci`
 when it is still in the text **and** owns a card record **and** that record is absent from
 `rem.getCards()`. The markup test excludes an edited-away cloze; requiring a record excludes a
 cloze whose card was never generated. Every Rem-wide cause (practice off, a disabling ancestor,

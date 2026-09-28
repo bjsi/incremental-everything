@@ -72,7 +72,7 @@ export async function saveReviewGraphData(
  * Order: the Rem's own property first, then the legacy synced key — and when the
  * legacy key is the one that answers, its value is copied onto the Rem so the
  * next read comes from the property. The legacy key itself cannot be removed
- * until RemNote provides a deletion API; it is recorded in STORAGE_PLAN.md's
+ * until RemNote provides a deletion API; it is recorded in plans/STORAGE_PLAN.md's
  * ledger phase for that day.
  */
 export async function loadReviewGraphData(

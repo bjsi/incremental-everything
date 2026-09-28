@@ -2,7 +2,7 @@
  * Deleting card records that no longer correspond to anything in their Rem.
  *
  * A Rem can hold cloze card records whose cloze ids are absent from its text —
- * the `markup-removed` state in CARD_STATE_REFERENCE.md. They keep their whole
+ * the `markup-removed` state in findings/CARD_STATE_REFERENCE.md. They keep their whole
  * repetition history, they can never be practised again, and RemNote's own UI
  * shows them under the Rem while reporting "Cards in Document 0".
  *

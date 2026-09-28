@@ -95,7 +95,7 @@ Recorded so they aren't re-litigated.
 
 **A `pdfLinks` property was designed and then dropped.** It existed to make the rem↔PDF association survive removal of the PDF source. On inspection the benefit was thin and the cost real — see below. Without that requirement, the index is a pure cache and `setLocal` is simpler and cheaper than any property.
 
-**"Keep the rem in `known_pdf_rems_*` after its PDF source is removed" was considered and rejected.** What the code does today: association is defined solely by `rem.getSources()` ([`findPDFinRem`](src/lib/pdfUtils.ts#L553)), and [`getInstantRemsForPDF`](src/lib/pdfUtils.ts#L860) — Page Range's first phase — verifies every entry and then overwrites the index with only the verified ids. So a detached chapter is dropped. Retaining it would gain only visibility from the PDF side (the rem stops being a reading item anyway once the source is gone, since `getAllPDFsInRem` finds nothing), while making the index unable to self-heal and creating a real hazard: [`findIncRemFast`](src/lib/pdfUtils.ts#L458) returns the first known rem carrying the Incremental powerup **without checking sources**, so a deliberately-retained stale entry could resolve as "the IncRem for this PDF" and open the wrong chapter.
+**"Keep the rem in `known_pdf_rems_*` after its PDF source is removed" was considered and rejected.** What the code does today: association is defined solely by `rem.getSources()` ([`findPDFinRem`](../src/lib/pdfUtils.ts#L553)), and [`getInstantRemsForPDF`](../src/lib/pdfUtils.ts#L860) — Page Range's first phase — verifies every entry and then overwrites the index with only the verified ids. So a detached chapter is dropped. Retaining it would gain only visibility from the PDF side (the rem stops being a reading item anyway once the source is gone, since `getAllPDFsInRem` finds nothing), while making the index unable to self-heal and creating a real hazard: [`findIncRemFast`](../src/lib/pdfUtils.ts#L458) returns the first known rem carrying the Incremental powerup **without checking sources**, so a deliberately-retained stale entry could resolve as "the IncRem for this PDF" and open the wrong chapter.
 
 The underlying goal — *don't lose the reading history when a chapter is detached* — is delivered instead by moving page/range/history onto the rem itself (Phase 3), where it travels with the rem regardless of sources.
 
@@ -105,10 +105,10 @@ The underlying goal — *don't lose the reading history when a chapter is detach
 
 ## 5. Already shipped (v1.0.30)
 
-- **`authoritativeDailyAggregates` compacted** — was 1.21 MB (137% of the ceiling, so every write was being silently rejected and the Study Dashboard's lifetime stats were frozen). Now stored `kbId → date → positional row` instead of an array of named-field objects: **1.21 MB → 300.8 KB**, no history lost. Reads accept either shape; a startup pass rewrites the legacy value in place. See [`authoritative_aggregates.ts`](src/lib/authoritative_aggregates.ts).
+- **`authoritativeDailyAggregates` compacted** — was 1.21 MB (137% of the ceiling, so every write was being silently rejected and the Study Dashboard's lifetime stats were frozen). Now stored `kbId → date → positional row` instead of an array of named-field objects: **1.21 MB → 300.8 KB**, no history lost. Reads accept either shape; a startup pass rewrites the legacy value in place. See [`authoritative_aggregates.ts`](../src/lib/authoritative_aggregates.ts).
 - **Row-expansion state removed from synced storage** in the three history widgets. Each chevron click had been rewriting the whole array (>500 KB for Flashcard History).
 - **Text caps** — flashcard history 500 chars/side; visited-rem history 200 (its writer previously had *no* cap while its own backfill truncated at 200).
-- **The audit tool itself** — [`synced_key_audit.ts`](src/lib/synced_key_audit.ts) + the Debug Widget section.
+- **The audit tool itself** — [`synced_key_audit.ts`](../src/lib/synced_key_audit.ts) + the Debug Widget section.
 
 ---
 
@@ -129,7 +129,7 @@ It resolved "the IncRem for this PDF" from the known-rems index without confirmi
 ### ✅ Phase 3 — PDF reading state onto the rem *(done)*
 **Removes ~464 keys, ~161 KB.** Also delivers history durability for detached chapters.
 
-State lives in [`pdf_state.ts`](src/lib/pdf_state.ts) as `{v:1, active?, bySource: {[pdfRemId]: {page, range, history}}}` in one hidden, `onlyProgrammaticModifying` slot — collapsing current page, page range, page history *and* active PDF into a single property per Rem, however many PDFs it draws on. History keeps its 100-entry cap per source.
+State lives in [`pdf_state.ts`](../src/lib/pdf_state.ts) as `{v:1, active?, bySource: {[pdfRemId]: {page, range, history}}}` in one hidden, `onlyProgrammaticModifying` slot — collapsing current page, page range, page history *and* active PDF into a single property per Rem, however many PDFs it draws on. History keeps its 100-entry cap per source.
 
 **The slot is registered on BOTH the Incremental and Dismissed powerups**, same code, same shape. Dismissal removes the Incremental powerup, which would take the property with it, so `transferToDismissed` copies the serialized string across — after the Dismissed powerup is attached, before the caller removes the Incremental one. `initIncrementalRem` reads it back off the Dismissed powerup *before* `mergeHistoryFromDismissed` deletes that powerup, then writes it once the Incremental powerup is attached. Because both sides share a shape, transfer is a string copy; re-dismissal merges per source with the newer value winning.
 
@@ -151,7 +151,7 @@ The snapshot now lives in a hidden, programmatic-only `graphData` slot on the **
 
 Reads go property-first, fall back to the legacy `priority_review_graph_data_*` key, and migrate it onto the Rem on the way past — no bulk pass, so pre-existing documents move themselves the first time they are opened. Both historical value shapes (bare bin array, and the later object) are normalized in one place. A malformed property falls back to the legacy key rather than blanking a graph the user can still see.
 
-New code in [`graph_data.ts`](src/lib/priority_review_document/graph_data.ts). `registerReviewGraphKey` is deleted (nothing registers new entries now); `cleanupOrphanedReviewGraphs` stays as a legacy sweep and is documented as such — it can only blank values, never free slots.
+New code in [`graph_data.ts`](../src/lib/priority_review_document/graph_data.ts). `registerReviewGraphKey` is deleted (nothing registers new entries now); `cleanupOrphanedReviewGraphs` stays as a legacy sweep and is documented as such — it can only blank values, never free slots.
 
 Legacy keys are left in place: there is still no deletion API, so they wait for Phase 7.
 

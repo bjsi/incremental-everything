@@ -16,7 +16,7 @@ import {
 } from '../lib/empty_ecd_scan';
 import { IE_DOCS_BASE_URL } from '../lib/settings';
 
-const DOCS_PATH = 'Utilities/#delete-empty-extra-card-detail-rems';
+const DOCS_PATH = 'Utilities-Cleaning-Up/#delete-empty-extra-card-detail-rems';
 
 /**
  * Opens the docs section for this feature. `window.open` is blocked in some

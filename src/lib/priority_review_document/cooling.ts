@@ -313,6 +313,46 @@ export function cardsFromCacheInfo(info: {
 }
 
 /**
+ * How soon RemNote makes a rated card due again, at the least: every rating in
+ * a 90-day sample (Sep 2026) scheduled the next one 60 minutes or more ahead —
+ * Forgot and Skip exactly an hour, Hard/Good/Easy a day or more.
+ */
+export const RATED_CARD_MIN_GAP_MS = 60 * 60_000;
+
+/**
+ * Adds the ratings a queue session just saw to one Rem's card facts. A plugin
+ * read does not wait for pending writes, and the card cache's facts carry no
+ * real card ids, so the card rated a moment ago can still look unseen and due —
+ * and its sibling would not cool. `ratedAt` maps the Rem's rated card ids →
+ * when the session saw them rated. A fact already holding that rating is kept
+ * as it is; a matching fact without it gains it; a rating with no matching fact
+ * (cache facts) is added as a fact of its own, which is all cooling needs: a
+ * card of the Rem seen at that moment and not due again for an hour.
+ */
+export function withSessionRatings(cards: CardLike[], ratedAt: ReadonlyMap<string, number>): CardLike[] {
+  if (ratedAt.size === 0) return cards;
+  const rated = (card: CardLike, at: number): CardLike => ({
+    ...card,
+    repetitionHistory: [...(card.repetitionHistory ?? []), { date: at, score: 1 }],
+    nextRepetitionTime: Math.max(card.nextRepetitionTime ?? 0, at + RATED_CARD_MIN_GAP_MS),
+  });
+  const matched = new Set<string>();
+  const out = cards.map((card) => {
+    const at = ratedAt.get(card._id);
+    if (at === undefined) return card;
+    matched.add(card._id);
+    const seen = cardLastSeenAt(card);
+    // The stored rating is dated a moment before the event that reported it.
+    if (seen !== null && seen >= at - 5_000) return card;
+    return rated(card, at);
+  });
+  for (const [cardId, at] of ratedAt) {
+    if (!matched.has(cardId)) out.push(rated({ _id: cardId, nextRepetitionTime: null, repetitionHistory: [] }, at));
+  }
+  return out;
+}
+
+/**
  * The queue's due predicate: `?? Infinity` so a card with no schedule
  * (disabled, table row, markup removed) never reads as due.
  */

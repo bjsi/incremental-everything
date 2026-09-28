@@ -291,7 +291,33 @@ Use the Mastery Drill to review only items you struggled with recently, ensuring
 
 ### Minimum Delay
 
-Cards rated *Again* or *Hard* enter the drill queue immediately but are held back for a configurable cooldown period (default: **120 minutes**) before appearing in the drill. This prevents you from re-reviewing the same card seconds after rating it, giving the initial repetition time to consolidate. Rating a card *Again* or *Hard* again — inside the drill or in a regular queue — restarts its delay. While cards are cooling, a **"X cooling"** badge is shown in the drill toolbar. The notification widget in the Left Sidebar also excludes cooling cards from its count, so it only shows cards that are genuinely ready to drill.
+Cards rated *Again* or *Hard* enter the drill queue immediately but are held back for a configurable cooldown period (default: **180 minutes**) before appearing in the drill. This prevents you from re-reviewing the same card seconds after rating it, giving the initial repetition time to consolidate. Rating a card *Again* or *Hard* again — inside the drill or in a regular queue — restarts its delay. While cards are cooling, a **"X cooling"** badge is shown in the drill toolbar. The notification widget in the Left Sidebar also excludes cooling cards from its count, so it only shows cards that are genuinely ready to drill.
+
+### Where the Drill Runs { #where-the-drill-runs }
+
+The drill runs in one of two places, chosen with **Where the Drill Runs** in the [IE Settings popup](Plugin-Settings-Reference.md#mastery-drill) (*Mastery Drill*):
+
+| | Regular queue (default) | Popup |
+|---|---|---|
+| **Where** | RemNote's own Practice queue | Its own window, with an embedded queue |
+| **Widgets under the card** | All of them: the card info bar and other plugins' widgets (context trees, repetition history…) | None: RemNote switches plugin widgets off in embedded queues |
+| **Other cards of a drill Rem** | Skipped by the plugin, behind the Reveal Delay | Never shown |
+| **Tools** | Remove from Drill and the Card List, in the drill bar | The toolbars described below |
+
+`dri`, the sidebar notification and the panel's 🎯 follow the setting. The commands **Mastery Drill (popup)** and **Mastery Drill (regular queue)** start either one whatever it says.
+
+#### The regular-queue drill
+
+![The Mastery Drill running in the regular queue: the queue titled "Mastery Drill" with 12 cards left, the drill bar above the card with Remove from Drill, Card List and the note that RemNote hid some drill cards, the card info bar with priority and FSRS figures under the cloze, and the Queue Dashboard on the right recording a Mastery Drill session with the card's forgetting curve](assets/native-drill.png){ width="900" }
+
+RemNote practises whole Rems, not a hand-picked set of cards. So each session creates a temporary **Mastery Drill** document holding the drill Rems, opens it in *Practice All*, and deletes it when you leave the queue. RemNote offers every card of those Rems, and the plugin skips the ones that are not ready drill cards.
+
+- **Reveal Delay** (default 500 ms): each card stays hidden this long, then fades in, so a skipped card is not seen. Most skips take under 150 ms; one that comes right after a rating can take longer and show briefly. A longer delay hides more of them, but every card appears that much later.
+- **"Time to Take a Break"**: skipping a card counts as seeing it, and RemNote then hides the other cards of that Rem for an hour, sometimes including its drill card. When RemNote shows its "Time to Take a Break" screen for them, the drill presses **Keep Practicing** itself and a toast says how many drill cards it is continuing with. It affects only the drill session, not your other queues. If the press ever fails, the screen stays up with Keep Practicing highlighted and a note under the buttons: press it, or **Esc**.
+- **The drill bar**, under the queue's top bar, has **Remove from Drill** (takes the card on screen out of the drill) and **Card List** (the [Card List](#card-list), in its own popup).
+- Ratings work as in any queue: *Again*/*Hard* keep the card in the drill and restart its [minimum delay](#minimum-delay), *Good*/*Easy* take it out. The session is recorded as **Mastery Drill** in the [Practiced Queues History](#practiced-queues-history-live-dashboard).
+
+The Queue Management, Editor Access and Keyboard Shortcuts sections below describe the popup drill.
 
 ### Queue Management
 
@@ -380,7 +406,7 @@ Three tabs are added to the right sidebar:
 
 1. Rate any flashcard **Forgot** or **Hard** during your regular queue.
 2. A notification will appear periodically in the Left Sidebar when the queue accumulates ≥ 10 pending cards.
-3. Open the drill using the **`Mastery Drill`** command in the Command Palette (Quick Code: `dri`), or click *Start Drill* in the notification widget.
+3. Open the drill using the **`Mastery Drill`** command in the Command Palette (Quick Code: `dri`), or click *Start Drill* in the notification widget. It opens in the popup or the regular queue, per [Where the Drill Runs](#where-the-drill-runs).
 4. The queue clears as you master cards (rate them Good or Easy).
 
 ![The Mastery Drill notification under the Incremental RemNote panel in the left sidebar, showing the number of cards ready for drill, a motivational phrase and the Start Drill button](assets/panel-hub-and-drill-expanded.png){ width="400" }
@@ -394,10 +420,12 @@ Three tabs are added to the right sidebar:
 | `Auto focus Queue Dashboard` | Off | When enabled, opens the Practiced Queues dashboard in the Right Sidebar automatically every time you enter a queue — no need to open the sidebar manually. It also **restores the dashboard after you press Next or Dismiss on an Incremental Rem**, bringing you back to the live session metrics once the sidebar was used for editing (Rem notes) or RemNote auto-focused its own pane (PDF/HTML). |
 | `Flashcard Response Time Limit` | 180 s | Caps recorded study time per card to prevent inflated stats when you step away from your device. |
 | `Forgetting Curve` | Shown | Draws the current card's [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) at the top of the dashboard. Set to *Hidden* to remove it. |
-| `Skip Mastery Drill` | Off | Master switch to disable all Mastery Drill features: hides the drill popup and sidebar notification widgets, removes the `Mastery Drill` command, and stops tracking *Again*/*Hard* cards. Flashcard and Practiced Queue history are not affected. |
+| `Enable Mastery Drill` | Off | Master switch for all Mastery Drill features: the drill, its sidebar notification and commands, and the tracking of *Again*/*Hard* cards. Flashcard and Practiced Queue history are not affected. Requires a reload. |
 | `Old Items Threshold` | 7 days | Number of days after which a Mastery Drill item is flagged as stale. Hover the warning badge in the toolbar for an explanation. |
-| `Mastery Drill Minimum Delay` | 120 min | A card rated *Again* or *Hard* will not appear in the drill until at least this many minutes have passed. Prevents re-reviewing the same card too soon after the initial rating. |
+| `Mastery Drill Minimum Delay` | 180 min | A card rated *Again* or *Hard* will not appear in the drill until at least this many minutes have passed. Prevents re-reviewing the same card too soon after the initial rating. |
 | `Disable Mastery Drill Notification` | Off | Hides the periodic Left Sidebar notification widget. The notification only counts cards that have passed the minimum delay and are genuinely ready to drill. |
+| `Where the Drill Runs` | Regular queue | *Regular queue* (RemNote's own queue, with every plugin widget) or *Popup* (embedded queue). See [Where the Drill Runs](#where-the-drill-runs). |
+| `Reveal Delay (regular-queue drill)` | 500 ms | How long each card stays hidden before it fades in during a regular-queue drill, so skipped cards are not seen. 0 turns it off. |
 
 📖 See [Plugin Settings Reference](Plugin-Settings-Reference.md) for the full settings list.
 
@@ -407,7 +435,9 @@ Three tabs are added to the right sidebar:
 
 | Command | Quick Code | Description |
 |---|---|---|
-| `Mastery Drill` | `dri` | Opens the Mastery Drill popup. |
+| `Mastery Drill` | `dri` | Opens the Mastery Drill, in the popup or the regular queue per [Where the Drill Runs](#where-the-drill-runs). |
+| `Mastery Drill (popup)` | — | Opens the drill in the popup, whatever the setting says. |
+| `Mastery Drill (regular queue)` | — | Opens the drill in RemNote's own queue, whatever the setting says. |
 | `Debug: Clear Flashcard History` | — | Clears this knowledge base's flashcard history (useful if sync errors occur). |
 
 📖 See [Plugin Commands Reference](Plugin-Commands-Reference.md) for the full command list.

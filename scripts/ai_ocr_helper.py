@@ -139,6 +139,12 @@ def fetch(url, suffix):
     name = None
     if url.startswith(LOCAL_FILE):
         name = url[len(LOCAL_FILE):]
+    elif url.startswith('local://'):
+        # Newer desktop builds (seen Sep 2026) hand over the local copy's absolute
+        # path instead: local://%2FUsers%2F…%2Fremnote-<kbId>%2Ffiles%2F<name>.
+        # Only the name is used, so the lookup stays in the requesting KB's folder
+        # (falling back to the download) rather than opening a path from the request.
+        name = Path(urllib.parse.unquote(url[len('local://'):])).name
     elif url.startswith(REMNOTE_FILES_URL):
         name = urllib.parse.urlsplit(url).path.lstrip('/')
     if name:
@@ -190,14 +196,18 @@ def page_boxes(data):
     return sorted(boxes.items())
 
 
-def render_crops(pdf_path, boxes, rem_id):
+def render_crops(pdf_path, boxes, rem_id, extend=None):
+    """`extend` names the side where a merged area box ends the highlight: the user
+    drew that box, margin included, so no padding there — the image edge is the end."""
     doc = pymupdf.open(pdf_path)
     images = []
+    pad_top = 0 if extend == 'above' else PAD_Y
+    pad_bottom = 0 if extend == 'below' else PAD_Y
     for page_number, (fx1, fy1, fx2, fy2) in boxes:
         page = doc[page_number - 1]
         size = page.rect
-        clip = pymupdf.Rect(fx1 * size.width - PAD_X, fy1 * size.height - PAD_Y,
-                            fx2 * size.width + PAD_X, fy2 * size.height + PAD_Y) & size
+        clip = pymupdf.Rect(fx1 * size.width - PAD_X, fy1 * size.height - pad_top,
+                            fx2 * size.width + PAD_X, fy2 * size.height + pad_bottom) & size
         png = page.get_pixmap(clip=clip, dpi=DPI).tobytes('png')
         (CROPS / f'{rem_id}-p{page_number}.png').write_bytes(png)
         images.append(png)
@@ -216,10 +226,21 @@ def bullets_to_markers(text):
     return '\n'.join(lines)
 
 
-def transcribe(images, raw_text):
+def transcribe(images, raw_text, extend=None):
     content = [{'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/png',
                                             'data': base64.b64encode(img).decode()}} for img in images]
-    if raw_text.strip():
+    if raw_text.strip() and extend in ('below', 'above'):
+        # A text highlight extended by an area box over what the text layer missed.
+        start, end = (('its first words', 'the bottom of the image') if extend == 'below'
+                      else ('the top of the image', 'its last words'))
+        instruction = (
+            'The image shows the region of a PDF page around one highlight. The PDF viewer extracted '
+            'this text for part of it — its spacing and formulae are garbled, and it misses content '
+            'the page\'s text layer does not cover (formulae set as pictures, for instance):\n<raw>\n'
+            + raw_text.strip() + '\n</raw>\n'
+            f'The highlight runs from {start} to {end}. Transcribe all of it, including everything '
+            'the extracted text leaves out.')
+    elif raw_text.strip():
         instruction = (
             'The image shows the region of a PDF page around one highlight. The PDF viewer extracted '
             'this text for the highlight — its spacing and formulae are garbled, but its words mark '
@@ -406,7 +427,8 @@ def handle_ocr(req, entry):
     data = req.get('data')
     data = json.loads(data) if isinstance(data, str) else (data or {})
     raw_text = req.get('rawText') or ''
-    entry.update(remId=rem_id, pdfUrl=req.get('pdfUrl'), data=data, rawText=raw_text[:300])
+    extend = req.get('extend')  # 'below' / 'above': a merged area box ends the highlight on that side
+    entry.update(remId=rem_id, pdfUrl=req.get('pdfUrl'), data=data, rawText=raw_text[:300], extend=extend)
 
     image_url = (data.get('content') or {}).get('imageUrl')
     if image_url:
@@ -419,10 +441,10 @@ def handle_ocr(req, entry):
             raise RuntimeError('highlight Data has no usable position')
         if not req.get('pdfUrl'):
             raise RuntimeError('no PDF URL')
-        images = render_crops(fetch(req['pdfUrl'], '.pdf'), boxes, rem_id)
+        images = render_crops(fetch(req['pdfUrl'], '.pdf'), boxes, rem_id, extend)
         entry['boxes'] = boxes
 
-    markup, model = transcribe(images, raw_text)
+    markup, model = transcribe(images, raw_text, extend)
     entry.update(model=model, markup=markup)
     return {'markup': markup}
 

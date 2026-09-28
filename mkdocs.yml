@@ -70,13 +70,13 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - toc:
       permalink: true
-      # Stop the sidebar at the utility level. Utilities.md nests four deep
-      # (page title → group → utility → detail); without this its 59 detail
-      # headings all land in the ToC. No other page goes deeper than H3.
+      # Keep the ToC to H2/H3. The Utilities category pages nest three deep
+      # (page title → utility → detail); deeper detail headings stay out of it.
       toc_depth: 3
 
 nav:
   - Home: index.md
+  - Changelog: Changelog.md
   - "User's Manual":
     - 1. Getting Started: Getting-Started.md
     - "2. What is Incrementalism?": What-is-Incrementalism?.md
@@ -97,7 +97,17 @@ nav:
       - History, Queue Dashboard & Mastery Drill: History-Queue-Dashboard-and-Mastery-Drill.md
       - "Repetition History & Statistics": Repetition-History-and-Statistics.md
       - Study Dashboard: Study-Dashboard.md
-    - 6. Essential References:
+    - 6. Integrations:
+      - Logos Bible Software: Logos-Bible-Software-Integration.md
+    - 7. Utilities:
+      - Overview: Utilities.md
+      - Text & Lists: Utilities-Text-and-Lists.md
+      - Outline & Headings: Utilities-Outline-and-Headings.md
+      - Finding & Navigating: Utilities-Finding-and-Navigating.md
+      - Queue Display: Utilities-Queue-Display.md
+      - Cleaning Up: Utilities-Cleaning-Up.md
+      - Under the Hood: Utilities-Under-the-Hood.md
+    - 8. Essential References:
       - Plugin Widgets Reference: Plugin-Widgets-Reference.md
       - Plugin Commands Reference: Plugin-Commands-Reference.md
       - Plugin Settings Reference: Plugin-Settings-Reference.md
@@ -105,12 +115,10 @@ nav:
       - Keyboard Shortcuts: Keyboard-Shortcuts.md
       - RemNote Native Shortcuts: RemNote-Native-Shortcuts.md
       - Colour Coding Reference: Colour-Coding-Reference.md
-      - Utilities: Utilities.md
       - Full Mode vs Light Mode: Full-Mode-x-Light-Mode.md
-    - 7. FAQ & Troubleshooting:
+    - 9. FAQ & Troubleshooting:
       - Does the plugin prioritize due-today items?: Does-the-plugin-prioritize-items-that-are-due-today-over-older-items?.md
       - How priority and due date interact: How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration.md
       - How to hide card priorities?: How-to-hide-card-priorities?.md
       - Troubleshooting: Troubleshooting.md
-    - 8. Changelog: Changelog.md
-    - 9. Contributing to the Wiki: Contributing-to-the-Wiki.md
+    - 10. Contributing to the Wiki: Contributing-to-the-Wiki.md

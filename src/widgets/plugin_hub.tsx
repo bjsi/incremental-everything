@@ -39,6 +39,7 @@ import {
   tipAnsweredThisSession,
   tipsAreSnoozed,
 } from '../lib/onboarding_tips';
+import { openMasteryDrill as launchMasteryDrill } from '../lib/mastery_drill_launch';
 
 /**
  * The "Incremental RemNote" sidebar hub.
@@ -909,7 +910,7 @@ export function PluginHub() {
   }, [plugin]);
 
   const openMasteryDrill = useCallback(
-    () => plugin.widget.openPopup('mastery_drill'),
+    () => launchMasteryDrill(plugin),
     [plugin]
   );
 

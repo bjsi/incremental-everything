@@ -17,7 +17,7 @@
 // So this walk is REM-DRIVEN: the population is the scope, not the card table,
 // and a Rem with no cards at all is a first-class result rather than an absence.
 //
-// The verdicts follow CARD_STATE_REFERENCE.md, which is the measured account of
+// The verdicts follow findings/CARD_STATE_REFERENCE.md, which is the measured account of
 // how these states differ. In particular: `rem.getCards()` is a "currently
 // surfaced" filter and its emptiness proves nothing on its own, which is why
 // every row here carries BOTH the surfaced count and the record count.
@@ -612,7 +612,7 @@ export function classifyRow(row: EnablementRow): EnablementVerdict {
   }
 
   // The Rem's OWN DisableCards powerup is not an ancestor problem — it is the
-  // other face of the Enable-Cards switch (CARD_STATE_REFERENCE.md lists them
+  // other face of the Enable-Cards switch (findings/CARD_STATE_REFERENCE.md lists them
   // as one state), so it is fixable from here and classified as such.
   if (!row.enablePractice || row.disableCardsOwn) return 'practice-off';
   if (row.practiceDirection === 'none') return 'direction-none';

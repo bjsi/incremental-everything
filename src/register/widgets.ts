@@ -1,6 +1,7 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
+import { screenFittedHeight } from '../lib/utils';
 
 /* Shows each queue badge/timer widget in one queue variant only. RemNote wraps
    each location widget as
@@ -557,11 +558,28 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   // Mastery Drill widgets are gated behind the 'enable-mastery-drill' setting.
   if (masteryDrillEnabled) {
-    // Mastery Drill popup
+    // Mastery Drill popup. The height follows the screen rather than sitting at
+    // the 900 it used to: the card list inside is capped in `vh`, so it scales
+    // with the frame and the drill gets the room a tall display can give it.
     plugin.app.registerWidget('mastery_drill', WidgetLocation.Popup, {
       dimensions: {
         width: 1100,
-        height: 900,
+        height: screenFittedHeight(560),
+      },
+    });
+
+    // Regular-queue drill (lib/mastery_drill_native): its bar in the queue, empty unless that
+    // drill is on screen, and the card list it opens.
+    plugin.app.registerWidget('mastery_drill_queue_bar', WidgetLocation.QueueBelowTopBar, {
+      dimensions: {
+        width: '100%',
+        height: 'auto',
+      },
+    });
+    plugin.app.registerWidget('mastery_drill_list', WidgetLocation.Popup, {
+      dimensions: {
+        width: 900,
+        height: screenFittedHeight(560),
       },
     });
 

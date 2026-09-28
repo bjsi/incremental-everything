@@ -9,7 +9,7 @@ import { GRAPH_DATA_KEY_PREFIX, REVIEW_GRAPH_INDEX_KEY } from '../consts';
 // only blank their values, not delete the keys (plugin storage has no deletion
 // API and writing null does not release the slot), so its benefit is limited to
 // reclaiming the bytes of graphs whose Rem is gone. Retire this once RemNote
-// ships deletion and the ledger sweep in STORAGE_PLAN.md Phase 7 can run.
+// ships deletion and the ledger sweep in plans/STORAGE_PLAN.md Phase 7 can run.
 
 interface ReviewGraphIndexEntry {
   remId: string;

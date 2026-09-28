@@ -600,6 +600,7 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 | `Opt + Shift + F` / `Alt + Shift + F` | [Find Rem (insert reference / open in pane)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + I` / `Alt + Shift + I` | [Open Incremental Rems Main View](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + L` / `Alt + Shift + L` | [Priority Queue](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
+| `Opt + Shift + M` / `Alt + Shift + M` | [Convert extracted markup to rich text](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + N` / `Alt + Shift + N` | Open Create Menu | Global |  |
 | `Opt + Shift + O` / `Alt + Shift + O` | [Open Hovered Source in Floating Window](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + Q` / `Alt + Shift + Q` | [Pin Source Quote](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |

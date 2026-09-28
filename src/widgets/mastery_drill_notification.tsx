@@ -9,6 +9,7 @@ import {
     finalDrillResumeTriggerKey,
     getMasteryDrillStatus,
 } from '../lib/mastery_drill_status';
+import { openMasteryDrill } from '../lib/mastery_drill_launch';
 
 const MOTIVATIONAL_PHRASES = [
     "Deliberately practice the material you are struggling with.",
@@ -189,7 +190,7 @@ export const FinalDrillNotification = () => {
 
             <button
                 onClick={async () => {
-                    await plugin.widget.openPopup("mastery_drill");
+                    await openMasteryDrill(plugin);
                     setDismissed(true);
                 }}
                 className="w-full py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded transition-colors"

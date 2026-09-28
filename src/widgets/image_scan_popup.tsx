@@ -12,7 +12,7 @@ import {
 import { hasImagePowerupName, pdfAreaHighlightPowerupName } from '../lib/consts';
 import { IE_DOCS_BASE_URL } from '../lib/settings';
 
-const DOCS_PATH = 'Utilities/#filter-a-document-by-images';
+const DOCS_PATH = 'Utilities-Finding-and-Navigating/#filter-a-document-by-images';
 
 /**
  * Opens the docs section for this feature. `window.open` is blocked in some

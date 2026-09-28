@@ -1,4 +1,6 @@
 import { AppEvents, ReactRNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
+import { deferDuringNativeDrill, isNativeDrillQueue, registerNativeDrillListeners } from '../lib/mastery_drill_native';
+import { deferDuringLearnNew, registerQueueCoolingListeners } from '../lib/queue_cooling_skip';
 import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
@@ -172,7 +174,9 @@ export function registerQueueExitListener(
   plugin: ReactRNPlugin,
   resetSessionItemCounter: ResetSessionItemCounter
 ) {
-  plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
+  plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId: rawSubQueueId }) => {
+    // The regular-queue Mastery Drill's one-session document gets no document shield (see QueueEnter).
+    const subQueueId = isNativeDrillQueue(rawSubQueueId) ? undefined : rawSubQueueId;
     // Safety net: always clear the incremental queue flag on exit.
     // The QueueComponent's useEffect cleanup may not fire if its iframe is destroyed abruptly.
     await plugin.storage.setSession(incrementalQueueActiveKey, false);
@@ -492,7 +496,10 @@ export function registerQueueEnterListener(
   resetSessionItemCounter: ResetSessionItemCounter
 ) {
 
-  plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
+  plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId: rawSubQueueId }) => {
+    // The regular-queue Mastery Drill's document exists for one session only: treat it like
+    // the popup drill, as a KB-wide session, so no per-document shield or history is keyed to it.
+    const subQueueId = isNativeDrillQueue(rawSubQueueId) ? undefined : rawSubQueueId;
     console.log('QUEUE ENTER: Starting session pre-calculation for subQueueId:', subQueueId);
 
     // Safety net: clear stale incremental queue flag from a previous session
@@ -815,6 +822,9 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
       if (!data || !data.cardId) {
         return;
       }
+      // Regular-queue Mastery Drill and Learn New: let a skip reach the bridge before this work.
+      await deferDuringNativeDrill();
+      await deferDuringLearnNew();
 
       const card = await plugin.card.findOne(data.cardId);
       const remId = card?.remId;
@@ -1484,6 +1494,8 @@ export function registerEventListeners(
   registerGlobalOpenRemListener(plugin);
   registerQueueSessionTracking(plugin);
   registerDrillCardRatingListener(plugin);
+  registerNativeDrillListeners(plugin);
+  registerQueueCoolingListeners(plugin);
 
   registerHoveredReferenceTracking(plugin);
   registerQueueDashboardRefocusListener(plugin);

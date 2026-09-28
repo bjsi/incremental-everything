@@ -13,7 +13,7 @@
 //
 // HOW A CARD IS JUDGED
 //
-// `rem.getCards()` is the "currently surfaced" filter (CARD_STATE_REFERENCE.md):
+// `rem.getCards()` is the "currently surfaced" filter (findings/CARD_STATE_REFERENCE.md):
 // a card present there is practicable, whatever else is true. Only when it is
 // absent do the Rem-level causes get read, in the same precedence
 // card_enablement/scan.ts#classifyRow uses — an ancestor that disables cards

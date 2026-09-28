@@ -12,6 +12,7 @@ import type { PracticedQueueSession } from '../widgets/practiced_queues';
 import { PRACTICED_QUEUES_HISTORY_KEY, rollOverOldSessions } from './queue_aggregates';
 import { computeFSRSState, parseWeightsString } from './fsrs';
 import { getIESetting } from './settings';
+import { isNativeDrillActive, isNativeDrillQueue } from './mastery_drill_native';
 
 const ACTIVE_SESSION_KEY = 'activeQueueSession';
 
@@ -382,18 +383,21 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
   // per-card panel state (currentCardId/prevCardId + lifetime stats) so the UI tracks
   // the sibling actually on screen rather than being stuck on the cluster anchor.
   setInterval(async () => {
-    if (!currentSession) return;
+    const session = currentSession;
+    if (!session) return;
     try {
       const vis = await plugin.storage.getSession<string>('clusterVisibleCardId');
-      if (!vis || vis === currentSession.currentCardId) return;
+      // The queue may have closed during the read: saveCurrentSession nulls the session.
+      if (currentSession !== session) return;
+      if (!vis || vis === session.currentCardId) return;
 
-      currentSession.prevCardFirstRep = currentSession.currentCardFirstRep;
-      currentSession.prevCardTotalTime = currentSession.currentCardTotalTime;
-      currentSession.prevCardRepCount = currentSession.currentCardRepCount;
-      currentSession.prevCardId = currentSession.currentCardId;
-      currentSession.currentCardId = vis;
+      session.prevCardFirstRep = session.currentCardFirstRep;
+      session.prevCardTotalTime = session.currentCardTotalTime;
+      session.prevCardRepCount = session.currentCardRepCount;
+      session.prevCardId = session.currentCardId;
+      session.currentCardId = vis;
 
-      await loadCardStats(plugin, currentSession, vis);
+      await loadCardStats(plugin, session, vis);
       await syncLiveSession(plugin);
     } catch (error) {
       console.error('ERROR in cluster sibling-transition poll:', error);
@@ -458,10 +462,16 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
 
       let scopeName = 'Ad-hoc Queue';
-      const queueId: string | undefined = data?.subQueueId;
+      const rawQueueId: string | undefined = data?.subQueueId;
+      // The regular-queue drill's document lives for one session: record it as "Mastery Drill",
+      // like the popup drill, rather than under a document id that is about to be deleted.
+      const isNativeDrill = isNativeDrillQueue(rawQueueId);
+      const queueId = isNativeDrill ? undefined : rawQueueId;
       const isValidId = queueId && typeof queueId === 'string' && !queueId.startsWith('0.');
 
-      if (isValidId) {
+      if (isNativeDrill) {
+        scopeName = 'Mastery Drill';
+      } else if (isValidId) {
         const rem = await plugin.rem.findOne(queueId);
         if (rem) {
           const text = rem.text ? await safeRemTextToString(plugin, rem.text) : '';
@@ -570,7 +580,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
             id: Math.random().toString(36).substring(7),
             startTime: now,
             kbId: kbData._id,
-            scopeName: isFinalDrillActive ? 'Mastery Drill' : (isMobile ? 'Restored Mobile Session' : 'Ad-hoc Session'),
+            scopeName: isFinalDrillActive || isNativeDrillActive() ? 'Mastery Drill' : (isMobile ? 'Restored Mobile Session' : 'Ad-hoc Session'),
             totalTime: 0,
             flashcardsCount: 0,
             flashcardsTime: 0,
@@ -622,7 +632,9 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
         // Verify Mastery Drill scope: if we labeled this session as Mastery Drill but the
         // card isn't in the drill list, it's an embedded/ad-hoc queue collision.
-        if (currentSession && currentSession.scopeName === 'Mastery Drill') {
+        // Not for the regular-queue drill: it is identified by its document, and it loads the
+        // drill Rems' other cards (which it then skips), so a non-drill card proves nothing.
+        if (currentSession && currentSession.scopeName === 'Mastery Drill' && !isNativeDrillActive()) {
           type FinalDrillItem = string | { cardId: string; kbId?: string };
           const finalDrillItems =
             ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];

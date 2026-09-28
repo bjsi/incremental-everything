@@ -10,6 +10,9 @@ Its source lives in this repository under [`docs/`](docs/). There is no separate
 incremental-everything/              ← repo root
 ├── mkdocs.yml                       ← site config + nav (the sidebar)
 ├── DOCUMENTATION.md                 ← this file (maintainer notes, not published)
+├── findings/                        ← how RemNote behaves: measured or read from the app bundle (not published)
+│   └── support-reports/             ← reports sent to RemNote support
+├── plans/                           ← working plans for multi-release efforts (not published)
 ├── docs/                            ← everything published, 28 pages
 │   ├── index.md                     ← site home
 │   ├── Changelog.md
@@ -29,6 +32,8 @@ incremental-everything/              ← repo root
 > **`.github/workflows/docs.yml` does exist.** `.github` is a dot-folder, so Finder hides it by default and some editors filter it out of the file tree. Confirm from the terminal with `ls .github/workflows/` or `git ls-files .github/` — it is tracked, and was added in commit `8a9d018`.
 
 The published site is built from `docs/` only; nothing outside that folder is included, which is why `DOCUMENTATION.md` lives at the root and never appears on the site.
+
+Maintainer-only material has two homes outside `docs/`. **`findings/`** holds what has been established about RemNote itself, by measurement or by reading the app bundle: reference notes and support reports ([`findings/README.md`](findings/README.md) indexes them and describes how to find things out). **`plans/`** holds working plans for efforts spanning several releases ([`plans/README.md`](plans/README.md)). Neither is published, and both use `UPPER_SNAKE_CASE.md` names, which keeps them apart from the published pages at a glance.
 
 ## History
 
@@ -66,14 +71,14 @@ mkdocs serve      # http://127.0.0.1:8000
 
 **Links between pages** point at the Markdown file, not the published URL — `[Utilities](Utilities.md)`, `[the Shield](Prioritization-&-Sorting.md#weighted-shield)`. MkDocs rewrites them and warns when a target disappears. The old wiki-style `[[Page#anchor|label]]` syntax does **not** work here.
 
-**Published URLs** are `https://hugomarins.github.io/incremental-remnote/<Page-File-Name>/` (directory URLs, no `.md`), with anchors appended after the trailing slash: `.../Utilities/#find-rem--reference-or-open`. Use this form only when linking from outside the docs (README, plugin manifest, Discord).
+**Published URLs** are `https://hugomarins.github.io/incremental-remnote/<Page-File-Name>/` (directory URLs, no `.md`), with anchors appended after the trailing slash: `.../Utilities-Finding-and-Navigating/#find-rem-reference-or-open`. Use this form only when linking from outside the docs (README, plugin manifest, Discord).
 
 **Assets** live in `docs/assets/`, referenced relatively: `![Alt](assets/thing.png)`. Images that had been pasted straight into the old GitHub Wiki (and so lived on GitHub's CDN under opaque UUID filenames) were downloaded into `docs/assets/uploaded/`.
 
 ## Shipping a feature — do BOTH, together
 
 1. **Add a `docs/Changelog.md` entry**, newest at the top, headed `## vX.Y.Z - Month Dth, Year`, with emoji-prefixed subheadings (✨ New / 🐛 Fixed / ♻️ Changed / ⚡ Improved). Bump `public/manifest.json` → `version.patch` to match. (`package.json` is stuck at `0.0.1` and is not the version of record.)
-2. **Update the page that documents the feature itself** — `Utilities.md`, `Plugin-Widgets-Reference.md`, `Plugin-Commands-Reference.md`, `Keyboard-Shortcuts.md`, `Plugin-Settings-Reference.md`, as applicable. Several of these have their own table of contents or item numbering that must be kept in sync when inserting a section.
+2. **Update the page that documents the feature itself** — a `Utilities-*.md` category page (one per category, with `Utilities.md` as the section overview listing them — add new utilities to both), `Plugin-Widgets-Reference.md`, `Plugin-Commands-Reference.md`, `Keyboard-Shortcuts.md`, `Plugin-Settings-Reference.md`, as applicable. Several of these have their own table of contents or item numbering that must be kept in sync when inserting a section.
 
 **Every changelog entry ends with a 📖 link to the page section** that explains the feature in full, e.g. `📖 See [Widgets → Card Priority Display](Plugin-Widgets-Reference.md#11-card-priority-display).` The changelog is *what changed*; the feature page is *how it works*. Never leave the changelog as the only place a feature is described.
 

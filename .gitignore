@@ -6,3 +6,8 @@ dist-ssr
 *.zip
 site/
 __pycache__/
+
+# Personal editor settings (shared files can be re-included below)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json

@@ -134,7 +134,7 @@ export async function getCardPriority(
   // and the due-card-priority cache — without any explicit disabled-card filter.
   //
   // It does NOT cover paused decks: pausing keeps a card's nextRepetitionTime
-  // intact (measured — see CARD_STATE_REFERENCE.md), so the arithmetic alone
+  // intact (measured — see findings/CARD_STATE_REFERENCE.md), so the arithmetic alone
   // would count those cards as due. What saves this path is its source: `cards`
   // comes from `rem.getCards()`, which returns [] for a rem under a paused deck.
   // Paths fed by `card.getAll()` get no such protection and must consult

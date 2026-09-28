@@ -2,6 +2,138 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.131 - September 28th, 2026
+
+### ⚡ Improved - the Mastery Drill gets past "Time to Take a Break"
+
+**Mastery Drill**: When RemNote hides drill cards because the drill skipped another card of the same Rem, the drill now presses **Keep Practicing** itself and carries on with them, instead of ending at "Time to Take a Break".
+
+📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#the-regular-queue-drill)
+
+### 🐛 Fixed
+
+**Create Cloze**: Fixed `Alt+Z` copying cloze hints (e.g. "less/more") into the new cloze Rem as ordinary text; Find Rem's "Text with Pin" is fixed too.
+
+📖 [Create Cloze](IR-Flow--Reading-Extracting-and-Clozing.md#create-cloze-altz-altshiftz)
+
+**Queue**: Fixed an Incremental Rem sometimes coming back right after you pressed Next, when RemNote refreshed the queue while you were reading it.
+
+📖 [Prepared in advance](Prioritization-&-Sorting.md#prepared-in-advance)
+
+## v1.0.130 - September 28th, 2026
+
+### ⚡ Improved - Descriptor cards keep their concept
+
+**Queue Display**: A concept tagged Hide in Queue or Remove from Queue now stays visible on its own descriptor cards, in both the Compact and Beautiful queues.
+
+📖 [Descriptor cards keep their concept](Utilities-Queue-Display.md#descriptor-cards-keep-their-concept)
+
+### 🐛 Fixed
+
+**Queue Display**: Fixed the "Hidden in queue" label overlapping the concept's name on descriptor cards in the Beautiful queue.
+
+📖 [Descriptor cards keep their concept](Utilities-Queue-Display.md#descriptor-cards-keep-their-concept)
+
+**Queue Display**: Fixed Hide Parent, Hide Grandparent, Remove Parent and Remove Grandparent not hiding anything on descriptor cards in the Beautiful queue.
+
+📖 [Beautiful Queue](Utilities-Queue-Display.md#beautiful-queue)
+
+## v1.0.129 - September 28th, 2026
+
+### ✨ New - Cooling in RemNote's own queues
+
+**Cooling**: Cards of a cooling Rem are now skipped in RemNote's own queues too — including **Learn New Cards**, where the clozes of one Rem used to run back to back.
+
+📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
+### ⚡ Improved - Faster startup
+
+**Priority Queue**: Only the full-KB Priority Queue is refreshed at startup; document queues are refreshed after their own sessions.
+
+📖 [Refresh at startup and after every session](Priority-Review-Document.md#refresh-after-every-session)
+
+## v1.0.128 - September 26th, 2026
+
+### ⚡ Improved - Forgetting Curve log axis starts at 12 hours
+
+**Forgetting Curve**: the log time axis no longer spends up to half its width on the minutes and hours of a card's learning steps; it starts at 12 hours, keeping the one-day review in view.
+
+![The Forgetting Curve on the log axis with five numbered notes: (1) the axis starts at 12 hours, with the first review and its same-day learning steps on the left edge; (2) two brackets of equal width, the first two weeks and the 5.6 years without a review, both a 28-fold stretch of time; (3) the gentle-looking slide from the 90% target to 64% over those years; (4) the two-year forecast past "now" squeezed into a sliver at the right end; (5) the stability step of ×10.61 bought by the review just made](assets/forgetting-curve-log-axis-explained.png){ width="900" }
+
+📖 [Log and linear time](Reviewing-Items-in-the-Queue.md#log-and-linear-time)
+
+### 🐛 Fixed
+
+**AI Transcribe**: Fixed transcription and Pin Source Quote failing with "unknown url type: local" on PDFs that RemNote now passes by their local file path — download the helper again to get the fix.
+
+📖 [AI Transcription setup](AI-Transcription-of-PDF-Highlights.md#setup)
+
+## v1.0.126 - September 26th, 2026
+
+### ✨ New - Logos Bible Software integration (macOS)
+
+![Logos Bible Software](assets/Logos.webp){ width="200" }
+
+**Logos Bible Software**: Added incremental reading of Logos books from inside Logos, through a small helper app — import a book, extract passages and keep a bookmark with keyboard shortcuts pressed in Logos.
+
+- `Ctrl+Opt+N` imports the open book as a top-level Incremental Rem tagged #Logos, once per book.
+- `Ctrl+Opt+X` sends the selection as an extract under the Incremental Rem you are reviewing, with a priority and interval panel over Logos; each extract links back to its passage and moves the book's bookmark.
+- `Ctrl+Opt+B` saves where you stopped; **Open in Logos** (`olg`) returns there, optionally on its own when the book comes up for review.
+
+📖 [Logos Bible Software Integration](Logos-Bible-Software-Integration.md)
+
+## v1.0.125 - September 25th, 2026
+
+### ⚡ Improved - Convert extracted markup turns `--` into dashes
+
+**Convert extracted markup to rich text** now turns `--` and `---` into en and em dashes (– and —), outside formulas.
+
+📖 [Convert extracted markup to rich text](Plugin-Commands-Reference.md#convert-extracted-markup-to-rich-text)
+
+## v1.0.124 - September 24th, 2026
+
+### ⚡ Improved - Convert extracted markup has a shortcut
+
+**Convert extracted markup to rich text** now runs with `Opt+Shift+M` / `Alt+Shift+M` (M for markup), as well as by its quick code `cem`.
+
+📖 [Convert extracted markup to rich text](Plugin-Commands-Reference.md#convert-extracted-markup-to-rich-text)
+
+## v1.0.123 - September 24th, 2026
+
+### ✨ New - a larger highlight absorbs the ones inside it
+
+**AI Transcribe**: highlighting a passage that already holds a smaller highlight and pressing ✨ on the larger one merges the smaller into it, moving its pins, references, inline links, tags, flashcards and bookmarks.
+
+![After AI Transcribe on the larger highlight: one Rem with the clean list, and the pins, references and bookmark of the smaller highlight point to it](assets/highlight-merge-3-after.png){ width="900" }
+
+📖 [A larger highlight over earlier ones](AI-Transcription-of-PDF-Highlights.md#absorb)
+
+### 🐛 Fixed
+
+**AI Transcribe**: Fixed text that is both bold and italic showing literal asterisks instead of the formatting.
+
+📖 [AI Transcription of PDF Highlights](AI-Transcription-of-PDF-Highlights.md)
+
+## v1.0.122 - September 23rd, 2026
+
+### ✨ New - extend a PDF highlight past what the text selection reaches
+
+**AI Transcribe**: when the selection stops short of a passage (formulas set as pictures, OCR gaps in scanned PDFs), draw an area highlight over the rest and press ✨ on it: the area merges into the text highlight and the whole passage is transcribed.
+
+📖 [Passages the text selection can't reach](AI-Transcription-of-PDF-Highlights.md#merge)
+
+## v1.0.121 - September 23rd, 2026
+
+### ✨ New - the Mastery Drill runs in the regular queue
+
+The Mastery Drill now runs in RemNote's own queue, where the card info bar and other plugins' widgets show under each card. The popup is still there: switch back with the new **Where the Drill Runs** setting, or start either one with **Mastery Drill (popup)** and **Mastery Drill (regular queue)**.
+
+RemNote practises whole Rems, so the drill skips the other cards of a drill Rem behind a short **Reveal Delay**. If RemNote then shows "Time to Take a Break", press **Keep Practicing** to get the rest of the drill.
+
+![The Mastery Drill running in the regular queue: the queue titled "Mastery Drill" with 12 cards left, the drill bar above the card with Remove from Drill, Card List and the note that RemNote hid some drill cards, the card info bar with priority and FSRS figures under the cloze, and the Queue Dashboard on the right recording a Mastery Drill session with the card's forgetting curve](assets/native-drill.png){ width="900" }
+
+📖 [Where the Drill Runs](History-Queue-Dashboard-and-Mastery-Drill.md#where-the-drill-runs)
+
 ## v1.0.116 - September 22nd, 2026
 
 ### ✨ New - forgetting curve for a card
@@ -160,7 +292,7 @@ The Card Shield shown while you practise now matches the one saved when you leav
 
 On the front of a card in RemNote's Beautiful queue variant, the "Hidden in queue" placeholder left by Hide in Queue, Hide Parent and Hide Grandparent now sits on its own line instead of over the question.
 
-📖 [Hide in Queue](Utilities.md#hide-in-queue)
+📖 [Hide in Queue](Utilities-Queue-Display.md#hide-in-queue)
 
 ## v1.0.105 - September 14th, 2026
 
@@ -364,13 +496,13 @@ An extract copies its parent's pin back to the original highlight so the way to 
 
 A 🖼️ now sits before the name of any result carrying an image, so a figure Rem is distinguishable from the prose that discusses it — captions and the sentences citing them are often worded almost identically.
 
-📖 [Spotting figures](Utilities.md#spotting-figures)
+📖 [Spotting figures](Utilities-Finding-and-Navigating.md#spotting-figures)
 
 ### 🐛 Fixed - Find Rem could not find `Figure 6.4` when you typed `Fig. 6.4`
 
 The `Figure` = `Fig` = `Fig.` folding was only ever applied to *matching and ranking*, never to what the picker asked RemNote's index for. So the Rem had to be retrieved by the word `fig` alone, which in a knowledge base full of figures returns thousands of results and is truncated long before the one you wanted — the alternate spelling of the **whole query** is now searched for as well.
 
-📖 [Why it finds Rems the normal search can't](Utilities.md#why-it-finds-rems-the-normal-search-cant)
+📖 [Why it finds Rems the normal search can't](Utilities-Finding-and-Navigating.md#why-it-finds-rems-the-normal-search-cant)
 
 ## v1.0.81 - September 6th, 2026
 
@@ -409,7 +541,7 @@ The cut is fixed rather than "hide whatever is empty today", so the row layout s
 
 **Card Enablement Audit**: added the `clozes off` and `some clozes off` verdicts, so a Rem silenced by RemNote's *Disable All Cloze Cards* is no longer filed under *not surfaced*. Nothing here can undo it — RemNote does not expose that list to plugins, and switching cards back on does not clear it — so the panel says so and points you at RemNote's own `/Enable All Cloze Cards`, in the Suppressed Cards breakdown and the enablement probe too.
 
-📖 [Card Enablement Audit](Utilities.md#card-enablement-audit) · [Suppressed cards](Prioritization-&-Sorting.md#suppressed-cards)
+📖 [Card Enablement Audit](Utilities-Cleaning-Up.md#card-enablement-audit) · [Suppressed cards](Prioritization-&-Sorting.md#suppressed-cards)
 
 ### ⚡ Improved - the Incremental History sidebar says what kind of item each entry is
 
@@ -463,7 +595,7 @@ The card history popup gains **➕ Repetition**: the four grade buttons, each sh
 
 The IMO/UN drafting style is now recognised as one marker, so the line break lands before the dot instead of leaving a stray `.` at the end of the previous item.
 
-📖 [Inlinize Detected List](Utilities.md#inlinize-detected-list-inl)
+📖 [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl)
 
 ### ⚡ Improved - the flashcard history table compares your schedule against FSRS
 
@@ -483,7 +615,7 @@ Every other surface colours it — the Sessions Summary, the live session card, 
 
 **Ctrl/Cmd+Shift+Enter** in the Find Rem picker appends a **pin at the end of the Rem** and leaves your selected text alone — so, mid-queue, you can select part of a card, press `Alt+Shift+F`, and pin the highlight it came from for next time.
 
-📖 [Pin a source at the end of a Rem](Utilities.md#pin-a-source-at-the-end-of-a-rem)
+📖 [Pin a source at the end of a Rem](Utilities-Finding-and-Navigating.md#pin-a-source-at-the-end-of-a-rem)
 
 ### ⚡ Improved - making a Rem incremental leaves one history entry, not two
 
@@ -495,7 +627,7 @@ Setting a priority right after creation (Alt+Shift+X, the highlight toolbar's **
 
 A highlight carries the same `DEFAULT_TYPE` as any plain Rem, so the picker's type badge couldn't tell one apart from your own note of the same sentence — highlights now show an amber **PDF HIGHLIGHT** badge instead.
 
-📖 [Spotting PDF highlights](Utilities.md#spotting-pdf-highlights)
+📖 [Spotting PDF highlights](Utilities-Finding-and-Navigating.md#spotting-pdf-highlights)
 
 ## v1.0.75 - September 2nd, 2026
 
@@ -509,7 +641,7 @@ Both surfaces that already reported PDF reading progress now do the same for a [
 
 Title Case no longer flattens an acronym to *(Ab)* or a `Seção II` to *Seção Ii*: maritime, institutional and technical acronyms are built in, Roman numerals are recognised where they read as numbering, capitals you already typed are preserved, and your own terms go in **IE Settings → Other → Title Case Acronyms**.
 
-📖 [Acronyms and initialisms](Utilities.md#acronyms-and-initialisms)
+📖 [Acronyms and initialisms](Utilities-Text-and-Lists.md#acronyms-and-initialisms)
 
 ### ⚡ Improved - Priority Shield History opens on the Knowledge Base graphs
 
@@ -561,11 +693,11 @@ A Rem can look exactly like a flashcard and generate nothing. The new **Audit Ca
 
 The case it was built for is an **Anki import**: hundreds of Rems arrive with the flashcard direction set to `none`. They read as ordinary cards and are never scheduled — and because they own **no card records at all**, no card-driven tool can see them and RemNote's search cannot express the question.
 
-📖 [Card Enablement Audit](Utilities.md#card-enablement-audit)
+📖 [Card Enablement Audit](Utilities-Cleaning-Up.md#card-enablement-audit)
 
 #### Technical explanation
 
-The walk is Rem-driven rather than card-driven, which is the whole point: a Rem at `direction=none` produces zero rows in `card.getAll()`, so the Suppressed Cards breakdown is structurally blind to it however it is filtered. Verdicts follow `CARD_STATE_REFERENCE.md` and are ordered by what a fix would accomplish — a disabling ancestor outranks the Rem's own direction, since setting a direction under one writes the slot and produces nothing.
+The walk is Rem-driven rather than card-driven, which is the whole point: a Rem at `direction=none` produces zero rows in `card.getAll()`, so the Suppressed Cards breakdown is structurally blind to it however it is filtered. Verdicts follow `findings/CARD_STATE_REFERENCE.md` and are ordered by what a fix would accomplish — a disabling ancestor outranks the Rem's own direction, since setting a direction under one writes the slot and produces nothing.
 
 Three things make it usable at scale, where the single-Rem debug probe is not: the card table is fetched once and indexed by `remId` instead of once per Rem; ancestor chains are memoised per parent id, so the hundreds of rows of an imported deck resolve one shared chain and get their breadcrumb from the same walk; and plain-string rich text is joined locally rather than paying a `normalize` + `toString` round trip per Rem. Writes are sequential under a suppression lease, and the cards created are counted by reading back afterwards rather than predicted.
 
@@ -637,7 +769,7 @@ A table column that generates flashcards can be set to print some of the table's
 
 The new **Hide Front Extras** powerup hides the table properties shown on the **front** of the card you tag — the back still shows everything. Apply it from the queue or the editor with the **Hide Front Extras (Table Properties)** command (`hfe`). Only the tagged card is affected; the rest of the table is untouched. **No Hierarchy** does not cover this: front extras render outside the ancestor hierarchy it hides, so the two are complementary.
 
-📖 [Hide Front Extras](Utilities.md#hide-front-extras)
+📖 [Hide Front Extras](Utilities-Queue-Display.md#hide-front-extras)
 
 #### Technical explanation
 
@@ -733,7 +865,7 @@ An area highlight's colours are per-edge (`border-color: yellow blue yellow blue
 
 The rings are **off by default**, behind **Enable Pin Reference Colour Rings** (*Editor Indicators*). Two of the three states depend on tags the scan writes, so a knowledge base that has never run it would otherwise wake up with a marker on every pin. Switching it off also clears the priority-band border that the highlight styling leaks onto pin containers, so "off" means genuinely unmarked.
 
-📖 [Pins that lead to an image are ringed](Utilities.md#pins-that-lead-to-an-image-are-ringed)
+📖 [Pins that lead to an image are ringed](Utilities-Finding-and-Navigating.md#pins-that-lead-to-an-image-are-ringed)
 
 ### 📚 Docs - one page listing every colour the plugin draws
 
@@ -913,7 +1045,7 @@ The scan writes nothing. It reports how many Extra Card Detail Rems it checked, 
 
 The bar for "empty" is high, because this one deletes. **Blank text is not the same as empty** — a **portal** has no text of its own, since it is a window onto other Rems, and its contents are not its children either, so neither a text test nor a child test notices it. Candidates must therefore be plain Rems: not portals, Concepts, Descriptors, slots or properties. On top of that: no text or back text (an image, reference, LaTeX or annotation counts as content, cosmetic formatting on nothing does not), no children, nothing displayed portal-style, no tag beyond Extra Card Detail, nothing referencing it, no cards, no source, no alias. Anything that fails a check is kept and counted with its reason.
 
-📖 [Delete Empty Extra Card Detail Rems](Utilities.md#delete-empty-extra-card-detail-rems)
+📖 [Delete Empty Extra Card Detail Rems](Utilities-Cleaning-Up.md#delete-empty-extra-card-detail-rems)
 
 #### Technical explanation
 
@@ -933,7 +1065,7 @@ The review screen reports the whole funnel — Rems walked → blank → blank *
 
 Nothing is lost: the tag is derived from the images themselves, so **Tag Rems With Images** rebuilds it exactly. Re-running the scan *is* the undo, which is why the command needs none of its own.
 
-📖 [Clearing the tag](Utilities.md#clearing-the-tag)
+📖 [Clearing the tag](Utilities-Finding-and-Navigating.md#clearing-the-tag)
 
 ### ⚡ Improved - Tag Rems With Images is about three times faster
 
@@ -941,7 +1073,7 @@ A first whole-KB run on a large knowledge base took **90 minutes**; the same run
 
 The documentation now states what a run actually costs, because the shape of it is not obvious: reading every Rem is fast (10 seconds for 413,000 of them) and **writing the tags is the whole cost**. A run's length is set by how many tags it must write, not how many Rems it reads — so the first whole-KB pass is slow once, and every one after it is quick.
 
-📖 [How long it takes](Utilities.md#how-long-it-takes-the-first-whole-kb-run-is-slow)
+📖 [How long it takes](Utilities-Finding-and-Navigating.md#how-long-it-takes-the-first-whole-kb-run-is-slow)
 
 #### Technical explanation
 
@@ -1106,7 +1238,7 @@ An image is a rich-text element with `i: 'i'`, so detection is a plain scan of `
 
 `HasImage` is a slotless powerup, not a plain tag Rem: RemNote's Filter lists powerups alongside tags, and an applied-powerup pill carries a stable `data-test`, which is what lets its chip be hidden without also hiding the user's own tags on the same Rem.
 
-📖 [Filter a Document by Images](Utilities.md#filter-a-document-by-images)
+📖 [Filter a Document by Images](Utilities-Finding-and-Navigating.md#filter-a-document-by-images)
 
 ### ✨ New - a pin that leads to an image is ringed
 
@@ -1120,7 +1252,7 @@ A **pin whose target holds an image** gets a blue ring after the scan mentioned 
 
 Colours come from RemNote's `--rn-clr-border-accent` / `--rn-clr-border-selected` tokens, so the ring follows light and dark mode without a `.dark` branch.
 
-📖 [Pins that lead to an image are ringed](Utilities.md#pins-that-lead-to-an-image-are-ringed)
+📖 [Pins that lead to an image are ringed](Utilities-Finding-and-Navigating.md#pins-that-lead-to-an-image-are-ringed)
 
 ### 📚 Docs - the Utilities page is grouped, and its table of contents is complete again
 
@@ -1779,11 +1911,11 @@ The shared ancestor-breadcrumb builder — used by the row tooltips in the **[In
 
 ### ✨ Improved: Find Rem treats "Figure", "Fig" and "Fig." as the same word
 
-The **[Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open)** picker now matches figure abbreviations interchangeably. Typing **`fig 4.3`** lists a Rem named **`Figure 4.3`** — and typing **`figure 4.3`** finds one named **`Fig. 4.3`** or **`Fig 4.3`**. Any capitalisation works, and a trailing dot is optional.
+The **[Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open)** picker now matches figure abbreviations interchangeably. Typing **`fig 4.3`** lists a Rem named **`Figure 4.3`** — and typing **`figure 4.3`** finds one named **`Fig. 4.3`** or **`Fig 4.3`**. Any capitalisation works, and a trailing dot is optional.
 
 This rides on the same folded-text matching that already made the picker accent-insensitive: a standalone `fig`/`fig.` word is canonicalised to `figure` in both your query and each Rem's name (and alias) before they're compared, so the two spellings score identically — an exact match still floats to the top with its `EXACT` badge. The backend search is also seeded with the alternate spelling, so the Rem is retrieved regardless of which form is stored versus typed. Only the whole word is affected — `figs`, `configure`, and the like are left alone.
 
-📖 See [Utilities → Find Rem — Reference or Open](Utilities.md#accent-insensitive-selection-aware).
+📖 See [Utilities → Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#accent-insensitive-selection-aware).
 
 ## v1.0.20 - July 22nd, 2026
 
@@ -1910,7 +2042,7 @@ Now nothing is lost:
 
 If a break already ate an image or pin: **`Restore List Rem`** recovers it — the pre-break snapshot always stored the complete original text, so nothing already broken is truly lost.
 
-📖 See [Utilities → Break Inline List Into Children](Utilities.md#break-inline-list-into-children-brl).
+📖 See [Utilities → Break Inline List Into Children](Utilities-Text-and-Lists.md#break-inline-list-into-children-brl).
 
 ## v1.0.12 - July 15th, 2026
 
@@ -1940,7 +2072,7 @@ Saving the priority/interval popup fired a full priority-inheritance cascade eve
 
 ### ✨ New: detect & break flattened PDF-highlight lists into an outline
 
-A PDF highlight often captures a whole enumerated list as **one rem**, flattened onto a single line with the numbers left inline and the line breaks dropped (`… evitá-las: 1 Aumentar… 2 Deixar… 3 O Oficial…`). [Bulletize Inline Selected Text](Utilities.md#bulletize-inline-selected-text) can only re-bullet lines that *already* exist — here there are none. Three new commands rebuild the structure in a reviewable, undoable flow:
+A PDF highlight often captures a whole enumerated list as **one rem**, flattened onto a single line with the numbers left inline and the line breaks dropped (`… evitá-las: 1 Aumentar… 2 Deixar… 3 O Oficial…`). [Bulletize Inline Selected Text](Utilities-Text-and-Lists.md#bulletize-inline-selected-text) can only re-bullet lines that *already* exist — here there are none. Three new commands rebuild the structure in a reviewable, undoable flow:
 
 - **`Inlinize Detected List`** (`quick: inl`) — detects the list and inserts a line break + `• ` before each item, so it becomes soft-wrapped bulleted lines in the **same rem**. **Enumerated** items keep their number (`1 Aumentar` → `• 1 Aumentar`); **already-bulleted** lists (`•`, `-`, `*` run together on one line) have their marker normalized to `• `. This is your review checkpoint — eyeball the split and `Ctrl+Z` if the heuristic got it wrong before anything destructive happens.
 - **`Break Inline List Into Children`** (`quick: brl`) — turns each `• ` line into a **child rem**, with the caput/title staying on the parent. If the rem carries a **pin back to a PDF highlight** (from the Create IncRem toolbar *or* from pasting the highlight straight into notes), the pin is **moved onto the caput** instead of clinging to the last item, so the source link rides the title and every child stays clean. It **snapshots** the original text + created child IDs first, so the split is fully reversible. Refuses rems that have **back text** (flashcards) to avoid scrambling a card.
@@ -1950,7 +2082,7 @@ A PDF highlight often captures a whole enumerated list as **one rem**, flattened
 
 Unlike Bulletize (which works on a text selection), all three commands act on the **focused rem** — no selection needed. Known v1 limits: the chain must start at `1`/`a`/`i`, and a gap in the numbering stops the chain (safe over clever). No default shortcut is bound (quick codes only) to avoid conflicts.
 
-📖 See [Utilities → Inlinize & Break Lists](Utilities.md#inlinize-break-lists-from-pdf-highlights).
+📖 See [Utilities → Inlinize & Break Lists](Utilities-Text-and-Lists.md#inlinize-break-lists-from-pdf-highlights).
 
 ### 🐛 Fixed: red priority badge on inheritance-only card rems
 
@@ -1988,7 +2120,7 @@ When a Rem reads from a **PDF with a page range** set, the **[IncRem Repetition 
 
 ### ✨ New: "Text with Pin" insertion in the Find Rem picker (`Opt/Alt+Enter`)
 
-The **[Find Rem](Utilities.md#find-rem-reference-or-open)** picker gains a third insertion mode alongside *reference* (`Enter`) and *pin* (`Ctrl/Cmd+Enter`): press **`Opt+Enter` / `Alt+Enter`** (or **`Opt/Alt+click`** a result) to insert the Rem's **text followed by a pin** — the same result as RemNote's paste dialog option **"Text with Pin"**, but in one keystroke and without copying first.
+The **[Find Rem](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open)** picker gains a third insertion mode alongside *reference* (`Enter`) and *pin* (`Ctrl/Cmd+Enter`): press **`Opt+Enter` / `Alt+Enter`** (or **`Opt/Alt+click`** a result) to insert the Rem's **text followed by a pin** — the same result as RemNote's paste dialog option **"Text with Pin"**, but in one keystroke and without copying first.
 
 It brings across the source's **full rich text**, not a plain label:
 
@@ -2010,7 +2142,7 @@ The correction happens before the box is shown, so there's no visible jump. (Rem
 
 ### ♻️ Changed: "Bulletize Inline Selected Text" default shortcut rebound to `Shift+F8`
 
-The default binding for **[Bulletize Inline Selected Text](Utilities.md#bulletize-inline-selected-text)** changed from `Ctrl+Opt+Shift+8` to **`Shift+F8`** — a recent RemNote build uses `Ctrl+Opt+Shift+8` to apply the **blue highlight** to inline text, so the old binding collided with it. `Shift+F8` sidesteps every conflict (`Opt+8` types `•`, `Opt+Shift+8` types `°`, `Ctrl+Opt+Shift+8` is RemNote's blue highlight) and is identical across macOS/Windows/Linux. If you rebound the command manually, your custom binding is unaffected.
+The default binding for **[Bulletize Inline Selected Text](Utilities-Text-and-Lists.md#bulletize-inline-selected-text)** changed from `Ctrl+Opt+Shift+8` to **`Shift+F8`** — a recent RemNote build uses `Ctrl+Opt+Shift+8` to apply the **blue highlight** to inline text, so the old binding collided with it. `Shift+F8` sidesteps every conflict (`Opt+8` types `•`, `Opt+Shift+8` types `°`, `Ctrl+Opt+Shift+8` is RemNote's blue highlight) and is identical across macOS/Windows/Linux. If you rebound the command manually, your custom binding is unaffected.
 
 ---
 
@@ -2100,7 +2232,7 @@ The read-only outline view (**[ExtractViewer](PDF-Incremental-Reading-Workflow.m
 
 ### 🐛 Fixed: "Find Rem" no longer suggests the Rem you're editing
 
-The **[Find Rem](Utilities.md#find-rem-reference-or-open)** picker now excludes the **source Rem** it was triggered from — a Rem can't reference itself, so it's no longer offered as a result.
+The **[Find Rem](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open)** picker now excludes the **source Rem** it was triggered from — a Rem can't reference itself, so it's no longer offered as a result.
 
 ---
 
@@ -2108,7 +2240,7 @@ The **[Find Rem](Utilities.md#find-rem-reference-or-open)** picker now excludes 
 
 ### ✨ New: "Find Rem — Reference or Open" now matches Rems by their aliases
 
-The **[Find Rem](Utilities.md#find-rem-reference-or-open)** picker (`Opt+Shift+F` / `Alt+Shift+F`, quick code `fir`) now finds Rems by their **aliases** — the alternate names you add via *Edit or Add Alias* (RemNote's built-in **Aliases** powerup) — just like RemNote's native `[[` search does. Previously the picker only matched a Rem's *primary* name, so a Rem named **Via navegável** with an alias **vias navegáveis** wouldn't appear when you typed the alias.
+The **[Find Rem](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open)** picker (`Opt+Shift+F` / `Alt+Shift+F`, quick code `fir`) now finds Rems by their **aliases** — the alternate names you add via *Edit or Add Alias* (RemNote's built-in **Aliases** powerup) — just like RemNote's native `[[` search does. Previously the picker only matched a Rem's *primary* name, so a Rem named **Via navegável** with an alias **vias navegáveis** wouldn't appear when you typed the alias.
 
 As a reminder, the picker's core purpose is to surface Rems that RemNote's own `[[` reference search can't find (names made entirely of high-frequency words get out-ranked off the candidate list):
 
@@ -2124,7 +2256,7 @@ The picker's existing **cloze-aware** insertion (a reference dropped inside a cl
 
 ![Find Rem — cloze-aware reference insertion (reference stays inside the cloze)](assets/find-rem-cloze-aware-insertion.gif)
 
-📖 See **[Find by alias](Utilities.md#find-by-alias)** and **[Cloze-aware insertion](Utilities.md#cloze-aware-insertion)** in Utilities.
+📖 See **[Find by alias](Utilities-Finding-and-Navigating.md#find-by-alias)** and **[Cloze-aware insertion](Utilities-Finding-and-Navigating.md#cloze-aware-insertion)** in Utilities.
 
 ---
 
@@ -2155,7 +2287,7 @@ The **[Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities)** comman
 
 ### ♻️ Changed: "Bulletize Inline Selected Text" default shortcut rebound (macOS degree-symbol conflict)
 
-The default binding for **[Bulletize Inline Selected Text](Utilities.md#bulletize-inline-selected-text)** changed from `Opt+Shift+8` to **`Ctrl+Opt+Shift+8`** (`Ctrl+Alt+Shift+8` on Windows/Linux). On macOS `Opt+Shift+8` types the degree symbol (`°`), so the old binding conflicted with typing it. If you rebound the command manually, your custom binding is unaffected.
+The default binding for **[Bulletize Inline Selected Text](Utilities-Text-and-Lists.md#bulletize-inline-selected-text)** changed from `Opt+Shift+8` to **`Ctrl+Opt+Shift+8`** (`Ctrl+Alt+Shift+8` on Windows/Linux). On macOS `Opt+Shift+8` types the degree symbol (`°`), so the old binding conflicted with typing it. If you rebound the command manually, your custom binding is unaffected.
 
 ---
 
@@ -2182,7 +2314,7 @@ The Bookmark popup (PDF/HTML) and the new Read Points popup now display the **na
 
 ### ✨ New: "Apply Heading Levels by Hierarchy (Table of Contents)" + Promote/Demote
 
-A new command — **Apply Heading Levels by Hierarchy (Table of Contents)** (quick code `htoc`) — turns a ready-made outline into a properly-leveled table of contents in one shot: select the rems and it assigns heading levels (H1–H6) **by each rem's depth in the hierarchy**, to a level range you choose (e.g. H1–H3 or H2–H4). It **never moves rems** — only their heading level changes — and reuses the same full-range H1–H6 detection/application as [Restructure Outline by Headings](Utilities.md#restructure-outline-by-headings) and [Set Next Heading Level](Utilities.md#set-next-heading-level).
+A new command — **Apply Heading Levels by Hierarchy (Table of Contents)** (quick code `htoc`) — turns a ready-made outline into a properly-leveled table of contents in one shot: select the rems and it assigns heading levels (H1–H6) **by each rem's depth in the hierarchy**, to a level range you choose (e.g. H1–H3 or H2–H4). It **never moves rems** — only their heading level changes — and reuses the same full-range H1–H6 detection/application as [Restructure Outline by Headings](Utilities-Outline-and-Headings.md#restructure-outline-by-headings) and [Set Next Heading Level](Utilities-Outline-and-Headings.md#set-next-heading-level).
 
 - **Selection → forest → depth.** The selection is reduced to its topmost rems (forest roots = the top level); everything beneath is leveled by depth. Selecting a parent *and* its descendants together is fine — descendants aren't double-counted.
 - **Choose the range.** A **Top level** and **Deepest level** picker in the preview controls the mapping; rems nested deeper than the range **keep their current level** (left unchanged, never force-stripped).
@@ -2190,7 +2322,7 @@ A new command — **Apply Heading Levels by Hierarchy (Table of Contents)** (qui
 - **Undoable.** After Apply, a **Heading Levels Applied** banner appears in the sidebar with an **Undo Heading Changes** button (restoring prior levels, including back to plain paragraphs). Also available as the `Revert Last Heading Level Change` command (`rlh`). It uses its own snapshot slot, separate from the restructure undo banner.
 - **Promote / Demote.** Two companion commands — **Demote Heading Level** (`hdmt`, `H2 → H3`) and **Promote Heading Level** (`hpmt`, `H2 → H1`) — shift every heading in the **selected subtree** by one level (clamped H1–H6; non-heading rems untouched), through the same preview + undo. They walk the whole selected subtree, since RemNote's outline selection reports only its top-level rems.
 
-📖 See **[Apply Heading Levels by Hierarchy](Utilities.md#apply-heading-levels-by-hierarchy-table-of-contents)** in Utilities and the **[command reference](Plugin-Commands-Reference.md)**.
+📖 See **[Apply Heading Levels by Hierarchy](Utilities-Outline-and-Headings.md#apply-heading-levels-by-hierarchy-table-of-contents)** in Utilities and the **[command reference](Plugin-Commands-Reference.md)**.
 
 ---
 
@@ -2200,12 +2332,12 @@ A new command — **Apply Heading Levels by Hierarchy (Table of Contents)** (qui
 
 A new command — **Set Next Heading Level** (quick code `hn`) — styles the selected rem(s) as **one heading level deeper than their parent**, so adding content under an existing heading keeps the outline hierarchy consistent without manually picking H1…H6. Under an `H3` parent the selected rem becomes `H4`; under `H4` it becomes `H5`, clamped at `H6`.
 
-- **Full H1–H6 support.** It reuses the same heading detection/application as [Restructure Outline by Headings](Utilities.md#restructure-outline-by-headings), so it handles H4/H5/H6 too (which RemNote stores in the Header powerup's `Size` slot rather than the H1–H3 font-size API).
+- **Full H1–H6 support.** It reuses the same heading detection/application as [Restructure Outline by Headings](Utilities-Outline-and-Headings.md#restructure-outline-by-headings), so it handles H4/H5/H6 too (which RemNote stores in the Header powerup's `Size` slot rather than the H1–H3 font-size API).
 - **Grandparent fallback.** If the immediate parent isn't a heading but the **grandparent** is `Hn`, a confirmation dialog offers to set the **parent** to `H(n+1)` and the **selected rem** to `H(n+2)` (e.g. grandparent `H2` → parent `H3`, rem `H4`) — Cancel leaves both unchanged.
 - **Multi-rem.** Select several rems and each is styled relative to its own parent; all grandparent-fallback cases are covered by a **single** confirmation, and a parent shared by several selected siblings is promoted only once. Rems with no ancestor heading are skipped, reported in a summary toast.
 - Omnibar-friendly (`Cmd+/` → `hn`), preserving the multi-rem selection.
 
-📖 See **[Set Next Heading Level](Utilities.md#set-next-heading-level)** in Utilities and the **[command reference](Plugin-Commands-Reference.md)**.
+📖 See **[Set Next Heading Level](Utilities-Outline-and-Headings.md#set-next-heading-level)** in Utilities and the **[command reference](Plugin-Commands-Reference.md)**.
 
 ---
 
@@ -2249,7 +2381,7 @@ Two new commands open the **PDF or web article behind a reference pin without le
 - **Auto-scroll + manual button.** For highlights, the embedded reader scrolls to the highlighted passage once it mounts (retried while the PDF engine initializes); a **🔖 Scroll to Highlight** button in the header re-centers on it after you scroll around.
 - **Two variants for two flows.** The **modal** (`Opt+O`) is ideal for a single focused "open → read → close → rate" glance. The **floating** window (`Opt+Shift+O`) opens on the right (~48% width) and **stays beside the card** so you can peek back and forth: it doesn't close when you click into the PDF (you can highlight/select there), **auto-closes when you advance the card**, and **Esc closes it without closing the queue** (it "steals" the Esc key while open).
 
-📖 See **[Open Source in Popup](Utilities.md#open-source-in-popup)** in Utilities, the Source Popup widgets ([modal](Plugin-Widgets-Reference.md#65-source-popup-modal-queue-safe-pdfhtml-viewer) · [floating](Plugin-Widgets-Reference.md#66-source-popup-floating-non-blocking)), and the **[command reference](Plugin-Commands-Reference.md)**.
+📖 See **[Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup)** in Utilities, the Source Popup widgets ([modal](Plugin-Widgets-Reference.md#65-source-popup-modal-queue-safe-pdfhtml-viewer) · [floating](Plugin-Widgets-Reference.md#66-source-popup-floating-non-blocking)), and the **[command reference](Plugin-Commands-Reference.md)**.
 
 ---
 
@@ -2268,7 +2400,7 @@ A new command — **Find Rem (insert reference / open in pane)** (`Opt+Shift+F` 
 
 ![Find Rem — surfacing a Rem that RemNote's own `[[` reference search can't find](assets/find-rem-finds-rems-normal-search-cannot.gif)
 
-📖 See **[Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open)** in Utilities.
+📖 See **[Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open)** in Utilities.
 
 ### ✨ New: "Search / Linkage Diagnostics" (Debug Widget)
 
@@ -2290,7 +2422,7 @@ A new command — **Bulletize Inline Selected Text** (`Opt+Shift+8` / `Alt+Shift
 
 ![Bulletize Inline Selected Text demo](assets/bulletize-text.gif)
 
-📖 See **[Bulletize Inline Selected Text](Utilities.md#bulletize-inline-selected-text)** in Utilities.
+📖 See **[Bulletize Inline Selected Text](Utilities-Text-and-Lists.md#bulletize-inline-selected-text)** in Utilities.
 
 ---
 
@@ -2484,7 +2616,7 @@ A new [**Open Weighted Shield Popup**](Plugin-Commands-Reference.md#special-oper
 
 ### ✨ New: Restructure Outline by Headings (`roh`)
 
-A new [**Restructure Outline by Headings**](Utilities.md#restructure-outline-by-headings) command (`quick: roh`) re-nests a flat or mis-pasted document so paragraphs and lower-level headings sit under their preceding higher-level heading. Built for the common case of pasting structured web content into RemNote — which often arrives as a flat list of siblings, or with `H2`s mis-indented under paragraphs instead of their parent `H1`.
+A new [**Restructure Outline by Headings**](Utilities-Outline-and-Headings.md#restructure-outline-by-headings) command (`quick: roh`) re-nests a flat or mis-pasted document so paragraphs and lower-level headings sit under their preceding higher-level heading. Built for the common case of pasting structured web content into RemNote — which often arrives as a flat list of siblings, or with `H2`s mis-indented under paragraphs instead of their parent `H1`.
 
 ![Restructure Outline by Headings demo](assets/restructure-outline-by-headings.png)
 
@@ -2495,7 +2627,7 @@ A new [**Restructure Outline by Headings**](Utilities.md#restructure-outline-by-
 
 ### ✨ Improvement: Text Case Converter Now Works on Multi-Rem Selections
 
-[**Text Case Converter**](Utilities.md#text-case-converter) (`Shift+F3`) previously only cycled the text **within a single rem**. It now also detects when one or more **whole rems** are selected in the outline and applies the next case (Title → UPPER → lower) to every selected rem's text — including the **back text** of concept/descriptor rems. The cycle stage is detected from the combined text of the batch so all rems advance together, while Title Case is still computed per rem so each one's first/last-word rule is respected.
+[**Text Case Converter**](Utilities-Text-and-Lists.md#text-case-converter) (`Shift+F3`) previously only cycled the text **within a single rem**. It now also detects when one or more **whole rems** are selected in the outline and applies the next case (Title → UPPER → lower) to every selected rem's text — including the **back text** of concept/descriptor rems. The cycle stage is detected from the combined text of the batch so all rems advance together, while Title Case is still computed per rem so each one's first/last-word rule is respected.
 
 ### ✨ Improvement: Multi-Rem Commands Now Work via `Cmd+/` Omnibar
 
@@ -2507,7 +2639,7 @@ RemNote blurs the editor when the `Cmd+/` Omnibar opens, which caused plugin com
 - **Text Case Converter**
 - **Restructure Outline by Headings**
 
-See [Utilities → Omnibar Selection Recovery](Utilities.md#omnibar-selection-recovery) for the technical details.
+See [Utilities → Omnibar Selection Recovery](Utilities-Under-the-Hood.md#omnibar-selection-recovery) for the technical details.
 
 ---
 
@@ -2767,7 +2899,7 @@ Incremental Everything can now register the powerups and commands originally dis
 - The incorporated 5 are gated by a new setting, **Enable Hide-in-Queue powerups and commands** (default: **off**). Enable it only after uninstalling the standalone plugin — the powerup codes are identical and RemNote throws a fatal `Duplicated powerup` error if both register the same code.
 - **Remove Parent** and **Remove Grandparent** are always registered regardless of the setting, since the cloze and extract creators depend on them.
 
-See the new [Queue Display Utilities](Utilities.md#queue-display-utilities) section of the Utilities wiki page for full documentation.
+See the new [Queue Display Utilities](Utilities-Queue-Display.md) section of the Utilities wiki page for full documentation.
 
 ### ✨ Improved: Priority Review Document Creator — Keyboard Navigation
 

@@ -47,6 +47,7 @@ import {
   coolingMinDaysId,
   coolingMaxDaysId,
   coolingNewCardDaysId,
+  coolingInQueuesId,
   displayWeightedShieldId,
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
@@ -59,6 +60,8 @@ import {
   hideDismissedTagSettingId,
   showPinRingIndicatorsSettingId,
   enableHideInQueueIntegrationId,
+  logosBridgeEnabledId,
+  logosAutoOpenId,
   enableFlashcardPrioritisationId,
   performanceModeId,
   alwaysUseLightModeOnMobileId,
@@ -76,6 +79,9 @@ import {
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
   disableFinalDrillNotificationId,
+  masteryDrillModeId,
+  MasteryDrillMode,
+  masteryDrillRevealDelayId,
   speedColorModeId,
   SpeedColorMode,
   speedColorRedCpmId,
@@ -118,6 +124,7 @@ export interface IESettings {
   [coolingMinDaysId]: number;
   [coolingMaxDaysId]: number;
   [coolingNewCardDaysId]: number;
+  [coolingInQueuesId]: boolean;
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
@@ -133,6 +140,8 @@ export interface IESettings {
 
   // Integrations / performance
   [enableHideInQueueIntegrationId]: boolean;
+  [logosBridgeEnabledId]: boolean;
+  [logosAutoOpenId]: boolean;
   [enableFlashcardPrioritisationId]: boolean;
   [performanceModeId]: PerformanceMode;
   [alwaysUseLightModeOnMobileId]: boolean;
@@ -155,6 +164,8 @@ export interface IESettings {
   [oldItemThresholdId]: number;
   [masteryDrillMinDelayMinutesId]: number;
   [disableFinalDrillNotificationId]: boolean;
+  [masteryDrillModeId]: MasteryDrillMode;
+  [masteryDrillRevealDelayId]: number;
 
   // Queue Dashboard
   [speedColorModeId]: SpeedColorMode;
@@ -192,6 +203,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [coolingMinDaysId]: 1,
   [coolingMaxDaysId]: 15,
   [coolingNewCardDaysId]: 1,
+  [coolingInQueuesId]: true,
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
@@ -205,6 +217,8 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [showPinRingIndicatorsSettingId]: false,
 
   [enableHideInQueueIntegrationId]: false,
+  [logosBridgeEnabledId]: false,
+  [logosAutoOpenId]: false,
   [enableFlashcardPrioritisationId]: false,
   [performanceModeId]: 'light',
   [alwaysUseLightModeOnMobileId]: true,
@@ -224,6 +238,8 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [oldItemThresholdId]: 7,
   [masteryDrillMinDelayMinutesId]: 180,
   [disableFinalDrillNotificationId]: false,
+  [masteryDrillModeId]: 'native',
+  [masteryDrillRevealDelayId]: 500,
 
   // Calibrated by default: an absolute cards-per-minute standard says little
   // about a knowledge base whose cards are long extracts or one-word clozes.
@@ -560,8 +576,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     group: 'priorityQueue',
     title: 'Refresh the Priority Queues at startup and after each session',
     description:
-      'When RemNote starts, once the caches are loaded, refreshes every Priority Queue document; ' +
-      'and when you leave the queue after practising one, refreshes that one. A refresh drains the ' +
+      'When RemNote starts, once the caches are loaded, refreshes the full-KB Priority Queue; and ' +
+      'when you leave the queue after practising any Priority Queue, refreshes that one. Document ' +
+      'queues are not refreshed at startup: each waits for its own session. A refresh drains the ' +
       'entries you reviewed and tops the document back up to its fill target, so it is ready ' +
       'before the next Practice. Never runs while a queue is open, and not in Light Mode — refresh ' +
       'from the Priority Queue popup there.',
@@ -611,6 +628,19 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'How long a card you just created stays out of the Priority Queue before its first review — ' +
       'SuperMemo counts creating an item as its first repetition, so it is never asked the same day. ' +
       'Counted from the card\u2019s own creation time; 0 turns this off. At most 10 days.',
+  },
+  [coolingInQueuesId]: {
+    kind: 'boolean',
+    group: 'priorityQueue',
+    helpPath: 'Priority-Review-Document/#cooling-in-remnotes-own-queues',
+    title: 'Cooling in RemNote\u2019s queues',
+    onLabel: 'All queues',
+    offLabel: 'Learn New only',
+    description:
+      'Where a card of a cooling Rem is skipped. Learn New Cards is always covered. With All queues, ' +
+      'RemNote\u2019s spaced-repetition queues are too (a document, the daily queue), with a toast ' +
+      'saying why; the card flashes briefly before it goes, stays due, and returns once cooling ends. ' +
+      'Practice All Flashcards (shuffled or in order), Card Clusters and Light Mode are left alone.',
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',
@@ -791,6 +821,46 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     title: 'Disable Mastery Drill Notifications',
     description: 'Stops the Mastery Drill sidebar notification from appearing.',
   },
+  [masteryDrillModeId]: {
+    kind: 'dropdown',
+    group: 'masteryDrill',
+    showWhen: { id: enableMasteryDrillId, equals: true },
+    title: 'Where the Drill Runs',
+    options: [
+      { value: 'popup', label: 'Popup (embedded queue)' },
+      { value: 'native', label: 'Regular queue' },
+    ],
+    description:
+      'Popup: the drill opens in its own window with an embedded queue. It holds exactly the ' +
+      'drill cards, but RemNote shows no plugin widgets inside an embedded queue: no card info ' +
+      'bar, and nothing from other plugins such as a context tree or repetition history.\n\n' +
+      "Regular queue: the drill runs in RemNote's own Practice queue, so every widget of every " +
+      'plugin shows, Card Clusters and keyboard shortcuts work natively, and ratings are recorded ' +
+      'like any review. RemNote can only practise whole Rems, though, so the other cards of a ' +
+      'drill Rem come up too and the plugin skips them. To keep a skipped card from flashing, each ' +
+      'card stays hidden for a moment before it fades in (see Reveal Delay). A skip that lands ' +
+      'right after a rating can still show briefly.\n\n' +
+      'Skipping a card counts as seeing it, so RemNote may hide ("bury") a drill card whose ' +
+      'sibling was skipped and end with "Time to Take a Break". Press Keep Practicing there to ' +
+      'get the hidden drill cards; it only affects the drill session.\n\n' +
+      'The commands "Mastery Drill (popup)" and "Mastery Drill (regular queue)" start either ' +
+      'one regardless of this setting.',
+  },
+  [masteryDrillRevealDelayId]: {
+    kind: 'number',
+    group: 'masteryDrill',
+    showWhen: { id: masteryDrillModeId, equals: 'native' },
+    min: 0,
+    max: 2000,
+    integer: true,
+    unit: 'ms',
+    title: 'Reveal Delay (regular-queue drill)',
+    description:
+      'How long each card stays hidden before it fades in during a regular-queue drill. A card ' +
+      'the plugin skips inside this window is never seen. Most skips take under 150 ms; the ones ' +
+      'right after a rating can take 600 ms or more. Longer hides more of them, but every card ' +
+      'appears that much later. 0 turns the mask off.',
+  },
 
   // --- Queue Dashboard ---
   [speedColorModeId]: {
@@ -909,7 +979,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     group: 'integrations',
     reloadRequired: true,
-    helpPath: 'Utilities/#hide-in-queue',
+    helpPath: 'Utilities-Queue-Display/#hide-in-queue',
     title: 'Enable Hide-in-Queue Powerups and Commands',
     description:
       'Registers the "Hide in Queue", "Remove from Queue", "No Hierarchy", "Hide Parent" and ' +
@@ -919,6 +989,29 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Uninstall the standalone plugin first, then reload RemNote.\n\n' +
       '"Remove Parent" and "Remove Grandparent" are always registered, since the Cloze and Extract ' +
       'creators depend on them.',
+  },
+  [logosBridgeEnabledId]: {
+    kind: 'boolean',
+    group: 'integrations',
+    helpPath: 'Logos-Bible-Software-Integration/#setup',
+    title: 'Logos Bible Software Bridge',
+    description:
+      'Receives extracts and reading bookmarks from Logos (macOS) through the local LogosBridge ' +
+      'helper (scripts/logos_bridge/build.sh). In Logos: ⌃⌥X extracts the selection under the ' +
+      'IncRem you are reviewing, ⌃⌥⇧X does it without asking priority and interval, ⌃⌥B saves ' +
+      'the reading position, ⌃⌥N creates an IncRem for the open book (a top-level document tagged ' +
+      '#Logos). Leave off unless the helper is installed.',
+  },
+  [logosAutoOpenId]: {
+    kind: 'boolean',
+    group: 'integrations',
+    showWhen: { id: logosBridgeEnabledId, equals: true },
+    helpPath: 'Logos-Bible-Software-Integration/#settings',
+    title: 'Open in Logos Automatically',
+    description:
+      'When an Incremental Rem comes up — in the queue, or when an Editor Review timer starts — ' +
+      'run "Open in Logos" for it: Logos comes forward at its bookmark (or, for an extract, at its ' +
+      'passage). Incremental Rems with no Logos link are left alone.',
   },
 
   // --- Misc ---

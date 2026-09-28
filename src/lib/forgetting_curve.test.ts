@@ -209,6 +209,44 @@ describe('buildForgettingCurveSeries', () => {
         }
     });
 
+    it('keeps the forecast worth looking at after a lapse, without losing history', () => {
+        // A lapse collapses stability to days while the history is still years,
+        // so sizing the view by the forecast's own timescale ended it a few days
+        // past `now` and left the branches in a fraction of a percent of the
+        // width. The floor is a share of the card's age instead.
+        const older = [840, 830, 800, 770, 700, 560, 420].map((d) => rep(d, QueueInteractionScore.GOOD));
+        const lapsed = [...older, rep(1, QueueInteractionScore.AGAIN)];
+
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(lapsed, { scale })!;
+            const viewEnd = scale === 'linear' ? s.xDomain[1] : Math.pow(10, s.xDomain[1]);
+            assert.ok(
+                viewEnd >= s.nowDays * 1.4 - 1e-6,
+                `${scale}: view should reach 40% of the card's age past now (${viewEnd} vs ${s.nowDays})`,
+            );
+            // The whole history is still on screen — that is the point of
+            // extending the right edge rather than trimming the left one.
+            assert.ok(
+                s.xDomain[0] <= s.reps[0].x + 1e-9,
+                `${scale}: the first repetition is still inside the opening view`,
+            );
+        }
+    });
+
+    it('leaves a healthy card to the retention rule', () => {
+        const older = [840, 830, 800, 770, 700, 560, 420].map((d) => rep(d, QueueInteractionScore.GOOD));
+        const healthy = [...older, rep(1, QueueInteractionScore.GOOD)];
+
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(healthy, { scale })!;
+            const viewEnd = scale === 'linear' ? s.xDomain[1] : Math.pow(10, s.xDomain[1]);
+            assert.ok(
+                viewEnd > s.nowDays * 1.4,
+                `${scale}: the age floor should not bind on a card whose forecast is long`,
+            );
+        }
+    });
+
     it('computes far past the opening view, so zooming out keeps finding curve', () => {
         for (const scale of ['log', 'linear'] as const) {
             const s = build(HISTORY, { scale })!;
@@ -261,6 +299,158 @@ describe('buildForgettingCurveSeries', () => {
         const s = build(HISTORY, { forecast: false })!;
         assert.equal(s.branches.length, 0);
         assert.ok(s.rows.every((r) => r.good == null));
+        // Including on the stability panel, which grew its own branches later.
+        assert.ok(s.rows.every((r) => r.goodSLog == null));
+        assert.ok(s.rows.every((r) => r.noReview == null));
+    });
+
+    it('carries the card\'s own curve past now as the do-nothing baseline', () => {
+        const s = build(HISTORY)!;
+        const w = FSRS_DEFAULT_WEIGHTS;
+        const decay = -w[20];
+        const factor = Math.pow(0.9, 1 / decay) - 1;
+        const lastRep = s.reps[s.reps.length - 1];
+
+        const future = s.rows.filter((r) => typeof r.noReview === 'number');
+        assert.ok(future.length > 10, `the baseline is drawn (${future.length} points)`);
+
+        for (const row of future) {
+            // Anchored on the last review, not on `now` — it is the same
+            // segment continuing, so the two must agree exactly.
+            const expected =
+                forgettingCurve(row.days - lastRep.days, lastRep.s, decay, factor) * 100;
+            assert.ok(
+                Math.abs((row.noReview as number) - expected) < 1e-9,
+                `baseline should continue the last segment (got ${row.noReview}, expected ${expected})`,
+            );
+            assert.ok(row.days >= s.nowDays - 1e-9, 'and only past now');
+        }
+
+        // It meets the history line where that one stops.
+        const junction = future[0];
+        assert.ok(Math.abs(junction.days - s.nowDays) < 1e-6);
+
+        // At `now` every branch starts from a fresh review, so all four are
+        // above the card's untouched curve.
+        for (const g of CURVE_GRADES) {
+            assert.ok((junction[g] as number) >= (junction.noReview as number));
+        }
+    });
+
+    it('keeps the forecast worth looking at after a lapse, without losing history', () => {
+        // A lapse collapses stability to days while the history is still years,
+        // so sizing the view by the forecast's own timescale ended it a few days
+        // past `now` and left the branches in a fraction of a percent of the
+        // width. The floor is a share of the card's age instead.
+        const older = [840, 830, 800, 770, 700, 560, 420].map((d) => rep(d, QueueInteractionScore.GOOD));
+        const lapsed = [...older, rep(1, QueueInteractionScore.AGAIN)];
+
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(lapsed, { scale })!;
+            const viewEnd = scale === 'linear' ? s.xDomain[1] : Math.pow(10, s.xDomain[1]);
+            assert.ok(
+                viewEnd >= s.nowDays * 1.4 - 1e-6,
+                `${scale}: view should reach 40% of the card's age past now (${viewEnd} vs ${s.nowDays})`,
+            );
+            // The whole history is still on screen — that is the point of
+            // extending the right edge rather than trimming the left one.
+            assert.ok(
+                s.xDomain[0] <= s.reps[0].x + 1e-9,
+                `${scale}: the first repetition is still inside the opening view`,
+            );
+        }
+    });
+
+    it('leaves a healthy card to the retention rule', () => {
+        const older = [840, 830, 800, 770, 700, 560, 420].map((d) => rep(d, QueueInteractionScore.GOOD));
+        const healthy = [...older, rep(1, QueueInteractionScore.GOOD)];
+
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(healthy, { scale })!;
+            const viewEnd = scale === 'linear' ? s.xDomain[1] : Math.pow(10, s.xDomain[1]);
+            assert.ok(
+                viewEnd > s.nowDays * 1.4,
+                `${scale}: the age floor should not bind on a card whose forecast is long`,
+            );
+        }
+    });
+
+    it('computes far past the opening view, so zooming out keeps finding curve', () => {
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(HISTORY, { scale })!;
+            const easy = s.branches.find((b) => b.grade === 'easy')!;
+
+            // The extent runs until Easy is as likely forgotten as recalled.
+            assert.ok(
+                Math.abs(rAt(s.axisMaxDays - s.nowDays, easy.stability) - 0.5) < 0.005,
+                `${scale}: extent should reach 50% on Easy`,
+            );
+            // Which is well past where the chart opens.
+            assert.ok(
+                s.xFullDomain[1] > s.xDomain[1],
+                `${scale}: there must be something to zoom out to`,
+            );
+            // And the rows really go there, rather than the axis claiming range
+            // the data does not cover.
+            const last = s.rows[s.rows.length - 1];
+            assert.ok(Math.abs((last.easy as number) - 50) < 0.5, `${scale}: last row is the 50% point`);
+        }
+    });
+
+    it('gives both scales the same extent, since only the opening view differs', () => {
+        const log = build(HISTORY, { scale: 'log' })!;
+        const linear = build(HISTORY, { scale: 'linear' })!;
+        // Not exactly equal: `computeFSRSState` reads the wall clock rather than
+        // the `now` this builder is given, so two calls a millisecond apart see
+        // fractionally different retrievability — and the horizon multiplies
+        // stability by about ninety, which magnifies that. Relative equality is
+        // what the claim actually is.
+        const drift = Math.abs(log.axisMaxDays - linear.axisMaxDays) / log.axisMaxDays;
+        assert.ok(drift < 1e-3, `extents differ by ${(drift * 100).toFixed(4)}%`);
+    });
+
+    it('samples the forecast densely inside the opening view', () => {
+        // The branches now span orders of magnitude more time than the window
+        // they open in. Spacing them evenly across that would leave the visible
+        // part with almost no points and draw it as a straight line — worst on
+        // the linear scale, where the opening window is a sliver of the extent.
+        for (const scale of ['log', 'linear'] as const) {
+            const s = build(HISTORY, { scale })!;
+            const inView = s.rows.filter(
+                (r) => r.x > s.nowX && r.x <= s.xDomain[1] && typeof r.good === 'number',
+            );
+            assert.ok(inView.length >= 20, `${scale}: only ${inView.length} forecast samples on screen`);
+        }
+    });
+
+    it('omits the branches when the forecast is switched off', () => {
+        const s = build(HISTORY, { forecast: false })!;
+        assert.equal(s.branches.length, 0);
+        assert.ok(s.rows.every((r) => r.good == null));
+        // Including on the stability panel, which grew its own branches later.
+        assert.ok(s.rows.every((r) => r.goodSLog == null));
+    });
+
+    it('ends a forecast-less view at now, with the history intact', () => {
+        // What the history popup asks for: the card up to the present moment
+        // and not a step further, since nothing is about to be answered there.
+        for (const scale of ['log', 'linear'] as const) {
+            const withForecast = build(HISTORY, { scale })!;
+            const s = build(HISTORY, { scale, forecast: false })!;
+
+            const end = scale === 'linear' ? s.xDomain[1] : Math.pow(10, s.xDomain[1]);
+            assert.ok(
+                Math.abs(end - s.nowDays) < 1e-6,
+                `${scale}: view should stop at now (${end} vs ${s.nowDays})`,
+            );
+            // Nothing to zoom out to either — the data ends where the view does.
+            assert.ok(Math.abs(s.xFullDomain[1] - s.xDomain[1]) < 1e-9, `${scale}: no hidden tail`);
+            assert.ok(withForecast.xDomain[1] > s.xDomain[1], `${scale}: the queue view reaches further`);
+
+            // Every repetition is still drawn.
+            assert.equal(s.reps.length, withForecast.reps.length);
+            assert.ok(s.rows.some((r) => typeof r.r === 'number'), `${scale}: the history curve is there`);
+        }
     });
 
     it('samples evenly in the plotted coordinate on a log scale', () => {
@@ -447,6 +637,30 @@ describe('buildForgettingCurveSeries', () => {
                 `${JSON.stringify(nonsense)} should fall back to the whole axis`,
             );
         }
+    });
+
+    it('starts the log axis at half a day once the card is older than its learning steps', () => {
+        // Learning steps at 0, 4m and 20m, then a rep at one day: the minutes
+        // must not claim the left of the axis, and the one-day rep must not be
+        // pinned to its edge.
+        const start = 2000;
+        const history = [
+            rep(start, QueueInteractionScore.GOOD),
+            rep(start - 4 / 1440, QueueInteractionScore.GOOD),
+            rep(start - 20 / 1440, QueueInteractionScore.GOOD),
+            rep(start - 1, QueueInteractionScore.GOOD),
+            rep(start - 5, QueueInteractionScore.GOOD),
+        ];
+        const s = build(history, { scale: 'log' })!;
+        assert.ok(Math.abs(s.xDomain[0] - Math.log10(0.5)) < 1e-9, `axis starts at ${Math.pow(10, s.xDomain[0])}d`);
+        assert.ok(s.reps[3].x > s.xDomain[0] + 0.25, 'the one-day rep sits clear of the left edge');
+        assert.ok(!s.ticks.some((t) => /m$|h$/.test(t.label)), `no sub-day ticks: ${s.ticks.map((t) => t.label)}`);
+
+        // A card still inside its first day has nothing else to show.
+        const young = build([rep(0.02, QueueInteractionScore.GOOD), rep(0.01, QueueInteractionScore.GOOD)], {
+            scale: 'log',
+        })!;
+        assert.ok(Math.pow(10, young.xDomain[0]) < 0.1);
     });
 
     it('covers a short-lived card without flooding it with ticks', () => {

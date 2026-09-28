@@ -245,7 +245,7 @@ export function expandCardInfosToCards(infos: CardPriorityInfo[]): PerCardShield
         // a card, it does not demote it, and it keeps a real nextRepetitionTime.
         // Dropping them would make every other card's percentile shift when a
         // deck is paused and shift back when it is unpaused — priority drifting
-        // as a side effect of a scheduling decision. See CARD_STATE_REFERENCE.md.
+        // as a side effect of a scheduling decision. See findings/CARD_STATE_REFERENCE.md.
         if (nextRep === null || nextRep === undefined) continue;
         out.push({
           priority: info.priority,

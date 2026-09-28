@@ -98,6 +98,11 @@ export const legacySkipMasteryDrillId = 'skip_mastery_drill';
 export const oldItemThresholdId = 'old_item_threshold';
 export const masteryDrillMinDelayMinutesId = 'mastery_drill_min_delay_minutes';
 export const disableFinalDrillNotificationId = 'disable_final_drill_notification';
+/** Where the drill runs: the popup's embedded queue, or RemNote's own queue. */
+export const masteryDrillModeId = 'mastery_drill_mode';
+export type MasteryDrillMode = 'popup' | 'native';
+/** Native drill: how long each card stays hidden before it fades in (hides skipped siblings). */
+export const masteryDrillRevealDelayId = 'mastery_drill_reveal_delay_ms';
 
 // --- Queue Dashboard: speed colour coding ---
 /** Fixed cpm thresholds, or thresholds derived from the user's own history. */
@@ -609,6 +614,11 @@ export const restoreHighlightBeforeAiCommandId = 'restore-highlight-before-ai';
 // Pin the source passage of the focused Rem's text in the open PDF (lib/source_pins).
 export const pinSourceQuoteCommandId = 'pin-source-quote';
 
+// Logos Bible Software bridge (lib/logos_bridge.ts + scripts/logos_bridge/).
+export const logosBridgeEnabledId = 'logos-bridge-enabled';
+export const logosAutoOpenId = 'logos-auto-open';
+export const openInLogosCommandId = 'open-in-logos';
+
 // --- Priority Queue cooling (lib/priority_review_document/cooling*.ts) ---
 // The cooling SET is never stored: it is a function of card data, recomputed on
 // every refresh. Two keys support it:
@@ -661,3 +671,6 @@ export const coolingMaxDaysId = 'cooling-max-days';
 // just wrote from being graded while its answer is still in view.
 export const coolingNewCardDaysId = 'cooling-new-card-days';
 export const COOLING_NEW_CARD_DAYS_MAX = 10;
+// Queue setting: skip a card in RemNote's own spaced-repetition queues while its
+// Rem is cooling (lib/queue_cooling_skip.ts). The Learn New queue is always covered.
+export const coolingInQueuesId = 'cooling-in-queues';

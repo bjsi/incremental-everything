@@ -116,13 +116,41 @@ On Windows or Linux the helper is the same Python script — start it by hand, o
 
 A toast says *Transcribing highlight with AI…*, and a few seconds later the highlight's text is replaced. Then carry on as usual — **Create Incremental Rem** extracts the clean text.
 
-- **Area highlights** (image selections) work too: the snapshot RemNote already saved is transcribed.
+- **Area highlights** (image selections) work too: the snapshot RemNote already saved is transcribed. Don't resize an area highlight afterwards: RemNote takes a new snapshot and puts it back in place of the text.
 - If you **edit the highlight** while the AI is working, your edit wins and nothing is overwritten.
 - Highlights made in the **PDF Text Reader** are not supported: they carry no position on the page.
 
+## Passages the text selection can't reach { #merge }
+
+On scanned PDFs the text layer often misses part of a passage (formulas pasted in as pictures, lines the OCR skipped), so the selection stops short. Cover the rest with an area highlight and merge the two:
+
+1. Select the text you can and highlight it (**Z**).
+2. Draw an **area highlight** (**V**) over the rest, right below or above it.
+3. Press **✨** on the area highlight.
+
+The area joins the text highlight, which is transcribed as a whole, and the area highlight is deleted. It applies when the area is in the same column as a text highlight and at most a few lines away; otherwise the area is transcribed on its own.
+
+## A larger highlight over earlier ones { #absorb }
+
+When you highlight a passage that already holds a smaller highlight, say one item first and then the whole list for context, **✨** on the larger highlight also merges the smaller ones inside it:
+
+![Step 1: an earlier highlight on item (d) only, with its Rem in the Highlights panel](assets/highlight-merge-1-earlier.png){ width="900" }
+
+![Step 2: a larger highlight over the whole list, which contains (d); the (d) Rem is still separate and the larger Rem holds the raw text layer](assets/highlight-merge-2-larger.png){ width="900" }
+
+![Step 3: after AI Transcribe on the larger highlight, one Rem with the clean list, and the pins, references and bookmark of (d) point to it](assets/highlight-merge-3-after.png){ width="900" }
+
+Everything that pointed at the smaller highlight moves to the larger one, in the same shape:
+
+- **References, pins and inline links** keep their form (pin only, Show Content, Show Full Name, alias).
+- **Tags, sources, portals, children and flashcards** (with their history) move over.
+- A **bookmark** on the smaller highlight now points at the larger one.
+
+The smaller highlight is then deleted. It counts as inside when at least 80% of it lies within the larger one. If both were Incremental Rems, the larger one keeps its own schedule and history.
+
 ## Undoing a transcription { #restore }
 
-Run **Restore PDF Highlight Text Before AI** on the highlight's Rem to put back the text the transcription replaced. The previous text is kept **on the device where you transcribed**, and only the latest one: transcribing the same highlight twice keeps the text from before the second run.
+Run **Restore PDF Highlight Text Before AI** on the highlight's Rem to put back the text the transcription replaced. The previous text is kept **on the device where you transcribed**, and only the latest one: transcribing the same highlight twice keeps the text from before the second run. After a merge ([area](#merge) or [smaller highlights](#absorb)), only the text comes back: merged highlights stay merged.
 
 ## Customising the instructions { #prompt }
 

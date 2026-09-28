@@ -15,8 +15,8 @@ ___
 ### 🎥 Videos about the basics
 
 - **Introductory Videos**: 
-  * [Incremental Reading Web Pages in RemNote](https://youtu.be/eXRlfCTOQNw)
-  * [Incremental Reading in RemNote](https://youtu.be/SL7wjgntrbg)
+    * [Incremental Reading Web Pages in RemNote](https://youtu.be/eXRlfCTOQNw)
+    * [Incremental Reading in RemNote](https://youtu.be/SL7wjgntrbg)
 
 - **Priorities Playlist**: [Prioritization in Incremental RemNote](https://www.youtube.com/playlist?list=PLpmcfTqNVuo9DWjeIrMZZfG140kOZD8Tl) – Covers setting priorities, inheritance, the Priority Shield, creating Priority Review Documents, and how to use prioritization to manage information overload.  
 
@@ -211,7 +211,7 @@ Happy learning! 📚✨
             * **[Dismiss](Reviewing-Items-in-the-Queue.md#dismiss):** How to finish an item and remove it from the queue.
             * **[Change Priority](Reviewing-Items-in-the-Queue.md#change-priority):** Its basic function of opening the priority menu.
             * **[Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor):** The workflow for moving from the queue to the editor.
-            * **[Scroll to Highlight](Utilities.md#scroll-to-highlight):** Its function for PDF extracts.
+            * **[Scroll to Highlight](Utilities-Finding-and-Navigating.md#scroll-to-highlight):** Its function for PDF extracts.
             * **[Strategic Guide to the Answer Buttons](Reviewing-Items-in-the-Queue.md#a-strategic-guide-to-the-answer-buttons):** In-depth explanation of when to use each action.
 
     * **3.3 [Reviewing Items in the Editor](Reviewing-Items-in-the-Editor.md)**
@@ -245,7 +245,22 @@ Happy learning! 📚✨
         * How to use document/folder-specific queues for **Subset Review**.
         * **[History-Queue-Dashboard-and-Mastery-Drill](History-Queue-Dashboard-and-Mastery-Drill.md)**: Track session history, monitor real-time study metrics, find recently reviewed cards, and deliberately re-practice difficult material with the Mastery Drill.
 
-* **6. Essential References**
+* **6. Integrations**
+    * **Purpose:** Connect the incremental workflow to other applications.
+    * **Content:**
+        * **[Logos Bible Software](Logos-Bible-Software-Integration.md)**: Read Logos books incrementally — import a book, send passages as extracts and keep a bookmark with keyboard shortcuts pressed in Logos (macOS).
+
+* **7. [Utilities](Utilities.md)**
+    * **Purpose:** Tools built into the plugin that support the workflow without being part of the queue itself.
+    * **Content:**
+        * **[Text & Lists](Utilities-Text-and-Lists.md)**: the Word-like Text Case Converter (Shift+F3), bulletizing, and inlinizing or breaking lists from PDF highlights.
+        * **[Outline & Headings](Utilities-Outline-and-Headings.md)**: Restructure Outline by Headings (`roh`) for fixing flat or mis-pasted documents, and heading-level tools.
+        * **[Finding & Navigating](Utilities-Finding-and-Navigating.md)**: **Find Rem — Reference or Open** (`Opt+Shift+F`) for Rems RemNote's own search can't find, source popups, and filtering a document by images.
+        * **[Queue Display](Utilities-Queue-Display.md)**: Hide in Queue, Remove Parent and the other powerups that control how a card's context shows in the queue.
+        * **[Cleaning Up](Utilities-Cleaning-Up.md)**: delete empty Extra Card Detail Rems and audit disabled cards.
+        * **[Under the Hood](Utilities-Under-the-Hood.md)**: infrastructure several commands rely on.
+
+* **8. Essential References**
     * **Purpose:** A complete index of the plugin's visual and functional capabilities.
     * **Content:**
         * **[Plugin Widgets Reference](Plugin-Widgets-Reference.md)**: Comprehensive visual manual of all widgets (History, Graphs, Trackers, etc).
@@ -253,9 +268,8 @@ Happy learning! 📚✨
         * **[Plugin Settings Reference](Plugin-Settings-Reference.md)**: Every configurable option explained, with defaults and context.
         * **[IncRem Scheduler](IncRem-Scheduler.md)**: How the plugin calculates review intervals — default exponential and beta saturating schedulers explained.
         * **[Keyboard Shortcuts](Keyboard-Shortcuts.md)**: Quick cheatsheet mapping essential actions to default keys.
-        * **[Utilities](Utilities.md)**: Additional tools built into the plugin, such as the Word-like Text Case Converter (Shift+F3), Restructure Outline by Headings (`roh`) for fixing flat or mis-pasted documents, and **Find Rem — Reference or Open** (`Opt+Shift+F`) for referencing/opening Rems that RemNote's own search can't find.
 
-* **7. FAQ & Troubleshooting**
+* **9. FAQ & Troubleshooting**
     * **Purpose:** A crucial section to help users solve common problems.
     * **Content:**
         * [How the Incremental Queue takes priority and due date in consideration](How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration.md)
@@ -269,8 +283,5 @@ Happy learning! 📚✨
           * [Page History Diagnostic & Cleanup](Troubleshooting.md#page-history-diagnostic-cleanup-debug-widget)
           * [Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)
 
-* **8. [Changelog](Changelog.md)**
-    * **Purpose:** Detail the history of updates.
-
-* **9. [Contributing to the Wiki](Contributing-to-the-Wiki.md)**
+* **10. [Contributing to the Wiki](Contributing-to-the-Wiki.md)**
     * **Purpose:** Guidelines on how to suggest changes or submit updates to this documentation.

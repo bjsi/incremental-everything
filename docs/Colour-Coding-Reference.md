@@ -60,7 +60,7 @@ Yellow and purple mean *"leads into a source document"* — a PDF page or HTML t
 
 **The band edges are not a fourth ring — they are the [priority band](Prioritization-&-Sorting.md#priorities-on-pdf-highlights) of the linked highlight**, the same marker the PDF reader draws, appearing here because a reference container carries the *referenced* Rem's tags. So a pin can say two things at once: where it leads (top and left) and how important that target is (bottom and right).
 
-**Off by default**, via **Enable Pin Reference Colour Rings**. Two of the three states depend on tags that only exist after [Tag Rems With Images](Utilities.md#filter-a-document-by-images) has been run, so the feature is opt-in. With the setting off, pins are left completely unmarked — including the priority-band border the highlight styling would otherwise draw on them.
+**Off by default**, via **Enable Pin Reference Colour Rings**. Two of the three states depend on tags that only exist after [Tag Rems With Images](Utilities-Finding-and-Navigating.md#filter-a-document-by-images) has been run, so the feature is opt-in. With the setting off, pins are left completely unmarked — including the priority-band border the highlight styling would otherwise draw on them.
 
 ![Two reference pins on a document title, each ringed yellow and blue, with the hover preview confirming the target carries the PdfAreaHighlight tag](assets/ring-pdf-area-highlight.png){ width="800" }
 

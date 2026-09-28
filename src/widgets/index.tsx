@@ -29,9 +29,10 @@ import {
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
 import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
-import { refreshAllPriorityQueuesAtStartup } from '../lib/priority_review_document/queue_doc';
+import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
+import { registerLogosBridge } from '../lib/logos_bridge';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
@@ -121,6 +122,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   // index widget: plugin.track subscriptions belong to the realm that owns the
   // callback, and this is the same realm registerCallbacks runs in.
   registerPrefetchTrackers(plugin);
+  // Long-polls the local Logos helper while the Logos Bridge setting is on.
+  registerLogosBridge(plugin);
   await registerWidgets(plugin);
 
   // Register CSS rules
@@ -240,8 +243,8 @@ async function onActivate(plugin: ReactRNPlugin) {
     await writeCardPriorityCache(plugin, []);
   }
 
-  // The queue-exit auto-refresh, also run once at startup for every Priority
-  // Queue document. After the caches: in Full Mode a refresh takes its card facts
+  // The queue-exit auto-refresh, also run once at startup for the full-KB
+  // Priority Queue (document queues wait for their own sessions). After the caches: in Full Mode a refresh takes its card facts
   // from the card cache, and would otherwise pay for a card.getAll(). After the
   // cooling scan too: both publish cooling, and the scan — which alone records the
   // Rems held back by a cooling ancestor for the shield — skips itself once any
@@ -252,7 +255,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     startup.track(
       'priorityQueueRefresh',
       Promise.all([cardCacheSettled, pretaggingSettled, coolingScanSettled, incRemSettled]).then(() =>
-        refreshAllPriorityQueuesAtStartup(plugin)
+        refreshKbPriorityQueueAtStartup(plugin)
       )
     );
   }

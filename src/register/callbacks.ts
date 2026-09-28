@@ -14,6 +14,7 @@ import {
   incremNotesSidebarRemIdKey,
 } from '../lib/consts';
 import { consumePendingScrollRequest } from '../lib/remHelpers';
+import { isNativeDrillQueue } from '../lib/mastery_drill_native';
 import {
   PrefetchQueueInfo,
   VERBOSE_QUEUE_INJECTION,
@@ -170,9 +171,24 @@ const rewindSessionItemCounter = () => {
 //   cardsPracticed UNCHANGED                           → same slot asked twice.
 //
 // A card rated AGAIN also leaves numCardsRemaining flat, so the SHOWN verdict is
-// the softer of the two; DROPPED is high-confidence, and it is the one wired to
-// a real consequence (rolling the candidate back onto the buffer).
+// the softer of the two.
+//
+// DROPPED needs more than the counters, though. numCardsRemaining is RemNote's
+// live queue size, and RemNote changes it on its own between two calls:
+// refreshItems() runs after every sync, reloading due cards and removing ones
+// that are no longer due (removeDoneCards), and a card rated AGAIN goes back in.
+// A count that moved for those reasons read as a drop, rolled an IncRem back
+// onto the buffer that the user was already reading, and served it again right
+// after they pressed Next (Sep 2026).
+//
+// A drop is only physically possible for a late answer. RemNote calls us from
+// its plugin card provider's preload, stores what we return as its
+// pendingPluginCard, and hands that out on the very next pop — nothing in
+// between discards it. Past the ~1s deadline it stops waiting instead. So the
+// counters are trusted to mean "dropped" only when the answer was slow, and only
+// when the count went DOWN.
 const SLOW_CALL_WARN_MS = 800;
+const DROP_POSSIBLE_MS = SLOW_CALL_WARN_MS;
 
 type QueueInfo = {
   mode: 'practice-all' | 'in-order' | 'normal';
@@ -243,7 +259,16 @@ function verifyPreviousDecision(plugin: ReactRNPlugin, queueInfo: QueueInfo) {
 
   if (prev.remId === null) return; // we yielded a flashcard on purpose; nothing to verify
 
-  if (remainingDelta === 0) {
+  if (remainingDelta !== 0 && (remainingDelta < 0 || prev.totalMs < DROP_POSSIBLE_MS)) {
+    // The queue changed size under us (sync refresh, AGAIN re-insert), but an
+    // answer this fast cannot have been dropped — see the block comment above.
+    confirmServed(plugin);
+    console.log(
+      `ℹ️ GetNextCard #${prev.seq}: queue size moved by ${-remainingDelta} while IncRem ` +
+        `${prev.remId} was served in ${prev.totalMs}ms — RemNote's own queue refresh, not a drop.`,
+      ctx
+    );
+  } else if (remainingDelta === 0) {
     confirmServed(plugin);
     if (VERBOSE_QUEUE_INJECTION) {
       console.log(
@@ -348,6 +373,12 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       // front of any return below is exactly what caused injections to be
       // silently dropped in large KBs.
       // ---------------------------------------------------------------------
+
+      // The regular-queue Mastery Drill serves drill cards only (lib/mastery_drill_native).
+      if (isNativeDrillQueue(queueInfo.subQueueId)) {
+        clearStaleIncRemSignals();
+        return finish(null, 'mastery-drill');
+      }
 
       const gates = readGates();
       if (gates.blocked) {

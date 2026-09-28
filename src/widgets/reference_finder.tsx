@@ -1,7 +1,7 @@
 import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType, RICH_TEXT_FORMATTING, BuiltInPowerupCodes, MoveUnit } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { resolveRemTextForBreadcrumb, buildAncestorBreadcrumb } from '../lib/richTextRemRefs';
-import { sanitizeRichTextForSetText } from '../lib/richTextSanitize';
+import { sanitizeRichTextForSetText, isHintNode } from '../lib/richTextSanitize';
 import { remHasImage } from '../lib/image_scan';
 
 // Report each step of the alias-id resolution as a toast. Off by default: the
@@ -689,6 +689,8 @@ function ReferenceFinder() {
                   out.push({ i: 'm', text: ' ' + arrowChar + ' ' });
                   continue;
                 }
+                // Cloze/card hints are separate text nodes, not part of the sentence.
+                if (isHintNode(item)) continue;
                 const node: any = isStr ? { i: 'm', text: item } : { ...(item as any) };
                 const hadCloze = CLOZE_KEY in node;
                 delete node[CLOZE_KEY];

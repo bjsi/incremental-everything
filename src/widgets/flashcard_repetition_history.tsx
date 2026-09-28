@@ -27,7 +27,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useMemo, useEffect, useState } from 'react';
 import { computeFSRSStatesPerReview, computeFSRSState, parseWeightsString } from '../lib/fsrs';
-import { formatStabilityDays, formatTimeAgo, getRetrievabilityColor } from '../lib/utils';
+import { formatStabilityDays, formatTimeAgo, getRetrievabilityColor, screenFittedHeight } from '../lib/utils';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { displayFsrsDsrId, fsrsWeightsId, powerupCode, dismissedPowerupCode } from '../lib/consts';
 import { useIESetting } from '../lib/settings';
@@ -71,6 +71,16 @@ function formatInterval(intervalMs: number): string {
 }
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+/**
+ * How tall this popup may grow.
+ *
+ * Registered with `height: 'auto'`, so the frame follows its content and this
+ * cap is what actually bounds the popup — a fixed 600px left half of a tall
+ * screen empty while the card's history, curve and repetition table competed
+ * for one small scroll area. The floor keeps it from ever being worse than that.
+ */
+const POPUP_MAX_HEIGHT_PX = screenFittedHeight(600);
 
 /**
  * A delay in the narrowest form that still reads: `+3d`, `−2w`, `+1.4y`, `0d`.
@@ -908,7 +918,7 @@ function FlashcardRepetitionHistory() {
     };
 
     return (
-        <div style={{ padding: 16, maxHeight: '600px', overflow: 'auto', fontSize: 11, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+        <div style={{ padding: 16, maxHeight: `${POPUP_MAX_HEIGHT_PX}px`, overflow: 'auto', fontSize: 11, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                 <h3 style={{ margin: 0, fontSize: 14, color: 'var(--rn-clr-content-primary)' }}>
                     📊 Flashcard Repetition History

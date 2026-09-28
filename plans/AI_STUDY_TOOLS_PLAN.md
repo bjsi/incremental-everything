@@ -8,14 +8,14 @@ Maintainer notes, not published (the docs site is built from `docs/` only).
 
 | Piece | Where | Docs |
 |---|---|---|
-| Local helper (`scripts/ai_ocr_helper.py`, LaunchAgent) running `claude -p` on the user's subscription | helper `/ocr` | [AI Transcription](docs/AI-Transcription-of-PDF-Highlights.md) |
+| Local helper (`scripts/ai_ocr_helper.py`, LaunchAgent) running `claude -p` on the user's subscription | helper `/ocr` | [AI Transcription](../docs/AI-Transcription-of-PDF-Highlights.md) |
 | ✨ AI Transcribe for PDF highlights | `src/lib/ai_ocr.ts`, toolbar button, `ait` | same |
 | Plugin-made PDF and HTML highlights | `src/lib/pdf_highlight_create.ts` | — |
-| Source pins: find a quote, reuse or create highlights, never overlapping | helper `/locate`, `/source`, `/match`; `src/lib/pdf_source_pins/` | [Source Pins](docs/Source-Pins.md) |
+| Source pins: find a quote, reuse or create highlights, never overlapping | helper `/locate`, `/source`, `/match`; `src/lib/pdf_source_pins/` | [Source Pins](../docs/Source-Pins.md) |
 | Pin Source Quote (`psq`) for PDF page view, saved web articles, PDF Text Reader view (asks which view) | `pdf_source_pins/index.ts`, `pin_source_views_popup.tsx` | same |
-| Source Highlight Colour setting; pin rings yellow (PDF page) / purple (HTML source) | `settings.ts`, `ui_helpers.ts` | same, [Colour Coding](docs/Colour-Coding-Reference.md#reference-pin-rings) |
+| Source Highlight Colour setting; pin rings yellow (PDF page) / purple (HTML source) | `settings.ts`, `ui_helpers.ts` | same, [Colour Coding](../docs/Colour-Coding-Reference.md#reference-pin-rings) |
 | Message dialog for failures (toasts can be swallowed) | `src/lib/message_dialog.ts`, `message_popup.tsx` | — |
-| Create IncRem: Also Pin the Other PDF View (setting, off by default), tags `pdfextract` | `highlightActions.ts` (`pinOtherReaderView`) | [Source Pins](docs/Source-Pins.md#create-increm-both-views) |
+| Create IncRem: Also Pin the Other PDF View (setting, off by default), tags `pdfextract` | `highlightActions.ts` (`pinOtherReaderView`) | [Source Pins](../docs/Source-Pins.md#create-increm-both-views) |
 
 Entry point for every later phase: `ensureSourcePins(plugin, sourceRemId, quotes, views?)` — takes verbatim quotes (with an optional page hint for PDFs) and returns the highlight ids to pin, per quote and per view. `withPins(richText, ids)` appends them without duplicates.
 
