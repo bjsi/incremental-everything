@@ -93,6 +93,8 @@ interface Session {
   checkMs: number[];
   /** Loads answered from a verdict judged ahead, vs judged live. */
   judgedAhead: number;
+  /** Skips whose removal landed after the mask revealed the card (the first card's longer hold aside). */
+  lateSkips: number;
   /** True until the first card's check ends and the hold drops to MASK_DELAY_MS. */
   firstCardHold: boolean;
   tripped: boolean;
@@ -163,6 +165,7 @@ async function startSession(plugin: RNPlugin, enteredAt: number, subQueueId: str
     clusterByParent: new Map(),
     checkMs: [],
     judgedAhead: 0,
+    lateSkips: 0,
     firstCardHold: kind === 'learn-new',
     tripped: false,
     toastShown: false,
@@ -232,6 +235,29 @@ async function judgeAhead(plugin: RNPlugin, s: Session, scopeIds: RemId[]): Prom
   console.log(`${LOG} mapped ${mapped} card ids to their Rems in ${Date.now() - idsStarted} ms`);
 }
 
+/**
+ * Records a card as seen now — rated, or left behind — lays it over its Rem's facts and judges
+ * every judged Rem again from memory, so the Rem and its relatives cool. Loads wait for it.
+ */
+function noteSeen(plugin: RNPlugin, s: Session, cardId: string) {
+  if (s.ratedAt.has(cardId)) return;
+  s.ratedAt.set(cardId, Date.now());
+  s.pending = s.pending
+    .then(async () => {
+      const scanner = await s.scanner;
+      if (!scanner) return;
+      let remId = s.remByCard.get(cardId);
+      if (!remId) {
+        remId = (await plugin.card.findOne(cardId))?.remId as RemId | undefined;
+        if (!remId) return;
+        s.remByCard.set(cardId, remId);
+      }
+      await scanner.updateCards(remId, withSessionRatings(scanner.cardsOf(remId), ratingsOf(s, remId)));
+      await scanner.refresh([...scanner.checkedIds]);
+    })
+    .catch((e) => console.warn(`${LOG} re-judging after a card was seen failed:`, e));
+}
+
 /** The Rem's cards rated in this session, card id → when. */
 function ratingsOf(s: Session, remId: RemId): Map<string, number> {
   const out = new Map<string, number>();
@@ -262,9 +288,7 @@ function endSession(plugin: RNPlugin, reason: string) {
     `${LOG} ${s.kind} session ended (${reason}): ${s.checkMs.length} cards checked, ${s.judgedAhead} from verdicts judged ahead ` +
       `(median ${sorted[Math.floor(sorted.length / 2)] ?? 0} ms, max ${sorted[sorted.length - 1] ?? 0} ms), ` +
       `${s.skipped.size} skipped` +
-      (s.kind === 'learn-new'
-        ? `, ${s.checkMs.slice(1).filter((ms) => ms > MASK_DELAY_MS).length} checks after the first outran the ${MASK_DELAY_MS} ms mask`
-        : '') +
+      (s.kind === 'learn-new' ? `, ${s.lateSkips} removed after the ${MASK_DELAY_MS} ms mask (flashed)` : '') +
       (s.tripped ? ', LOOP GUARD TRIPPED' : '')
   );
 }
@@ -309,6 +333,7 @@ function announce(plugin: RNPlugin, s: Session, verdict: CoolingVerdict) {
 
 async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<void> {
   const started = Date.now();
+  const heldLonger = s.firstCardHold;
   const scanner = await s.scanner;
   if (!scanner) return;
   await s.pending;
@@ -345,6 +370,7 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
   const timing =
     `waited ${waited} ms for re-judging, decided at ${decided} ms (Rem ${mappedAhead ? 'known' : 'read'}), ` +
     `removal took ${Date.now() - removing} ms`;
+  if (s.kind === 'learn-new' && !heldLonger && Date.now() - started > MASK_DELAY_MS) s.lateSkips++;
   const reason = verdict.reasons[0];
   console.log(
     `${LOG} ${s.kind === 'learn-new' ? 'Learn New' : 'queue'}: skipped "${verdict.label ?? '(no text)'}" ` +
@@ -386,6 +412,12 @@ export function registerQueueCoolingListeners(plugin: RNPlugin) {
     // RemNote fires an id-less load around every card change and moves past it by itself.
     // Removing on it would remove the NEXT real card.
     if (!s || !cardId) return;
+    // RemNote loads the next card BEFORE it reports the rating (QueueCompleteCard is emitted
+    // deferred, after updateRepetitionStatus has advanced the queue). A card the queue has left
+    // behind was on screen, so it counts as seen now — else the sibling loading next, the
+    // "In Order" case, is judged without it. Cards this module removed were never shown.
+    const previous = s.currentCardId;
+    if (previous && previous !== cardId && !s.skipped.has(previous)) noteSeen(plugin, s, previous);
     s.currentCardId = cardId;
     if (s.tripped) return;
     const loads = (s.loadsByCard.get(cardId) ?? 0) + 1;
@@ -411,20 +443,9 @@ export function registerQueueCoolingListeners(plugin: RNPlugin) {
     const s = session;
     const cardId: string | undefined = data?.cardId;
     if (!s || !cardId || s.skipped.has(cardId)) return;
-    s.ratedAt.set(cardId, Date.now());
     if (s.currentCardId === cardId) s.currentCardId = null;
-    const remId = s.remByCard.get(cardId);
-    if (!remId) return;
-    // The rating reaches the facts at once and every judged Rem is judged again from memory,
-    // so the Rem and its relatives cool before the next card has loaded.
-    s.pending = s.pending
-      .then(async () => {
-        const scanner = await s.scanner;
-        if (!scanner) return;
-        await scanner.updateCards(remId, withSessionRatings(scanner.cardsOf(remId), ratingsOf(s, remId)));
-        await scanner.refresh([...scanner.checkedIds]);
-      })
-      .catch((e) => console.warn(`${LOG} re-judging after a rating failed:`, e));
+    // Usually already noted when the next card loaded; a no-op then.
+    noteSeen(plugin, s, cardId);
   });
 
   plugin.event.addListener(AppEvents.QueueExit, undefined, () => {

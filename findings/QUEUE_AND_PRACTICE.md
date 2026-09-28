@@ -18,6 +18,12 @@ In a document's Practice All queue, every card change also fires a `QueueLoadCar
 
 Ignore id-less loads. Before any skip, confirm with `plugin.queue.getCurrentCard()` that the card is still current, and keep a circuit breaker.
 
+## The next card loads before the rating is reported
+
+Read from the 1.28.19 bundle and confirmed in a Learn New session, 2026-09-28. The answer handler runs `this.updateRepetitionStatus(score)`, which advances the queue; `setCurrentCard` then emits `QueueLoadCard` for the next card synchronously. `QueueCompleteCard` for the rated card is emitted afterwards and deferred (`L6(async () => emitPluginEvent(QueueCompleteCard, {score, cardId}))`). A listener that updates state on the rating therefore judges the next card without it. The next card is often a sibling cloze of the one just rated, and always is with "In Order".
+
+Treat a card the queue has left behind as seen when the next card loads, not when its rating arrives. `src/lib/queue_cooling_skip.ts` does this (`noteSeen`).
+
 ## A skip buries the card's siblings
 
 `removeCurrentCardFromQueue` runs every provider's "before pop" hook. The bury provider records the card in `UserDataStore.recentlySeenCardsTuples` (synced, entries last 60 minutes), exactly as if it had been answered.
