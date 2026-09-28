@@ -16,6 +16,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Create Cloze](IR-Flow--Reading-Extracting-and-Clozing.md#create-cloze-altz-altshiftz)
 
+**Queue**: Fixed an Incremental Rem sometimes coming back right after you pressed Next, when RemNote refreshed the queue while you were reading it.
+
+📖 [Prepared in advance](Prioritization-&-Sorting.md#prepared-in-advance)
+
 ## v1.0.130 - September 28th, 2026
 
 ### ⚡ Improved - Descriptor cards keep their concept

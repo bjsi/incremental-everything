@@ -4,6 +4,7 @@ import {
   allIncrementalRemKey,
   allIncrementalRemSlimKey,
   currentScopeRemIdsKey,
+  currentIncRemKey,
   seenRemInSessionKey,
   noIncRemTimerKey,
   incRemDisabledDeviceKey,
@@ -246,12 +247,20 @@ export function takePrefetchedCandidate(
   options?: { allowDeferred?: boolean }
 ): SlimIncRem | null {
   if (!isPrefetchReadyFor(info)) return null;
-  let next = state.buffer.shift();
+  // A rem can be burned while it sits in a buffer (see noteIncRemDisplayed), and
+  // the buffers are only rebuilt later. Skipping it here is the last guard
+  // against showing the same IncRem twice in one session.
+  const takeUnseen = (list: SlimIncRem[]) => {
+    let c = list.shift();
+    while (c && state.seen.has(c.remId)) c = list.shift();
+    return c;
+  };
+  let next = takeUnseen(state.buffer);
   if (!next && (state.cleanExhausted || options?.allowDeferred)) {
     // Nothing unspoiled is left to show instead, so the protection has done all
     // it usefully can: serving the held-back IncRem now beats withholding it for
     // a card that this session is not going to reach anyway.
-    next = state.deferredBuffer.shift();
+    next = takeUnseen(state.deferredBuffer);
     if (next && VERBOSE_QUEUE_INJECTION) {
       console.log(
         `🎭 Spoiler protection released ${next.remId} — ` +
@@ -279,10 +288,41 @@ export function confirmServed(plugin: ReactRNPlugin) {
   const served = state.pending;
   if (!served) return;
   state.pending = null;
-  state.seen.add(served.remId);
+  burn(plugin, served.remId);
+}
+
+function burn(plugin: ReactRNPlugin, remId: RemId) {
+  state.seen.add(remId);
   void plugin.storage
     .setSession(seenRemInSessionKey, Array.from(state.seen))
     .catch((e) => console.error('[prefetch] seen write-through failed:', e));
+}
+
+/**
+ * Late confirmation: the queue widget reported that `remId` is on screen.
+ *
+ * GetNextCard verification runs from RemNote's preload, which fires as soon as
+ * an item is popped — before our widget has even mounted — and it can only read
+ * queue counters. So a rem judged "dropped" there may in fact be on screen a
+ * moment later. If it is sitting in a buffer (rolled back), it goes out of it
+ * now and is burned, instead of being served a second time.
+ *
+ * `pending` is left alone: a rem that is pending AND displayed is the one the
+ * user is reading while RemNote already holds it for the next slot, and a
+ * returned item cannot be taken back.
+ */
+function noteIncRemDisplayed(plugin: ReactRNPlugin, remId: RemId) {
+  if (state.seen.has(remId) || state.pending?.remId === remId) return;
+  const inBuffer = (list: SlimIncRem[]) => list.some((c) => c.remId === remId);
+  const wasBuffered = inBuffer(state.buffer) || inBuffer(state.deferredBuffer);
+  if (!wasBuffered) return;
+  state.buffer = state.buffer.filter((c) => c.remId !== remId);
+  state.deferredBuffer = state.deferredBuffer.filter((c) => c.remId !== remId);
+  if (state.dueCount > 0) state.dueCount--;
+  burn(plugin, remId);
+  console.log(
+    `🩹 IncRem ${remId} was on screen after all — removed from the prefetch buffer so it is not served again.`
+  );
 }
 
 /**
@@ -725,6 +765,14 @@ export function registerPrefetchTrackers(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     const timerEnd = await rp.storage.getSynced<number>(noIncRemTimerKey);
     state.timerEndsAt = timerEnd && timerEnd > Date.now() ? timerEnd : null;
+  });
+
+  // The queue widget writes this key when it mounts (only the widget writes it;
+  // QueueExit clears it). The tracker fires on change only, so the same rem
+  // shown twice in a row is not reported — which is fine: by then it is burned.
+  plugin.track(async (rp) => {
+    const remId = await rp.storage.getSession<RemId>(currentIncRemKey);
+    if (remId) noteIncRemDisplayed(plugin, remId);
   });
 
   // Seed the non-session mirrors at activation so the very first GetNextCard of
