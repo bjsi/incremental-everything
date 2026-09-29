@@ -450,9 +450,17 @@ The **Log** / **Linear** toggle changes the time axis, and the two answer differ
 
 *How to read the log axis: equal widths are equal ratios of time, not equal durations.*
 
-**Linear** shows real elapsed time, so intervals are comparable by eye. It opens on a much narrower window — ending where **Good** is still 6 points above target — because on a linear axis every day added to the right steals width from every day already drawn, and a window chosen for the far future would flatten the repetitions you are trying to read.
+**Linear** shows real elapsed time, so intervals are comparable by eye. Here every day added to the right steals width from every day already drawn, so the window is balanced between the forecast and the history:
 
-Both rules size the window by the *forecast's* timescale, which collapses after a lapse: stability drops to days while the card's history is still years, and the branches would end up in a sliver at the right edge. So the window also never ends sooner than 40% of the card's age past *now*, whichever of the two reaches further. The whole history stays on screen either way.
+- It aims to follow **Good** down to your target retention — the whole next interval, which is what shows how long that memory is meant to last.
+- But the history is owed width first, and how much depends on how many repetitions it has to fit: 5% of the chart per review, at least a quarter and at most two thirds. A card with a handful of reviews reads fine in a quarter of the width and gets the full forecast; a card with twenty keeps two thirds and the forecast stops short of the target.
+- Whatever the history needs, the window always runs at least until **Good** is 6 points above target, so there is always a forecast to read.
+
+![Two cards opening on the linear axis, with numbered notes. A card with 3 reviews: brackets under the axis mark the history at 25% of the width (2.2 years) and the forecast at 75% (6.7 years), and a ring on the end of the Good branch at about 91%, just above the 90% target. A card with 14 or more reviews: the history at 67% of the width (5.6 years), the forecast at 33% (2.8 years), and Good ending at about 92%](assets/forgetting-curve-linear-opening.png){ width="900" }
+
+*The number of reviews, not the length of the history, decides how much of the width the past keeps.*
+
+Both scales size the window by the *forecast's* timescale, which collapses after a lapse: stability drops to days while the card's history is still years, and the branches would end up in a sliver at the right edge. So the window also never ends sooner than 40% of the card's age past *now*, whichever reaches further. The whole history stays on screen either way.
 
 ![The same card on a linear time axis: its first six months are compressed against the left edge while the axis runs to 6.2 years, and a tooltip reads "2mo since first review, Retrievability 100.0%, Stability 1.1y"](assets/forgetting-curve-linear-scale.png){ width="900" }
 
@@ -465,6 +473,19 @@ Both rules size the window by the *forecast's* timescale, which collapses after 
 - **Double-click**, or press **Reset zoom**, to return to the opening window.
 
 Both panels share the axis, so either one drives both, and the vertical scales refit to what is on screen.
+
+![A card with many reviews on the linear axis: the Forecast button stretches the window from 7.9 to 10.3 years, History brings it back, and scrolling then zooms into the card's first months until its learning-phase repetitions stand apart, with their ×SInc labels readable](assets/forgetting-curve-zoom.gif){ width="700" }
+
+On the linear axis, two presets jump to the ends of the balance described above:
+
+- **History** stops the forecast where **Good** is 6 points above target, giving the repetitions the most room.
+- **Forecast** runs **Good** all the way down to your target retention, whatever that costs the history.
+
+![A card with 3 reviews on the linear axis: History shortens the window to 4.4 years, Forecast stretches it to 9.7 years with Good ending on the 90% target, and Reset zoom returns to the 8.9-year opening window; hovering each button shows what it does](assets/forgetting-curve-zoom-history-forecast.gif){ width="700" }
+
+The opening window is always one of the two or somewhere between them. The buttons light up to show which preset the view matches, so on a card whose opening window already runs to the target, **Forecast** is lit from the start; a view you zoomed by hand lights neither. **Reset zoom** only appears once the view differs from the opening one. The presets are hidden on the log axis, which has room for both at once, and on cards where the two would draw the same window. Like any zoom, the choice is per card: the next card opens on its own window.
+
+![The same 3-review card three times, with numbered notes. History preset: the History button lit, Reset zoom shown, the axis ending at 4.4 years and Good ringed at 96%. Opening view: neither preset lit, the axis ending at 8.9 years and Good ringed at about 91%. Forecast preset: the Forecast button lit, the axis ending at 9.7 years and Good ringed at 90%, on the target line](assets/forgetting-curve-linear-presets.png){ width="900" }
 
 Zooming out goes well past where the chart opens. The forecast is computed until **Easy** decays to 50% — the point at which that memory is as likely gone as recalled — so you can follow every branch far beyond the next repetition and watch the four separate. On a mature card that is a long way out: FSRS's curve is a power law with a heavy tail, and 50% arrives at roughly ninety times the stability, so do not be surprised to find the axis running into centuries.
 

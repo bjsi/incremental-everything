@@ -127,6 +127,10 @@ The **Debug: Clear Flashcard History** command clears the list for the knowledge
 
 **Forgetting Curve:** Below the live session card, the [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) charts the card you are looking at — where its retrievability has been, and where each of the four answer buttons would send it. Set **Forgetting Curve** to *Hidden* in the settings below to remove it.
 
+The **Current** / **Previous** switch in its header shows the card you just answered instead — the same previous card the session card reports on, with that answer already in its curve. It goes back to **Current** on its own as soon as the queue moves to the next card.
+
+![The Queue Dashboard during a session, with numbered notes: (1) the Prev. Card column of the session card; (2) the Current / Previous switch in the forgetting curve's header; (3) the History / Forecast presets, with the History tooltip "Short forecast (Good at about 96%) — more room for the repetitions so far"; (4) Reset zoom](assets/forgetting-curve-queue-dashboard-previous.png){ width="500" }
+
 ![The Queue Dashboard sidebar: the live Active Session card for "Endurance limit" above a CURRENT CARD — FORGETTING CURVE section on the Log axis, its history line green above the 90% target, four dashed forecast branches past "now", and the stability staircase below labelled ×1.44, ×1.39, ×1.54, ×3.04 and ×1.04](assets/forgetting-curve-queue-dashboard.png){ width="500" }
 
 ### Metrics Collected

@@ -166,6 +166,7 @@ A few things work as they do in the Priority Queue:
 
 * **Release** and **Never** in the [Cooling list](#the-cooling-list) apply here too.
 * **Card Cluster** members are never skipped: a cluster is shown as one unit.
+* A card never cools itself: when it comes back in the same session — after **Forgot**, say — it is shown, even while its siblings are being skipped.
 * **Cooling: new cards** does not apply: in the daily queue it would skip every card you wrote today, and Learn New Cards exists to learn new cards.
 
 In Light Mode only Learn New Cards is covered: judging the other queues would mean reading every card in the knowledge base each time a queue opens.

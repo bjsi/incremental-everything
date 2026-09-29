@@ -2,6 +2,28 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.135 - September 29th, 2026
+
+### ⚡ Improved - the Forgetting Curve shows the whole next interval
+
+**Forgetting Curve**: On the linear axis the chart now opens with **Good** running down to your target retention, and stops sooner only when a card's many reviews need the width; new **History** / **Forecast** buttons jump to either end.
+
+![A card with 3 reviews on the linear axis: History shortens the window to 4.4 years, Forecast stretches it to 9.7 years with Good ending on the 90% target, and Reset zoom returns to the 8.9-year opening window](assets/forgetting-curve-zoom-history-forecast.gif){ width="700" }
+
+📖 [Log and linear time](Reviewing-Items-in-the-Queue.md#log-and-linear-time)
+
+**Queue Dashboard**: A **Current** / **Previous** switch shows the forgetting curve of the card you just answered.
+
+![The Queue Dashboard during a session, with numbered notes on the Prev. Card column, the Current / Previous switch, the History / Forecast presets and Reset zoom](assets/forgetting-curve-queue-dashboard-previous.png){ width="500" }
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
+### 🐛 Fixed
+
+**Cooling**: A card coming back in the same session (e.g. after **Forgot**) should no longer be skipped in RemNote's own queues as if it were its own sibling.
+
+📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
 ## v1.0.131 - September 28th, 2026
 
 ### ⚡ Improved - the Mastery Drill gets past "Time to Take a Break"
