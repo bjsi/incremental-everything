@@ -445,6 +445,15 @@ function PracticedQueues() {
     );
     const [activeSession] = useSessionStorageState<PracticedQueueSession | null>("activeQueueSession", null);
     const showForgettingCurve = useIESetting(showQueueDashboardCurveId);
+    // The curve can show the previous card instead of the current one. The
+    // choice remembers which card was current when it was made, so it lapses
+    // back to the current card as soon as the queue moves on — no effect, no
+    // frame drawn with a stale choice.
+    const [previousCurveWhile, setPreviousCurveWhile] = useState<string | null>(null);
+    const canShowPreviousCurve =
+        !!activeSession?.prevCardId && activeSession.prevCardId !== activeSession.currentCardId;
+    const showPreviousCurve =
+        canShowPreviousCurve && previousCurveWhile !== null && previousCurveWhile === activeSession?.currentCardId;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const speed = useSpeedThresholds();
 
@@ -797,9 +806,37 @@ function PracticedQueues() {
                 {activeSession && showForgettingCurve && activeSession.currentCardId && (
                     <div className="mb-6">
                         <CardForgettingCurve
-                            cardId={activeSession.currentCardId}
-                            title="Current Card — Forgetting Curve"
+                            cardId={showPreviousCurve ? activeSession.prevCardId : activeSession.currentCardId}
+                            title={`${showPreviousCurve ? 'Previous' : 'Current'} Card — Forgetting Curve`}
                             height={220}
+                            headerRight={
+                                canShowPreviousCurve && (
+                                    <div className="flex rn-clr-border-opaque border rounded-md overflow-hidden text-[10px]">
+                                        {([false, true] as const).map((previous) => (
+                                            <button
+                                                key={String(previous)}
+                                                onClick={() =>
+                                                    setPreviousCurveWhile(
+                                                        previous ? activeSession.currentCardId ?? null : null,
+                                                    )
+                                                }
+                                                className={`px-2 py-0.5 ${
+                                                    showPreviousCurve === previous
+                                                        ? 'rn-clr-background-secondary font-semibold'
+                                                        : 'rn-clr-content-tertiary'
+                                                }`}
+                                                title={
+                                                    previous
+                                                        ? 'The card you just answered, with that answer included'
+                                                        : 'The card on screen now'
+                                                }
+                                            >
+                                                {previous ? 'Previous' : 'Current'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )
+                            }
                         />
                         <div className="h-px w-full rn-clr-background-elevation-10 mt-4"></div>
                     </div>

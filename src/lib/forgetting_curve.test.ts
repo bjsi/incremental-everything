@@ -184,18 +184,47 @@ describe('buildForgettingCurveSeries', () => {
         }
     });
 
-    it('opens the linear view while Good is still 6 points clear of the target', () => {
-        // A linear axis pays for every extra day by squeezing the repetitions
-        // that have happened, so it opens on the current stability instead.
-        for (const target of [0.9, 0.8]) {
-            const s = build(HISTORY, { scale: 'linear', targetRetention: target })!;
-            const good = s.branches.find((b) => b.grade === 'good')!;
-            const elapsed = s.xDomain[1] - s.nowDays;
-            assert.ok(
-                Math.abs(rAt(elapsed, good.stability) - (target + 0.06)) < 0.005,
-                `Good should be 6pp above the target on the opening edge (got ${rAt(elapsed, good.stability)})`,
-            );
-        }
+    describe('linear opening view', () => {
+        const goodAtEdge = (s: NonNullable<ReturnType<typeof build>>, edge: number) =>
+            rAt(edge - s.nowDays, s.branches.find((b) => b.grade === 'good')!.stability);
+        const goods = (daysAgo: number[]) => daysAgo.map((d) => rep(d, QueueInteractionScore.GOOD));
+
+        it('runs Good to the target when few reviews leave the history room', () => {
+            const s = build(HISTORY, { scale: 'linear' })!;
+            const r = goodAtEdge(s, s.xDomain[1]);
+            assert.ok(Math.abs(r - 0.9) < 0.005, `Good should be at the target on the opening edge (got ${r})`);
+        });
+
+        it('stops between the two stops when many reviews need the width', () => {
+            // Ten reviews are owed half the width, so the forecast may be at
+            // most as long as the history — short of the target, past the near stop.
+            const s = build(goods([1000, 998, 990, 970, 930, 860, 760, 620, 430, 200]), { scale: 'linear' })!;
+            assert.ok(Math.abs(s.xDomain[1] - 2 * s.nowDays) < 1e-6, `forecast = history (got ${s.xDomain[1]})`);
+            const r = goodAtEdge(s, s.xDomain[1]);
+            assert.ok(r > 0.9 && r < 0.96, `Good between the target and 6 points above it (got ${r})`);
+        });
+
+        it('never stops before Good is 6 points clear of the target', () => {
+            // A card days old with a stability of months: the history cap would
+            // leave no forecast at all, so the near stop wins.
+            const s = build([3, 2.9, 0.01].map((d) => rep(d, QueueInteractionScore.EASY)), { scale: 'linear' })!;
+            const r = goodAtEdge(s, s.xDomain[1]);
+            assert.ok(Math.abs(r - 0.96) < 0.005, `Good at 96% on the opening edge (got ${r})`);
+        });
+
+        it('offers the two stops as presets, with the opening view between them', () => {
+            const s = build(goods([1000, 998, 990, 970, 930, 860, 760, 620, 430, 200]), { scale: 'linear' })!;
+            const { history, forecast } = s.xPresets!;
+            assert.ok(Math.abs(goodAtEdge(s, history[1]) - 0.96) < 0.005, 'history preset stops at the near stop');
+            assert.ok(Math.abs(goodAtEdge(s, forecast[1]) - 0.9) < 0.005, 'forecast preset runs to the target');
+            assert.ok(history[1] < s.xDomain[1] && s.xDomain[1] < forecast[1]);
+            assert.deepEqual([history[0], forecast[0]], [s.xDomain[0], s.xDomain[0]], 'both keep the whole history');
+        });
+
+        it('has no presets on the log axis or without a forecast', () => {
+            assert.equal(build(HISTORY, { scale: 'log' })!.xPresets, null);
+            assert.equal(build(HISTORY, { scale: 'linear', forecast: false })!.xPresets, null);
+        });
     });
 
     it('opens the log scale on a longer window than the linear one', () => {

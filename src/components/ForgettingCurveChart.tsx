@@ -225,6 +225,12 @@ const ZOOM_STEP = 1.25;
 /** Tightest window the reader may zoom to, as a divisor of the opening span. */
 const MAX_ZOOM_IN = 50;
 
+/** Two x ranges that differ by less than a thousandth of the span — one view, as far as the eye goes. */
+function sameRange(a: [number, number], b: [number, number]): boolean {
+    const tolerance = Math.max(Math.abs(b[1] - b[0]), 1e-9) * 1e-3;
+    return Math.abs(a[0] - b[0]) < tolerance && Math.abs(a[1] - b[1]) < tolerance;
+}
+
 /** How many staggered rows the labels may use before one is dropped. */
 const LABEL_ROWS = 2;
 
@@ -545,6 +551,16 @@ export function ForgettingCurveChart({
 
     const xDomain: [number, number] = activeZoom ?? series.xDomain;
 
+    // The two linear presets. Which one is lit is read off the view rather than
+    // stored, so the opening view lights whichever preset it coincides with, a
+    // wheel or drag that leaves them unlights both, and Reset zoom only shows
+    // once the view differs from the opening one — choosing the preset the chart
+    // already opened on is not a zoom.
+    const presets = series.xPresets;
+    const showPresets = !!presets && !sameRange(presets.history, presets.forecast);
+    const choosePreset = (range: [number, number]) =>
+        setZoom(sameRange(range, series.xDomain) ? null : { series, range });
+
     const ticks = useMemo(
         () => (plotWidth > 0 ? rebuildTicks(series, plotWidth, activeZoom ?? series.xDomain) : series.ticks),
         [series, plotWidth, activeZoom],
@@ -674,10 +690,7 @@ export function ForgettingCurveChart({
                 // Back to the opening window: drop to null so the axis returns
                 // to the ticks and y range it was built with. Anything else —
                 // narrower or wider — is a view the reader chose.
-                const atOpening =
-                    Math.abs(next[0] - openLo) < openSpan * 1e-3 &&
-                    Math.abs(next[1] - openHi) < openSpan * 1e-3;
-                return atOpening ? null : { series, range: next };
+                return sameRange(next, series.xDomain) ? null : { series, range: next };
             });
         };
 
@@ -921,6 +934,28 @@ export function ForgettingCurveChart({
                         >
                             Reset zoom
                         </button>
+                    )}
+                    {showPresets && presets && (
+                        <div className="flex rn-clr-border-opaque border rounded-md overflow-hidden text-[10px]">
+                            {(['history', 'forecast'] as const).map((p) => (
+                                <button
+                                    key={p}
+                                    onClick={() => choosePreset(presets[p])}
+                                    className={`px-2 py-0.5 ${
+                                        sameRange(xDomain, presets[p])
+                                            ? 'rn-clr-background-secondary font-semibold'
+                                            : 'rn-clr-content-tertiary'
+                                    }`}
+                                    title={
+                                        p === 'history'
+                                            ? `Short forecast (Good at about ${Math.round(series.targetPercent + 6)}%) — more room for the repetitions so far`
+                                            : `Long forecast — Good all the way down to the ${Math.round(series.targetPercent)}% target, the whole next interval`
+                                    }
+                                >
+                                    {p === 'history' ? 'History' : 'Forecast'}
+                                </button>
+                            ))}
+                        </div>
                     )}
                     {onScaleChange && (
                         <div className="flex rn-clr-border-opaque border rounded-md overflow-hidden text-[10px]">
