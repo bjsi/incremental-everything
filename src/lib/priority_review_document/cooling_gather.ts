@@ -25,6 +25,7 @@ import { getCoolingParams, HeldByCoolingAncestor, mergeCoolingCache, readCooling
 import { getCardPriorityValue } from '../card_priority';
 import type { CardPriorityInfo } from '../card_priority/types';
 import { readChildren } from './children';
+import { isAnswerLine } from './multiline';
 import { CardSource, loadCardSource } from './card_source';
 
 /**
@@ -56,6 +57,13 @@ import { CardSource, loadCardSource } from './card_source';
  * RemNote's own bury rule treats the selected cluster as one unit; so a cluster
  * parent contributes no sibling events, and a cluster parent's own children
  * contribute no descendant events.
+ *
+ * MULTI-LINE CARDS. A candidate whose children include answer lines (card
+ * items, multiline.ts) takes events from those children only, as
+ * `answer-line`, plus an `answer-line-due` hold for each one still due — the
+ * inverted order: answer lines first, the multi-line card after them. Card-item
+ * membership costs one probe per child that has cards (or carded children),
+ * memoised.
  */
 
 export interface CoolingScanOptions {
@@ -186,6 +194,8 @@ export class CoolingScanner {
 
   private readonly reader: RemReader;
   private readonly clusterCache = new Map<RemId, boolean>();
+  /** Card-item membership, memoised: siblings share a parent, candidates share children. */
+  private readonly answerLineCache = new Map<RemId, Promise<boolean>>();
   private loaded: Promise<void> | null = null;
   private cardsByRem = new Map<RemId, CardLike[]>();
   private incByRem = new Map<RemId, IncrementalRem>();
@@ -239,6 +249,15 @@ export class CoolingScanner {
       })();
     }
     return this.loaded;
+  }
+
+  private isAnswerLine(rem: PluginRem): Promise<boolean> {
+    let pending = this.answerLineCache.get(rem._id);
+    if (!pending) {
+      pending = isAnswerLine(rem);
+      this.answerLineCache.set(rem._id, pending);
+    }
+    return pending;
   }
 
   private async isCluster(rem: PluginRem): Promise<boolean> {
@@ -390,21 +409,64 @@ export class CoolingScanner {
     // 3 & 4. Own Alt+Z clozes, and descendant cards two levels down.
     if (!(await this.isCluster(rem))) {
       const children = await this.reader.childrenOf(rem);
-      for (const child of children) {
-        const childLabel = flattenText(child.text) || undefined;
-        const relation = this.clozeExtractIds.has(child._id) ? 'own-cloze-child' : 'descendant';
-        candidate.seen.push(...this.seenEventsFor(child._id, relation, childLabel));
-      }
       // Every child's own children, read concurrently — one call per child,
       // memoised across candidates that share them.
       const grandchildLists = await Promise.all(children.map((c) => this.reader.childrenOf(c)));
-      const grandchildren = new Map<RemId, PluginRem>();
-      for (const list of grandchildLists) for (const gc of list) grandchildren.set(gc._id, gc);
-      for (const [gcId, gc] of grandchildren) {
-        candidate.seen.push(
-          ...this.seenEventsFor(gcId, 'descendant', flattenText(gc.text) || undefined)
-        );
-      }
+
+      // A multi-line card: some children are its answer lines (multiline.ts).
+      // Only children that could produce an event are asked — those with cards,
+      // or with children that have cards — so a Rem with none costs no probe.
+      const hasCards = (id: RemId) => (this.cardsByRem.get(id)?.length ?? 0) > 0;
+      const answerLines = new Set<RemId>();
+      await Promise.all(
+        children.map(async (child, i) => {
+          if (!hasCards(child._id) && !grandchildLists[i].some((gc) => hasCards(gc._id))) return;
+          if (await this.isAnswerLine(child)) answerLines.add(child._id);
+        })
+      );
+      const multiLine = answerLines.size > 0;
+
+      const grandchildrenSeen = new Set<RemId>();
+      children.forEach((child, i) => {
+        // The other children of a multi-line card show only its question as
+        // context, never its answer: they neither cool it nor hold it.
+        if (multiLine && !answerLines.has(child._id)) return;
+        const childLabel = flattenText(child.text) || undefined;
+        const relation = this.clozeExtractIds.has(child._id)
+          ? 'own-cloze-child'
+          : multiLine
+            ? 'answer-line'
+            : 'descendant';
+        candidate.seen.push(...this.seenEventsFor(child._id, relation, childLabel));
+
+        // An answer line still due goes first: the multi-line card is held
+        // until it has been reviewed, and then cools from that review.
+        if (multiLine) {
+          const due = (this.cardsByRem.get(child._id) ?? []).filter((c) => isCardDue(c, this.now));
+          if (due.length) {
+            const first = due.reduce((a, b) =>
+              (b.nextRepetitionTime ?? Infinity) < (a.nextRepetitionTime ?? Infinity) ? b : a
+            );
+            candidate.seen.push({
+              relation: 'answer-line-due',
+              sourceRemId: child._id,
+              sourceLabel: childLabel,
+              cardId: first._id,
+              seenAt: first.nextRepetitionTime ?? this.now,
+              stillDue: true,
+              whileDue: true,
+            });
+          }
+        }
+
+        for (const gc of grandchildLists[i]) {
+          if (grandchildrenSeen.has(gc._id)) continue;
+          grandchildrenSeen.add(gc._id);
+          candidate.seen.push(
+            ...this.seenEventsFor(gc._id, 'descendant', flattenText(gc.text) || undefined)
+          );
+        }
+      });
     }
 
     return candidate;

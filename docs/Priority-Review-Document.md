@@ -104,12 +104,13 @@ A Rem is **cooling** when it still owes the queue a card, and a card that gives 
 
 ### What counts as a spoiler
 
-Five relations, each a distinct way one review puts another card's answer on screen:
+Six relations, each a distinct way one review puts another card's answer on screen:
 
 * **Another card of the same Rem** — the other direction, or another cloze in the same text. RemNote's hour-long bury, extended.
 * **A sibling `Alt+Z` cloze under the same parent extract**, or the **parent extract itself** read as an Incremental Rem. Each cloze quotes the whole sentence with one span blanked, so any one of them shows the others' answers.
 * **One of the Rem's own `Alt+Z` clozes**, when the Rem carries a card of its own as well.
 * **A child or grandchild card**, whose context line displayed this Rem's answer — the [ancestor gate](#ancestor-spoiler-protection) extended across time, in the direction that actually spoils.
+* **An answer line of a multi-line card.** Reviewing one puts part of the multi-line card's answer on screen. Only its answer lines count — the other children of a multi-line card show just its question — and while one of them is still due, the multi-line card waits for it: see [Multi-line cards: answer lines first](#multi-line-cards-answer-lines-first).
 * **Its concept, for a descriptor's backward card.** A descriptor's backward card shows the descriptor and asks for the concept it belongs to: the nearest ancestor that is not itself a descriptor, which is a grandparent or higher when descriptors are nested. Reviewing any card of that concept, forward, backward or a cloze in it, puts the answer on screen, so the descriptor waits. RemNote buries this pairing for an hour; cooling extends it for the whole window.
 
 **And one rule about the card itself: new cards.** In the Priority Queue only, a card you have just created and never reviewed cools too, for a fixed number of days counted from the moment the card was created (**Cooling: new cards**, 1 day by default, up to 10, 0 to turn it off). SuperMemo counts creating an item as its first repetition, so a cloze you wrote while reading is never asked the same day, while its answer is still in view. The date is the card's own: a cloze added today to an old Rem counts as new, and a direction you switch off and back on keeps its original card and history, so it does not. A direction switched on for the first time is a new card.
@@ -231,6 +232,21 @@ Due-ness is read from the ancestor's **actual cards**, not from the plugin's pri
 **Entries already in the document are checked too.** The draw only looks at a child's ancestors when it first picks the child, so every refresh also checks each flashcard entry the document already holds. A child whose parent or grandparent has come due since it was added is drained, and that ancestor is pulled in ahead of the normal fill, so it is reviewed first. The toast after the [automatic refresh](#refresh-after-every-session) counts these, and the status block shows how many ancestors were swapped in.
 
 Once the ancestor *has* been reviewed, its descendant returns at a later refresh — and that is exactly when the reverse relation takes over: a descendant reviewed recently cools its ancestor, since the descendant's context line showed the ancestor's answer. The two rules are the same rule in the two directions of time.
+
+### Multi-line cards: answer lines first { #multi-line-cards-answer-lines-first }
+
+A multi-line card (`>>>`) is the one case where the order is **inverted**. Its answer is a list of children, and when those answer lines are flashcards themselves, each one is a smaller question inside the big one. So the answer lines go **first**, and the multi-line card waits for them.
+
+![A multi-line card "which short lines?" whose two answer lines, "forward" and "aft", are flashcards of their own; the image and the note below them are children but not part of the answer](assets/cooling-multiline-answer-lines.png){ width="700" }
+
+Above, *which short lines?* is a multi-line card, and its answer lines *forward* and *aft* have cards of their own:
+
+1. While *forward* or *aft* is due, *which short lines?* is **held back** — left out of the Priority Queue, skipped in [RemNote's own queues](#cooling-in-remnotes-own-queues), and not counted by the Priority Shield. The reason reads *one of its answer lines is due and goes first*.
+2. *forward* and *aft* are **not** held back by their parent, and they do not cool each other: review them in any order, in the same session.
+3. When the held card comes up in a Priority Queue fill, its due answer lines are **pulled in** in its place — the ancestor swap in reverse.
+4. Once they are reviewed, *which short lines?* **cools** from that review, for its own window, and then comes back to be reviewed last.
+
+Only children marked as **card items** — the lines on the back of the card — trigger this. Other children of a multi-line card, like the image and the *~Lógica* note above, are not part of its answer: they neither hold it nor cool it. A due **grandparent** still goes first, as for any other card.
 
 ### What You See
 

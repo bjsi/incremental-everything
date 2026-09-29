@@ -13,6 +13,8 @@ import {
   pickConceptAncestor,
   isRecentlyCreatedUnseen,
   COOLING_RELATION_LABELS,
+  coolingReasonText,
+  dueAnswerLineIds,
   coolingWindowDays,
   DAY_MS,
   DEFAULT_COOLING_PARAMS,
@@ -438,5 +440,66 @@ describe('withoutOwnSightings', () => {
       seen: [{ relation: 'just-created', sourceRemId: 'r', cardId: 'a', seenAt: NOW - 1000, stillDue: false, windowDays: 1 }],
     };
     assert.equal(withoutOwnSightings(c, 'a'), c);
+  });
+});
+
+describe('multi-line cards: answer lines first', () => {
+  // "which short lines?" (interval 38 d → 2-day window) with two answer lines, "forward" and "aft".
+  const hold = (over: Partial<SpoilerSeenEvent> = {}): SpoilerSeenEvent => ({
+    relation: 'answer-line-due',
+    sourceRemId: 'forward',
+    cardId: 'forward-card',
+    seenAt: daysAgo(30), // came due a month ago
+    stillDue: true,
+    whileDue: true,
+    ...over,
+  });
+  const multiLine = (seen: SpoilerSeenEvent[]): CoolingCandidate => ({
+    remId: 'which',
+    dueCards: [{ cardId: 'which-card', intervalDays: 38 }],
+    seen,
+  });
+
+  it('holds the multi-line card while an answer line is due, a full window from now', () => {
+    const v = evaluateCooling(multiLine([hold()]), NOW);
+    assert.ok(v);
+    assert.equal(v!.reasons[0].relation, 'answer-line-due');
+    assert.equal(v!.until, NOW + coolingWindowDays(38) * DAY_MS);
+  });
+  it('lets the hold go once the answer line is no longer due, and cools from its review instead', () => {
+    const reviewed = hold({ stillDue: false });
+    assert.equal(evaluateCooling(multiLine([reviewed]), NOW), null);
+    const v = evaluateCooling(
+      multiLine([reviewed, seen({ relation: 'answer-line', sourceRemId: 'forward', seenAt: NOW - 3_600_000 })]),
+      NOW
+    );
+    assert.ok(v);
+    assert.equal(v!.reasons[0].relation, 'answer-line');
+    assert.equal(v!.until, NOW - 3_600_000 + coolingWindowDays(38) * DAY_MS);
+  });
+  it('an answer line still due is no sighting: its own review, not its due card, cools the parent', () => {
+    const dueLine = seen({ relation: 'answer-line', sourceRemId: 'forward', seenAt: daysAgo(1), stillDue: true });
+    assert.equal(evaluateCooling(multiLine([dueLine]), NOW), null);
+  });
+  it('a release lets the hold go until the answer line comes due again', () => {
+    const released = { ...EMPTY_COOLING_OVERRIDES, released: { which: daysAgo(1) } };
+    assert.equal(evaluateCooling(multiLine([hold()]), NOW, DEFAULT_COOLING_PARAMS, released), null);
+    const dueAgain = hold({ seenAt: NOW - 60_000 });
+    assert.ok(evaluateCooling(multiLine([dueAgain]), NOW, DEFAULT_COOLING_PARAMS, released));
+  });
+  it('"never cool" covers the hold too', () => {
+    const never = { ...EMPTY_COOLING_OVERRIDES, never: ['which'] };
+    assert.equal(evaluateCooling(multiLine([hold()]), NOW, DEFAULT_COOLING_PARAMS, never), null);
+  });
+  it('lists the answer lines it waits for, once each', () => {
+    const v = evaluateCooling(
+      multiLine([hold(), hold({ cardId: 'forward-card-2' }), hold({ sourceRemId: 'aft', cardId: 'aft-card' })]),
+      NOW
+    );
+    assert.deepEqual(dueAnswerLineIds(v!).sort(), ['aft', 'forward']);
+  });
+  it('describes the hold without an "ago"', () => {
+    assert.equal(coolingReasonText('answer-line-due', '3 days ago'), COOLING_RELATION_LABELS['answer-line-due']);
+    assert.equal(coolingReasonText('answer-line', '3 days ago'), `${COOLING_RELATION_LABELS['answer-line']} 3 days ago`);
   });
 });

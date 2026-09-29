@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.136 - September 29th, 2026
+
+### ✨ New - multi-line cards go after their answer lines
+
+**Cooling**: When the answer lines of a multi-line card are flashcards themselves, they now come first; the multi-line card waits while any of them is due, then cools from their review.
+
+📖 [Multi-line cards: answer lines first](Priority-Review-Document.md#multi-line-cards-answer-lines-first)
+
 ## v1.0.135 - September 29th, 2026
 
 ### ⚡ Improved - the Forgetting Curve shows the whole next interval

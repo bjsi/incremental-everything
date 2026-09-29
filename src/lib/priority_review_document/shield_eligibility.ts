@@ -2,6 +2,7 @@ import { RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { isCardDue } from './cooling';
 import { CoolingScanner } from './cooling_gather';
 import { HeldByCoolingAncestor } from './cooling_store';
+import { isAnswerLine } from './multiline';
 
 /**
  * Which of the given due Rems are held back by a COOLING ancestor.
@@ -18,7 +19,8 @@ import { HeldByCoolingAncestor } from './cooling_store';
  * so the work that frees the child is available.
  *
  * Same rule as the draw — parent and grandparent, the HIGHEST due one decides —
- * so the shield and the queue agree on what is held. Due-ness comes from the
+ * so the shield and the queue agree on what is held, including its exception:
+ * an answer line of a multi-line card is never held by that parent. Due-ness comes from the
  * scanner's own card facts (the card cache in Full Mode), and the tree from two
  * batched Rem lookups, so this costs no card read.
  */
@@ -36,6 +38,7 @@ export async function findHeldByCoolingAncestor(
     !!id && (facts.get(id) ?? []).some((c) => isCardDue(c, now));
 
   const rems = (await plugin.rem.findMany(ids)) || [];
+  const remById = new Map(rems.map((r) => [r._id, r]));
   const parentOf = new Map<RemId, RemId>();
   for (const r of rems) if (r.parent) parentOf.set(r._id, r.parent as RemId);
 
@@ -48,7 +51,14 @@ export async function findHeldByCoolingAncestor(
   for (const id of ids) {
     const parent = parentOf.get(id);
     const grandparent = parent ? grandparentOf.get(parent) : undefined;
-    const blocker = dueNow(grandparent) ? grandparent! : dueNow(parent) ? parent! : null;
+    let blocker = dueNow(grandparent) ? grandparent! : dueNow(parent) ? parent! : null;
+    if (!blocker) continue;
+    // An answer line goes BEFORE its multi-line parent, which waits for it:
+    // counting the parent's hold against the line would hold both forever.
+    if (blocker === parent) {
+      const rem = remById.get(id);
+      if (rem && (await isAnswerLine(rem))) blocker = null;
+    }
     if (!blocker) continue;
     const verdict = await scanner.verdictFor(blocker);
     if (verdict) held.push({ remId: id, ancestorRemId: blocker, until: verdict.until });

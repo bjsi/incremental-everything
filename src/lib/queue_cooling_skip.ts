@@ -3,7 +3,7 @@ import { coolingInQueuesId, currentScopeRemIdsKey } from './consts';
 import { getIESetting } from './settings';
 import { shouldUseLightMode } from './mobileUtils';
 import { QueueRouteKind, queueRouteKind } from './queue_route';
-import { COOLING_RELATION_LABELS, CoolingVerdict, isCardDue, withSessionRatings } from './priority_review_document/cooling';
+import { coolingReasonText, CoolingVerdict, isCardDue, withSessionRatings } from './priority_review_document/cooling';
 import { CoolingScanner } from './priority_review_document/cooling_gather';
 import { getCoolingParams } from './priority_review_document/cooling_store';
 import { loadCardSource } from './priority_review_document/card_source';
@@ -405,7 +405,7 @@ function announce(plugin: RNPlugin, s: Session, verdict: CoolingVerdict) {
   }
   const reason = verdict.reasons[0];
   const why = reason
-    ? `${COOLING_RELATION_LABELS[reason.relation]} ${ago(reason.seenAt)}`
+    ? coolingReasonText(reason.relation, ago(reason.seenAt))
     : 'its cooling was extended';
   void plugin.app.toast(`Cooling: skipped a card — ${why}.`);
 }
@@ -467,7 +467,7 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
     `${LOG} ${s.kind === 'learn-new' ? 'Learn New' : 'queue'}: skipped "${verdict.label ?? '(no text)'}" ` +
       `(card ${cardId}, Rem ${remId}) after ${Date.now() - started} ms, ${ahead ? 'judged ahead' : 'judged live'} [${timing}] — ` +
       (reason
-        ? `${COOLING_RELATION_LABELS[reason.relation]} ${ago(reason.seenAt)}` +
+        ? coolingReasonText(reason.relation, ago(reason.seenAt)) +
           (reason.sourceRemId !== remId ? ` ("${reason.sourceLabel ?? reason.sourceRemId}")` : '') +
           (reason.cardId ? ` (card ${reason.cardId})` : '')
         : 'its cooling was extended') +

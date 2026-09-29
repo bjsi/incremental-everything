@@ -49,6 +49,21 @@ export type CoolingRelation =
    */
   | 'concept-reviewed'
   /**
+   * This Rem is a multi-line card and one of its answer lines — a child marked
+   * as a card item, with a card of its own — was graded. That review put part
+   * of this Rem's answer on screen. Only answer lines count: other children of
+   * a multi-line card show just its question as context.
+   */
+  | 'answer-line'
+  /**
+   * This Rem is a multi-line card and one of its answer lines still has a due
+   * card. The order is inverted for multi-line cards: the answer lines go first
+   * (each is a smaller question inside the big one), and the multi-line card
+   * waits for them, then cools from their review. Not a window: it holds while
+   * the answer line is due (see `whileDue`).
+   */
+  | 'answer-line-due'
+  /**
    * The card itself was created recently and has never been shown. SuperMemo
    * counts creating an item as its first repetition; this keeps a card you just
    * wrote out of the queue for a fixed number of days (not the interval formula
@@ -63,8 +78,20 @@ export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'own-cloze-child': 'one of its Alt+Z clozes was reviewed',
   descendant: 'a descendant card showed its answer as context',
   'concept-reviewed': 'its concept was reviewed',
+  'answer-line': 'one of its answer lines was reviewed',
+  'answer-line-due': 'one of its answer lines is due and goes first',
   'just-created': 'a card of it was created',
 };
+
+/**
+ * One reason in words: the relation's label and how long ago its card was seen.
+ * A hold has no "ago" — it lasts while the answer line is due, not from a
+ * viewing.
+ */
+export function coolingReasonText(relation: CoolingRelation, ago: string): string {
+  if (relation === 'answer-line-due') return COOLING_RELATION_LABELS[relation];
+  return `${COOLING_RELATION_LABELS[relation]} ${ago}`;
+}
 
 export interface CoolingParams {
   /** Fraction of the cooled card's interval that becomes cooling time. */
@@ -112,6 +139,14 @@ export interface SpoilerSeenEvent {
    * one — used by `just-created`, whose length is its own setting.
    */
   windowDays?: number;
+  /**
+   * A hold rather than a sighting (`answer-line-due`): the event counts only
+   * WHILE the source is still due, and `seenAt` is when it came due (so a
+   * "release now" lets it go until the source comes due again). It holds the
+   * candidate for one full window from now: the review that ends it starts
+   * that window, and it has not happened yet.
+   */
+  whileDue?: boolean;
 }
 
 export interface CoolingCandidate {
@@ -403,13 +438,14 @@ export function evaluateCooling(
 
   const reasons: CoolingReason[] = [];
   for (const event of candidate.seen) {
-    if (event.stillDue) continue;
+    // A sighting counts once its card has moved on; a hold, only while it has not.
+    if (event.whileDue ? !event.stillDue : event.stillDue) continue;
     // A timestamp from the future is a clock skew, not a review from tomorrow.
     const seenAt = Math.min(event.seenAt, now);
     if (seenAt <= releasedAt) continue;
     const eventWindowDays = typeof event.windowDays === 'number' ? Math.max(0, event.windowDays) : windowDays;
     if (eventWindowDays <= 0) continue;
-    const until = seenAt + eventWindowDays * DAY_MS;
+    const until = (event.whileDue ? now : seenAt) + eventWindowDays * DAY_MS;
     if (until <= now) continue;
     reasons.push({
       relation: event.relation,
@@ -467,6 +503,16 @@ export function pruneCoolingOverrides(
     if (typeof until === 'number' && until > now) extended[remId] = until;
   }
   return { released, extended, never: [...new Set(overrides.never ?? [])] };
+}
+
+/**
+ * The answer lines a multi-line card is waiting for: the Rems behind its
+ * `answer-line-due` reasons, in the order the reasons list them.
+ */
+export function dueAnswerLineIds(verdict: CoolingVerdict): string[] {
+  return [
+    ...new Set(verdict.reasons.filter((r) => r.relation === 'answer-line-due').map((r) => r.sourceRemId)),
+  ];
 }
 
 /** Removes cooling Rems from any list keyed by remId — the shield's exclusion. */

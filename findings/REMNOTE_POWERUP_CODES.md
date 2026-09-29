@@ -53,7 +53,7 @@ Legend: ✅ same in both · ⚠️ in both, but disagreeing · ❌ not in the SD
 | ⚠️ | Link | `b` | URL `u`, ShouldOpenInTextReader `s`, Title `t`, ReadPercent `r`, LastReadDate `d`, FileURL `f`, HasAIComputedTitle `ait`, Theme `h`, FontFamily `ff`, FontSize `fs`, LineHeight `lh` | slots not in the SDK: ShouldOpenInTextReader `s`, HasAIComputedTitle `ait`, Theme `h`, FontFamily `ff`, FontSize `fs`, LineHeight `lh` |
 | ✅ | List | `i` | — |  |
 | ✅ | MultipleChoice | `mc` | — |  |
-| ✅ | MultiLineCard | `w` | — |  |
+| ✅ | MultiLineCard | `w` | — | Marks a CARD ITEM (an answer line of a multi-line card): it sits on each answer child, never on the multi-line Rem itself — `getIsCardItem()` is `hasPowerup(w)`. Children without it (an image, Extra Card Detail) are not in the answer. Checked in remnote.db, Sep 2026. |
 | ✅ | PDFPageNumber | `pn` | — |  |
 | ✅ | PDFHighlight | `n` | Data `d`, PdfId `p` |  |
 | ❌ | PDFHighlightSection | `phs` | — | not in the SDK |
