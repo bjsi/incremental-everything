@@ -75,6 +75,8 @@ const MAX_LOADS_PER_CARD = 6;
 const MAX_JUDGED_AHEAD = 500;
 /** A card the queue left behind sooner than this can hardly have been read: flagged in the trace. */
 const BRIEF_MS = 2000;
+/** How long a card left behind waits for its rating (deferred by RemNote) before it is traced. */
+const RATING_GRACE_MS = 3000;
 
 type SessionKind = Exclude<QueueRouteKind, 'other'>;
 
@@ -291,7 +293,14 @@ function noteSeen(plugin: RNPlugin, s: Session, cardId: string, sighting: Omit<S
         s.remByCard.set(cardId, remId);
       }
       if (sighting.how === 'left-behind') {
-        console.log(`${LOG} card ${cardId} (Rem ${remId}) noted as seen: ${describeSighting(s.sightings.get(cardId)!)}`);
+        // The rating of a card left behind arrives after the next card's load: wait for it, and
+        // trace only a card the queue passed without one, or too soon to have been read.
+        const traced = remId;
+        setTimeout(() => {
+          const x = s.sightings.get(cardId);
+          if (!x || (typeof x.score === 'number' && (x.currentForMs ?? Infinity) >= BRIEF_MS)) return;
+          console.log(`${LOG} card ${cardId} (Rem ${traced}) counted as seen: ${describeSighting(x)}`);
+        }, RATING_GRACE_MS);
       }
       await scanner.updateCards(remId, withSessionRatings(scanner.cardsOf(remId), ratingsOf(s, remId)));
       await scanner.refresh([...scanner.checkedIds]);
@@ -312,7 +321,7 @@ function describeSighting(x: Sighting): string {
   if (x.idlessLoads) {
     parts.push(`${x.idlessLoads} id-less load${x.idlessLoads === 1 ? '' : 's'} in between (first at +${x.firstIdlessAfterMs} ms)`);
   }
-  if (x.how === 'left-behind') parts.push(typeof x.score === 'number' ? `rated afterwards (score ${x.score})` : 'no rating reported (yet)');
+  if (x.how === 'left-behind') parts.push(typeof x.score === 'number' ? `rated afterwards (score ${x.score})` : 'no rating reported');
   return parts.join(', ');
 }
 
