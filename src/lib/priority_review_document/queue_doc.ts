@@ -80,11 +80,15 @@ export const clampShieldSlice = (f: number) =>
 export const clampPausedThreshold = (n: number) =>
   Math.max(0, Math.min(100, Math.round(Number.isFinite(n) ? n : PRIORITY_QUEUE_PAUSED_THRESHOLD)));
 
-/** True when RemNote is on a flashcards route or the plugin's queue widget is mounted. */
+/**
+ * True when RemNote is on a flashcards route. The URL is the authority: the
+ * queue widget's session flag can outlive the queue (see the URLChange
+ * listener), so it is consulted only when the URL cannot be read.
+ */
 export async function isQueueOpen(plugin: RNPlugin): Promise<boolean> {
   try {
     const url = await plugin.window.getURL();
-    if (typeof url === 'string' && url.includes('/flashcards')) return true;
+    if (typeof url === 'string') return url.includes('/flashcards');
   } catch {
     /* fall through */
   }
