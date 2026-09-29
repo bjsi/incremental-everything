@@ -215,7 +215,7 @@ This is intentionally a passive readout — it doesn't gate or sort the queue. I
 
 **Why use it:** Gain insights into your study habits, track your velocity, and monitor your usage of incremental reading tools alongside standard flashcards.
 
-**Interaction:** Clicking on a session opens the **queue** on that document straight away — the same route as its Practice button — so you can pick up where that session left off. Ad-hoc sessions, which have no document, are not clickable.
+**Interaction:** Clicking on a session opens the **queue** on that document straight away — the same route as its Practice button — so you can pick up where that session left off. Sessions with no document behind them are not clickable: **editor reviews** (IncRems reviewed in the editor with no queue open) and **ad-hoc sessions** (the Global Queue, embedded queues). Both take the name of the first Incremental Rem they touch, so they can look like a queue — hover one and the tooltip says there is no queue to reopen.
 
 **Export & Import:** Back up your practice session history across all Knowledge Bases to a local JSON file, and import it back at any time (duplicate sessions are automatically skipped).
 

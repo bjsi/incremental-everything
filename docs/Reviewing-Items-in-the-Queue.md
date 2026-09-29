@@ -291,9 +291,8 @@ It performs a powerful sequence of actions:
 Once you are in the editor with the timer running, you can perform heavy editing, restructuring, or use AI tools. 
 When you are completely finished processing the item:
 
-1. Click **"End Review"** on the Timer Widget. 
-2. The timer will conclude, record your repetition (along with the time spent), and **navigate you back to the original queue document**.
-3. You must then press `Cmd+Shift+P` (or your Practice shortcut / the Practice button) to instantly dive back into the queue and continue.
+1. Click **"End Review and Back to Queue"** on the Timer Widget. 
+2. The timer will conclude, record your repetition (along with the time spent), and **reopen the queue you came from** — the same document queue, or the Global Queue if that is where you were — so you carry on with the next item.
 
 ####  When to use it
 

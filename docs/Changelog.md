@@ -18,11 +18,25 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
 
+### ⚡ Improved - End Review takes you back into the queue
+
+**Editor Review Timer**: **End Review and Back to Queue** now reopens the queue you left, the Global Queue included, instead of opening its document and leaving you to press Practice.
+
+📖 [The Workflow Loop](Reviewing-Items-in-the-Queue.md#the-workflow-loop)
+
 ### 🐛 Fixed
 
 **Cooling**: A card coming back in the same session (e.g. after **Forgot**) should no longer be skipped in RemNote's own queues as if it were its own sibling.
 
 📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
+**Learn**: Fixed `Cmd/Ctrl+L` and **▶** saying "A queue is already open" when none was, after a Review in Editor detour.
+
+📖 [Practise it](Priority-Review-Document.md#practise-it)
+
+**Practiced Queues**: Editor reviews and ad-hoc sessions no longer look clickable in the history; their tooltip now says there is no queue to reopen.
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
 
 ## v1.0.131 - September 28th, 2026
 

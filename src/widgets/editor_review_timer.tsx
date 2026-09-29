@@ -511,18 +511,21 @@ function EditorReviewTimer() {
     // Perform navigation at the very end — only if requested
     if (navigateBack) {
       if (timerData.origin === 'queue') {
-        // Return to the queue
+        // Straight back into the queue, through the route RemNote's own Practice
+        // button takes (see practicePriorityQueue in lib/priority_review_document/queue_doc.ts).
+        // Leaving the queue for the editor fires no QueueExit, so the queue's
+        // document id is still in session here.
         const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
         if (subQueueId) {
           const subQueueRem = await plugin.rem.findOne(subQueueId);
           if (subQueueRem) {
-            await subQueueRem.openRemAsPage();
-            await plugin.app.toast('Hit Cmd+Shift+P to resume your Queue!');
+            await plugin.window.setURL(`/flashcards/${subQueueId}`);
           } else {
             await plugin.app.toast('Could not find the queue document.');
           }
         } else {
-          await plugin.app.toast("Please click 'Flashcards' on the sidebar to resume the Global Queue!");
+          // No document: the review came from the Global Queue.
+          await plugin.window.setURL('/flashcards');
         }
       } else if (timerData.origin === 'inc-rem-list') {
         // Return to the IncRem List popup (state was already stored in session by inc_rem_list.tsx)

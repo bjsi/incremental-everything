@@ -1307,8 +1307,12 @@ function QueueSessionItem({ session, onDelete, isLive, thresholds }: { session: 
     return (
         <div className="p-3 border rounded-lg rn-clr-border-opaque hover:shadow-sm transition-shadow rn-clr-background-elevation-10">
             <div className="flex justify-between items-start">
-                <div onClick={handleOpen} className="cursor-pointer flex-grow">
-                    <div className="font-semibold text-lg hover:underline truncate" title={session.queueId ? `Practice "${session.scopeName || 'this queue'}" again` : (session.scopeName || "Ad-hoc Queue")}>
+                {/* Only a document queue can be reopened. Editor reviews and ad-hoc
+                    queues (Global Queue, embedded queues) record no queueId — and
+                    take the name of the first IncRem they touch — so they must not
+                    look clickable. */}
+                <div onClick={session.queueId ? handleOpen : undefined} className={`flex-grow ${session.queueId ? 'cursor-pointer' : ''}`}>
+                    <div className={`font-semibold text-lg truncate ${session.queueId ? 'hover:underline' : ''}`} title={session.queueId ? `Practice "${session.scopeName || 'this queue'}" again` : `${session.scopeName || "Ad-hoc Queue"} — an editor review or ad-hoc session, no queue to reopen`}>
                         {session.scopeName ? session.scopeName : (session.queueId ? (
                             <RemViewer remId={session.queueId} width="100%" />
                         ) : "Ad-hoc Queue")}
