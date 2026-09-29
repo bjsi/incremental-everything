@@ -327,7 +327,10 @@ export const RATED_CARD_MIN_GAP_MS = 60 * 60_000;
  * when the session saw them rated. A fact already holding that rating is kept
  * as it is; a matching fact without it gains it; a rating with no matching fact
  * (cache facts) is added as a fact of its own, which is all cooling needs: a
- * card of the Rem seen at that moment and not due again for an hour.
+ * card of the Rem seen at that moment and not due again for an hour. That fact
+ * sits beside the card's own (still due) cache fact, so it reads as "another
+ * card of this Rem" even when the card itself comes back — the queue judges a
+ * loading card with {@link withoutOwnSightings} for that reason.
  */
 export function withSessionRatings(cards: CardLike[], ratedAt: ReadonlyMap<string, number>): CardLike[] {
   if (ratedAt.size === 0) return cards;
@@ -350,6 +353,19 @@ export function withSessionRatings(cards: CardLike[], ratedAt: ReadonlyMap<strin
     if (!matched.has(cardId)) out.push(rated({ _id: cardId, nextRepetitionTime: null, repetitionHistory: [] }, at));
   }
   return out;
+}
+
+/**
+ * The candidate as one of its own cards sees it: a card never spoils itself.
+ * `same-rem` sightings of that card are dropped. A Rem-wide verdict can name
+ * the very card that is loading — a session sighting laid over card-cache
+ * facts, which carry no real ids, becomes an extra "other" card; and with real
+ * ids, a card left behind or rated Forgot is a seen, not-due sibling of the
+ * Rem's other due cards when it comes back.
+ */
+export function withoutOwnSightings(candidate: CoolingCandidate, cardId: string): CoolingCandidate {
+  const seen = candidate.seen.filter((e) => !(e.relation === 'same-rem' && e.cardId === cardId));
+  return seen.length === candidate.seen.length ? candidate : { ...candidate, seen };
 }
 
 /**

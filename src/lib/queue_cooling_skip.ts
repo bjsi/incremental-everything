@@ -54,6 +54,10 @@ import { hasCardClusterPowerup } from './priority_review_document/cluster';
  *   - On a rating: it is laid over the Rem's facts (a plugin read would not see
  *     it yet, and cache facts carry no card ids), and every judged Rem is judged
  *     again from memory — no read — so the Rem and its relatives cool at once.
+ *   - A card is judged with its own sightings left out (verdictForCard): having been seen
+ *     cools its siblings, never the card itself when it comes back.
+ *   - Every card counted as seen keeps a trace (how, how long it was current, id-less loads in
+ *     between, whether a rating followed), printed with the skips it causes and at session end.
  * The same safeguards as the drill: id-less loads ignored, no removal once the
  * user has moved on, and a loop guard.
  */
@@ -69,8 +73,30 @@ const DEFER_MS = 1000;
 const MAX_LOADS_PER_CARD = 6;
 /** Rems with a due card beyond which the scope is not judged ahead (about 1.5 s per 200). */
 const MAX_JUDGED_AHEAD = 500;
+/** A card the queue left behind sooner than this can hardly have been read: flagged in the trace. */
+const BRIEF_MS = 2000;
 
 type SessionKind = Exclude<QueueRouteKind, 'other'>;
+
+/**
+ * Why the session counts a card as seen — the trace behind a skip whose reason is a card seen in
+ * this session. A card is "left behind" when another card loads after it (RemNote reports the
+ * rating only after the next card has loaded), "rated" when QueueCompleteCard names it first.
+ */
+interface Sighting {
+  at: number;
+  how: 'left-behind' | 'rated';
+  /** How long it was the current card before the queue moved on. */
+  currentForMs?: number;
+  /** The card whose load moved the queue past it. */
+  nextCardId?: string;
+  /** Id-less loads between its load and the next card's: IncRems, the break item, RemNote's own. */
+  idlessLoads?: number;
+  /** When the first of them fired, in ms after its load. */
+  firstIdlessAfterMs?: number;
+  /** The score QueueCompleteCard reported for it; absent when it was never rated. */
+  score?: number;
+}
 
 interface Session {
   kind: SessionKind;
@@ -84,6 +110,12 @@ interface Session {
   pending: Promise<void>;
   /** The card on screen, cleared once it is rated. */
   currentCardId: string | null;
+  /** When the current card's load arrived, and the id-less loads since — for the trace. */
+  currentLoadedAt: number | null;
+  idlessSinceLoad: number;
+  firstIdlessAt: number | null;
+  /** Card id → why it counts as seen. */
+  sightings: Map<string, Sighting>;
   remByCard: Map<string, RemId>;
   /** Card id → when the session saw it rated. */
   ratedAt: Map<string, number>;
@@ -158,6 +190,10 @@ async function startSession(plugin: RNPlugin, enteredAt: number, subQueueId: str
     scopeTaken: false,
     pending: Promise.resolve(),
     currentCardId: null,
+    currentLoadedAt: null,
+    idlessSinceLoad: 0,
+    firstIdlessAt: null,
+    sightings: new Map(),
     remByCard: new Map(),
     ratedAt: new Map(),
     skipped: new Set(),
@@ -239,9 +275,11 @@ async function judgeAhead(plugin: RNPlugin, s: Session, scopeIds: RemId[]): Prom
  * Records a card as seen now — rated, or left behind — lays it over its Rem's facts and judges
  * every judged Rem again from memory, so the Rem and its relatives cool. Loads wait for it.
  */
-function noteSeen(plugin: RNPlugin, s: Session, cardId: string) {
+function noteSeen(plugin: RNPlugin, s: Session, cardId: string, sighting: Omit<Sighting, 'at'>) {
   if (s.ratedAt.has(cardId)) return;
-  s.ratedAt.set(cardId, Date.now());
+  const at = Date.now();
+  s.ratedAt.set(cardId, at);
+  s.sightings.set(cardId, { ...sighting, at });
   s.pending = s.pending
     .then(async () => {
       const scanner = await s.scanner;
@@ -252,10 +290,30 @@ function noteSeen(plugin: RNPlugin, s: Session, cardId: string) {
         if (!remId) return;
         s.remByCard.set(cardId, remId);
       }
+      if (sighting.how === 'left-behind') {
+        console.log(`${LOG} card ${cardId} (Rem ${remId}) noted as seen: ${describeSighting(s.sightings.get(cardId)!)}`);
+      }
       await scanner.updateCards(remId, withSessionRatings(scanner.cardsOf(remId), ratingsOf(s, remId)));
       await scanner.refresh([...scanner.checkedIds]);
     })
     .catch((e) => console.warn(`${LOG} re-judging after a card was seen failed:`, e));
+}
+
+function describeSighting(x: Sighting): string {
+  const parts: string[] = [];
+  parts.push(
+    x.how === 'left-behind'
+      ? `left behind at ${new Date(x.at).toLocaleTimeString()} when card ${x.nextCardId} loaded`
+      : `rated at ${new Date(x.at).toLocaleTimeString()}`
+  );
+  if (typeof x.currentForMs === 'number') {
+    parts.push(`current for ${x.currentForMs} ms${x.currentForMs < BRIEF_MS ? ' (too brief to have been read)' : ''}`);
+  }
+  if (x.idlessLoads) {
+    parts.push(`${x.idlessLoads} id-less load${x.idlessLoads === 1 ? '' : 's'} in between (first at +${x.firstIdlessAfterMs} ms)`);
+  }
+  if (x.how === 'left-behind') parts.push(typeof x.score === 'number' ? `rated afterwards (score ${x.score})` : 'no rating reported (yet)');
+  return parts.join(', ');
 }
 
 /** The Rem's cards rated in this session, card id → when. */
@@ -291,6 +349,18 @@ function endSession(plugin: RNPlugin, reason: string) {
       (s.kind === 'learn-new' ? `, ${s.lateSkips} removed after the ${MASK_DELAY_MS} ms mask (flashed)` : '') +
       (s.tripped ? ', LOOP GUARD TRIPPED' : '')
   );
+  // Cards counted as seen that RemNote never reported rated: each one cooled its relatives on
+  // the strength of having been on screen. The last card's rating may not have arrived yet.
+  const unrated = [...s.sightings].filter(([, x]) => x.how === 'left-behind' && typeof x.score !== 'number');
+  if (unrated.length) {
+    console.log(
+      `${LOG} ${unrated.length} card(s) counted as seen without a rating:\n` +
+        unrated
+          .slice(0, 30)
+          .map(([cardId, x]) => `  ${cardId} (Rem ${s.remByCard.get(cardId) ?? '?'}): ${describeSighting(x)}`)
+          .join('\n')
+    );
+  }
 }
 
 /** A Card Cluster is shown as one unit: its members are never skipped one by one. */
@@ -349,10 +419,22 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
   const ahead = scanner.checkedIds.has(remId);
   if (ahead) s.judgedAhead++;
   else await scanner.refresh([remId]);
-  const found = scanner.verdicts.get(remId);
-  const verdict = found && found.until > Date.now() ? found : null;
+  const now = Date.now();
+  const remWide = scanner.verdicts.get(remId);
+  // A card never spoils itself: its own sightings in this session hold only its siblings.
+  const found = scanner.verdictForCard(remId, cardId, now);
+  const verdict = found && found.until > now ? found : null;
   s.checkMs.push(Date.now() - started);
-  if (!verdict) return;
+  if (!verdict) {
+    if (remWide && remWide.until > now) {
+      const own = s.sightings.get(cardId);
+      console.log(
+        `${LOG} "${remWide.label ?? remId}" (card ${cardId}) left in: only its own sighting held it` +
+          (own ? ` — ${describeSighting(own)}` : '')
+      );
+    }
+    return;
+  }
   const decided = Date.now() - started;
   const rem = await scanner.remOf(remId);
   if (rem && (await inCluster(plugin, s, rem))) {
@@ -377,10 +459,15 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
       `(card ${cardId}, Rem ${remId}) after ${Date.now() - started} ms, ${ahead ? 'judged ahead' : 'judged live'} [${timing}] — ` +
       (reason
         ? `${COOLING_RELATION_LABELS[reason.relation]} ${ago(reason.seenAt)}` +
-          (reason.sourceRemId !== remId ? ` ("${reason.sourceLabel ?? reason.sourceRemId}")` : '')
+          (reason.sourceRemId !== remId ? ` ("${reason.sourceLabel ?? reason.sourceRemId}")` : '') +
+          (reason.cardId ? ` (card ${reason.cardId})` : '')
         : 'its cooling was extended') +
       `; cooling until ${new Date(verdict.until).toLocaleString()}` +
-      (verdict.reasons.length > 1 ? ` (${verdict.reasons.length} reasons)` : ''),
+      (verdict.reasons.length > 1 ? ` (${verdict.reasons.length} reasons)` : '') +
+      `; loaded ${s.loadsByCard.get(cardId) ?? 1}× this session` +
+      (reason?.cardId && s.sightings.has(reason.cardId)
+        ? ` — that card was seen in this session: ${describeSighting(s.sightings.get(reason.cardId)!)}`
+        : ''),
     verdict
   );
   announce(plugin, s, verdict);
@@ -406,18 +493,39 @@ export function registerQueueCoolingListeners(plugin: RNPlugin) {
   });
 
   plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async (data: any) => {
+    const receivedAt = Date.now();
     await entering;
     const s = session;
     const cardId: string | undefined = data?.cardId;
+    if (!s) return;
     // RemNote fires an id-less load around every card change and moves past it by itself.
-    // Removing on it would remove the NEXT real card.
-    if (!s || !cardId) return;
+    // Removing on it would remove the NEXT real card. An IncRem and the break item load
+    // id-less too; they are only counted, for the trace of the card before them.
+    if (!cardId) {
+      s.idlessSinceLoad++;
+      if (s.firstIdlessAt === null) s.firstIdlessAt = receivedAt;
+      return;
+    }
     // RemNote loads the next card BEFORE it reports the rating (QueueCompleteCard is emitted
     // deferred, after updateRepetitionStatus has advanced the queue). A card the queue has left
     // behind was on screen, so it counts as seen now — else the sibling loading next, the
     // "In Order" case, is judged without it. Cards this module removed were never shown.
     const previous = s.currentCardId;
-    if (previous && previous !== cardId && !s.skipped.has(previous)) noteSeen(plugin, s, previous);
+    if (previous && previous !== cardId && !s.skipped.has(previous)) {
+      const loadedAt = s.currentLoadedAt;
+      noteSeen(plugin, s, previous, {
+        how: 'left-behind',
+        nextCardId: cardId,
+        currentForMs: loadedAt === null ? undefined : receivedAt - loadedAt,
+        idlessLoads: s.idlessSinceLoad,
+        firstIdlessAfterMs: loadedAt === null || s.firstIdlessAt === null ? undefined : s.firstIdlessAt - loadedAt,
+      });
+    }
+    if (previous !== cardId) {
+      s.currentLoadedAt = receivedAt;
+      s.idlessSinceLoad = 0;
+      s.firstIdlessAt = null;
+    }
     s.currentCardId = cardId;
     if (s.tripped) return;
     const loads = (s.loadsByCard.get(cardId) ?? 0) + 1;
@@ -440,12 +548,21 @@ export function registerQueueCoolingListeners(plugin: RNPlugin) {
   });
 
   plugin.event.addListener(AppEvents.QueueCompleteCard, undefined, (data: any) => {
+    const receivedAt = Date.now();
     const s = session;
     const cardId: string | undefined = data?.cardId;
     if (!s || !cardId || s.skipped.has(cardId)) return;
-    if (s.currentCardId === cardId) s.currentCardId = null;
+    const score: number | undefined = typeof data?.score === 'number' ? data.score : undefined;
+    const noted = s.sightings.get(cardId);
+    if (noted) noted.score = score;
+    const current = s.currentCardId === cardId;
+    if (current) s.currentCardId = null;
     // Usually already noted when the next card loaded; a no-op then.
-    noteSeen(plugin, s, cardId);
+    noteSeen(plugin, s, cardId, {
+      how: 'rated',
+      score,
+      currentForMs: current && s.currentLoadedAt !== null ? receivedAt - s.currentLoadedAt : undefined,
+    });
   });
 
   plugin.event.addListener(AppEvents.QueueExit, undefined, () => {

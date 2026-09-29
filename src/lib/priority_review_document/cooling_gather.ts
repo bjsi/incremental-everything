@@ -19,6 +19,7 @@ import {
   isRecentlyCreatedUnseen,
   pickConceptAncestor,
   REM_TYPE_DESCRIPTOR,
+  withoutOwnSightings,
 } from './cooling';
 import { getCoolingParams, HeldByCoolingAncestor, mergeCoolingCache, readCoolingOverrides } from './cooling_store';
 import { getCardPriorityValue } from '../card_priority';
@@ -178,6 +179,8 @@ export class CoolingScanner {
   /** Verdicts by Rem, for the Rems found cooling. */
   readonly verdicts = new Map<RemId, CoolingVerdict>();
   readonly candidates: CoolingCandidate[] = [];
+  /** The candidate behind each verdict, so one card's view of it needs no read. */
+  private readonly candidateByRem = new Map<RemId, CoolingCandidate>();
   withDueCards = 0;
   clustersSkipped = 0;
 
@@ -434,6 +437,7 @@ export class CoolingScanner {
         const verdict = evaluateCooling(candidate, this.now, this.params, this.overrides);
         if (verdict) {
           this.verdicts.set(id, verdict);
+          this.candidateByRem.set(id, candidate);
           found.push(verdict);
         }
       });
@@ -454,6 +458,7 @@ export class CoolingScanner {
     for (const id of ids) {
       this.checkedIds.delete(id);
       this.verdicts.delete(id);
+      this.candidateByRem.delete(id);
     }
     await this.scan(ids);
   }
@@ -478,6 +483,20 @@ export class CoolingScanner {
   async verdictFor(remId: RemId): Promise<CoolingVerdict | null> {
     if (!this.checkedIds.has(remId)) await this.scan([remId]);
     return this.verdicts.get(remId) ?? null;
+  }
+
+  /**
+   * The Rem's verdict as one of its cards sees it, from memory: a card never
+   * spoils itself (see {@link withoutOwnSightings}). Null when that card's own
+   * sightings were all that held the Rem.
+   */
+  verdictForCard(remId: RemId, cardId: string, now: number = Date.now()): CoolingVerdict | null {
+    const verdict = this.verdicts.get(remId) ?? null;
+    const candidate = this.candidateByRem.get(remId);
+    if (!verdict || !candidate) return verdict;
+    const own = withoutOwnSightings(candidate, cardId);
+    if (own === candidate) return verdict;
+    return evaluateCooling(own, now, this.params, this.overrides);
   }
 
   isCooling(remId: RemId): boolean {

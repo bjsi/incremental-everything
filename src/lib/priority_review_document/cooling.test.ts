@@ -25,6 +25,7 @@ import {
   SpoilerSeenEvent,
   RATED_CARD_MIN_GAP_MS,
   withSessionRatings,
+  withoutOwnSightings,
 } from './cooling';
 
 const NOW = Date.UTC(2026, 8, 11, 12, 0, 0);
@@ -395,5 +396,47 @@ describe('withSessionRatings', () => {
       NOW
     );
     assert.ok(v);
+  });
+});
+
+describe('withoutOwnSightings', () => {
+  // The Sep 2026 case: a one-card Rem whose card the queue left behind unrated. Cache facts
+  // carry positional ids, so the session sighting lands beside the card's own due fact.
+  const cacheFact = { _id: 'r#0', nextRepetitionTime: daysAgo(10), lastRepetitionTime: daysAgo(28) };
+  const facts = withSessionRatings([cacheFact], new Map([['realA', NOW - 120_000]]));
+  const candidate = (cards: typeof facts): CoolingCandidate => ({
+    remId: 'r',
+    dueCards: cards.filter((c) => isCardDue(c, NOW)).map((c) => ({ cardId: c._id, intervalDays: cardIntervalDays(c) })),
+    seen: cards
+      .filter((c) => !isCardDue(c, NOW) && cardLastSeenAt(c) !== null)
+      .map((c) => ({ relation: 'same-rem' as const, sourceRemId: 'r', cardId: c._id, seenAt: cardLastSeenAt(c)!, stillDue: false })),
+  });
+
+  it('the Rem-wide verdict names the card itself as "another card"', () => {
+    const v = evaluateCooling(candidate(facts), NOW);
+    assert.ok(v);
+    assert.equal(v!.reasons[0].cardId, 'realA');
+  });
+  it('the card itself is not held by its own sighting', () => {
+    assert.equal(evaluateCooling(withoutOwnSightings(candidate(facts), 'realA'), NOW), null);
+  });
+  it('a sibling seen in the session still holds it', () => {
+    const both = withSessionRatings([cacheFact], new Map([['realA', NOW - 120_000], ['realB', NOW - 60_000]]));
+    const v = evaluateCooling(withoutOwnSightings(candidate(both), 'realA'), NOW);
+    assert.ok(v);
+    assert.deepEqual(v!.reasons.map((r) => r.cardId), ['realB']);
+  });
+  it('keeps a user extension', () => {
+    const overrides = { ...EMPTY_COOLING_OVERRIDES, extended: { r: NOW + DAY_MS } };
+    const v = evaluateCooling(withoutOwnSightings(candidate(facts), 'realA'), NOW, DEFAULT_COOLING_PARAMS, overrides);
+    assert.equal(v?.until, NOW + DAY_MS);
+  });
+  it('leaves other relations naming the card alone, and returns the same object when nothing drops', () => {
+    const c: CoolingCandidate = {
+      remId: 'r',
+      dueCards: [{ cardId: 'a', intervalDays: 0 }],
+      seen: [{ relation: 'just-created', sourceRemId: 'r', cardId: 'a', seenAt: NOW - 1000, stillDue: false, windowDays: 1 }],
+    };
+    assert.equal(withoutOwnSightings(c, 'a'), c);
   });
 });
