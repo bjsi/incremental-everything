@@ -16,14 +16,17 @@ import {
   evaluateCooling,
   isBackwardCard,
   isCardDue,
+  isImageOcclusionText,
   isRecentlyCreatedUnseen,
   pickConceptAncestor,
   REM_TYPE_DESCRIPTOR,
+  withoutOwnSightings,
 } from './cooling';
 import { getCoolingParams, HeldByCoolingAncestor, mergeCoolingCache, readCoolingOverrides } from './cooling_store';
 import { getCardPriorityValue } from '../card_priority';
 import type { CardPriorityInfo } from '../card_priority/types';
 import { readChildren } from './children';
+import { isAnswerLine } from './multiline';
 import { CardSource, loadCardSource } from './card_source';
 
 /**
@@ -55,6 +58,15 @@ import { CardSource, loadCardSource } from './card_source';
  * RemNote's own bury rule treats the selected cluster as one unit; so a cluster
  * parent contributes no sibling events, and a cluster parent's own children
  * contribute no descendant events.
+ *
+ * MULTI-LINE CARDS. A candidate whose children include answer lines (card
+ * items, multiline.ts) takes events from those children only, as
+ * `answer-line`, plus an `answer-line-due` hold for each one still due — the
+ * inverted order: answer lines first, the multi-line card after them. And the
+ * other way round, for a multi-line card reviewed first anyway: an answer line
+ * takes `multi-line-card` events from its parent. Card-item membership costs
+ * one probe per child that has cards (or carded children), and per candidate
+ * whose parent has cards, memoised.
  */
 
 export interface CoolingScanOptions {
@@ -73,6 +85,12 @@ export interface CoolingScanOptions {
    * share a single read.
    */
   cardSource?: CardSource;
+  /**
+   * Judge as cooling any Rem that was cooling at some moment since this instant
+   * (see evaluateCooling). Only the shield's scan sets it, to the start of the
+   * local day; its verdicts may then have an `until` in the past.
+   */
+  since?: number;
 }
 
 export interface CoolingScanResult {
@@ -178,11 +196,15 @@ export class CoolingScanner {
   /** Verdicts by Rem, for the Rems found cooling. */
   readonly verdicts = new Map<RemId, CoolingVerdict>();
   readonly candidates: CoolingCandidate[] = [];
+  /** The candidate behind each verdict, so one card's view of it needs no read. */
+  private readonly candidateByRem = new Map<RemId, CoolingCandidate>();
   withDueCards = 0;
   clustersSkipped = 0;
 
   private readonly reader: RemReader;
   private readonly clusterCache = new Map<RemId, boolean>();
+  /** Card-item membership, memoised: siblings share a parent, candidates share children. */
+  private readonly answerLineCache = new Map<RemId, Promise<boolean>>();
   private loaded: Promise<void> | null = null;
   private cardsByRem = new Map<RemId, CardLike[]>();
   private incByRem = new Map<RemId, IncrementalRem>();
@@ -238,6 +260,15 @@ export class CoolingScanner {
     return this.loaded;
   }
 
+  private isAnswerLine(rem: PluginRem): Promise<boolean> {
+    let pending = this.answerLineCache.get(rem._id);
+    if (!pending) {
+      pending = isAnswerLine(rem);
+      this.answerLineCache.set(rem._id, pending);
+    }
+    return pending;
+  }
+
   private async isCluster(rem: PluginRem): Promise<boolean> {
     const cached = this.clusterCache.get(rem._id);
     if (cached !== undefined) return cached;
@@ -276,6 +307,7 @@ export class CoolingScanner {
 
     const rem = await this.reader.one(remId);
     if (!rem) return null;
+    if (isImageOcclusionText(rem.text, rem.backText)) return null;
     const label = flattenText(rem.text) || undefined;
 
     const candidate: CoolingCandidate = {
@@ -352,6 +384,19 @@ export class CoolingScanner {
       }
     }
 
+    // 1c. Its multi-line card, when this Rem is one of its answer lines: that
+    //     card's back shows the line in full. Probed only when the parent has
+    //     cards at all, so most Rems cost nothing here.
+    const lineParentId = (rem.parent as RemId | undefined) ?? null;
+    if (lineParentId && (this.cardsByRem.get(lineParentId)?.length ?? 0) > 0 && (await this.isAnswerLine(rem))) {
+      const multiLine = await this.reader.one(lineParentId);
+      if (multiLine && !(await this.isCluster(multiLine))) {
+        candidate.seen.push(
+          ...this.seenEventsFor(lineParentId, 'multi-line-card', flattenText(multiLine.text) || undefined)
+        );
+      }
+    }
+
     // 2. Cloze siblings and the parent extract — only when this Rem IS an Alt+Z
     //    cloze, since only then is its content the parent's sentence.
     const parentId = (rem.parent as RemId | undefined) ?? null;
@@ -387,21 +432,64 @@ export class CoolingScanner {
     // 3 & 4. Own Alt+Z clozes, and descendant cards two levels down.
     if (!(await this.isCluster(rem))) {
       const children = await this.reader.childrenOf(rem);
-      for (const child of children) {
-        const childLabel = flattenText(child.text) || undefined;
-        const relation = this.clozeExtractIds.has(child._id) ? 'own-cloze-child' : 'descendant';
-        candidate.seen.push(...this.seenEventsFor(child._id, relation, childLabel));
-      }
       // Every child's own children, read concurrently — one call per child,
       // memoised across candidates that share them.
       const grandchildLists = await Promise.all(children.map((c) => this.reader.childrenOf(c)));
-      const grandchildren = new Map<RemId, PluginRem>();
-      for (const list of grandchildLists) for (const gc of list) grandchildren.set(gc._id, gc);
-      for (const [gcId, gc] of grandchildren) {
-        candidate.seen.push(
-          ...this.seenEventsFor(gcId, 'descendant', flattenText(gc.text) || undefined)
-        );
-      }
+
+      // A multi-line card: some children are its answer lines (multiline.ts).
+      // Only children that could produce an event are asked — those with cards,
+      // or with children that have cards — so a Rem with none costs no probe.
+      const hasCards = (id: RemId) => (this.cardsByRem.get(id)?.length ?? 0) > 0;
+      const answerLines = new Set<RemId>();
+      await Promise.all(
+        children.map(async (child, i) => {
+          if (!hasCards(child._id) && !grandchildLists[i].some((gc) => hasCards(gc._id))) return;
+          if (await this.isAnswerLine(child)) answerLines.add(child._id);
+        })
+      );
+      const multiLine = answerLines.size > 0;
+
+      const grandchildrenSeen = new Set<RemId>();
+      children.forEach((child, i) => {
+        // The other children of a multi-line card show only its question as
+        // context, never its answer: they neither cool it nor hold it.
+        if (multiLine && !answerLines.has(child._id)) return;
+        const childLabel = flattenText(child.text) || undefined;
+        const relation = this.clozeExtractIds.has(child._id)
+          ? 'own-cloze-child'
+          : multiLine
+            ? 'answer-line'
+            : 'descendant';
+        candidate.seen.push(...this.seenEventsFor(child._id, relation, childLabel));
+
+        // An answer line still due goes first: the multi-line card is held
+        // until it has been reviewed, and then cools from that review.
+        if (multiLine) {
+          const due = (this.cardsByRem.get(child._id) ?? []).filter((c) => isCardDue(c, this.now));
+          if (due.length) {
+            const first = due.reduce((a, b) =>
+              (b.nextRepetitionTime ?? Infinity) < (a.nextRepetitionTime ?? Infinity) ? b : a
+            );
+            candidate.seen.push({
+              relation: 'answer-line-due',
+              sourceRemId: child._id,
+              sourceLabel: childLabel,
+              cardId: first._id,
+              seenAt: first.nextRepetitionTime ?? this.now,
+              stillDue: true,
+              whileDue: true,
+            });
+          }
+        }
+
+        for (const gc of grandchildLists[i]) {
+          if (grandchildrenSeen.has(gc._id)) continue;
+          grandchildrenSeen.add(gc._id);
+          candidate.seen.push(
+            ...this.seenEventsFor(gc._id, 'descendant', flattenText(gc.text) || undefined)
+          );
+        }
+      });
     }
 
     return candidate;
@@ -431,9 +519,10 @@ export class CoolingScanner {
         if (!candidate) return;
         this.withDueCards++;
         if (this.options.includeCandidates) this.candidates.push(candidate);
-        const verdict = evaluateCooling(candidate, this.now, this.params, this.overrides);
+        const verdict = evaluateCooling(candidate, this.now, this.params, this.overrides, this.options.since);
         if (verdict) {
           this.verdicts.set(id, verdict);
+          this.candidateByRem.set(id, candidate);
           found.push(verdict);
         }
       });
@@ -454,6 +543,7 @@ export class CoolingScanner {
     for (const id of ids) {
       this.checkedIds.delete(id);
       this.verdicts.delete(id);
+      this.candidateByRem.delete(id);
     }
     await this.scan(ids);
   }
@@ -478,6 +568,20 @@ export class CoolingScanner {
   async verdictFor(remId: RemId): Promise<CoolingVerdict | null> {
     if (!this.checkedIds.has(remId)) await this.scan([remId]);
     return this.verdicts.get(remId) ?? null;
+  }
+
+  /**
+   * The Rem's verdict as one of its cards sees it, from memory: a card never
+   * spoils itself (see {@link withoutOwnSightings}). Null when that card's own
+   * sightings were all that held the Rem.
+   */
+  verdictForCard(remId: RemId, cardId: string, now: number = Date.now()): CoolingVerdict | null {
+    const verdict = this.verdicts.get(remId) ?? null;
+    const candidate = this.candidateByRem.get(remId);
+    if (!verdict || !candidate) return verdict;
+    const own = withoutOwnSightings(candidate, cardId);
+    if (own === candidate) return verdict;
+    return evaluateCooling(own, now, this.params, this.overrides, this.options.since);
   }
 
   isCooling(remId: RemId): boolean {
@@ -527,6 +631,7 @@ export class CoolingScanner {
     await this.fillMissingPriorities();
     await mergeCoolingCache(this.plugin, {
       computedAt: this.now,
+      since: this.options.since,
       scopeRemId: this.options.scopeRemId ?? null,
       checkedIds: this.checkedIds,
       verdicts: this.sortedVerdicts(),

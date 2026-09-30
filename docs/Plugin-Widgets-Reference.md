@@ -321,7 +321,7 @@ Tracks every practice session with a real-time live view and a full history tabl
 
 - Aggregated stats for Today, Yesterday, This Week, Last Week, and custom ranges.
 - Per-session detail: total time, card count, flashcard/IncRem split, speed, retention.
-- Click a session to open its source document in the Editor.
+- Click a session to reopen the queue on its document (editor reviews and ad-hoc sessions have none, and are not clickable).
 - Export/Import session history to a local JSON file for backup.
 
 📖 **Full documentation:** [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)

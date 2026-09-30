@@ -9,6 +9,7 @@ import {
   DEFAULT_COOLING_PARAMS,
   EMPTY_COOLING_OVERRIDES,
   pruneCoolingOverrides,
+  startOfLocalDay,
 } from './cooling';
 
 /**
@@ -138,13 +139,19 @@ export interface CoolingCache {
 }
 
 /**
- * Everything the shields must not count, as of `now`: Rems cooling themselves
- * and Rems held back by a cooling ancestor. Reads the cache only.
+ * Everything the shields must not count today: Rems cooling themselves and Rems
+ * held back by a cooling ancestor, at any moment since the start of the local
+ * day — the shield's own horizon (see evaluateCooling's `since`). A window that
+ * closes this afternoon keeps its Rem out of the shield until tomorrow. Reads
+ * the cache only.
  */
-export function shieldExclusionIds(cache: CoolingCache | null | undefined, now: number = Date.now()): Set<RemId> {
+export function shieldExclusionIds(
+  cache: CoolingCache | null | undefined,
+  since: number = startOfLocalDay()
+): Set<RemId> {
   const ids = new Set<RemId>();
-  for (const v of cache?.verdicts ?? []) if (v.until > now) ids.add(v.remId);
-  for (const h of cache?.heldByCoolingAncestor ?? []) if (h.until > now) ids.add(h.remId);
+  for (const v of cache?.verdicts ?? []) if (v.until > since) ids.add(v.remId);
+  for (const h of cache?.heldByCoolingAncestor ?? []) if (h.until > since) ids.add(h.remId);
   return ids;
 }
 
@@ -201,11 +208,19 @@ export async function getCoolingRemIdSet(plugin: RNPlugin, now: number = Date.no
  * keep theirs while their window lasts. This is what lets a document-scoped
  * refresh and a full-KB refresh share one cache without one wiping the other's
  * knowledge of the KB's top.
+ *
+ * Entries are kept for the rest of the local day, not just while their window
+ * lasts: the shield excludes a Rem that was cooling at any moment today
+ * ({@link shieldExclusionIds}). So a scan judging at "now" (a Priority Queue
+ * refresh) does not erase an entry whose window closed before its horizon — it
+ * could not have seen it; only a scan whose horizon covers the entry does.
  */
 export async function mergeCoolingCache(
   plugin: RNPlugin,
   scan: {
     computedAt: number;
+    /** The scan's horizon (CoolingScanOptions.since); defaults to `computedAt`. */
+    since?: number;
     scopeRemId: RemId | null;
     checkedIds: ReadonlySet<RemId>;
     verdicts: CoolingVerdict[];
@@ -216,11 +231,17 @@ export async function mergeCoolingCache(
   }
 ): Promise<void> {
   const existing = await readCoolingCache(plugin);
+  const dayStart = startOfLocalDay(scan.computedAt);
+  const since = Math.min(scan.since ?? scan.computedAt, scan.computedAt);
+  const judged = new Set(scan.verdicts.map((v) => v.remId));
   const kept = (existing?.verdicts ?? []).filter(
-    (v) => v.until > scan.computedAt && !scan.checkedIds.has(v.remId)
+    (v) =>
+      v.until > dayStart &&
+      !judged.has(v.remId) &&
+      (!scan.checkedIds.has(v.remId) || v.until <= since)
   );
   const keptHeld = (existing?.heldByCoolingAncestor ?? []).filter(
-    (h) => h.until > scan.computedAt && !scan.heldCheckedIds?.has(h.remId)
+    (h) => h.until > dayStart && !scan.heldCheckedIds?.has(h.remId)
   );
   await writeCoolingCache(plugin, {
     computedAt: scan.computedAt,

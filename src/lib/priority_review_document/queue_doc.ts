@@ -38,7 +38,7 @@ import { ClusterFinder } from './cluster';
 import { coolingClusterMembersToKeep, missingClusterSiblings } from './cluster_rules';
 import { cleanPriorityReviewDocuments, PrdDocReport, scanPriorityReviewDocuments } from './clean';
 import { CoolingScanner } from './cooling_gather';
-import { CoolingVerdict, isCardDue } from './cooling';
+import { CoolingVerdict, dueAnswerLineIds, isCardDue } from './cooling';
 import { readChildren } from './children';
 import { loadCardSource } from './card_source';
 
@@ -80,11 +80,15 @@ export const clampShieldSlice = (f: number) =>
 export const clampPausedThreshold = (n: number) =>
   Math.max(0, Math.min(100, Math.round(Number.isFinite(n) ? n : PRIORITY_QUEUE_PAUSED_THRESHOLD)));
 
-/** True when RemNote is on a flashcards route or the plugin's queue widget is mounted. */
+/**
+ * True when RemNote is on a flashcards route. The URL is the authority: the
+ * queue widget's session flag can outlive the queue (see the URLChange
+ * listener), so it is consulted only when the URL cannot be read.
+ */
 export async function isQueueOpen(plugin: RNPlugin): Promise<boolean> {
   try {
     const url = await plugin.window.getURL();
-    if (typeof url === 'string' && url.includes('/flashcards')) return true;
+    if (typeof url === 'string') return url.includes('/flashcards');
   } catch {
     /* fall through */
   }
@@ -399,10 +403,15 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
   const report: PrdDocReport | undefined = scan.docs[0];
   const drained = { reviewed: 0, cooling: 0, ancestor: 0, missing: 0, kept: 0 };
   const forceAncestors: ForcedAncestor[] = [];
+  // Multi-line cards drained because an answer line is due: the lines take their place.
+  const forceAnswerLinesOf: RemId[] = [];
   if (report && mode !== 'refill') {
     for (const e of report.removableEntries) {
-      if (e.status === 'cooling') drained.cooling++;
-      else if (e.status === 'ancestor-due') {
+      if (e.status === 'cooling') {
+        drained.cooling++;
+        const verdict = e.targetRemId ? scanner.verdicts.get(e.targetRemId) : undefined;
+        if (verdict && dueAnswerLineIds(verdict).length) forceAnswerLinesOf.push(e.targetRemId as RemId);
+      } else if (e.status === 'ancestor-due') {
         drained.ancestor++;
         const held = e.targetRemId ? heldByAncestor.get(e.targetRemId) : undefined;
         if (held) forceAncestors.push(held);
@@ -463,6 +472,7 @@ export async function refreshPriorityQueue(plugin: RNPlugin, options: RefreshOpt
     cardSource,
     // Drain only removes; the ancestors wait for the next refresh or refill.
     forceAncestors: mode === 'drain' ? [] : forceAncestors,
+    forceAnswerLinesOf: mode === 'drain' ? [] : forceAnswerLinesOf,
   });
   await scanner.publish();
 

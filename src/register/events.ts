@@ -471,6 +471,12 @@ export function registerURLChangeListener(plugin: ReactRNPlugin) {
     if (!url.includes('/flashcards')) {
       clearQueueUI(plugin);
       await setCurrentIncrementalRem(plugin, undefined);
+      // Leaving the queue by navigation (Review in Editor, a link, a tab switch)
+      // fires no QueueExit, and the queue widget's unmount cleanup is lost with
+      // its iframe — so an IncRem turn would otherwise leave this flag true for
+      // the rest of the session, and every "is a queue open?" check believes it.
+      await plugin.storage.setSession(incrementalQueueActiveKey, false);
+      await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
     }
 
     // Trigger inc rem counter widget reactivity by updating current document ID

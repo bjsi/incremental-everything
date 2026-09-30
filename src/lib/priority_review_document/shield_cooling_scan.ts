@@ -5,10 +5,15 @@ import { CoolingScanner } from './cooling_gather';
 import { findHeldByCoolingAncestor } from './shield_eligibility';
 import { HeldByCoolingAncestor, readCoolingCache } from './cooling_store';
 import { isCardCacheUsable } from './card_source';
+import { startOfLocalDay } from './cooling';
 
 /**
  * The shield's cooling scan: which of the top overdue Rems may not set the
  * Priority Shield because they are cooling, or held back by a cooling ancestor.
+ *
+ * Judged over the whole local day, not the instant: a Rem cooling at any
+ * moment since midnight is excluded, like the shield's own "overdue at the
+ * start of the day" rule.
  *
  * The result lives in SESSION storage (cooling_store), so a RemNote restart
  * empties it. The live shield in the queue reads it; before this ran at startup,
@@ -58,6 +63,11 @@ export async function runShieldCoolingScan(
   const scanner = new CoolingScanner(plugin, {
     scopeRemId: opts.scopeRemId ?? null,
     priorityByRemId: new Map(overdueByPriority.map((info) => [info.remId, info.priority])),
+    // The shield's day starts at local midnight: it counts only cards already
+    // overdue then, so it also leaves out every Rem that was cooling then — or
+    // at any moment since. A new card whose day of cooling ends at 20:55 must
+    // not drop the shield at 20:55; it counts from tomorrow.
+    since: startOfLocalDay(),
   });
   const toCheck = [...new Set([...headIds, ...scopeHeadIds])];
   await scanner.scan(toCheck);

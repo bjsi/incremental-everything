@@ -164,7 +164,7 @@ When launching a review from the list, the plugin saves your current filter/sort
 |--------|----------------------|-------------------------------|
 | **When repetition is recorded** | Immediately (before opening editor) | On timer end (after review) |
 | **Rescheduling** | Done immediately when clicking the button (timer only adds review time) | Deferred to timer end — the scheduler's interval is pre-computed and the timer records the full repetition on "End Review" |
-| **Return destination** | Back to queue document | Back to IncRem List (with same filters) |
+| **Return destination** | Back into the queue | Back to IncRem List (with same filters) |
 | **End button text** | "End Review and Back to Queue" | "End Review and Back to IncRem List" |
 
 ### When to Use It

@@ -439,10 +439,14 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Study Dashboard popup. The height follows the screen rather than sitting at
+  // the 950 it used to, which ran off a laptop display; the body scrolls, so a
+  // shorter frame only means less of it at once. Keep in sync with the
+  // container height in widgets/study_dashboard.tsx.
   plugin.app.registerWidget('study_dashboard', WidgetLocation.Popup, {
     dimensions: {
       width: '900px',
-      height: 950,
+      height: screenFittedHeight(600),
     },
   });
 

@@ -127,6 +127,10 @@ The **Debug: Clear Flashcard History** command clears the list for the knowledge
 
 **Forgetting Curve:** Below the live session card, the [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) charts the card you are looking at — where its retrievability has been, and where each of the four answer buttons would send it. Set **Forgetting Curve** to *Hidden* in the settings below to remove it.
 
+The **Current** / **Previous** switch in its header shows the card you just answered instead — the same previous card the session card reports on, with that answer already in its curve. It goes back to **Current** on its own as soon as the queue moves to the next card.
+
+![The Queue Dashboard during a session, with numbered notes: (1) the Prev. Card column of the session card; (2) the Current / Previous switch in the forgetting curve's header; (3) the History / Forecast presets, with the History tooltip "Short forecast (Good at about 96%) — more room for the repetitions so far"; (4) Reset zoom](assets/forgetting-curve-queue-dashboard-previous.png){ width="500" }
+
 ![The Queue Dashboard sidebar: the live Active Session card for "Endurance limit" above a CURRENT CARD — FORGETTING CURVE section on the Log axis, its history line green above the 90% target, four dashed forecast branches past "now", and the stability staircase below labelled ×1.44, ×1.39, ×1.54, ×3.04 and ×1.04](assets/forgetting-curve-queue-dashboard.png){ width="500" }
 
 ### Metrics Collected
@@ -211,7 +215,7 @@ This is intentionally a passive readout — it doesn't gate or sort the queue. I
 
 **Why use it:** Gain insights into your study habits, track your velocity, and monitor your usage of incremental reading tools alongside standard flashcards.
 
-**Interaction:** Clicking on a session opens the **queue** on that document straight away — the same route as its Practice button — so you can pick up where that session left off. Ad-hoc sessions, which have no document, are not clickable.
+**Interaction:** Clicking on a session opens the **queue** on that document straight away — the same route as its Practice button — so you can pick up where that session left off. Sessions with no document behind them are not clickable: **editor reviews** (IncRems reviewed in the editor with no queue open) and **ad-hoc sessions** (the Global Queue, embedded queues). Both take the name of the first Incremental Rem they touch, so they can look like a queue — hover one and the tooltip says there is no queue to reopen.
 
 **Export & Import:** Back up your practice session history across all Knowledge Bases to a local JSON file, and import it back at any time (duplicate sessions are automatically skipped).
 

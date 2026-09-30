@@ -13,6 +13,9 @@ import {
   pickConceptAncestor,
   isRecentlyCreatedUnseen,
   COOLING_RELATION_LABELS,
+  coolingReasonText,
+  dueAnswerLineIds,
+  startOfLocalDay,
   coolingWindowDays,
   DAY_MS,
   DEFAULT_COOLING_PARAMS,
@@ -20,11 +23,13 @@ import {
   evaluateCooling,
   excludeCooling,
   isCardDue,
+  isImageOcclusionText,
   pruneCoolingOverrides,
   CoolingCandidate,
   SpoilerSeenEvent,
   RATED_CARD_MIN_GAP_MS,
   withSessionRatings,
+  withoutOwnSightings,
 } from './cooling';
 
 const NOW = Date.UTC(2026, 8, 11, 12, 0, 0);
@@ -395,5 +400,173 @@ describe('withSessionRatings', () => {
       NOW
     );
     assert.ok(v);
+  });
+});
+
+describe('withoutOwnSightings', () => {
+  // The Sep 2026 case: a one-card Rem whose card the queue left behind unrated. Cache facts
+  // carry positional ids, so the session sighting lands beside the card's own due fact.
+  const cacheFact = { _id: 'r#0', nextRepetitionTime: daysAgo(10), lastRepetitionTime: daysAgo(28) };
+  const facts = withSessionRatings([cacheFact], new Map([['realA', NOW - 120_000]]));
+  const candidate = (cards: typeof facts): CoolingCandidate => ({
+    remId: 'r',
+    dueCards: cards.filter((c) => isCardDue(c, NOW)).map((c) => ({ cardId: c._id, intervalDays: cardIntervalDays(c) })),
+    seen: cards
+      .filter((c) => !isCardDue(c, NOW) && cardLastSeenAt(c) !== null)
+      .map((c) => ({ relation: 'same-rem' as const, sourceRemId: 'r', cardId: c._id, seenAt: cardLastSeenAt(c)!, stillDue: false })),
+  });
+
+  it('the Rem-wide verdict names the card itself as "another card"', () => {
+    const v = evaluateCooling(candidate(facts), NOW);
+    assert.ok(v);
+    assert.equal(v!.reasons[0].cardId, 'realA');
+  });
+  it('the card itself is not held by its own sighting', () => {
+    assert.equal(evaluateCooling(withoutOwnSightings(candidate(facts), 'realA'), NOW), null);
+  });
+  it('a sibling seen in the session still holds it', () => {
+    const both = withSessionRatings([cacheFact], new Map([['realA', NOW - 120_000], ['realB', NOW - 60_000]]));
+    const v = evaluateCooling(withoutOwnSightings(candidate(both), 'realA'), NOW);
+    assert.ok(v);
+    assert.deepEqual(v!.reasons.map((r) => r.cardId), ['realB']);
+  });
+  it('keeps a user extension', () => {
+    const overrides = { ...EMPTY_COOLING_OVERRIDES, extended: { r: NOW + DAY_MS } };
+    const v = evaluateCooling(withoutOwnSightings(candidate(facts), 'realA'), NOW, DEFAULT_COOLING_PARAMS, overrides);
+    assert.equal(v?.until, NOW + DAY_MS);
+  });
+  it('leaves other relations naming the card alone, and returns the same object when nothing drops', () => {
+    const c: CoolingCandidate = {
+      remId: 'r',
+      dueCards: [{ cardId: 'a', intervalDays: 0 }],
+      seen: [{ relation: 'just-created', sourceRemId: 'r', cardId: 'a', seenAt: NOW - 1000, stillDue: false, windowDays: 1 }],
+    };
+    assert.equal(withoutOwnSightings(c, 'a'), c);
+  });
+});
+
+describe('multi-line cards: answer lines first', () => {
+  // "which short lines?" (interval 38 d → 2-day window) with two answer lines, "forward" and "aft".
+  const hold = (over: Partial<SpoilerSeenEvent> = {}): SpoilerSeenEvent => ({
+    relation: 'answer-line-due',
+    sourceRemId: 'forward',
+    cardId: 'forward-card',
+    seenAt: daysAgo(30), // came due a month ago
+    stillDue: true,
+    whileDue: true,
+    ...over,
+  });
+  const multiLine = (seen: SpoilerSeenEvent[]): CoolingCandidate => ({
+    remId: 'which',
+    dueCards: [{ cardId: 'which-card', intervalDays: 38 }],
+    seen,
+  });
+
+  it('holds the multi-line card while an answer line is due, a full window from now', () => {
+    const v = evaluateCooling(multiLine([hold()]), NOW);
+    assert.ok(v);
+    assert.equal(v!.reasons[0].relation, 'answer-line-due');
+    assert.equal(v!.until, NOW + coolingWindowDays(38) * DAY_MS);
+  });
+  it('lets the hold go once the answer line is no longer due, and cools from its review instead', () => {
+    const reviewed = hold({ stillDue: false });
+    assert.equal(evaluateCooling(multiLine([reviewed]), NOW), null);
+    const v = evaluateCooling(
+      multiLine([reviewed, seen({ relation: 'answer-line', sourceRemId: 'forward', seenAt: NOW - 3_600_000 })]),
+      NOW
+    );
+    assert.ok(v);
+    assert.equal(v!.reasons[0].relation, 'answer-line');
+    assert.equal(v!.until, NOW - 3_600_000 + coolingWindowDays(38) * DAY_MS);
+  });
+  it('an answer line still due is no sighting: its own review, not its due card, cools the parent', () => {
+    const dueLine = seen({ relation: 'answer-line', sourceRemId: 'forward', seenAt: daysAgo(1), stillDue: true });
+    assert.equal(evaluateCooling(multiLine([dueLine]), NOW), null);
+  });
+  it('a release lets the hold go until the answer line comes due again', () => {
+    const released = { ...EMPTY_COOLING_OVERRIDES, released: { which: daysAgo(1) } };
+    assert.equal(evaluateCooling(multiLine([hold()]), NOW, DEFAULT_COOLING_PARAMS, released), null);
+    const dueAgain = hold({ seenAt: NOW - 60_000 });
+    assert.ok(evaluateCooling(multiLine([dueAgain]), NOW, DEFAULT_COOLING_PARAMS, released));
+  });
+  it('"never cool" covers the hold too', () => {
+    const never = { ...EMPTY_COOLING_OVERRIDES, never: ['which'] };
+    assert.equal(evaluateCooling(multiLine([hold()]), NOW, DEFAULT_COOLING_PARAMS, never), null);
+  });
+  it('lists the answer lines it waits for, once each', () => {
+    const v = evaluateCooling(
+      multiLine([hold(), hold({ cardId: 'forward-card-2' }), hold({ sourceRemId: 'aft', cardId: 'aft-card' })]),
+      NOW
+    );
+    assert.deepEqual(dueAnswerLineIds(v!).sort(), ['aft', 'forward']);
+  });
+  it('describes the hold without an "ago"', () => {
+    assert.equal(coolingReasonText('answer-line-due', '3 days ago'), COOLING_RELATION_LABELS['answer-line-due']);
+    assert.equal(coolingReasonText('answer-line', '3 days ago'), `${COOLING_RELATION_LABELS['answer-line']} 3 days ago`);
+  });
+});
+
+describe('the shield judges cooling over the whole local day', () => {
+  // The Sep 29 case: a card created at 20:55 the day before, never shown, cools for one day.
+  const created = startOfLocalDay(NOW) - 3 * 3_600_000 - 5 * 60_000; // 20:55 yesterday
+  const newCard: CoolingCandidate = {
+    remId: 'new',
+    dueCards: [{ cardId: 'n', intervalDays: 0 }],
+    seen: [{ relation: 'just-created', sourceRemId: 'new', cardId: 'n', seenAt: created, stillDue: false, windowDays: 1 }],
+  };
+  const afterWindow = created + DAY_MS + 60 * 60_000; // 21:55 today
+
+  it('the queue lets the card go once its window has closed', () => {
+    assert.equal(evaluateCooling(newCard, afterWindow), null);
+  });
+  it('the shield keeps it out for the rest of the day', () => {
+    const v = evaluateCooling(newCard, afterWindow, DEFAULT_COOLING_PARAMS, EMPTY_COOLING_OVERRIDES, startOfLocalDay(afterWindow));
+    assert.ok(v);
+    assert.equal(v!.until, created + DAY_MS);
+  });
+  it('and counts it again from the next day', () => {
+    const tomorrow = startOfLocalDay(afterWindow) + DAY_MS + 3_600_000;
+    assert.equal(evaluateCooling(newCard, tomorrow, DEFAULT_COOLING_PARAMS, EMPTY_COOLING_OVERRIDES, startOfLocalDay(tomorrow)), null);
+  });
+  it('a window that closed before the day began does not count', () => {
+    const old: CoolingCandidate = { ...newCard, seen: [{ ...newCard.seen[0], seenAt: created - 2 * DAY_MS }] };
+    assert.equal(evaluateCooling(old, afterWindow, DEFAULT_COOLING_PARAMS, EMPTY_COOLING_OVERRIDES, startOfLocalDay(afterWindow)), null);
+  });
+  it('a horizon in the future is clamped to now', () => {
+    assert.equal(evaluateCooling(newCard, afterWindow, DEFAULT_COOLING_PARAMS, EMPTY_COOLING_OVERRIDES, afterWindow + DAY_MS), null);
+  });
+});
+
+describe('multi-line cards: the other way round', () => {
+  it('an answer line cools after its multi-line card was reviewed', () => {
+    const line: CoolingCandidate = {
+      remId: 'forward',
+      dueCards: [{ cardId: 'f', intervalDays: 60 }],
+      seen: [seen({ relation: 'multi-line-card', sourceRemId: 'which', cardId: 'which-card', seenAt: NOW - 3_600_000 })],
+    };
+    const v = evaluateCooling(line, NOW);
+    assert.ok(v);
+    assert.equal(v!.reasons[0].relation, 'multi-line-card');
+    assert.equal(coolingReasonText('multi-line-card', '1 h ago'), 'its multi-line card was reviewed 1 h ago');
+  });
+});
+
+describe('image occlusion Rems are exempt', () => {
+  const occlusion = {
+    i: 'i',
+    url: '%LOCAL_FILE%x.png',
+    blocks: [{ x: 0.1, y: 0.1, width: 0.2, height: 0.1, rotation: 0, cId: '1', label: [], frontLabel: [] }],
+    practiceInOrder: false,
+  };
+
+  it('detects an image with occlusion boxes, in the front or the back', () => {
+    assert.equal(isImageOcclusionText(['Planos do Casco\n\n', occlusion]), true);
+    assert.equal(isImageOcclusionText(['front'], [occlusion]), true);
+  });
+
+  it('ignores plain images, empty box lists and text', () => {
+    assert.equal(isImageOcclusionText(['caption', { i: 'i', url: 'x.png' }]), false);
+    assert.equal(isImageOcclusionText([{ ...occlusion, blocks: [] }]), false);
+    assert.equal(isImageOcclusionText(['text', { i: 'q', _id: 'x' }], undefined), false);
   });
 });

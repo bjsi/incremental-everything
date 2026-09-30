@@ -183,7 +183,9 @@ The properties are gone from the question stage…
 
 ## Beautiful Queue { #beautiful-queue }
 
-Hide Parent, Hide Grandparent, Remove Parent and Remove Grandparent work in both queue variants, Compact and Beautiful. In Beautiful, a descriptor card (the "↔ Recall the description" cards of a concept) is drawn beside its concept rather than under it; the powerups still hide the right ancestor there — the concept as the parent, the Rem above it as the grandparent.
+Hide Parent, Hide Grandparent, Remove Parent and Remove Grandparent work in both queue variants, Compact and Beautiful. In Beautiful, some cards — descriptor cards ("↔ Recall the description") and concept cards among them — are drawn beside their parent rather than under it; the powerups still hide the right ancestor there — the Rem the card sits beside as the parent, the Rem above that as the grandparent.
+
+Beautiful draws no bullet on the top row of the hierarchy, just under the breadcrumbs. When Hide in Queue, Hide Parent or Hide Grandparent hides that row, the "Hidden in queue" label takes the row's place instead of sitting beside a bullet.
 
 ---
 

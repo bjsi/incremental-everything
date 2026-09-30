@@ -10,7 +10,8 @@ import { safeRemTextToString } from '../pdfUtils';
 import { hasCardClusterPowerup } from './cluster';
 import { CoolingScanner } from './cooling_gather';
 import { CardSource } from './card_source';
-import { COOLING_RELATION_LABELS, CoolingVerdict } from './cooling';
+import { coolingReasonText, CoolingVerdict, dueAnswerLineIds } from './cooling';
+import { isAnswerLine } from './multiline';
 
 /**
  * Item selection for review documents — the one ranking both the snapshot
@@ -76,8 +77,8 @@ export interface SelectionOptions {
   /** IncRems to select. 0 is allowed: the universe is still computed. */
   incRemCount: number;
   /**
-   * Flashcard Rems to select. Forced ancestors and Card Cluster siblings count
-   * toward it. The split between the two counts is the caller's (fill_split.ts).
+   * Flashcard Rems to select. Forced ancestors, answer lines pulled in for a
+   * multi-line card, and Card Cluster siblings count toward it. The split between the two counts is the caller's (fill_split.ts).
    */
   cardCount: number;
   /** Paces the interleave only: one IncRem, then up to this many cards. */
@@ -100,6 +101,13 @@ export interface SelectionOptions {
    * as held back. Added even past `cardCount`, like a cluster: protection first.
    */
   forceAncestors?: ForcedAncestor[];
+  /**
+   * Multi-line cards already in the document that were drained because one of
+   * their answer lines is due (cooling.ts, `answer-line-due`). Their due answer
+   * lines are pulled in before the normal draw — the swap in reverse. Added even
+   * past `cardCount`, like a forced ancestor.
+   */
+  forceAnswerLinesOf?: RemId[];
   /**
    * Card facts the caller already loaded. When they came from card.getAll()
    * (no card cache), the due-cards gatherer reuses them instead of loading every
@@ -205,6 +213,10 @@ async function readAncestorInfo(
  * Finds the ancestor whose answer this card would give away: parent and
  * grandparent only, HIGHEST due ancestor first so the tree unblocks top-down.
  * See the Ancestor Spoiler Protection section of the docs.
+ *
+ * One exception: an ANSWER LINE of a multi-line card (multiline.ts) goes before
+ * its parent, not after it — the parent waits for it through cooling
+ * (`answer-line-due`) — so its parent never blocks it. Its grandparent still does.
  */
 export async function findDueAncestorSpoiler(
   plugin: RNPlugin,
@@ -224,7 +236,7 @@ export async function findDueAncestorSpoiler(
     }
   }
 
-  if (parent.hasDueCard) {
+  if (parent.hasDueCard && !(await isAnswerLine(rem))) {
     return { remId: parentId, level: 1, text: parent.text };
   }
 
@@ -238,7 +250,7 @@ export function describeCoolingVerdict(v: CoolingVerdict, now: number): string {
   if (!first) return v.extendedUntil ? 'extended by you' : 'cooling';
   const ago = daysAgo(first.seenAt, now);
   const when = ago < 1 ? 'today' : ago < 2 ? 'yesterday' : `${Math.round(ago)} days ago`;
-  return `${COOLING_RELATION_LABELS[first.relation]} ${when}`;
+  return coolingReasonText(first.relation, when);
 }
 
 /**
@@ -345,6 +357,8 @@ export async function selectPriorityItems(
   let shieldSliceCount = 0;
 
   const isBlocked = (remId: RemId) => excludeRemIds.has(remId) || addedRemIds.has(remId);
+  /** Card Rems that have been through the gates in this fill (see drawCard). */
+  const drawn = new Set<RemId>();
 
   const coolingVerdict = async (remId: RemId): Promise<CoolingVerdict | null> =>
     scanner ? scanner.verdictFor(remId) : null;
@@ -379,8 +393,31 @@ export async function selectPriorityItems(
 
   const addCard = async (idx: number): Promise<boolean> => {
     if (idx >= sortedCards.length) return false;
-    const item = sortedCards[idx];
-    if (isBlocked(item.rem._id)) return true;
+    await drawCard(sortedCards[idx], idx);
+    return true;
+  };
+
+  // The swap in reverse, for a multi-line card held by its due answer lines
+  // (cooling.ts, `answer-line-due`): the answer lines are drawn in its place,
+  // through every gate, so the card they hold back can follow them. Added even
+  // past `cardCount`, like a forced ancestor.
+  const pullAnswerLines = async (verdict: CoolingVerdict, fallbackPriority: number): Promise<void> => {
+    for (const lineId of dueAnswerLineIds(verdict)) {
+      if (isBlocked(lineId)) continue;
+      const entry = dueCardByRemId.get(lineId);
+      const rem = entry?.rem ?? (await plugin.rem.findOne(lineId));
+      if (!rem) continue;
+      await drawCard({ rem, priority: entry?.priority ?? priorityByRemId.get(lineId) ?? fallbackPriority }, null);
+    }
+  };
+
+  /** `idx` is the card's place in the ranking; null for one pulled in by another. */
+  const drawCard = async (item: { rem: PluginRem; priority: number }, idx: number | null): Promise<void> => {
+    // Each Rem goes through the gates once per fill: a pull can lead back to a
+    // Rem already being judged (nested multi-line cards), and its verdict would
+    // not change.
+    if (isBlocked(item.rem._id) || drawn.has(item.rem._id)) return;
+    drawn.add(item.rem._id);
 
     if (filterPaused && item.priority > pausedPriorityThreshold && (await isInPausedDocument(item.rem))) {
       skippedPausedItems.push({
@@ -388,12 +425,13 @@ export async function selectPriorityItems(
         name: await safeRemTextToString(plugin, item.rem.text),
         priority: item.priority,
       });
-      return true;
+      return;
     }
 
     // Ancestor spoiler: hold the descendant, swap the blocking ancestor in —
     // unless the ancestor is itself cooling, in which case nothing is added
-    // and both wait.
+    // and both wait. (A multi-line ancestor held by its answer lines is
+    // "cooling" too; its answer lines are pulled in, as when it is drawn.)
     const spoiler = await findDueAncestorSpoiler(plugin, item.rem, now, ancestorInfoCache);
     if (spoiler) {
       let ancestorAction: SkippedAncestorItem['ancestorAction'] = 'already-included';
@@ -401,6 +439,7 @@ export async function selectPriorityItems(
         const ancestorCooling = await coolingVerdict(spoiler.remId);
         if (ancestorCooling) {
           ancestorAction = 'cooling';
+          await pullAnswerLines(ancestorCooling, item.priority);
         } else {
           const ancestorRem = await plugin.rem.findOne(spoiler.remId);
           if (ancestorRem) {
@@ -429,13 +468,14 @@ export async function selectPriorityItems(
         level: spoiler.level,
         ancestorAction,
       });
-      return true;
+      return;
     }
 
     const cooling = await coolingVerdict(item.rem._id);
     if (cooling) {
       await noteCooling(item.rem, item.priority, cooling);
-      return true;
+      await pullAnswerLines(cooling, item.priority);
+      return;
     }
 
     items.push({
@@ -445,7 +485,7 @@ export async function selectPriorityItems(
       percentile: cardPercentiles[item.rem._id] ?? 100,
     });
     addedRemIds.add(item.rem._id);
-    if (idx < cardRanked.head) shieldSliceCount++;
+    if (idx !== null && idx < cardRanked.head) shieldSliceCount++;
 
     // Card Cluster expansion: bring every due sibling along, cooling or not —
     // a partial cluster breaks the queue experience, and cluster members are
@@ -473,8 +513,6 @@ export async function selectPriorityItems(
     } catch (clusterErr) {
       console.warn('[CardCluster] Error during cluster expansion:', clusterErr);
     }
-
-    return true;
   };
 
   // Ancestors of children drained from the document (see forceAncestors): the
@@ -482,8 +520,11 @@ export async function selectPriorityItems(
   for (const forced of options.forceAncestors ?? []) {
     let ancestorAction: SkippedAncestorItem['ancestorAction'] = 'already-included';
     if (!isBlocked(forced.ancestorRemId)) {
-      if (await coolingVerdict(forced.ancestorRemId)) {
+      const ancestorCooling = await coolingVerdict(forced.ancestorRemId);
+      if (ancestorCooling) {
         ancestorAction = 'cooling';
+        addedRemIds.add(forced.childRemId);
+        await pullAnswerLines(ancestorCooling, priorityByRemId.get(forced.childRemId) ?? 100);
       } else {
         const ancestorRem = await plugin.rem.findOne(forced.ancestorRemId);
         if (ancestorRem) {
@@ -515,6 +556,14 @@ export async function selectPriorityItems(
       level: forced.level,
       ancestorAction,
     });
+  }
+
+  // Multi-line cards drained from the document because an answer line came due
+  // (see forceAnswerLinesOf): the reverse swap, for entries already there.
+  for (const parentId of options.forceAnswerLinesOf ?? []) {
+    addedRemIds.add(parentId); // drained: keep it out of this fill too
+    const verdict = await coolingVerdict(parentId);
+    if (verdict) await pullAnswerLines(verdict, priorityByRemId.get(parentId) ?? 100);
   }
 
   // Each list fills to its own count; the ratio only interleaves them. A list

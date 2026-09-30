@@ -364,9 +364,11 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
     }
   })();
 
-  // Heartbeat monitor: auto-save Mastery Drill session if the popup is closed without QueueExit
+  // Heartbeat monitor: auto-save Mastery Drill session if the popup is closed without QueueExit.
+  // Popup drill only: the regular-queue drill writes no heartbeat, so a timestamp left behind
+  // by an earlier popup would end each of its sessions 5 s after it starts.
   setInterval(async () => {
-    if (currentSession && currentSession.scopeName === 'Mastery Drill') {
+    if (currentSession && currentSession.scopeName === 'Mastery Drill' && !isNativeDrillActive()) {
       if (Date.now() - currentSession.startTime < 5000) return; // grace period
       const lastHeartbeat = await plugin.storage.getSession<number>('finalDrillHeartbeat');
       if (lastHeartbeat) {

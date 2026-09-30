@@ -21,7 +21,7 @@ import {
 } from '../lib/consts';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
-import { formatDuration, tryParseJson } from '../lib/utils';
+import { formatDuration, screenFittedHeight, tryParseJson } from '../lib/utils';
 import { Period, resolvePeriod, parseDateInput, formatDateForDisplay } from '../lib/period';
 import { resolveRemTextSegments } from '../lib/richTextRemRefs';
 import { retentionColorHex, retentionPercent } from '../lib/retention';
@@ -2283,8 +2283,9 @@ function StudyDashboardPopup() {
 
     const containerStyle: React.CSSProperties = {
         width: '900px',
-        // Keep in sync with the popup dimensions in register/widgets.ts.
-        height: '950px',
+        // Same formula as the popup's registered height in register/widgets.ts,
+        // so the container fills the frame on whatever display it opens on.
+        height: `${screenFittedHeight(600)}px`,
         backgroundColor: 'var(--rn-clr-background-primary)',
         borderRadius: 12,
         overflow: 'hidden',

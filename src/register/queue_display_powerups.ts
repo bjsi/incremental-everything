@@ -119,9 +119,10 @@ const CORE_CSS = `
   margin-left: 0px !important;
 }
 
-/* ===== Remove Parent / Remove Grandparent — Beautiful descriptor cards =====
-   Beautiful lifts a descriptor question OUT of its concept parent: the question
-   sits in a wrapper div that follows the parent, inside the grandparent:
+/* ===== Remove Parent / Remove Grandparent — Beautiful hoisted cards =====
+   Beautiful lifts some questions OUT of their parent — descriptor cards
+   (2026-09-28) and concept cards (2026-09-30) at least: the question sits in a
+   wrapper div that follows the parent, inside the grandparent:
      .indented-rem                      ← grandparent
        .indented-rem                    ← parent (concept), no question inside
        div.mt-3
@@ -300,7 +301,7 @@ const LEGACY_CSS = `
   top: 0;
 }
 
-/* ===== Hide Parent / Hide Grandparent — Beautiful descriptor cards =====
+/* ===== Hide Parent / Hide Grandparent — Beautiful hoisted cards =====
    Same hoisted layout as Remove Parent / Remove Grandparent in CORE_CSS: the
    question is the parent's next sibling ("+ div > …") and a grandchild-by-wrapper
    of the grandparent ("> div > …"). A concept ancestor puts its text in
@@ -330,6 +331,27 @@ const LEGACY_CSS = `
   position: absolute;
   left: 25px;
   top: 0;
+}
+
+/* ===== "Hidden in queue" on a bullet-less row — Beautiful =====
+   Beautiful draws no bullet on the top row of the hierarchy (the first Rem under
+   the breadcrumbs), and every placeholder above hangs off the bullet — so a
+   hidden top row vanished with no label. Such a row carries the label itself, in
+   flow. Confirmed 2026-09-30 against live DOM (a concept card whose Hide Parent
+   parent was the top row). */
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hideinqueue"]:not(.rn-question-rem)${NOT_DESCRIPTOR_CONCEPT} > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hideparent"]) > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden .indented-rem:has(+ div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hideparent"]) > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden .indented-rem:has(> .indented-rem > .rn-question-rem[data-queue-rem-container-tags~="hide-grandparent"]) > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden .indented-rem:has(> .indented-rem > .rn-question-rem[data-queue-rem-container-tags~="hidegrandparent"]) > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hide-grandparent"]) > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after,
+.rn-queue__content--answer-hidden .indented-rem:has(> div:not(.indented-rem) > .rn-question-rem[data-queue-rem-container-tags~="hidegrandparent"]) > .queue-beautiful-hierarchy-rem:not(:has(> .rn-bullet-container))::after {
+  content: "Hidden in queue";
+  opacity: .3;
+  white-space: nowrap;
 }
 `;
 

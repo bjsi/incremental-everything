@@ -43,11 +43,33 @@ export type CoolingRelation =
   /** A child or grandchild card was graded, and its context line displayed this Rem's answer. */
   | 'descendant'
   /**
+   * This Rem is an answer line of a multi-line card, and that card was graded:
+   * its back showed this line in full. Answer lines normally go first (see
+   * `answer-line-due`), so this covers the multi-line card reviewed before them —
+   * RemNote's queue order is random.
+   */
+  | 'multi-line-card'
+  /**
    * This Rem is a descriptor with a due BACKWARD card, which answers with its
    * concept — and a card of that concept (forward, backward or a cloze in it)
    * was shown. RemNote buries the same pairing for an hour; this extends it.
    */
   | 'concept-reviewed'
+  /**
+   * This Rem is a multi-line card and one of its answer lines — a child marked
+   * as a card item, with a card of its own — was graded. That review put part
+   * of this Rem's answer on screen. Only answer lines count: other children of
+   * a multi-line card show just its question as context.
+   */
+  | 'answer-line'
+  /**
+   * This Rem is a multi-line card and one of its answer lines still has a due
+   * card. The order is inverted for multi-line cards: the answer lines go first
+   * (each is a smaller question inside the big one), and the multi-line card
+   * waits for them, then cools from their review. Not a window: it holds while
+   * the answer line is due (see `whileDue`).
+   */
+  | 'answer-line-due'
   /**
    * The card itself was created recently and has never been shown. SuperMemo
    * counts creating an item as its first repetition; this keeps a card you just
@@ -63,8 +85,21 @@ export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'own-cloze-child': 'one of its Alt+Z clozes was reviewed',
   descendant: 'a descendant card showed its answer as context',
   'concept-reviewed': 'its concept was reviewed',
+  'answer-line': 'one of its answer lines was reviewed',
+  'answer-line-due': 'one of its answer lines is due and goes first',
+  'multi-line-card': 'its multi-line card was reviewed',
   'just-created': 'a card of it was created',
 };
+
+/**
+ * One reason in words: the relation's label and how long ago its card was seen.
+ * A hold has no "ago" — it lasts while the answer line is due, not from a
+ * viewing.
+ */
+export function coolingReasonText(relation: CoolingRelation, ago: string): string {
+  if (relation === 'answer-line-due') return COOLING_RELATION_LABELS[relation];
+  return `${COOLING_RELATION_LABELS[relation]} ${ago}`;
+}
 
 export interface CoolingParams {
   /** Fraction of the cooled card's interval that becomes cooling time. */
@@ -112,6 +147,14 @@ export interface SpoilerSeenEvent {
    * one — used by `just-created`, whose length is its own setting.
    */
   windowDays?: number;
+  /**
+   * A hold rather than a sighting (`answer-line-due`): the event counts only
+   * WHILE the source is still due, and `seenAt` is when it came due (so a
+   * "release now" lets it go until the source comes due again). It holds the
+   * candidate for one full window from now: the review that ends it starts
+   * that window, and it has not happened yet.
+   */
+  whileDue?: boolean;
 }
 
 export interface CoolingCandidate {
@@ -214,6 +257,29 @@ export function isRecentlyCreatedUnseen(card: CardLike, now: number, days: numbe
   if (typeof card.createdAt !== 'number' || card.createdAt <= 0) return false;
   if (cardLastSeenAt(card) !== null) return false;
   return now - card.createdAt < days * DAY_MS;
+}
+
+/**
+ * True when the Rem's text holds an image with occlusion boxes — an Image
+ * Occlusion Rem, one card per box. Such Rems never cool: with "Hide All, Test
+ * One" on, every other box stays covered, so a sibling box's review spoils
+ * nothing (RemNote's own bury skips those siblings too). That setting is the
+ * Rem field `hato`, which the plugin API does not expose, so the Rem is
+ * exempted whichever way it is set.
+ */
+export function isImageOcclusionText(...texts: unknown[]): boolean {
+  return texts.some(
+    (text) =>
+      Array.isArray(text) &&
+      text.some(
+        (el) =>
+          !!el &&
+          typeof el === 'object' &&
+          (el as { i?: unknown }).i === 'i' &&
+          Array.isArray((el as { blocks?: unknown }).blocks) &&
+          (el as { blocks: unknown[] }).blocks.length > 0
+      )
+  );
 }
 
 /** RemType.DESCRIPTOR in the SDK; kept as a literal so this module stays SDK-free. */
@@ -327,7 +393,10 @@ export const RATED_CARD_MIN_GAP_MS = 60 * 60_000;
  * when the session saw them rated. A fact already holding that rating is kept
  * as it is; a matching fact without it gains it; a rating with no matching fact
  * (cache facts) is added as a fact of its own, which is all cooling needs: a
- * card of the Rem seen at that moment and not due again for an hour.
+ * card of the Rem seen at that moment and not due again for an hour. That fact
+ * sits beside the card's own (still due) cache fact, so it reads as "another
+ * card of this Rem" even when the card itself comes back — the queue judges a
+ * loading card with {@link withoutOwnSightings} for that reason.
  */
 export function withSessionRatings(cards: CardLike[], ratedAt: ReadonlyMap<string, number>): CardLike[] {
   if (ratedAt.size === 0) return cards;
@@ -353,6 +422,19 @@ export function withSessionRatings(cards: CardLike[], ratedAt: ReadonlyMap<strin
 }
 
 /**
+ * The candidate as one of its own cards sees it: a card never spoils itself.
+ * `same-rem` sightings of that card are dropped. A Rem-wide verdict can name
+ * the very card that is loading — a session sighting laid over card-cache
+ * facts, which carry no real ids, becomes an extra "other" card; and with real
+ * ids, a card left behind or rated Forgot is a seen, not-due sibling of the
+ * Rem's other due cards when it comes back.
+ */
+export function withoutOwnSightings(candidate: CoolingCandidate, cardId: string): CoolingCandidate {
+  const seen = candidate.seen.filter((e) => !(e.relation === 'same-rem' && e.cardId === cardId));
+  return seen.length === candidate.seen.length ? candidate : { ...candidate, seen };
+}
+
+/**
  * The queue's due predicate: `?? Infinity` so a card with no schedule
  * (disabled, table row, markup removed) never reads as due.
  */
@@ -370,15 +452,24 @@ export function isCardDue(card: CardLike, now: number): boolean {
  * event that is not itself still due, that happened after any release, and
  * whose window has not yet run out, becomes a reason; the Rem cools until the
  * latest of them. A user extension can only lengthen that.
+ *
+ * `since` widens "right now" to "at any moment since": a reason whose window
+ * closed after `since` still counts, and the verdict's `until` may then lie in
+ * the past. The Priority Shield passes the start of the local day — its own
+ * rule counts only cards already overdue then, so a Rem that was cooling at the
+ * start of the day stays out of that day's shield instead of lowering it the
+ * minute its window closes. Everything else judges at `now` (the default).
  */
 export function evaluateCooling(
   candidate: CoolingCandidate,
   now: number,
   params: CoolingParams = DEFAULT_COOLING_PARAMS,
-  overrides: CoolingOverrides = EMPTY_COOLING_OVERRIDES
+  overrides: CoolingOverrides = EMPTY_COOLING_OVERRIDES,
+  since: number = now
 ): CoolingVerdict | null {
   if (candidate.dueCards.length === 0) return null;
   if (overrides.never.includes(candidate.remId)) return null;
+  since = Math.min(since, now);
 
   const intervalDays = Math.max(0, ...candidate.dueCards.map((c) => c.intervalDays));
   const windowDays = coolingWindowDays(intervalDays, params);
@@ -387,14 +478,15 @@ export function evaluateCooling(
 
   const reasons: CoolingReason[] = [];
   for (const event of candidate.seen) {
-    if (event.stillDue) continue;
+    // A sighting counts once its card has moved on; a hold, only while it has not.
+    if (event.whileDue ? !event.stillDue : event.stillDue) continue;
     // A timestamp from the future is a clock skew, not a review from tomorrow.
     const seenAt = Math.min(event.seenAt, now);
     if (seenAt <= releasedAt) continue;
     const eventWindowDays = typeof event.windowDays === 'number' ? Math.max(0, event.windowDays) : windowDays;
     if (eventWindowDays <= 0) continue;
-    const until = seenAt + eventWindowDays * DAY_MS;
-    if (until <= now) continue;
+    const until = (event.whileDue ? now : seenAt) + eventWindowDays * DAY_MS;
+    if (until <= since) continue;
     reasons.push({
       relation: event.relation,
       sourceRemId: event.sourceRemId,
@@ -408,7 +500,7 @@ export function evaluateCooling(
   reasons.sort((a, b) => b.until - a.until);
 
   const extendedUntil = overrides.extended[candidate.remId];
-  const extensionApplies = typeof extendedUntil === 'number' && extendedUntil > now;
+  const extensionApplies = typeof extendedUntil === 'number' && extendedUntil > since;
 
   if (reasons.length === 0 && !extensionApplies) return null;
 
@@ -451,6 +543,23 @@ export function pruneCoolingOverrides(
     if (typeof until === 'number' && until > now) extended[remId] = until;
   }
   return { released, extended, never: [...new Set(overrides.never ?? [])] };
+}
+
+/** The start of the local day containing `now` — the Priority Shield's horizon. */
+export function startOfLocalDay(now: number = Date.now()): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/**
+ * The answer lines a multi-line card is waiting for: the Rems behind its
+ * `answer-line-due` reasons, in the order the reasons list them.
+ */
+export function dueAnswerLineIds(verdict: CoolingVerdict): string[] {
+  return [
+    ...new Set(verdict.reasons.filter((r) => r.relation === 'answer-line-due').map((r) => r.sourceRemId)),
+  ];
 }
 
 /** Removes cooling Rems from any list keyed by remId — the shield's exclusion. */

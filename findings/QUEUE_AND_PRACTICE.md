@@ -24,6 +24,8 @@ Read from the 1.28.19 bundle and confirmed in a Learn New session, 2026-09-28. T
 
 Treat a card the queue has left behind as seen when the next card loads, not when its rating arrives. `src/lib/queue_cooling_skip.ts` does this (`noteSeen`).
 
+Going back with the left arrow reloads the previous card with an ordinary `QueueLoadCard`. The card you left gets no `QueueCompleteCard`, and it loads again when you move forward. Observed 2026-09-29: a card rated Again, the next card left unrated after 3.5 s, then both loaded again. So a card seen earlier in the session can come back. It must never cool itself: its own sighting is left out when it is judged (`verdictForCard`).
+
 ## A skip buries the card's siblings
 
 `removeCurrentCardFromQueue` runs every provider's "before pop" hook. The bury provider records the card in `UserDataStore.recentlySeenCardsTuples` (synced, entries last 60 minutes), exactly as if it had been answered.

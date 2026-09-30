@@ -106,14 +106,35 @@ const HORIZON_RETENTION = 0.5;
  * A linear axis has no such mercy. Every day added to the right steals width
  * from every day already drawn, so a horizon chosen for the far future flattens
  * the repetitions that have actually happened into the first few pixels — the
- * part being analysed. It therefore follows the representative branch (Good)
- * and stops while it is still well clear of the target, keeping the plot on the
- * current stability rather than on a future one.
+ * part being analysed. It therefore follows the representative branch (Good),
+ * between two stops: `far`, where Good reaches the target — the next interval
+ * in full, which is what shows how long the memory is meant to last — and
+ * `near`, a few points above it, which is the least forecast worth showing.
+ * It goes to `far` when the history can spare the width (see
+ * `HISTORY_SHARE_PER_REVIEW`) and falls back towards `near` when it cannot.
  */
-const INITIAL_VIEW: Record<CurveScale, { grade: CurveGrade; offsetFromTarget: number }> = {
-    log: { grade: 'easy', offsetFromTarget: 0 },
-    linear: { grade: 'good', offsetFromTarget: 0.06 },
-};
+const LOG_VIEW = { grade: 'easy' as CurveGrade, offsetFromTarget: 0 };
+const LINEAR_VIEW = { grade: 'good' as CurveGrade, farOffset: 0, nearOffset: 0.06 };
+
+/**
+ * How much of a linear axis the history is owed on opening, per review.
+ *
+ * What makes the past unreadable is not how long it is but how many decay arcs
+ * it has to fit: six reviews read fine in a third of the width, twenty-three do
+ * not. So the share grows with the review count, between a floor that leaves
+ * even a young card's forecast room to run to the target and a ceiling that
+ * still leaves a third of the width for the forecast. The forecast may then be
+ * at most `(1 − share) / share` times as long as the history.
+ */
+const HISTORY_SHARE_PER_REVIEW = 0.05;
+const MIN_HISTORY_SHARE = 0.25;
+const MAX_HISTORY_SHARE = 2 / 3;
+
+/** Longest forecast the opening linear view allows, as a multiple of the card's age. */
+export function maxForecastToHistoryRatio(reviewCount: number): number {
+    const share = Math.min(Math.max(reviewCount * HISTORY_SHARE_PER_REVIEW, MIN_HISTORY_SHARE), MAX_HISTORY_SHARE);
+    return (1 - share) / share;
+}
 
 /**
  * A floor on how far the opening view reaches past `now`, as a share of the
@@ -298,6 +319,12 @@ export interface ForgettingCurveSeries {
     ticks: CurveTick[];
     /** [min, max] the x axis opens on, in plotted units. */
     xDomain: [number, number];
+    /**
+     * The two linear views the opening one is balanced between: `history` stops
+     * the Good branch at the near stop, `forecast` runs it to the target. Null on
+     * the log axis, which has room for both at once, and without a forecast.
+     */
+    xPresets: { history: [number, number]; forecast: [number, number] } | null;
     /**
      * [min, max] the reader may zoom out to. Wider than `xDomain`: the forecast
      * is computed well past the window it opens in, so scrolling out keeps
@@ -802,25 +829,29 @@ export function buildForgettingCurveSeries(
               Math.max(daysUntilRetention(easyBranch.stability, HORIZON_RETENTION, decay, factor), 1 / 24)
             : nowDays;
 
-    // How far it is shown on opening — see `INITIAL_VIEW`.
-    const view = INITIAL_VIEW[scale];
-    const viewBranch = branches.find((b) => b.grade === view.grade);
-    const viewRetention = Math.min(Math.max(targetRetention + view.offsetFromTarget, 0.5), 0.995);
-    const viewDays =
-        forecast && viewBranch
-            ? Math.min(
-                  Math.max(
-                      nowDays +
-                          Math.max(
-                              daysUntilRetention(viewBranch.stability, viewRetention, decay, factor),
-                              1 / 24,
-                          ),
-                      // ...or far enough out to be worth looking at at all.
-                      nowDays * (1 + MIN_FORECAST_AGE_SHARE),
-                  ),
-                  horizonDays,
-              )
-            : nowDays;
+    // How far it is shown on opening — see `LOG_VIEW` / `LINEAR_VIEW`.
+    const forecastEnd = (grade: CurveGrade, offsetFromTarget: number): number => {
+        const branch = branches.find((b) => b.grade === grade);
+        if (!branch) return nowDays;
+        const retention = Math.min(Math.max(targetRetention + offsetFromTarget, 0.5), 0.995);
+        return nowDays + Math.max(daysUntilRetention(branch.stability, retention, decay, factor), 1 / 24);
+    };
+    // ...or far enough out to be worth looking at at all, and never past what
+    // was computed.
+    const settle = (days: number): number =>
+        forecast ? Math.min(Math.max(days, nowDays * (1 + MIN_FORECAST_AGE_SHARE)), horizonDays) : nowDays;
+
+    let viewDays: number;
+    let presetDays: { history: number; forecast: number } | null = null;
+    if (scale === 'log') {
+        viewDays = settle(forecastEnd(LOG_VIEW.grade, LOG_VIEW.offsetFromTarget));
+    } else {
+        const nearDays = forecastEnd(LINEAR_VIEW.grade, LINEAR_VIEW.nearOffset);
+        const farDays = forecastEnd(LINEAR_VIEW.grade, LINEAR_VIEW.farOffset);
+        const capDays = nowDays * (1 + maxForecastToHistoryRatio(reviews.length));
+        viewDays = settle(Math.max(nearDays, Math.min(farDays, capDays)));
+        if (forecast) presetDays = { history: settle(nearDays), forecast: settle(farDays) };
+    }
 
     // The log axis needs a positive floor. Derive it from the data so a card
     // with no sub-day steps does not waste three decades on minutes it never
@@ -971,8 +1002,13 @@ export function buildForgettingCurveSeries(
     // --- Axes -------------------------------------------------------------
     const xMin = toX(scale === 'linear' ? 0 : floorDays);
     const axisMaxDays = Math.max(horizonDays, nowDays, floorDays * 2);
-    const viewMaxDays = Math.max(Math.min(viewDays, axisMaxDays), nowDays, floorDays * 2);
+    const toViewMax = (days: number) => Math.max(Math.min(days, axisMaxDays), nowDays, floorDays * 2);
+    const viewMaxDays = toViewMax(viewDays);
     const xMax = toX(viewMaxDays);
+    const xPresets = presetDays && {
+        history: [xMin, toX(toViewMax(presetDays.history))] as [number, number],
+        forecast: [xMin, toX(toViewMax(presetDays.forecast))] as [number, number],
+    };
     const xFullMax = toX(axisMaxDays);
 
     // Fitted to the opening view, not to everything computed. The rows run on
@@ -1000,6 +1036,7 @@ export function buildForgettingCurveSeries(
         branches,
         ticks,
         xDomain: [xMin, xMax],
+        xPresets,
         xFullDomain: [xMin, xFullMax],
         yDomain: [Math.floor(yMin), 100],
         nowX: toX(nowDays),

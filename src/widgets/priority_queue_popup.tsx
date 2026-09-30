@@ -24,7 +24,7 @@ import {
   RefreshResult,
 } from '../lib/priority_review_document/queue_doc';
 import { scanPriorityReviewDocuments, PrdDocReport } from '../lib/priority_review_document/clean';
-import { CoolingVerdict, COOLING_RELATION_LABELS, DAY_MS } from '../lib/priority_review_document/cooling';
+import { CoolingVerdict, coolingReasonText, DAY_MS } from '../lib/priority_review_document/cooling';
 import {
   CoolingCache,
   extendCooling,
@@ -1020,7 +1020,7 @@ export function PriorityQueuePopup() {
                 </div>
                 <div style={faint}>
                   {first
-                    ? `${COOLING_RELATION_LABELS[first.relation]} ${formatDate(first.seenAt)}${first.sourceLabel && first.relation !== 'same-rem' && first.relation !== 'just-created' ? ` (“${first.sourceLabel.slice(0, 40)}”)` : ''}`
+                    ? `${coolingReasonText(first.relation, formatDate(first.seenAt))}${first.sourceLabel && first.relation !== 'same-rem' && first.relation !== 'just-created' ? ` (“${first.sourceLabel.slice(0, 40)}”)` : ''}`
                     : 'extended by you'}
                   {' · '}back {formatDate(v.until)} ({plural(daysLeft(v.until), 'day', 'days')}, window {v.windowDays}d)
                 </div>

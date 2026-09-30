@@ -2,6 +2,80 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.139 - September 30th, 2026
+
+### ♻️ Changed
+
+**Cooling**: Image Occlusion Rems are no longer cooled, in the Priority Queue or in RemNote's own queues; with Hide All, Test One on, a reviewed box gives nothing away.
+
+📖 [Image Occlusion is never cooled](Priority-Review-Document.md#image-occlusion-is-never-cooled)
+
+## v1.0.138 - September 30th, 2026
+
+### 🐛 Fixed
+
+**Queue Display**: Fixed the "Hidden in queue" label missing when Hide in Queue, Hide Parent or Hide Grandparent hid the top row of the Beautiful queue; the row vanished instead.
+
+📖 [Beautiful Queue](Utilities-Queue-Display.md#beautiful-queue)
+
+## v1.0.137 - September 29th, 2026
+
+### ✨ Improved - multi-line cards cool their answer lines
+
+**Cooling**: Reviewing a multi-line card now cools its answer lines, for when RemNote shows it before them.
+
+📖 [Multi-line cards: answer lines first](Priority-Review-Document.md#multi-line-cards-answer-lines-first)
+
+### 🐛 Fixed
+
+**Priority Shield**: A Rem whose cooling ends during the day no longer lowers that day's shield; like overdue cards, cooling is now judged from the start of the day.
+
+📖 [Smart Scope & Priority Shield Integration](Priority-Review-Document.md#smart-scope-priority-shield-integration)
+
+## v1.0.136 - September 29th, 2026
+
+### ✨ New - multi-line cards go after their answer lines
+
+**Cooling**: When the answer lines of a multi-line card are flashcards themselves, they now come first; the multi-line card waits while any of them is due, then cools from their review.
+
+📖 [Multi-line cards: answer lines first](Priority-Review-Document.md#multi-line-cards-answer-lines-first)
+
+## v1.0.135 - September 29th, 2026
+
+### ⚡ Improved - the Forgetting Curve shows the whole next interval
+
+**Forgetting Curve**: On the linear axis the chart now opens with **Good** running down to your target retention, and stops sooner only when a card's many reviews need the width; new **History** / **Forecast** buttons jump to either end.
+
+![A card with 3 reviews on the linear axis: History shortens the window to 4.4 years, Forecast stretches it to 9.7 years with Good ending on the 90% target, and Reset zoom returns to the 8.9-year opening window](assets/forgetting-curve-zoom-history-forecast.gif){ width="700" }
+
+📖 [Log and linear time](Reviewing-Items-in-the-Queue.md#log-and-linear-time)
+
+**Queue Dashboard**: A **Current** / **Previous** switch shows the forgetting curve of the card you just answered.
+
+![The Queue Dashboard during a session, with numbered notes on the Prev. Card column, the Current / Previous switch, the History / Forecast presets and Reset zoom](assets/forgetting-curve-queue-dashboard-previous.png){ width="500" }
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
+### ⚡ Improved - End Review takes you back into the queue
+
+**Editor Review Timer**: **End Review and Back to Queue** now reopens the queue you left, the Global Queue included, instead of opening its document and leaving you to press Practice.
+
+📖 [The Workflow Loop](Reviewing-Items-in-the-Queue.md#the-workflow-loop)
+
+### 🐛 Fixed
+
+**Cooling**: A card coming back in the same session (e.g. after **Forgot**) should no longer be skipped in RemNote's own queues as if it were its own sibling.
+
+📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
+**Learn**: Fixed `Cmd/Ctrl+L` and **▶** saying "A queue is already open" when none was, after a Review in Editor detour.
+
+📖 [Practise it](Priority-Review-Document.md#practise-it)
+
+**Practiced Queues**: Editor reviews and ad-hoc sessions no longer look clickable in the history; their tooltip now says there is no queue to reopen.
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
 ## v1.0.131 - September 28th, 2026
 
 ### ⚡ Improved - the Mastery Drill gets past "Time to Take a Break"
