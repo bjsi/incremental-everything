@@ -118,6 +118,10 @@ Seven relations, each a distinct way one review puts another card's answer on sc
 
 Card Cluster siblings never cool each other: a cluster is designed to be shown together, and RemNote treats it as one unit. A sibling rated *Again* that is still due does not cool anything either — RemNote's own rule already separates that pair within the hour.
 
+### Image Occlusion is never cooled { #image-occlusion-is-never-cooled }
+
+An Image Occlusion Rem never cools. With **Hide All, Test One** on, every other box stays covered while one is tested, so reviewing one box gives nothing away, and RemNote's own bury leaves those boxes alone too. The plugin cannot read that setting, so it exempts every Image Occlusion Rem, whether the setting is on or off. With it off, RemNote's hour-long bury still separates the boxes within a session.
+
 ### How long
 
 The window belongs to the cooled card and scales with its own interval, because a mature card is both more damaged by a free recall and cheaper to delay:
@@ -168,6 +172,7 @@ A few things work as they do in the Priority Queue:
 
 * **Release** and **Never** in the [Cooling list](#the-cooling-list) apply here too.
 * **Card Cluster** members are never skipped: a cluster is shown as one unit.
+* **Image Occlusion** cards are never skipped: see [Image Occlusion is never cooled](#image-occlusion-is-never-cooled).
 * A card never cools itself: when it comes back in the same session — after **Forgot**, say — it is shown, even while its siblings are being skipped.
 * **Cooling: new cards** does not apply: in the daily queue it would skip every card you wrote today, and Learn New Cards exists to learn new cards.
 

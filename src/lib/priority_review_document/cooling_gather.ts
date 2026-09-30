@@ -16,6 +16,7 @@ import {
   evaluateCooling,
   isBackwardCard,
   isCardDue,
+  isImageOcclusionText,
   isRecentlyCreatedUnseen,
   pickConceptAncestor,
   REM_TYPE_DESCRIPTOR,
@@ -306,6 +307,7 @@ export class CoolingScanner {
 
     const rem = await this.reader.one(remId);
     if (!rem) return null;
+    if (isImageOcclusionText(rem.text, rem.backText)) return null;
     const label = flattenText(rem.text) || undefined;
 
     const candidate: CoolingCandidate = {

@@ -259,6 +259,29 @@ export function isRecentlyCreatedUnseen(card: CardLike, now: number, days: numbe
   return now - card.createdAt < days * DAY_MS;
 }
 
+/**
+ * True when the Rem's text holds an image with occlusion boxes — an Image
+ * Occlusion Rem, one card per box. Such Rems never cool: with "Hide All, Test
+ * One" on, every other box stays covered, so a sibling box's review spoils
+ * nothing (RemNote's own bury skips those siblings too). That setting is the
+ * Rem field `hato`, which the plugin API does not expose, so the Rem is
+ * exempted whichever way it is set.
+ */
+export function isImageOcclusionText(...texts: unknown[]): boolean {
+  return texts.some(
+    (text) =>
+      Array.isArray(text) &&
+      text.some(
+        (el) =>
+          !!el &&
+          typeof el === 'object' &&
+          (el as { i?: unknown }).i === 'i' &&
+          Array.isArray((el as { blocks?: unknown }).blocks) &&
+          (el as { blocks: unknown[] }).blocks.length > 0
+      )
+  );
+}
+
 /** RemType.DESCRIPTOR in the SDK; kept as a literal so this module stays SDK-free. */
 export const REM_TYPE_DESCRIPTOR = 2;
 

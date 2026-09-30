@@ -23,6 +23,7 @@ import {
   evaluateCooling,
   excludeCooling,
   isCardDue,
+  isImageOcclusionText,
   pruneCoolingOverrides,
   CoolingCandidate,
   SpoilerSeenEvent,
@@ -547,5 +548,25 @@ describe('multi-line cards: the other way round', () => {
     assert.ok(v);
     assert.equal(v!.reasons[0].relation, 'multi-line-card');
     assert.equal(coolingReasonText('multi-line-card', '1 h ago'), 'its multi-line card was reviewed 1 h ago');
+  });
+});
+
+describe('image occlusion Rems are exempt', () => {
+  const occlusion = {
+    i: 'i',
+    url: '%LOCAL_FILE%x.png',
+    blocks: [{ x: 0.1, y: 0.1, width: 0.2, height: 0.1, rotation: 0, cId: '1', label: [], frontLabel: [] }],
+    practiceInOrder: false,
+  };
+
+  it('detects an image with occlusion boxes, in the front or the back', () => {
+    assert.equal(isImageOcclusionText(['Planos do Casco\n\n', occlusion]), true);
+    assert.equal(isImageOcclusionText(['front'], [occlusion]), true);
+  });
+
+  it('ignores plain images, empty box lists and text', () => {
+    assert.equal(isImageOcclusionText(['caption', { i: 'i', url: 'x.png' }]), false);
+    assert.equal(isImageOcclusionText([{ ...occlusion, blocks: [] }]), false);
+    assert.equal(isImageOcclusionText(['text', { i: 'q', _id: 'x' }], undefined), false);
   });
 });

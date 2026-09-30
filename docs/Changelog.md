@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.139 - September 30th, 2026
+
+### ♻️ Changed
+
+**Cooling**: Image Occlusion Rems are no longer cooled, in the Priority Queue or in RemNote's own queues; with Hide All, Test One on, a reviewed box gives nothing away.
+
+📖 [Image Occlusion is never cooled](Priority-Review-Document.md#image-occlusion-is-never-cooled)
+
 ## v1.0.138 - September 30th, 2026
 
 ### 🐛 Fixed
