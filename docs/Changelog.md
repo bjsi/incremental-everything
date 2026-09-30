@@ -8,6 +8,10 @@ This page documents the major changes and improvements for each version of the I
 
 **Card Info Bar**: In the Beautiful queue the bar now stays docked above the answer buttons, below RemNote's AI Explanation, instead of moving with the card's length.
 
+![The answer side of a card in the Beautiful queue: the AI Explanation panel, then the Card Info Bar with priority, shields and FSRS figures, then the four answer buttons](assets/card-info-bar-docked-answer.png){ width="900" }
+
+![The question side of a card in the Beautiful queue: the Card Info Bar docked just above the Reveal Answer button, well below the card text](assets/card-info-bar-docked-question.png){ width="900" }
+
 📖 [Card Info Bar in the Beautiful queue](Plugin-Widgets-Reference.md#card-info-bar-beautiful)
 
 ## v1.0.139 - September 30th, 2026

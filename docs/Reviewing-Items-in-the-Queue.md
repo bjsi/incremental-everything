@@ -361,6 +361,10 @@ When reviewing flashcards in the queue, the **Card Info Bar** widget (formerly *
 
 In the Beautiful queue variant the bar is docked just above the answer buttons. See [Card Info Bar in the Beautiful queue](Plugin-Widgets-Reference.md#card-info-bar-beautiful).
 
+![The answer side of a card in the Beautiful queue: the AI Explanation panel, then the Card Info Bar with priority, shields and FSRS figures, then the four answer buttons](assets/card-info-bar-docked-answer.png){ width="900" }
+
+![The question side of a card in the Beautiful queue: the Card Info Bar docked just above the Reveal Answer button, well below the card text](assets/card-info-bar-docked-question.png){ width="900" }
+
 ### What's Displayed
 
 The info bar includes (from left to right):
