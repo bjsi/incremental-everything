@@ -43,6 +43,13 @@ export type CoolingRelation =
   /** A child or grandchild card was graded, and its context line displayed this Rem's answer. */
   | 'descendant'
   /**
+   * This Rem is an answer line of a multi-line card, and that card was graded:
+   * its back showed this line in full. Answer lines normally go first (see
+   * `answer-line-due`), so this covers the multi-line card reviewed before them —
+   * RemNote's queue order is random.
+   */
+  | 'multi-line-card'
+  /**
    * This Rem is a descriptor with a due BACKWARD card, which answers with its
    * concept — and a card of that concept (forward, backward or a cloze in it)
    * was shown. RemNote buries the same pairing for an hour; this extends it.
@@ -80,6 +87,7 @@ export const COOLING_RELATION_LABELS: Record<CoolingRelation, string> = {
   'concept-reviewed': 'its concept was reviewed',
   'answer-line': 'one of its answer lines was reviewed',
   'answer-line-due': 'one of its answer lines is due and goes first',
+  'multi-line-card': 'its multi-line card was reviewed',
   'just-created': 'a card of it was created',
 };
 
@@ -421,15 +429,24 @@ export function isCardDue(card: CardLike, now: number): boolean {
  * event that is not itself still due, that happened after any release, and
  * whose window has not yet run out, becomes a reason; the Rem cools until the
  * latest of them. A user extension can only lengthen that.
+ *
+ * `since` widens "right now" to "at any moment since": a reason whose window
+ * closed after `since` still counts, and the verdict's `until` may then lie in
+ * the past. The Priority Shield passes the start of the local day — its own
+ * rule counts only cards already overdue then, so a Rem that was cooling at the
+ * start of the day stays out of that day's shield instead of lowering it the
+ * minute its window closes. Everything else judges at `now` (the default).
  */
 export function evaluateCooling(
   candidate: CoolingCandidate,
   now: number,
   params: CoolingParams = DEFAULT_COOLING_PARAMS,
-  overrides: CoolingOverrides = EMPTY_COOLING_OVERRIDES
+  overrides: CoolingOverrides = EMPTY_COOLING_OVERRIDES,
+  since: number = now
 ): CoolingVerdict | null {
   if (candidate.dueCards.length === 0) return null;
   if (overrides.never.includes(candidate.remId)) return null;
+  since = Math.min(since, now);
 
   const intervalDays = Math.max(0, ...candidate.dueCards.map((c) => c.intervalDays));
   const windowDays = coolingWindowDays(intervalDays, params);
@@ -446,7 +463,7 @@ export function evaluateCooling(
     const eventWindowDays = typeof event.windowDays === 'number' ? Math.max(0, event.windowDays) : windowDays;
     if (eventWindowDays <= 0) continue;
     const until = (event.whileDue ? now : seenAt) + eventWindowDays * DAY_MS;
-    if (until <= now) continue;
+    if (until <= since) continue;
     reasons.push({
       relation: event.relation,
       sourceRemId: event.sourceRemId,
@@ -460,7 +477,7 @@ export function evaluateCooling(
   reasons.sort((a, b) => b.until - a.until);
 
   const extendedUntil = overrides.extended[candidate.remId];
-  const extensionApplies = typeof extendedUntil === 'number' && extendedUntil > now;
+  const extensionApplies = typeof extendedUntil === 'number' && extendedUntil > since;
 
   if (reasons.length === 0 && !extensionApplies) return null;
 
@@ -503,6 +520,13 @@ export function pruneCoolingOverrides(
     if (typeof until === 'number' && until > now) extended[remId] = until;
   }
   return { released, extended, never: [...new Set(overrides.never ?? [])] };
+}
+
+/** The start of the local day containing `now` — the Priority Shield's horizon. */
+export function startOfLocalDay(now: number = Date.now()): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
 }
 
 /**

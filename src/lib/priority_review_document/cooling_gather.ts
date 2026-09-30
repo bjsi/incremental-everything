@@ -61,9 +61,11 @@ import { CardSource, loadCardSource } from './card_source';
  * MULTI-LINE CARDS. A candidate whose children include answer lines (card
  * items, multiline.ts) takes events from those children only, as
  * `answer-line`, plus an `answer-line-due` hold for each one still due — the
- * inverted order: answer lines first, the multi-line card after them. Card-item
- * membership costs one probe per child that has cards (or carded children),
- * memoised.
+ * inverted order: answer lines first, the multi-line card after them. And the
+ * other way round, for a multi-line card reviewed first anyway: an answer line
+ * takes `multi-line-card` events from its parent. Card-item membership costs
+ * one probe per child that has cards (or carded children), and per candidate
+ * whose parent has cards, memoised.
  */
 
 export interface CoolingScanOptions {
@@ -82,6 +84,12 @@ export interface CoolingScanOptions {
    * share a single read.
    */
   cardSource?: CardSource;
+  /**
+   * Judge as cooling any Rem that was cooling at some moment since this instant
+   * (see evaluateCooling). Only the shield's scan sets it, to the start of the
+   * local day; its verdicts may then have an `until` in the past.
+   */
+  since?: number;
 }
 
 export interface CoolingScanResult {
@@ -374,6 +382,19 @@ export class CoolingScanner {
       }
     }
 
+    // 1c. Its multi-line card, when this Rem is one of its answer lines: that
+    //     card's back shows the line in full. Probed only when the parent has
+    //     cards at all, so most Rems cost nothing here.
+    const lineParentId = (rem.parent as RemId | undefined) ?? null;
+    if (lineParentId && (this.cardsByRem.get(lineParentId)?.length ?? 0) > 0 && (await this.isAnswerLine(rem))) {
+      const multiLine = await this.reader.one(lineParentId);
+      if (multiLine && !(await this.isCluster(multiLine))) {
+        candidate.seen.push(
+          ...this.seenEventsFor(lineParentId, 'multi-line-card', flattenText(multiLine.text) || undefined)
+        );
+      }
+    }
+
     // 2. Cloze siblings and the parent extract — only when this Rem IS an Alt+Z
     //    cloze, since only then is its content the parent's sentence.
     const parentId = (rem.parent as RemId | undefined) ?? null;
@@ -496,7 +517,7 @@ export class CoolingScanner {
         if (!candidate) return;
         this.withDueCards++;
         if (this.options.includeCandidates) this.candidates.push(candidate);
-        const verdict = evaluateCooling(candidate, this.now, this.params, this.overrides);
+        const verdict = evaluateCooling(candidate, this.now, this.params, this.overrides, this.options.since);
         if (verdict) {
           this.verdicts.set(id, verdict);
           this.candidateByRem.set(id, candidate);
@@ -558,7 +579,7 @@ export class CoolingScanner {
     if (!verdict || !candidate) return verdict;
     const own = withoutOwnSightings(candidate, cardId);
     if (own === candidate) return verdict;
-    return evaluateCooling(own, now, this.params, this.overrides);
+    return evaluateCooling(own, now, this.params, this.overrides, this.options.since);
   }
 
   isCooling(remId: RemId): boolean {
@@ -608,6 +629,7 @@ export class CoolingScanner {
     await this.fillMissingPriorities();
     await mergeCoolingCache(this.plugin, {
       computedAt: this.now,
+      since: this.options.since,
       scopeRemId: this.options.scopeRemId ?? null,
       checkedIds: this.checkedIds,
       verdicts: this.sortedVerdicts(),

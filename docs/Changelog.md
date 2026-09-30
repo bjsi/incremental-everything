@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.137 - September 29th, 2026
+
+### ✨ Improved - multi-line cards cool their answer lines
+
+**Cooling**: Reviewing a multi-line card now cools its answer lines, for when RemNote shows it before them.
+
+📖 [Multi-line cards: answer lines first](Priority-Review-Document.md#multi-line-cards-answer-lines-first)
+
+### 🐛 Fixed
+
+**Priority Shield**: A Rem whose cooling ends during the day no longer lowers that day's shield; like overdue cards, cooling is now judged from the start of the day.
+
+📖 [Smart Scope & Priority Shield Integration](Priority-Review-Document.md#smart-scope-priority-shield-integration)
+
 ## v1.0.136 - September 29th, 2026
 
 ### ✨ New - multi-line cards go after their answer lines

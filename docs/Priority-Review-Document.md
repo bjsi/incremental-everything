@@ -104,13 +104,14 @@ A Rem is **cooling** when it still owes the queue a card, and a card that gives 
 
 ### What counts as a spoiler
 
-Six relations, each a distinct way one review puts another card's answer on screen:
+Seven relations, each a distinct way one review puts another card's answer on screen:
 
 * **Another card of the same Rem** — the other direction, or another cloze in the same text. RemNote's hour-long bury, extended.
 * **A sibling `Alt+Z` cloze under the same parent extract**, or the **parent extract itself** read as an Incremental Rem. Each cloze quotes the whole sentence with one span blanked, so any one of them shows the others' answers.
 * **One of the Rem's own `Alt+Z` clozes**, when the Rem carries a card of its own as well.
 * **A child or grandchild card**, whose context line displayed this Rem's answer — the [ancestor gate](#ancestor-spoiler-protection) extended across time, in the direction that actually spoils.
 * **An answer line of a multi-line card.** Reviewing one puts part of the multi-line card's answer on screen. Only its answer lines count — the other children of a multi-line card show just its question — and while one of them is still due, the multi-line card waits for it: see [Multi-line cards: answer lines first](#multi-line-cards-answer-lines-first).
+* **Its multi-line card**, when the Rem is one of that card's answer lines: the multi-line card's back shows the line in full.
 * **Its concept, for a descriptor's backward card.** A descriptor's backward card shows the descriptor and asks for the concept it belongs to: the nearest ancestor that is not itself a descriptor, which is a grandparent or higher when descriptors are nested. Reviewing any card of that concept, forward, backward or a cloze in it, puts the answer on screen, so the descriptor waits. RemNote buries this pairing for an hour; cooling extends it for the whole window.
 
 **And one rule about the card itself: new cards.** In the Priority Queue only, a card you have just created and never reviewed cools too, for a fixed number of days counted from the moment the card was created (**Cooling: new cards**, 1 day by default, up to 10, 0 to turn it off). SuperMemo counts creating an item as its first repetition, so a cloze you wrote while reading is never asked the same day, while its answer is still in view. The date is the card's own: a cloze added today to an old Rem counts as new, and a direction you switch off and back on keeps its original card and history, so it does not. A direction switched on for the first time is a new card.
@@ -245,6 +246,7 @@ Above, *which short lines?* is a multi-line card, and its answer lines *forward*
 2. *forward* and *aft* are **not** held back by their parent, and they do not cool each other: review them in any order, in the same session.
 3. When the held card comes up in a Priority Queue fill, its due answer lines are **pulled in** in its place — the ancestor swap in reverse.
 4. Once they are reviewed, *which short lines?* **cools** from that review, for its own window, and then comes back to be reviewed last.
+5. The other way round works too. In RemNote's own queues the order is random: if *which short lines?* is reviewed first anyway, its back shows *forward* and *aft* in full, so they **cool** from that review.
 
 Only children marked as **card items** — the lines on the back of the card — trigger this. Other children of a multi-line card, like the image and the *~Lógica* note above, are not part of its answer: they neither hold it nor cool it. A due **grandparent** still goes first, as for any other card.
 
@@ -301,6 +303,7 @@ Even though you are reviewing a generated list, the plugin knows where the items
 * **Original Scope Awareness:** While reviewing a Priority Queue document, the plugin "pretends" you are reviewing the original source.
 * **[Priority Shield](Prioritization-&-Sorting.md#priority-shield):** The Priority Shield (the stats below the answer buttons) calculates your protection against the **original scope** — the document you chose, or the whole knowledge base — never against the review document itself. *Example:* a Priority Queue scoped to "Biology 101" shows how well you are protecting priorities within "Biology 101".
 * **Cooling Rems are not counted.** A Rem whose spoiler sibling you reviewed recently cannot set the shield, live or in the history graph — the set is recomputed once when RemNote starts and at every queue exit, so the siblings you just reviewed are already accounted for, and the first queue after a restart counts the same Rems as the last one. Neither can a Rem held back because its parent or grandparent is due and cooling: the Priority Queue will not serve it until that window ends.
+* **Cooling counts for the whole day.** The shield counts only cards that were already overdue at the start of the day, and cooling follows the same clock: a Rem that was cooling at any moment since midnight stays out of that day's shield, even after its window closes. A card created at 20:55 yesterday cools until 20:55 today and can set the shield only from tomorrow, so the shield no longer drops in the evening just because a window closed. The queues are not affected: they serve the card as soon as its cooling ends.
 * **Stats Tracking:** The history graph records your progress against the original document or the whole knowledge base, keeping your long-term stats accurate.
 
 ## Cleaning up leftovers
