@@ -41,6 +41,8 @@ const ROOT = `.spacedRepetition:has(> .queue-beautiful-scroll-surface ${IFRAME})
 const DEFAULT_BAR_HEIGHT = 38;
 // Space between the bar and the answer buttons.
 const GAP_ABOVE_BUTTONS = 12;
+// The "↵ Enter" tab RemNote draws above a suggested answer button.
+const SUGGESTED_TAB_HEIGHT = 25;
 // Matches the controls' px-8 on desktop, so the bar lines up with the buttons.
 const SIDE_INSET = 32;
 
@@ -60,6 +62,12 @@ export function buildCardInfoBarDockCss(barHeight: number): string {
   }
   ${ROOT} > .beautiful-queue-bottom-controls-overlay .spaced-repetition__bottom {
     padding-top: ${band}px !important;
+  }
+  /* A graded type-in answer pre-selects a button and hangs an "↵ Enter" tab over
+     it (absolute, 25px, top: -25px). On desktop that button, and only that one,
+     loses its top border and corners, which is the hook to make room for the tab. */
+  ${ROOT} > .beautiful-queue-bottom-controls-overlay .spaced-repetition__bottom:has(.rn-queue__answer-btn.border-t-transparent.rounded-t-none) {
+    padding-top: ${band > 0 ? band + SUGGESTED_TAB_HEIGHT : 0}px !important;
   }
   ${ROOT} .beautiful-queue-card-content--sticky:has(${IFRAME}) {
     z-index: 10001;

@@ -10,7 +10,7 @@ This page serves as a comprehensive visual and functional guide to every widget 
 
 *(Formerly **Card Priority Display** — renamed as its scope grew beyond priority to full review, memory, and scheduling stats. Older Changelog entries refer to it by the old name.)*
 
-Displayed immediately below flashcards in the queue, this widget shows the card's priority, review statistics, and FSRS memory state.
+Displayed below flashcards in the queue (and, in the Beautiful queue variant, [docked above the answer buttons](#card-info-bar-beautiful)), this widget shows the card's priority, review statistics, and FSRS memory state.
 
 ![Card Stats with FSRS DSR](assets/DSR-stats.png){ width="900" }
 
@@ -30,10 +30,18 @@ Displayed immediately below flashcards in the queue, this widget shows the card'
 
 ![Card Toolbar in the Queue](assets/card-priority-display-full-queue.png){ width="900" }
 
+#### In the Beautiful queue variant { #card-info-bar-beautiful }
+
+In RemNote's **Beautiful** queue variant the bar no longer follows the end of the card. It stays docked just above the answer buttons, so it is always in the same place, however long the card is. RemNote's AI **Explanation** panel moves up to make room: the order from top to bottom is Explanation → Card Info Bar → answer buttons. When a typed answer has been graded, the bar also moves up to leave room for RemNote's **↵ Enter** tab over the suggested button. In the *Compact* variant the bar stays under the card, as before.
+
+![The answer side of a card in the Beautiful queue: the AI Explanation panel, then the Card Info Bar with priority, shields and FSRS figures, then the four answer buttons](assets/card-info-bar-docked-answer.png){ width="900" }
+
+![The question side of a card in the Beautiful queue: the Card Info Bar docked just above the Reveal Answer button, well below the card text](assets/card-info-bar-docked-question.png){ width="900" }
+
 ### 1.2. Queue Toolbar Priority
 Installed directly into the native RemNote Queue Toolbar, this widget guarantees that the **absolute priority** of the current item (both Flashcards and Incremental Rems) is persistently visible during review.
 
-Unlike the *Card Info Bar*, which lives at the bottom of flashcards and can be easily scrolled out of view on long documents, the Queue Toolbar Priority widget is anchored to the top toolbar, making it accessible instantly. 
+Unlike the *Card Info Bar*, which in the Compact queue lives at the bottom of flashcards and can be easily scrolled out of view on long documents, the Queue Toolbar Priority widget is anchored to the top toolbar, making it accessible instantly. 
 
 - **Supports both types**: Shows absolute priorities for both Incremental Rems (e.g. `P10`) and Flashcards (percentile rank - relative priority - is shown on hover and also indicated by the badge color).
 - **Opt-in setting**: Controlled via the `Display Queue Toolbar Priority` plugin setting (enabled by default).

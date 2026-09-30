@@ -359,6 +359,8 @@ See also: [Using the RemNote Clipper](https://help.remnote.com/en/articles/60308
 
 When reviewing flashcards in the queue, the **Card Info Bar** widget (formerly *Card Priority Display*) shows additional card statistics and FSRS memory state information alongside the priority and shield data.
 
+In the Beautiful queue variant the bar is docked just above the answer buttons. See [Card Info Bar in the Beautiful queue](Plugin-Widgets-Reference.md#card-info-bar-beautiful).
+
 ### What's Displayed
 
 The info bar includes (from left to right):

@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.140 - September 30th, 2026
+
+### ✨ Improved
+
+**Card Info Bar**: In the Beautiful queue the bar now stays docked above the answer buttons, below RemNote's AI Explanation, instead of moving with the card's length.
+
+📖 [Card Info Bar in the Beautiful queue](Plugin-Widgets-Reference.md#card-info-bar-beautiful)
+
 ## v1.0.139 - September 30th, 2026
 
 ### ♻️ Changed
