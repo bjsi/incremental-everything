@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.138 - September 30th, 2026
+
+### 🐛 Fixed
+
+**Queue Display**: Fixed the "Hidden in queue" label missing when Hide in Queue, Hide Parent or Hide Grandparent hid the top row of the Beautiful queue; the row vanished instead.
+
+📖 [Beautiful Queue](Utilities-Queue-Display.md#beautiful-queue)
+
 ## v1.0.137 - September 29th, 2026
 
 ### ✨ Improved - multi-line cards cool their answer lines
