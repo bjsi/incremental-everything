@@ -90,6 +90,17 @@ The SDK has no `startQueue`, but `plugin.window.setURL(url)` is implemented as `
 - It is a **fake embed**: the plugin iframe holds only an empty `div.js-fake-embed` placeholder, and RemNote paints the real component in a layer **above** the iframe at that position. Plugin overlays, whatever their z-index, are hidden beneath it. The SDK re-sends the position on any attribute change in the plugin's DOM (a MutationObserver), so moving the wrapper off-screen (`position: fixed; top: 200vh`) hides the embed without unmounting it. Unmounting a `<Queue>` fires QueueEnter again and starts a new session.
 - The `DocumentViewer` fake embed mounts the real `Document` component, where DocumentBelowTitle and DocumentAboveToolbar widgets **are** enabled. Not yet confirmed at runtime.
 
+## Flashcard widget slots and the Beautiful queue's bottom
+
+Read from the 1.28.19 bundle (`renderSR`, `SwipeQueueHOC`, the insight scroll layout `sQ`). Not yet tried at runtime.
+
+- **FlashcardAnswerButtons replaces the native buttons.** The slot's `componentToRenderIfNoWidgets` holds the answer buttons, type-in answer, MCAT indicator and "Grade yourself" hint. Any matching widget swaps all of them out. It is only safe for Plugin queue items, which is how `answer_buttons` uses it.
+- **FlashcardUnder** is the last child of the card content, inside the scroll surface. Its widget is part of the height RemNote measures for the card.
+- **QueueBelowTopBar** is the only slot pinned in place, at the top of the box.
+- Every widget iframe sits in `div.fade-in-first-load.relative` with inline `transform: rotate(0); overflow: hidden`. That wrapper is a containing block and a stacking context, so a `position: fixed` iframe stays trapped inside it. To relocate a widget, move the wrapper.
+- **Beautiful bottom controls** are `div.beautiful-queue-bottom-controls-overlay` (`absolute bottom-0`, `z-[10000]`, `pointer-events-none`) wrapping a transparent `.spaced-repetition__bottom`. The backdrop behind the buttons is `.beautiful-queue-bottom-fade-mask` (`z-[9998]`). A ResizeObserver reads the overlay's `offsetHeight` into `--beautiful-queue-bottom-controls-height` on the HOC root (`.spacedRepetition`), and also into `bottomControlsHeight`.
+- **The AI insights panel ("Explanation") is not pinned.** It is in-flow after the card content. A computed spacer (`scroll height − controlsHeight − 16 − card height − 16 − min(insights, 100)`) lands it just above the controls, and the card content goes `--sticky` (`position: sticky`, so it is a stacking context) when there is room. If the controls get taller, the Explanation moves up with them. Padding on `.spaced-repetition__bottom` does this, because it grows the overlay's content box and the ResizeObserver fires. Padding on the overlay itself would not trigger the observer.
+
 ## Cross-plugin side channel
 
 `messaging.broadcast` reaches only the caller's own widgets, but plugin events are keyed by event and key, not by plugin. So `storage.setSession(k, v)` fires `StorageSessionChange` for **any** plugin listening on `k`. This is undocumented and may be closed.

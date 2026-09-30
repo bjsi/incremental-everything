@@ -386,6 +386,11 @@ export const pdfHighlightBordersReloadKey = 'pdf-highlight-borders-reload';
 // --- Keys for our successful fixes ---
 export const queueLayoutFixId = 'incremental-everything-queue-layout-fix';
 export const queueHideElementsId = 'incremental-everything-queue-hide-elements';
+// registerCSS id for docking card_info_bar above the Beautiful queue's answer
+// buttons, and the session key the widget writes its height to. registerCSS is
+// index-only, so a plugin.track in index.tsx re-registers on each new height.
+export const cardInfoBarDockCssId = 'incremental-everything-card-info-bar-dock';
+export const cardInfoBarHeightKey = 'card-info-bar-height';
 export const collapseTopBarCssId = 'incremental-everything-collapse-top-bar'; // CSS registration ID
 export const incrementalQueueActiveKey = 'incremental-queue-active';
 export const activeHighlightIdKey = 'active-highlight-id-key';

@@ -31,6 +31,7 @@ import {
   PerCardShieldItem,
 } from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
+import { reportCardInfoBarHeight } from '../lib/card_info_bar_dock';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
@@ -582,8 +583,26 @@ export function CardInfoBar() {
     setStatsSepVisible(sameRow);
   }); // No deps — runs after every render so it catches the first render where refs are populated
 
+  // Report the bar's height so the Beautiful queue can reserve exactly that much
+  // room above the answer buttons (lib/card_info_bar_dock). 0 while it renders nothing.
+  const rendersBar = !!(rem && finalCardInfo && !isIncrementalQueueActive);
+  const barObserverRef = React.useRef<ResizeObserver | null>(null);
+  const barRef = React.useCallback((el: HTMLDivElement | null) => {
+    barObserverRef.current?.disconnect();
+    barObserverRef.current = null;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      void reportCardInfoBarHeight(plugin, el.offsetHeight);
+    });
+    observer.observe(el);
+    barObserverRef.current = observer;
+  }, [plugin]);
+  React.useEffect(() => {
+    if (!rendersBar) void reportCardInfoBarHeight(plugin, 0);
+  }, [plugin, rendersBar]);
+
   // Check isIncrementalQueueActive
-  if (!rem || !finalCardInfo || isIncrementalQueueActive) {
+  if (!rendersBar) {
     // console.log('[CardInfoBar] Early return — rem:', !!rem, ', finalCardInfo:', !!finalCardInfo,
     //   ', isIncrementalQueueActive:', isIncrementalQueueActive,
     //   ', cardInfo:', !!cardInfo, ', lightCardInfo:', !!lightCardInfo,
@@ -624,7 +643,9 @@ export function CardInfoBar() {
   };
 
   return (
-    <div style={{ paddingTop: '30px', paddingBottom: '10px' }}>
+    // No vertical padding here: the spacing from the card above is host CSS
+    // (lib/card_info_bar_dock), so the docked bar in the Beautiful queue has none.
+    <div ref={barRef}>
       <div
         className="flex items-center justify-center gap-3 px-3 py-1.5"
         style={{

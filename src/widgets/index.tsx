@@ -28,7 +28,8 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey } from '../lib/consts';
+import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
@@ -139,6 +140,14 @@ async function onActivate(plugin: ReactRNPlugin) {
     // marker tint is emitted inside this stylesheet.
     await rp.storage.getSession(priorityBandColorsReloadKey);
     await registerPdfHighlightCSS(plugin);
+  });
+
+  // card_info_bar docks above the Beautiful queue's answer buttons, in a band the
+  // size of the bar. The widget reports its height here because it can't call
+  // registerCSS from its own iframe. Also runs at activation with the default height.
+  plugin.track(async (rp) => {
+    const barHeight = await rp.storage.getSession<number>(cardInfoBarHeightKey);
+    await registerCardInfoBarDockCss(plugin, barHeight);
   });
 
   // Band badge colours come from the RELATIVE position of each band in the
