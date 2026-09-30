@@ -1,0 +1,2584 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Utilities-Text-and-Lists/">
+      
+      
+        <link rel="prev" href="../Utilities/">
+      
+      
+        <link rel="next" href="../Utilities-Outline-and-Headings/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Text & Lists - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#text-lists" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Text & Lists
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AI-Transcription-of-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Transcription of PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Source-Pins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source Pins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Repetition-History-and-Statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repetition History & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Logos-Bible-Software-Integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logos Bible Software
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & Lists
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & Lists
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#text-case-converter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text Case Converter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Text Case Converter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#english-title-case-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        English Title Case rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acronyms-and-initialisms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acronyms and initialisms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bulletize-inline-selected-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bulletize Inline Selected Text
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bulletize Inline Selected Text">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-to-invoke" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to invoke
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inlinize-break-lists-from-pdf-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inlinize &amp; Break Lists (from PDF Highlights)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inlinize &amp; Break Lists (from PDF Highlights)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inlinize-detected-list-inl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inlinize Detected List (inl)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#break-inline-list-into-children-brl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Break Inline List Into Children (brl)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#restore-list-rem-rlr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restore List Rem (rlr)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-detection-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How detection works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Outline-and-Headings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outline & Headings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Finding-and-Navigating/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding & Navigating
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Queue-Display/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue Display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Cleaning-Up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning Up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Under-the-Hood/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Under the Hood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    8. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RemNote-Native-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RemNote Native Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Colour-Coding-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Colour Coding Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    9. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#text-case-converter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text Case Converter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Text Case Converter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#english-title-case-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        English Title Case rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acronyms-and-initialisms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acronyms and initialisms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bulletize-inline-selected-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bulletize Inline Selected Text
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bulletize Inline Selected Text">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-to-invoke" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to invoke
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it does
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inlinize-break-lists-from-pdf-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inlinize &amp; Break Lists (from PDF Highlights)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inlinize &amp; Break Lists (from PDF Highlights)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inlinize-detected-list-inl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inlinize Detected List (inl)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#break-inline-list-into-children-brl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Break Inline List Into Children (brl)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#restore-list-rem-rlr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restore List Rem (rlr)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-detection-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How detection works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="text-lists">Text &amp; Lists<a class="headerlink" href="#text-lists" title="Permanent link">&para;</a></h1>
+<p>Commands that reshape the text <em>inside</em> a Rem — most useful right after a PDF highlight lands in your notes as one flattened block.</p>
+<h2 id="text-case-converter">Text Case Converter<a class="headerlink" href="#text-case-converter" title="Permanent link">&para;</a></h2>
+<p>This incorportated utility cycles selected text through three case styles with a single shortcut — just like <strong>Shift+F3</strong> in Microsoft Word.</p>
+<p><img alt="Text Case Converter demo" src="../assets/text-case-converter.gif" /></p>
+<hr />
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<p>Press <strong>Shift+F3</strong> with text selected to cycle through:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Style</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1st press</td>
+<td><strong>Title Case</strong></td>
+<td><em>Cyclone in Tropical Latitudes</em></td>
+</tr>
+<tr>
+<td>2nd press</td>
+<td><strong>UPPERCASE</strong></td>
+<td><em>CYCLONE IN TROPICAL LATITUDES</em></td>
+</tr>
+<tr>
+<td>3rd press</td>
+<td><strong>lowercase</strong></td>
+<td><em>cyclone in tropical latitudes</em></td>
+</tr>
+</tbody>
+</table>
+<p>The plugin <strong>auto-detects</strong> the current case of the selection and always advances to the next stage, so you never have to think about where you are in the cycle.</p>
+<hr />
+<h3 id="english-title-case-rules">English Title Case rules<a class="headerlink" href="#english-title-case-rules" title="Permanent link">&para;</a></h3>
+<p>Title Case follows <strong>Chicago/APA style</strong>:</p>
+<ul>
+<li><strong>Always capitalised / Sempre maiúsculas:</strong></li>
+<li>The first and last word of the selection.</li>
+<li>
+<p>All nouns, verbs, adjectives and adverbs.</p>
+</li>
+<li>
+<p><strong>Kept lowercase / Mantidas em minúsculas</strong> (unless first or last word):</p>
+</li>
+<li><strong>Articles / Artigos:</strong> <em>a, an, the</em> · <em>o, a, os, as, um, uma…</em></li>
+<li><strong>Prepositions / Preposições:</strong> <em>at, by, in, of, on, to, up, as, via</em> · <em>de, em, por, para, com, sem, sob, sobre…</em></li>
+<li><strong>Conjunctions / Conjunções:</strong> <em>and, or, nor, but, for, yet, so</em> · <em>e, ou, mas, nem, que, se, como, pois, logo…</em></li>
+<li><strong>Portuguese contractions / Contrações portuguesas:</strong> <em>do, da, dos, das, no, na, nos, nas, ao, aos, pelo, pela, pelos, pelas…</em></li>
+</ul>
+<h4 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p><code>cyclone in tropical or subtropical latitudes</code>
+→ <strong>Cyclone in Tropical or Subtropical Latitudes</strong></p>
+<p><code>princípios das radiocomunicações marítimas</code>
+→ <strong>Princípios das Radiocomunicações Marítimas</strong></p>
+</blockquote>
+<hr />
+<h3 id="acronyms-and-initialisms">Acronyms and initialisms<a class="headerlink" href="#acronyms-and-initialisms" title="Permanent link">&para;</a></h3>
+<p>Words that are uppercase by nature stay that way through Title Case — <code>arqueação bruta (ab)</code> becomes <strong>Arqueação Bruta (AB)</strong>, never <em>(Ab)</em>. Four signals are used, in this order:</p>
+<ol>
+<li><strong>The acronym list.</strong> Common maritime (<em>GT, NT, AB, TPB, DWT, LOA, IMO, MMSI, SOLAS, MARPOL, STCW, ECDIS, GMDSS…</em>), institutional (<em>ONU, UN, ISO, CNPJ, IBGE…</em>) and technical (<em>PDF, URL, HTML, API, CSV…</em>) acronyms are built in. Add your own under <strong>IE Settings → Other → <a href="../Plugin-Settings-Reference/#other">Title Case Acronyms</a></strong>, separated by commas or spaces.</li>
+<li><strong>Initialisms and initials.</strong> <code>u.s.a.</code> → <strong>U.S.A.</strong>, and a lone initial keeps its capital: <code>o autor a. silva</code> → <strong>O Autor A. Silva</strong>. The dotted abbreviations that are conventionally lowercase — <em>e.g., i.e., cf., a.m., p.m.</em> — are exempt and behave like the minor words above.</li>
+<li><strong>Roman numerals used as numbers.</strong> <code>seção ii</code> → <strong>Seção II</strong>, <code>capítulo iv</code> → <strong>Capítulo IV</strong>, <code>chapter xl</code> → <strong>Chapter XL</strong>. See <a href="#when-a-roman-numeral-counts-as-a-numeral">when a numeral counts as a numeral</a> below.</li>
+<li><strong>Capitals already in the text.</strong> A word you wrote with two or more capitals is preserved as typed: <code>RO-RO</code>, <code>P&amp;I</code>, <code>COVID-19</code>, <code>A/S</code>. This signal is switched off when the <em>whole</em> selection is uppercase, where existing capitals say nothing about which words are acronyms — there, signal 1 does the work, so <code>ARQUEAÇÃO BRUTA (AB)</code> still title-cases to <strong>Arqueação Bruta (AB)</strong>.</li>
+</ol>
+<p>A trailing plural <code>s</code> stays lowercase: <strong>GTs</strong>, not <em>GTS</em>.</p>
+<blockquote>
+<p><strong>Why the list matters even though capitals are preserved.</strong> Signal 4 reads what is on screen, so it cannot survive the lowercase step of the cycle — once <code>GT</code> has become <code>gt</code>, only the list knows to bring it back. Domain terms you cycle through all three stages belong in the setting.</p>
+</blockquote>
+<h4 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p><code>o navio de 500 gt e a convenção solas</code>
+→ <strong>O Navio de 500 GT e a Convenção SOLAS</strong></p>
+<p><code>tonelagem de porte bruto (tpb) em nm</code> <em>(with <code>TPB, NM</code> in the setting)</em>
+→ <strong>Tonelagem de Porte Bruto (TPB) em NM</strong></p>
+<p><code>SEÇÃO II - DIÁRIO DE NAVEGAÇÃO</code>
+→ <strong>Seção II - Diário de Navegação</strong></p>
+</blockquote>
+<p>Acronyms are forced uppercase in the <strong>Title Case</strong> step only. The <strong>UPPERCASE</strong> and <strong>lowercase</strong> steps stay literal, so <code>Shift+F3</code> can always take you to a fully lowercase selection.</p>
+<h4 id="when-a-roman-numeral-counts-as-a-numeral">When a Roman numeral counts as a numeral<a class="headerlink" href="#when-a-roman-numeral-counts-as-a-numeral" title="Permanent link">&para;</a></h4>
+<p><code>VI</code>, <code>LI</code> and <code>MI</code> are Portuguese words, <code>CM</code>, <code>ML</code> and <code>CC</code> are units, and every one of them is also a valid Roman numeral — so the numeral has to be recognisable as a number before it is capitalised. Two things make it so:</p>
+<ul>
+<li><strong>The word before it names a numbered thing</strong> — <em>seção, capítulo, parte, volume, tomo, livro, título, anexo, artigo, regra, item, fase, classe, figura, tabela, século, guerra, papa, rei</em>, and their English counterparts (<em>section, chapter, part, book, annex, article, rule, figure, table, century, war, king, pope…</em>). This is the only route for a <strong>single letter</strong>, since nothing else distinguishes <code>Capítulo V</code> from an ordinary <em>v</em>: <code>anexo vi da marpol</code> → <strong>Anexo VI da MARPOL</strong>.</li>
+<li><strong>The numeral is two letters or longer and is not an ambiguous one</strong> — <code>II</code>, <code>III</code>, <code>IV</code>, <code>XL</code>, <code>XVIII</code> are taken as numerals anywhere in the text, even as the first word: <code>ii - diário de navegação</code> → <strong>II - Diário de Navegação</strong>.</li>
+</ul>
+<p>Everything else is left alone, so <code>eu vi o navio</code> stays <strong>Eu Vi o Navio</strong> and <code>o volume em cm e ml</code> stays <strong>O Volume em Cm e Ml</strong>. If you want one of the ambiguous forms capitalised regardless of context, add it to the <strong>Title Case Acronyms</strong> setting.</p>
+<blockquote>
+<p><strong>A word on two-letter entries.</strong> For the same reason, <code>EU</code>, <code>MOB</code> and <code>RAM</code> are deliberately <em>not</em> in the built-in list — they would capitalise every Portuguese <em>eu</em> and every English <em>mob</em> and <em>ram</em>. Add them yourself if your notes never use those words.</p>
+</blockquote>
+<hr />
+<h3 id="other-features">Other features<a class="headerlink" href="#other-features" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Formatting preserved / Formatação preservada:</strong> bold, italic, highlight and all other rich-text styles are kept intact through every transformation.</li>
+<li><strong>Cross-element word boundaries / Palavras com formatação mista:</strong> words split across formatting runs (e.g. a bold first letter) are handled correctly — only the true first letter of each word is capitalised.</li>
+<li><strong>Multi-rem selections / Seleção de múltiplos rems:</strong> select one or more whole rems in the outline (instead of a text range) and <code>Shift+F3</code> will cycle the case of each rem's text — and the <strong>back text</strong> of concept/descriptor rems — in a single shot. The current cycle stage is detected from the combined text of the batch so all rems advance together (Title → UPPER → lower), while Title Case is still computed per rem so each one's first/last-word rule is respected.</li>
+</ul>
+<hr />
+<h2 id="bulletize-inline-selected-text">Bulletize Inline Selected Text<a class="headerlink" href="#bulletize-inline-selected-text" title="Permanent link">&para;</a></h2>
+<p>Toggles a <code>•</code> (bullet glyph + space) prefix at the start of each line <strong>within a single rem</strong>, across a multi-line selection. Built for the common case where a <strong>PDF highlight flattens a real bullet list into soft-wrapped text</strong> — RemNote keeps the visual lines inside one rem (joined by <code>Shift+Enter</code> soft line breaks) but drops the original bullet markers. Re-adding <code>•</code> by hand at every line start is tedious, especially when you're prepping a highlight to become an <a href="../Create-Incremental-Rem-from-PDF-Highlights/">Incremental Rem</a>.</p>
+<p><img alt="Bulletize Inline Selected Text demo" src="../assets/bulletize-text.gif" /></p>
+<h3 id="how-to-invoke">How to invoke<a class="headerlink" href="#how-to-invoke" title="Permanent link">&para;</a></h3>
+<p>Run <strong><code>Bulletize Inline Selected Text</code></strong> (quick code <code>bul</code>) or press <strong><code>Shift+F8</code></strong>.</p>
+<blockquote>
+<p>The default binding is <code>Shift+F8</code> because the plainer combos are all taken: on macOS <code>Opt+8</code> types the <code>•</code> glyph itself and <code>Opt+Shift+8</code> types the degree symbol (<code>°</code>), and <code>Ctrl+Opt+Shift+8</code> (the previous default) is used by RemNote to apply the <strong>blue highlight</strong> to inline text. <code>Shift+F8</code> avoids all of these and is identical across macOS/Windows/Linux. You can rebind it in RemNote's keyboard-shortcut settings.</p>
+</blockquote>
+<h3 id="what-it-does">What it does<a class="headerlink" href="#what-it-does" title="Permanent link">&para;</a></h3>
+<p>It is a <strong>toggle</strong>, evaluated over the lines your selection touches:</p>
+<ul>
+<li>If <strong>every non-empty selected line already starts with <code>•</code></strong>, the prefix is <strong>stripped</strong> from all of them.</li>
+<li>Otherwise, <code>•</code> is <strong>added</strong> to the selected lines that don't already have it (lines already bulleted are left as-is, so you never get a double bullet).</li>
+</ul>
+<p>Empty lines (e.g. the blank line a <code>\n\n</code> produces between a heading and its list) are skipped.</p>
+<h4 id="selection-modes">Selection modes<a class="headerlink" href="#selection-modes" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Multi-line text selection</strong> → operates on every line the selection intersects. A partial selection still bulletizes whole lines: the start is expanded back to the beginning of its line, so you don't have to select from the exact line start.</li>
+<li><strong>Collapsed cursor (no selection) or a whole-rem selection</strong> → bulletizes the rem's <strong>entire front text</strong> in one shot. Handy for "bulletize this whole rem" — click into it and hit the shortcut.</li>
+</ul>
+<h4 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h4>
+<p>Before (one rem, soft line breaks; the first four lines were bulleted manually, the rest weren't):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>a. Engine characteristics
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>• Type of engine and its BHP.
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>• Type of propeller – RH, LH or CPP.
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>• Critical RPM,
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>• Minimum number of consecutive start,
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>Astern power is %age of ahead power
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>Emergency full ahead to full astern time
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>...
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>RPM indicators in the bridge and outside bridge.
+</code></pre></div>
+<p>Select the list and press <code>Shift+F8</code> → the un-bulleted lines gain <code>•</code>, so the whole list is uniform. Press it again on the same selection → all bullets are stripped.</p>
+<h3 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Formatting preserved.</strong> The toggle rebuilds the rem's rich text by character offset, so highlights, colors, bold/italic, references and other inline nodes are left intact. The bullet itself is inserted as a <strong>plain</strong> node, so on a PDF-highlight rem (where the line text is highlighted yellow) the <code>•</code> glyph is <em>not</em> highlighted. If you'd prefer the bullet to match the line's highlight/color, that's a small change — open an issue.</li>
+<li><strong>Front text only for the whole-rem gesture.</strong> A multi-line selection works in either the front or the back text (the plugin detects which contains the selection), but the collapsed-cursor "bulletize the whole rem" path acts on the front text.</li>
+<li><strong>Why <code>•</code> and not a native bullet:</strong> native RemNote bullets require <em>separate rems</em>. Inside a single rem (which is what a PDF highlight produces), the only way to simulate a list is the literal <code>•</code> prefix on each soft-wrapped line — which is exactly what this command automates.</li>
+</ul>
+<hr />
+<h2 id="inlinize-break-lists-from-pdf-highlights">Inlinize &amp; Break Lists (from PDF Highlights)<a class="headerlink" href="#inlinize-break-lists-from-pdf-highlights" title="Permanent link">&para;</a></h2>
+<p>Where <a href="#bulletize-inline-selected-text">Bulletize Inline Selected Text</a> re-bullets lines that <strong>already exist</strong>, these commands handle the harder case: a PDF highlight that captured a whole enumerated list as <strong>one rem, flattened onto a single line</strong> with the numbers left inline and every line break dropped:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>As seguintes medidas podem contribuir para evitá-las: 1 Aumentar, em certas
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>circunstâncias, o número de pessoal qualificado… 2 Deixar claro em que situações
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>"chamar o Comandante ao passadiço". 3 O Oficial de quarto… 11 Garantir que…
+</code></pre></div>
+<p>There are no line breaks to bulletize — the only structure is in the <strong>markers</strong>: <strong>enumerators</strong> (<code>1</code>, <code>2</code>, <code>3</code>… / <code>a)</code> <code>b)</code> / <code>i.</code> <code>ii.</code> / <code>.1</code> <code>.2</code> <code>.3</code>), <strong>depth/compound numbers</strong> (<code>1.1</code>, <code>1.2</code>… or mixed <code>1.a</code>, <code>1.b</code>…), or <strong>inline bullet/dash glyphs</strong> (<code>•</code>, <code>-</code>, <code>*</code>) that a highlight ran together onto one line. These commands detect that structure and rebuild the list, first inline (for review) and then as proper child rems, with a full undo.</p>
+<p>Unlike Bulletize, all three act on the <strong>focused rem</strong> — just click into the rem, no text selection required.</p>
+<h3 id="the-workflow">The workflow<a class="headerlink" href="#the-workflow" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Highlight the list in the PDF and <strong>Create IncRem</strong> from it (one rem, flattened).</li>
+<li>Run <strong><code>Inlinize Detected List</code></strong> — the numbers become soft-wrapped <code>•</code> lines in the same rem. <strong>Review the split</strong>; if it's wrong, <code>Ctrl+Z</code> and you're back to the original.</li>
+<li>Run <strong><code>Break Inline List Into Children</code></strong> — the caput/title stays on the parent, each item becomes a child rem.</li>
+<li>If the break went wrong, run <strong><code>Restore List Rem</code></strong> to undo it exactly.</li>
+</ol>
+<h3 id="inlinize-detected-list-inl">Inlinize Detected List (<code>inl</code>)<a class="headerlink" href="#inlinize-detected-list-inl" title="Permanent link">&para;</a></h3>
+<p>Detects the list and inserts a line break + <code>•</code> before each item, so the flattened text becomes soft-wrapped bulleted lines:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>As seguintes medidas podem contribuir para evitá-las:
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>• 1 Aumentar, em certas circunstâncias, o número de pessoal qualificado…
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>• 2 Deixar claro em que situações "chamar o Comandante ao passadiço".
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>• 3 O Oficial de quarto…
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>• 11 Garantir que…
+</code></pre></div>
+<ul>
+<li><strong>Enumerated lists keep their number:</strong> <code>1 Aumentar</code> → <code>• 1 Aumentar</code>.</li>
+<li><strong>Sub-paragraph markers keep their leading dot:</strong> the <code>.1</code> <code>.2</code> <code>.3</code> style used by IMO/UN and other legal drafting is read as one marker, so the break lands <strong>before the dot</strong> (<code>• .1 Deep unrestricted water…</code>) instead of stranding a lone <code>.</code> at the end of the previous item. A number glued to a word (<code>footnote.1</code>) is not a marker.</li>
+<li><strong>Bullet/dash lists have their marker normalized:</strong> an existing <code>•</code>, <code>-</code> or <code>*</code> is <strong>replaced</strong> by a single <code>•</code> (so <code>- calado</code> and <code>* item</code> both become <code>• …</code>) — no duplicate bullet is added.</li>
+</ul>
+<p>The text before the first marker becomes the <strong>caput</strong> (title line); the whitespace before each marker is collapsed into the <code>•</code> prefix. This stays a <strong>single rem</strong> and is fully <code>Ctrl+Z</code>-able — it's the review checkpoint before the destructive step. If no list is detected, a toast says so and nothing changes.</p>
+<h3 id="break-inline-list-into-children-brl">Break Inline List Into Children (<code>brl</code>)<a class="headerlink" href="#break-inline-list-into-children-brl" title="Permanent link">&para;</a></h3>
+<p>Splits the inline-bulletized rem on its <code>\n</code> lines: the <strong>first line (caput) stays on the parent</strong>, and each <code>•</code> line becomes a <strong>child rem</strong> (order preserved). The <code>•</code> prefix is stripped from each child.</p>
+<ul>
+<li><strong>Keeps the PDF-highlight pin on the caput.</strong> A list rem made from a PDF highlight carries a <strong>pin</strong> back to that highlight — which sits at the end of the text and would otherwise ride along with the <em>last</em> item. The break detects that pin (any reference whose target rem is a <strong>PDF Highlight</strong> — the <code>#pdfextract</code> tag is also accepted but <strong>not</strong> required) and <strong>moves it to the end of the caput/parent</strong>, so every child stays clean and the source link stays on the title. This covers both the <strong>Create IncRem</strong> highlight-toolbar flow <em>and</em> directly pasting a highlight into your notes (text + pin), where no <code>#pdfextract</code> tag is present.</li>
+<li><strong>Images and other pins survive too.</strong> A highlight that ends with a <strong>figure</strong> (soft line break + image) gets that image split into its own <strong>child rem, appended as the last item</strong>; any other <strong>trailing references</strong> (e.g. a pin to a regular rem) join the caput alongside the highlight pin. Mid-text images stay attached to the line/item they end, and an image sitting alone on its own line becomes its own item rather than being dropped.</li>
+<li><strong>Snapshot first.</strong> Before mutating, it saves the original front text <strong>and the IDs of the children it creates</strong> to synced storage, keyed by the rem — so <a href="#restore-list-rem-rlr">Restore List Rem</a> can reverse it exactly.</li>
+<li><strong>Won't touch flashcards.</strong> If the rem has <strong>back text</strong> (i.e. it's a flashcard), the command refuses with a toast rather than risk scrambling the card.</li>
+<li><strong>Prerequisite.</strong> Run <a href="#inlinize-detected-list-inl">Inlinize Detected List</a> first — if there are no <code>•</code> item lines, a toast tells you.</li>
+</ul>
+<h3 id="restore-list-rem-rlr">Restore List Rem (<code>rlr</code>)<a class="headerlink" href="#restore-list-rem-rlr" title="Permanent link">&para;</a></h3>
+<p>Reads the snapshot saved by the break, <strong>deletes exactly the children it created</strong> (skipping any you've since re-parented away), rewrites the original front text, and clears the snapshot. Use it whenever a break didn't split the way you wanted.</p>
+<h3 id="how-detection-works">How detection works<a class="headerlink" href="#how-detection-works" title="Permanent link">&para;</a></h3>
+<p>Detection runs two paths and takes whichever finds the longer list (enumerated wins ties).</p>
+<p><strong>Enumerated lists — an ascending chain.</strong> The core problem is disambiguation: a lone <code>2</code> in prose (<em>"reduzir para 2 nós"</em>) is <strong>not</strong> a marker, but <code>1 … 2 … 3</code> in order almost certainly is. So it doesn't split on every number:</p>
+<ul>
+<li>It finds a start marker (<code>1</code> / <code>a</code> / <code>i</code>), then searches forward for the <strong>next expected value</strong> (<code>prev + 1</code>) at a word boundary, allowing arbitrary text (which may itself contain other numbers) in between.</li>
+<li>When the expected value appears more than once, it <strong>prefers the occurrence that sits after sentence punctuation</strong> (<code>.</code>, <code>;</code>, <code>:</code>, <code>)</code>, <code>"</code>). This is what stops <em>"reduzir de 3 para </em><em>2</em><em> nós"</em> inside item 1 from being mistaken for marker <code>2</code> — the real <code>. 2 Manter…</code> wins.</li>
+<li>Plain prose with scattered numbers forms no chain, so nothing is detected.</li>
+</ul>
+<p>Supported enumerator styles: <strong>decimal</strong> (<code>1</code>, <code>1.</code>, <code>1-</code>, <code>1)</code>), <strong>lettered</strong> (<code>a)</code>, <code>b.</code>) and <strong>roman</strong> (<code>i.</code>, <code>ii.</code>). Bare decimals like <code>1 Aumentar</code> work with no delimiter; <strong>letters and roman numerals require a delimiter</strong> (<code>.</code>, <code>)</code>, <code>-</code>) because bare <code>a</code>/<code>i</code>/<code>o</code>/<code>v</code> collide with common words.</p>
+<p><strong>Depth / compound markers — a fixed prefix with an ascending tail.</strong> Dotted markers where a constant prefix identifies the group and the <strong>last component ascends</strong> are detected too: <code>1.1</code>, <code>1.2</code>, <code>1.3…</code> (numeric tail) and mixed <code>1.a</code>, <code>1.b</code>, <code>1.c…</code> (letter tail), as well as sub-lists under any prefix (<code>3.1</code>, <code>3.2…</code>). The full label is kept (<code>1.1 Falha…</code> → <code>• 1.1 Falha…</code>). Because bare <code>1.1</code>/<code>5.2</code> also read as version numbers or ratios in prose, a compound list is only recognized when the <strong>first item opens after a clause boundary</strong> (<code>:</code>, <code>;</code>, <code>.</code>, or the start) — so <em>"atualize para 2.1 e depois 2.2"</em> is left alone. Items become <strong>flat siblings</strong> (see limitations); the compound path does not (yet) build a nested outline from <code>1</code>, <code>1.1</code>, <code>1.2</code>, <code>2</code>, <code>2.1…</code>.</p>
+<p><strong>Bullet/dash lists — a consistent standalone marker.</strong> When there's no enumeration, it looks for one repeated marker glyph (<code>•</code>, <code>▪</code>, <code>◦</code>, <code>*</code>, <code>-</code>, <code>–</code>, <code>—</code>) that stands alone — preceded by a separator and followed by a space + a letter (so <code>bem-vindo</code>, <code>10-20</code> and <code>*bold*</code> are rejected). At least two such markers are needed.</p>
+<ul>
+<li><strong>Glyph bullets</strong> (<code>•</code>, <code>*</code>, …) are safe and used as-is.</li>
+<li><strong>Dashes</strong> also appear in prose (parenthetical <em>"o navio – já antigo – foi rebocado"</em>), so a dash list is only recognized when the <strong>first item opens after a clause boundary</strong> (<code>:</code>, <code>;</code>, <code>.</code>, or the start of the text) — as in <em>"Requisitos: - calado…; - reboque…"</em>. Later items may be dash-separated freely. A dash used mid-sentence with no such boundary is left alone.</li>
+</ul>
+<p><strong>Formatting is preserved</strong> throughout — the rewrite operates by character offset, and the <code>•</code> bullet is inserted as a plain node (same approach as Bulletize).</p>
+<h3 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Chains must start at <code>1</code> / <code>a</code> / <code>i</code></strong> (and, for compound markers, the ascending tail must start at <code>.1</code> / <code>.a</code>). A highlight that begins <em>mid-list</em> isn't detected (much riskier to guess).</li>
+<li><strong>A gap stops the chain.</strong> If the PDF extraction dropped an item (e.g. the <code>7</code> is missing), detection stops at <code>6</code>. This is deliberate — safe over clever.</li>
+<li><strong>Compound markers produce flat siblings, not a nested outline.</strong> <code>1.1</code>, <code>1.2</code>, <code>1.3</code> all become siblings under the caput; a full multi-level hierarchy (<code>1</code> → <code>1.1</code>/<code>1.2</code> → <code>2</code> → <code>2.1</code>…) isn't nested, and only one prefix group is captured per run.</li>
+<li><strong>Dash lists need a clause boundary before the first item</strong> (<code>:</code>, <code>;</code>, <code>.</code>, or start). A dash list buried mid-sentence with no such cue is skipped, to avoid mistaking parenthetical dashes for a list. Glyph bullets (<code>•</code>, <code>*</code>) have no such restriction.</li>
+<li><strong>The last item runs to the end of the text.</strong> If prose follows the final list item in the same highlight, it stays attached to that item — there's no reliable signal for where the list ends.</li>
+<li><strong>No default keyboard shortcut</strong> is bound (quick codes <code>inl</code> / <code>brl</code> / <code>rlr</code> only), to avoid clashing with existing bindings. You can add your own in RemNote's settings.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

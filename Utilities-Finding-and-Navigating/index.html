@@ -1,0 +1,2978 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Utilities-Finding-and-Navigating/">
+      
+      
+        <link rel="prev" href="../Utilities-Outline-and-Headings/">
+      
+      
+        <link rel="next" href="../Utilities-Queue-Display/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Finding & Navigating - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#finding-navigating" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Finding & Navigating
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AI-Transcription-of-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Transcription of PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Source-Pins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source Pins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Repetition-History-and-Statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repetition History & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Logos-Bible-Software-Integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logos Bible Software
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Text-and-Lists/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & Lists
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Outline-and-Headings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outline & Headings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding & Navigating
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding & Navigating
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#find-rem-reference-or-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find Rem — Reference or Open
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Find Rem — Reference or Open">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-to-invoke" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to invoke
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spotting-pdf-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spotting PDF highlights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spotting-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spotting figures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-finds-rems-the-normal-search-cant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it finds Rems the normal search can't
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-by-alias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find by alias
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended use cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#insert-as-a-pin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insert as a pin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#insert-text-with-a-pin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insert text with a pin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pin-a-source-at-the-end-of-a-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin a source at the end of a Rem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloze-aware-insertion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cloze-aware insertion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accent-insensitive-selection-aware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accent-insensitive &amp; selection-aware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stays-on-screen-near-the-edges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stays on-screen near the edges
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-source-in-popup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Source in Popup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Open Source in Popup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-ways-to-open-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two ways to open it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-invoke_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to invoke
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-opens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it opens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scroll-to-highlight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scroll to Highlight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#floating-window-interaction-closing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Floating window — interaction &amp; closing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-use-cases_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended use cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filter-a-document-by-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filter a Document by Images
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Filter a Document by Images">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to use it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seeing-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seeing the result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-counts-as-an-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What counts as an image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-running-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-running it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-long-it-takes-the-first-whole-kb-run-is-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How long it takes — the first whole-KB run is slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clearing-the-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clearing the tag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-tag-is-invisible-in-the-outline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tag is invisible in the outline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pins-that-lead-to-an-image-are-ringed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pins that lead to an image are ringed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Queue-Display/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue Display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Cleaning-Up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning Up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Under-the-Hood/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Under the Hood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    8. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RemNote-Native-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RemNote Native Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Colour-Coding-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Colour Coding Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    9. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#find-rem-reference-or-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find Rem — Reference or Open
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Find Rem — Reference or Open">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-to-invoke" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to invoke
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spotting-pdf-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spotting PDF highlights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spotting-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spotting figures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-finds-rems-the-normal-search-cant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it finds Rems the normal search can't
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-by-alias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find by alias
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended use cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#insert-as-a-pin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insert as a pin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#insert-text-with-a-pin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insert text with a pin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pin-a-source-at-the-end-of-a-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin a source at the end of a Rem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloze-aware-insertion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cloze-aware insertion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accent-insensitive-selection-aware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accent-insensitive &amp; selection-aware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stays-on-screen-near-the-edges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stays on-screen near the edges
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-source-in-popup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Source in Popup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Open Source in Popup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-ways-to-open-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two ways to open it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-invoke_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to invoke
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-opens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it opens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scroll-to-highlight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scroll to Highlight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#floating-window-interaction-closing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Floating window — interaction &amp; closing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-use-cases_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended use cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filter-a-document-by-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filter a Document by Images
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Filter a Document by Images">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to use it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seeing-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seeing the result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-counts-as-an-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What counts as an image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-running-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-running it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-long-it-takes-the-first-whole-kb-run-is-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How long it takes — the first whole-KB run is slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clearing-the-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clearing the tag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-tag-is-invisible-in-the-outline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tag is invisible in the outline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pins-that-lead-to-an-image-are-ringed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pins that lead to an image are ringed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="finding-navigating">Finding &amp; Navigating<a class="headerlink" href="#finding-navigating" title="Permanent link">&para;</a></h1>
+<p>Reaching a Rem, a source, or a figure that RemNote's own search will not surface.</p>
+<h2 id="find-rem-reference-or-open">Find Rem — Reference or Open<a class="headerlink" href="#find-rem-reference-or-open" title="Permanent link">&para;</a></h2>
+<p>A floating picker that finds a Rem <strong>by name even when RemNote's own reference search can't</strong>, then either inserts a reference to it at your cursor or opens it in a new pane. Built for the frustrating case where a perfectly normal Rem — even a Concept referenced dozens of times — simply never appears when you type its name in the <code>[[</code> reference search.</p>
+<p><img alt="The Find Rem — Reference or Open picker" src="../assets/find-rem-widget-2.png" /></p>
+<h3 id="how-to-invoke">How to invoke<a class="headerlink" href="#how-to-invoke" title="Permanent link">&para;</a></h3>
+<p>Run <strong><code>Find Rem (insert reference / open in pane)</code></strong> (quick code <code>fir</code>) or press <strong><code>Opt+Shift+F</code> / <code>Alt+Shift+F</code></strong>. A compact box opens <strong>at your cursor</strong>.</p>
+<ul>
+<li><strong>Type a name</strong> → results appear as you type, with the best matches floated to the top (an <code>EXACT</code> badge marks an exact-name match; an <code>ALIAS</code> badge marks a match found through one of the Rem's <a href="#find-by-alias">aliases</a>). Each row shows the Rem's <strong>type badge</strong> (see <a href="#spotting-pdf-highlights">Spotting PDF highlights</a>), a 🖼️ icon when it holds an image (see <a href="#spotting-figures">Spotting figures</a>), its <strong>back text</strong> (the definition side of a Concept↔definition card), and a short <strong>breadcrumb</strong> (<code>root / … / parent</code>) so you can tell which document it lives in when names collide.</li>
+<li><strong>Enter</strong> or <strong>click</strong> → inserts a reference to the selected Rem at your cursor.</li>
+<li><strong>Ctrl+Enter / Cmd+Enter</strong> or <strong>Ctrl/Cmd+click</strong> → inserts the reference as a <strong>pin</strong> (the link chip <em>without</em> the referenced text). See <a href="#insert-as-a-pin">Insert as a pin</a> below.</li>
+<li><strong>Opt+Enter / Alt+Enter</strong> or <strong>Opt/Alt+click</strong> → inserts the Rem's <strong>text followed by a pin</strong> — the readable text plus a link chip (RemNote's paste "Text with Pin"). See <a href="#insert-text-with-a-pin">Insert text with a pin</a> below.</li>
+<li><strong>Shift+Enter</strong> or <strong>Shift+click</strong> → opens the selected Rem in a <strong>new pane</strong> beside your current one (without inserting anything).</li>
+<li><strong>Ctrl/Cmd+Shift+Enter</strong> or <strong>Ctrl/Cmd+Shift+click</strong> → appends a <strong>pin at the end of the Rem you are editing, keeping your selected text</strong>. See <a href="#pin-a-source-at-the-end-of-a-rem">Pin a source at the end of a Rem</a> below.</li>
+<li><strong>↑/↓</strong> navigate · <strong>Esc</strong> closes.</li>
+<li><strong>Concepts only</strong> checkbox narrows results to Concept-type Rems.</li>
+</ul>
+<p>The Rem you triggered the picker from is <strong>excluded from results</strong> — a Rem can't reference itself.</p>
+<h3 id="spotting-pdf-highlights">Spotting PDF highlights<a class="headerlink" href="#spotting-pdf-highlights" title="Permanent link">&para;</a></h3>
+<p>A PDF highlight carries the same <code>DEFAULT_TYPE</code> as any plain Rem, so the type badge alone couldn't tell a highlight apart from your own note of the same sentence — a common collision, since a note is often worded exactly like the passage it came from. Highlights are badged <strong><code>PDF HIGHLIGHT</code></strong> in amber instead, so you can see at a glance which result is the source passage and which is your note, and reference the one you meant.</p>
+<h3 id="spotting-figures">Spotting figures<a class="headerlink" href="#spotting-figures" title="Permanent link">&para;</a></h3>
+<p>A result whose Rem holds an <strong>image</strong> is marked with a 🖼️ before its name. An image contributes no searchable text, so a figure Rem is identified only by its caption — and captions are often near-identical to the prose that discusses them (<code>Figure 6.4: Definitions used on turning circle</code> beside a highlight reading <em>"… consists of (Fig. 6.4)"</em>). The icon tells you which row is the actual figure.</p>
+<p>This reads the Rem's own text directly, so it is accurate whether or not you have ever run <a href="#filter-a-document-by-images">Tag Rems With Images</a> — it does not depend on the <strong>HasImage</strong> tag being present or up to date.</p>
+<h3 id="why-it-finds-rems-the-normal-search-cant">Why it finds Rems the normal search can't<a class="headerlink" href="#why-it-finds-rems-the-normal-search-cant" title="Permanent link">&para;</a></h3>
+<p>RemNote's reference search builds its candidate list <strong>per token, with a cap</strong>. When <em>every</em> word in a Rem's name is high-frequency in your knowledge base (e.g. <code>Navegação Interior</code>, <code>mar territorial</code> — where both <code>navegação</code>/<code>interior</code> and <code>mar</code>/<code>territorial</code> appear in hundreds of Rems), the exact-name Concept never makes any token's candidate cut, so typing its full name returns a flood of partial matches but <strong>not the Rem itself</strong>. This is a property of the search ranking — not a corruption of the Rem — so "Reload Search Cache", retyping the name, or changing its type do <strong>not</strong> fix it. (You can confirm all of this on a specific Rem with the <strong><a href="../Troubleshooting/#search-linkage-diagnostics-debug-widget">Search / Linkage Diagnostics</a></strong> tool in the Debug Widget.)</p>
+<p>This picker sidesteps the limitation: it searches <strong>each word of your query separately</strong>, unions the results, keeps only the Rems whose name contains <strong>all</strong> your words, and floats exact-name matches to the top. Because a distinctive word (e.g. <code>interior</code>) <em>does</em> return the Rem, it reliably surfaces — then ranking puts the exact match first.</p>
+<p>It also asks for the <strong>whole query as a phrase</strong>, which is the one thing that pulls back a small, precise set instead of a truncated flood. RemNote only looks for an exact run of adjacent words when the phrase it is handed is at least two words long, and it matches those words literally apart from the last one. That matters for names built from common words plus a number: a query like <code>fig. 6.4</code> seeds the word <code>fig</code>, which in a knowledge base full of figures returns thousands of Rems and is cut back long before yours is reached — whereas the phrase <code>figure 6.4</code> matches only the handful of Rems that actually contain those two words side by side. Since the literal spelling decides whether the phrase matches, both spellings are asked for (see <a href="#accent-insensitive-selection-aware"><code>Figure</code> = <code>Fig</code> = <code>Fig.</code></a>).</p>
+<p><img alt="Find Rem — surfacing a Rem that RemNote's own [[ reference search can't find" src="../assets/find-rem-finds-rems-normal-search-cannot.gif" /></p>
+<h3 id="find-by-alias">Find by alias<a class="headerlink" href="#find-by-alias" title="Permanent link">&para;</a></h3>
+<p>Like RemNote's native <code>[[</code> search, this picker also matches a Rem by its <strong>aliases</strong> (the built-in <strong>Aliases</strong> powerup — the alternate names you add via <em>Edit or Add Alias</em>). Earlier versions only matched the Rem's <em>primary</em> name, so a Rem named <strong>Via navegável</strong> with an alias <strong>vias navegáveis</strong> would not appear when you typed the alias.</p>
+<p>When a result's primary name doesn't contain every word you typed, the picker consults that Rem's aliases and matches against them too. An alias match is shown with the <strong>alias text</strong> as the row's title, an <strong><code>ALIAS</code></strong> badge, and the Rem's real name underneath (<code>↳ Via navegável</code>) so you know which Concept it links to.</p>
+<p>Picking an alias match inserts a reference to the <strong>owning Rem</strong> that <strong>renders the alias text</strong> — exactly the shape RemNote uses for its own alias references (the reference's <code>aliasId</code> points at the matched alias). So inserting the <strong>vias navegáveis</strong> result links to the <strong>Via navegável</strong> Concept while displaying "vias navegáveis". Alias matches work with every insertion mode — normal reference, <a href="#insert-as-a-pin">pin</a>, and <a href="#cloze-aware-insertion">cloze-aware</a> insertion.</p>
+<p><img alt="Find Rem — inserting a reference via a Rem's alias" src="../assets/find-rem-alias-insertion.gif" /></p>
+<h3 id="recommended-use-cases">Recommended use cases<a class="headerlink" href="#recommended-use-cases" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>When RemNote's <code>[[</code> search won't find a Rem</strong> you know exists (common-word names, heavily-referenced Concepts). Use <code>Opt+Shift+F</code> instead of <code>[[</code> to insert the reference.</li>
+<li><strong>To open an "invisible" Rem.</strong> Shift+Enter / Shift+click jumps to the Rem in a new pane — the practical way to reach Rems the normal search buries.</li>
+<li><strong>To reference a Rem inside a cloze deletion</strong> (see below).</li>
+</ul>
+<h3 id="insert-as-a-pin">Insert as a pin<a class="headerlink" href="#insert-as-a-pin" title="Permanent link">&para;</a></h3>
+<p>A <strong>pin</strong> is a Rem reference that renders as just the link chip <strong>without</strong> the referenced Rem's text. In native RemNote, creating one is fiddly: you insert the reference with <code>[[</code>, then right-click it → <strong>Edit or Add Alias</strong>, clear the text, and press Enter. This picker does it in <strong>one keystroke</strong> — press <strong>Ctrl+Enter / Cmd+Enter</strong> (or <strong>Ctrl/Cmd+click</strong> a result) instead of plain Enter, and the reference is inserted with <code>pin: true</code>.</p>
+<p>Pins are cloze-aware and selection-aware just like normal references: inside a cloze the pin stays inside the cloze, and a pin can replace selected text.</p>
+<h3 id="insert-text-with-a-pin">Insert text with a pin<a class="headerlink" href="#insert-text-with-a-pin" title="Permanent link">&para;</a></h3>
+<p>Press <strong>Opt+Enter / Alt+Enter</strong> (or <strong>Opt/Alt+click</strong> a result) to insert the Rem's <strong>text spelled out, followed by a pin</strong> — the same result as RemNote's paste dialog option <strong>"Text with Pin"</strong>, but in one keystroke and without copying first. Use it when you want the reference to read as normal prose <em>and</em> carry a link back to the source — a flow that's handy when you're weaving a referenced Rem into a sentence.</p>
+<p>It brings across the source's <strong>full rich text</strong>, not just a plain label:</p>
+<ul>
+<li><strong>Formatting and images are preserved</strong> — bold, italic, inline colours, LaTeX, embedded images, and so on come along exactly as they appear in the source Rem.</li>
+<li><strong>Front/back cards bring the back too.</strong> If the source is a Concept↔definition (or any front/back) card, the back text is included after the front, joined by a <strong>practice-direction arrow</strong> (<code>⇒</code>, <code>⇐</code>, or <code>⇔</code>) instead of RemNote's card delimiter.</li>
+<li><strong>The source's clozes are marked, not re-clozed.</strong> Any cloze deletions in the source are inserted as <strong>highlighted text (yellow background + reference-coloured font)</strong> — the same visual mark the plugin's cloze command (<code>Opt+Z</code>) leaves behind — so they still <em>read</em> as clozes without becoming functional clozes in your target (no "clozes out of clozes").</li>
+</ul>
+<p>Alias matches use the alias Rem's text; the trailing pin still links to the owning Rem.</p>
+<h3 id="pin-a-source-at-the-end-of-a-rem">Pin a source at the end of a Rem<a class="headerlink" href="#pin-a-source-at-the-end-of-a-rem" title="Permanent link">&para;</a></h3>
+<p>The other three modes all insert <strong>at your cursor</strong>, and — like RemNote's own <code>[[</code> — a text selection is <strong>consumed</strong>: the words you highlighted are replaced by the reference. That is wrong for one very common move: <em>linking a flashcard back to where it came from</em>. There, the selected text is the card, and the reference belongs at the <strong>end</strong> of the line, out of the way.</p>
+<p>Press <strong>Ctrl/Cmd+Shift+Enter</strong> (or <strong>Ctrl/Cmd+Shift+click</strong> a result) to do exactly that: a <strong>pin is appended at the end of the Rem</strong>, and your <strong>selected text is left untouched</strong>. The pin lands at the end of the field the selection is in, so highlighting something on a card's back appends to the back, not the front. When the selection sits inside a cloze, the pin stays <em>outside</em> it — a pin at the end of the line is a source marker, not part of the answer.</p>
+<p><img alt="Find Rem — searching with the selected text of a card" src="../assets/find-rem-selected-text.png" /></p>
+<p><strong>The queue flow this is built for.</strong> You are reviewing a card and want to check where it came from — say the PDF highlight behind it:</p>
+<ol>
+<li><strong>Peek at the source</strong> while the card is in front of you.</li>
+<li><strong>Select part of the card's text</strong> — the phrase you would search for.</li>
+<li>Press <strong><code>Alt+Shift+F</code></strong>. The picker opens with that text already in the search box, so the source Rem (its <code>PDF HIGHLIGHT</code> badge makes it easy to spot — see <a href="#spotting-pdf-highlights">Spotting PDF highlights</a>) is usually the first result.</li>
+<li>Press <strong><code>Ctrl/Cmd+Shift+Enter</code></strong>.</li>
+</ol>
+<p>The card keeps reading exactly as before, and now carries a small chip at the end that takes you straight back to the highlight next time the card comes up — no re-searching, no broken wording.</p>
+<h3 id="cloze-aware-insertion">Cloze-aware insertion<a class="headerlink" href="#cloze-aware-insertion" title="Permanent link">&para;</a></h3>
+<p>Both RemNote's native <code>[[</code> and this picker would normally <strong>break a cloze deletion</strong> if you inserted a reference inside it — the new reference would land <em>outside</em> the cloze. This picker is <strong>cloze-aware</strong>: when your cursor (or selected text) sits inside a cloze, the inserted reference is stamped with that cloze's id, so it stays <strong>inside</strong> the cloze instead of splitting it.</p>
+<p><img alt="Find Rem — cloze-aware reference insertion (reference stays inside the cloze)" src="../assets/find-rem-cloze-aware-insertion.gif" /></p>
+<h3 id="accent-insensitive-selection-aware">Accent-insensitive &amp; selection-aware<a class="headerlink" href="#accent-insensitive-selection-aware" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Accent/diacritic-insensitive:</strong> typing <code>navegacao interior</code> matches <code>Navegação Interior</code>.</li>
+<li><strong><code>Figure</code> = <code>Fig</code> = <code>Fig.</code>:</strong> figure abbreviations are treated interchangeably, so typing <code>fig 4.3</code> lists a Rem named <code>Figure 4.3</code>, and typing <code>figure 4.3</code> finds one named <code>Fig. 4.3</code> or <code>Fig 4.3</code>. Any capitalisation works and the trailing dot is optional. It's folded the same way accents are — the standalone word <code>fig</code>/<code>fig.</code> is canonicalised to <code>figure</code> in both your query and each Rem's name (and alias) before matching, so an exact match still ranks first with its <code>EXACT</code> badge. Only the whole word is affected: <code>figs</code>, <code>configure</code>, etc. are left alone. The <strong>search itself</strong> is run in both spellings too, not just the matching: <code>fig. 6.4</code> is looked up as <code>fig. 6.4</code> <em>and</em> as <code>figure 6.4</code>, because RemNote's phrase lookup matches the words literally and would otherwise never return <code>Figure 6.4: …</code> for a query written <code>Fig.</code> (see <a href="#why-it-finds-rems-the-normal-search-cant">Why it finds Rems the normal search can't</a>).</li>
+<li><strong>Selected text seeds the search:</strong> if you select text before invoking, the box opens pre-filled with it (and selected, so you can refine or overwrite). On insert, the selected text is <strong>replaced</strong> by the reference — exactly like RemNote's <code>[[</code> behaviour where selected text becomes the link.</li>
+</ul>
+<blockquote>
+<p>The reference is inserted into the editor that was focused when you opened the picker. In the rare case RemNote has no active editor caret at insertion time, the picker copies the reference to your clipboard instead and tells you to paste it.</p>
+</blockquote>
+<h3 id="stays-on-screen-near-the-edges">Stays on-screen near the edges<a class="headerlink" href="#stays-on-screen-near-the-edges" title="Permanent link">&para;</a></h3>
+<p>The picker opens <strong>at your cursor</strong>, but it now keeps itself fully visible instead of being clipped by the window edge:</p>
+<ul>
+<li><strong>Near the right edge</strong> it flips to open to the <strong>left</strong> of the cursor.</li>
+<li><strong>Past the vertical midpoint</strong> it flips to open <strong>above</strong> the cursor (like RemNote's own selection search), and the results list is capped to the space available on whichever side it opens, so a long list <strong>scrolls</strong> rather than running off-screen.</li>
+</ul>
+<p>This all happens before the box appears, so you never see it jump.</p>
+<hr />
+<h2 id="open-source-in-popup">Open Source in Popup<a class="headerlink" href="#open-source-in-popup" title="Permanent link">&para;</a></h2>
+<p>Opens the <strong>PDF or web article behind a reference pin</strong> <em>without leaving the queue</em>. Built for the moment in review when a flashcard (or any Rem) carries a pin to a PDF highlight and you want to glance at the surrounding source — clicking the pin directly <strong>navigates away and tears down the queue</strong> (you lose your position and the ability to rate the card). This shows the source on top of (or beside) the queue instead, so you read it and dismiss it without interrupting the session.</p>
+<p>It comes in <strong>two variants</strong> — a centered <strong>modal popup</strong> and a non-blocking <strong>floating window</strong> — that share the same reader; pick whichever fits the moment.</p>
+<p><img alt="PDF Source shown in floating widget" src="../assets/source-floating-widget.png" width="900" /></p>
+<h3 id="two-ways-to-open-it">Two ways to open it<a class="headerlink" href="#two-ways-to-open-it" title="Permanent link">&para;</a></h3>
+<p>Both are triggered the same way — <strong>hover</strong> the reference pin, then press a shortcut — and both only act on genuine <strong>Reader sources</strong> (see <a href="#what-it-opens">What it opens</a>).</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>Modal popup</strong></th>
+<th><strong>Floating window</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Command</td>
+<td><code>Open Hovered Source in Popup</code></td>
+<td><code>Open Hovered Source in Floating Window</code></td>
+</tr>
+<tr>
+<td>Shortcut</td>
+<td><strong><code>Opt+O</code> / <code>Alt+O</code></strong></td>
+<td><strong><code>Opt+Shift+O</code> / <code>Alt+Shift+O</code></strong></td>
+</tr>
+<tr>
+<td>Placement</td>
+<td>Centered, large</td>
+<td>Right portion of the screen (≈48% width)</td>
+</tr>
+<tr>
+<td>Blocks the UI behind it</td>
+<td><strong>Yes</strong> — a backdrop covers/dims the card</td>
+<td><strong>No</strong> — the card/editor stays visible beside it</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>"Open → read → close → rate" in one focused glance</td>
+<td><strong>Peeking back and forth</strong> between source and card without close/reopen</td>
+</tr>
+<tr>
+<td>Closes on</td>
+<td><code>✕</code>, Esc, or clicking outside</td>
+<td><code>✕</code>, Esc, or advancing to the next card (does <strong>not</strong> close on outside click, so you can highlight/select in the PDF)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why hover + a shortcut, instead of right-click?</strong> RemNote exposes a <em>hover</em> event for references to plugins but <strong>no right-click/context-menu event</strong>, and the plain left-click navigation can't be intercepted. So the queue-safe path is: hover to identify the reference, then a shortcut you own to open it. The plugin tracks only the last-hovered reference and resolves it when you press the key.</p>
+<h3 id="how-to-invoke_1">How to invoke<a class="headerlink" href="#how-to-invoke_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Hover</strong> the reference pin (the link chip) you want to open. <em>Hovering</em> is the signal the plugin listens to — no click needed.</li>
+<li>With the pin still hovered, press <strong><code>Opt+O</code></strong> for the modal popup, or <strong><code>Opt+Shift+O</code></strong> for the floating window.</li>
+<li>The source renders inside RemNote's own PDF/web reader. The queue stays live; close it to return exactly where you were.</li>
+</ol>
+<h3 id="what-it-opens">What it opens<a class="headerlink" href="#what-it-opens" title="Permanent link">&para;</a></h3>
+<p>The command inspects the hovered reference's target and only acts on <strong>Reader sources</strong> (identical for both variants):</p>
+<table>
+<thead>
+<tr>
+<th>Hovered reference points to…</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>PDF highlight</strong></td>
+<td>Opens the host PDF and auto-scrolls to the highlight</td>
+</tr>
+<tr>
+<td><strong>HTML / web-article highlight</strong></td>
+<td>Opens the article (Reader Mode) at the highlight</td>
+</tr>
+<tr>
+<td><strong>PDF source document</strong> (the uploaded file Rem)</td>
+<td>Opens the PDF at the top</td>
+</tr>
+<tr>
+<td><strong>HTML source</strong> (a non-YouTube Link Rem)</td>
+<td>Opens the article</td>
+</tr>
+<tr>
+<td><strong>A plain Rem</strong> (no PDF/HTML source)</td>
+<td><strong>Nothing happens</strong> — you get a toast and default behavior is left untouched</td>
+</tr>
+</tbody>
+</table>
+<p>So you can hover <em>any</em> pin and press the shortcut safely; only genuine sources open a viewer.</p>
+<h3 id="scroll-to-highlight">Scroll to Highlight<a class="headerlink" href="#scroll-to-highlight" title="Permanent link">&para;</a></h3>
+<p>For PDF/HTML <strong>highlights</strong>, the viewer auto-scrolls to the highlighted passage once the reader finishes mounting (the embedded PDF engine takes a few seconds to initialize, so the scroll is retried a few times). If you then scroll around the document and want to jump back, click the <strong>🔖 Scroll to Highlight</strong> button in the header to re-center on the highlight at any time.</p>
+<h3 id="floating-window-interaction-closing">Floating window — interaction &amp; closing<a class="headerlink" href="#floating-window-interaction-closing" title="Permanent link">&para;</a></h3>
+<p>The floating variant is designed so the source sits <strong>beside</strong> your card while you study, which is why it behaves a little differently from the modal:</p>
+<ul>
+<li><strong>Stays open while you use the PDF.</strong> Unlike a modal, clicking into the reader to highlight, select text, or click existing highlights will <strong>not</strong> dismiss it.</li>
+<li><strong>Closes itself when you advance the card,</strong> so a previous card's source never lingers over the next one.</li>
+<li><strong>Esc closes it</strong> — without closing the queue. The plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it; Esc closes the float instead. (When focus is inside the PDF itself, the browser handles Esc within the reader; use the <code>✕</code> button there.)</li>
+<li><strong>Not user-resizable.</strong> RemNote floating widgets have a fixed registered size; the window opens at ≈48% of the screen width on the right.</li>
+</ul>
+<p><img alt="PDF Source shown in floating widget" src="../assets/source-floating-widget.png" width="900" /></p>
+<h3 id="recommended-use-cases_1">Recommended use cases<a class="headerlink" href="#recommended-use-cases_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Mid-review context check.</strong> While rating a flashcard that references a PDF highlight, open the source to re-read the paragraph it came from — then close and rate, without losing your queue position. <em>(Modal is ideal for a quick look; floating if you need to glance repeatedly.)</em></li>
+<li><strong>"What was I trying to recall?"</strong> Keep the <strong>floating</strong> window open beside the card so you can look from the source back to the card and forth, without the close/reopen churn a modal forces.</li>
+<li><strong>Reviewing extracts and clozes</strong> that carry a <a href="../Create-Incremental-Rem-from-PDF-Highlights/">bridging pin back to the original PDF source</a> — see the figure or surrounding text without navigating into the document.</li>
+<li><strong>Any pin to a long source</strong> where the inline hover-preview is too small but opening the full document in a pane is too disruptive.</li>
+</ul>
+<blockquote>
+<p>Implemented as the Source Popup widgets — <a href="../Plugin-Widgets-Reference/#65-source-popup-modal-queue-safe-pdfhtml-viewer">modal</a> and <a href="../Plugin-Widgets-Reference/#66-source-popup-floating-non-blocking">floating</a> — triggered by the <strong>Open Hovered Source in Popup / Floating Window</strong> commands. The default shortcuts <code>Opt+O</code> and <code>Opt+Shift+O</code> can be rebound in RemNote's keyboard settings.</p>
+</blockquote>
+<hr />
+<h2 id="filter-a-document-by-images">Filter a Document by Images<a class="headerlink" href="#filter-a-document-by-images" title="Permanent link">&para;</a></h2>
+<p>RemNote's search indexes <strong>text</strong>. An image carries no searchable token, so neither <code>Ctrl+F</code>, nor the query language, nor a Search Portal can answer <em>"show me the figures in this chapter"</em> — the <strong>Filters</strong> section of RemNote's document search only lists <strong>tags</strong>, and an image is not one.</p>
+<p><strong>Tag Rems With Images</strong> (<code>quick: img</code>) closes that gap. It scans a scope for images and marks every Rem holding one with the <strong><code>HasImage</code></strong> tag — which the native document filter <em>can</em> isolate.</p>
+<p><img alt="Running Tag Rems With Images on a chapter, then filtering the document by HasImage so it collapses to only the Rems holding a figure" src="../assets/filtering-rems-with-images.gif" /></p>
+<h3 id="how-to-use-it">How to use it<a class="headerlink" href="#how-to-use-it" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Put your cursor in the Rem you want to scan — or simply open the document — and run <strong>Tag Rems With Images</strong> from the Omnibar (<code>Cmd+/</code>).</li>
+<li>
+<p>The <strong>Image Scan popup</strong> opens with two scopes to choose from:</p>
+<ul>
+<li><strong>Scan this Rem and its descendants</strong> — the button <strong>names the exact Rem</strong>, so you can be sure of the target before anything is written. The scope is the <strong>focused Rem</strong> when your cursor is in one, and the <strong>open document</strong> otherwise. (With neither, this button is disabled.)</li>
+<li><strong>Scan the whole knowledge base</strong> — every Rem, every document. The <strong>first</strong> such run is slow in proportion to how many images it finds (<a href="#how-long-it-takes-the-first-whole-kb-run-is-slow">how long it takes</a>), so reach for it when you want the tag applied everywhere once, and use the scoped run for day-to-day work.</li>
+</ul>
+<p>The popup is <strong>fully keyboard-driven</strong>: <code>↑</code>/<code>↓</code> move between the two scopes, <code>Enter</code> runs the selected one, <code>Esc</code> cancels. (<code>Esc</code> is ignored <em>while a scan is running</em>, so a reflex press can't abort a long run.)</p>
+<p><img alt="The Image Scan popup: the first button names the Rem it would scan, the second offers the whole knowledge base, and the footer lists the keys" src="../assets/tag-rems-with-images-popup.png" width="700" /></p>
+</li>
+<li>
+<p>Progress is reported live while it runs. <strong>Keep the popup open until it finishes</strong> — the scan runs inside it, so closing it stops the walk. Nothing is corrupted if you do: whatever was already tagged stays correct, and running the command again picks the work up.</p>
+</li>
+<li>When it finishes, the <strong>same popup reports the work done</strong> — Rems scanned, how many hold an image, how many were newly tagged, how many had the tag cleared — and repeats the two ways to use it. <strong>Scan again</strong> goes back to the scope choice; <strong>?</strong> in the header opens this page.</li>
+</ol>
+<h3 id="seeing-the-result">Seeing the result<a class="headerlink" href="#seeing-the-result" title="Permanent link">&para;</a></h3>
+<p><strong>Filter one document.</strong> Open it, press <strong><code>Cmd/Ctrl+Shift+F</code></strong> (or <code>Cmd/Ctrl+F</code> and switch the search mode to <strong>Filter</strong>), then pick <strong>HasImage</strong>. The document collapses to just the Rems that carry an image. The count next to each filter tells you how many Rems it would leave — <code>3 · ⚡ HasImage</code> below.</p>
+<p><img alt="The Ctrl+F Filter list showing HasImage alongside the plugin's other powerup tags" src="../assets/filtering-doc-hasimage-tag.png" width="700" /></p>
+<p><strong>Collect them anywhere.</strong> A <strong>Search Portal</strong> on the <code>HasImage</code> tag gathers every tagged Rem into one place — useful for building a figure index across documents, and combinable with another tag or a document in the query to narrow it down. This is the whole-KB scan's payoff: with the tag applied everywhere, one portal is a live index of every image in the knowledge base.</p>
+<h3 id="what-counts-as-an-image">What counts as an image<a class="headerlink" href="#what-counts-as-an-image" title="Permanent link">&para;</a></h3>
+<p>Any image element in a Rem's <strong>front text or back text</strong> — pasted, dragged, added with <code>/image</code>, or extracted from a PDF. Image-occlusion Rems count too, since the occlusion is drawn on an ordinary image element. An image sitting only on the <strong>back of a flashcard</strong> is found, which a purely visual scan of the outline would miss.</p>
+<h3 id="re-running-it">Re-running it<a class="headerlink" href="#re-running-it" title="Permanent link">&para;</a></h3>
+<p>The command is <strong>idempotent and self-correcting</strong>. On every run it also <em>removes</em> the tag from Rems inside the scope that carry it but no longer hold an image — so deleting a figure and re-running leaves no stale mark behind. Rems <strong>outside</strong> the scanned scope are never touched, so a scoped run cannot disturb tags applied in other documents (only a whole-KB run reaches them).</p>
+<p>Only Rems whose state actually changes are written to, which is what makes a re-scan of a large document cheap.</p>
+<h3 id="how-long-it-takes-the-first-whole-kb-run-is-slow">How long it takes — the first whole-KB run is slow<a class="headerlink" href="#how-long-it-takes-the-first-whole-kb-run-is-slow" title="Permanent link">&para;</a></h3>
+<p><strong>Finding the images is fast. Applying the tags is not.</strong> Reading every Rem in a large knowledge base takes seconds; writing a tag costs a round trip to RemNote, and those happen one at a time. So the cost of a run is set almost entirely by <strong>how many tags it has to write</strong>, not by how many Rems it looks at.</p>
+<p>Measured on a knowledge base of <strong>413,000 Rems</strong> holding <strong>23,000 images</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Writes</th>
+<th>Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reading every Rem, before any tagging</td>
+<td>—</td>
+<td><strong>~10 seconds</strong></td>
+</tr>
+<tr>
+<td>First whole-KB run, tagging everything it finds</td>
+<td>23,000</td>
+<td><strong>~30 minutes</strong></td>
+</tr>
+<tr>
+<td>Every whole-KB run after that</td>
+<td>~0</td>
+<td><strong>~10 seconds</strong></td>
+</tr>
+<tr>
+<td>One document (12,000 Rems, 1,200 images)</td>
+<td>1,200</td>
+<td><strong>~90 seconds</strong></td>
+</tr>
+</tbody>
+</table>
+<p>So the whole-KB scan is a <strong>one-time cost</strong>, and only on a knowledge base of that size — the write cost per tag also grows with the knowledge base, so a smaller one is disproportionately quicker. After the first pass there is nothing left to write, and a re-scan only has to write the handful of Rems whose images changed since. Day-to-day, run it on a document and it finishes while you watch.</p>
+<p>If you would rather not sit through the first pass, run it <strong>per document as you go</strong>; the tag accumulates, and a whole-KB run afterwards finds most of the work already done.</p>
+<div class="admonition tip">
+<p class="admonition-title">Leave it running</p>
+<p>The scan lives inside the popup, so keep it open. If you do close it, nothing breaks — the tags already written stay correct, and running the command again picks up where it left off.</p>
+</div>
+<h3 id="clearing-the-tag">Clearing the tag<a class="headerlink" href="#clearing-the-tag" title="Permanent link">&para;</a></h3>
+<p><strong>Remove <code>HasImage</code> Tags</strong> (<code>quick: rmimg</code>) takes the tag <strong>off</strong> every Rem that carries it, in the focused Rem's subtree or across the whole knowledge base. It exists because a whole-KB scan can mark tens of thousands of Rems and RemNote offers no way to take a tag off in bulk.</p>
+<p><strong>Nothing is lost.</strong> The tag is derived from the images themselves, so <strong>Tag Rems With Images</strong> rebuilds it exactly — the same relationship <em>Remove All Priority Band Tags</em> has to <em>Refresh Priority Badges</em>. That is why there is no undo: re-running the scan <em>is</em> the undo.</p>
+<p>The scopes and keys match the scan's, and it costs the same per tag — clearing 23,000 tags takes about as long as applying them, so prefer the document scope unless you really do want the tag gone everywhere.</p>
+<h3 id="the-tag-is-invisible-in-the-outline">The tag is invisible in the outline<a class="headerlink" href="#the-tag-is-invisible-in-the-outline" title="Permanent link">&para;</a></h3>
+<p><code>HasImage</code> is bookkeeping for the filter, not something to read. Its chip is hidden from the editor tag bar — precisely, by targeting that pill alone, so <strong>your own tags on the same Rem stay visible</strong>. You will still see <code>HasImage</code> where it matters: in the document's Filter list.</p>
+<h3 id="pins-that-lead-to-an-image-are-ringed">Pins that lead to an image are ringed<a class="headerlink" href="#pins-that-lead-to-an-image-are-ringed" title="Permanent link">&para;</a></h3>
+<p>A <strong>pin</strong> is drawn with a hairline ring saying where it leads, so you can pick the right one without following any of them — useful in an extract, where the plugin leaves both a reference to the parent it came from <em>and</em> a pin to the PDF highlight:</p>
+<table>
+<thead>
+<tr>
+<th>Ring</th>
+<th>The pin leads to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Blue</strong></td>
+<td>a Rem holding an <strong>image</strong> — a figure in your own notes</td>
+</tr>
+<tr>
+<td><strong>Yellow</strong></td>
+<td>a <strong>text highlight</strong> in a PDF or web article — the source passage</td>
+</tr>
+<tr>
+<td><strong>Yellow + blue</strong></td>
+<td>a <strong>PDF area highlight</strong> — a clipped figure from the source</td>
+</tr>
+<tr>
+<td>none</td>
+<td>an ordinary Rem</td>
+</tr>
+</tbody>
+</table>
+<p>Yellow means <em>"this leads into a source document"</em> and blue means <em>"you will land on an image"</em>, so an area highlight — which is both — carries both colours, one per edge. The rings brighten when you hover one or edit the Rem.</p>
+<p><img alt="Three pins in one document, each labelled: a yellow ring on a pin to a PDF text highlight (its green dotted bottom and right edges carrying the linked highlight's 20s priority band), a blue ring on a pin to a Rem holding an image, and a yellow-and-blue ring on a pin to a PDF area highlight" src="../assets/pin-rings-explanation.png" width="900" /></p>
+<blockquote>
+<p><strong>Off by default.</strong> Turn on <strong>Enable Pin Reference Colour Rings</strong> (Plugin Settings → <em>Editor Indicators</em>) to get them. Two of the three states depend on tags this scan writes, so the feature is opt-in rather than something a knowledge base wakes up wearing. With the setting off, pins are left completely unmarked — including the priority-band border the highlight styling would otherwise draw on them. Every colour the plugin uses is catalogued in the <a href="../Colour-Coding-Reference/">Colour Coding Reference</a>.</p>
+</blockquote>
+<p>This is the second thing the <a href="#filter-a-document-by-images">image scan</a> buys you, and it needs the scan to have run: the ring keys on the tag, so it appears on a pin only once its target has been tagged, and disappears when a re-scan clears the tag from a Rem whose image is gone.</p>
+<p><img alt="Two pins side by side: the left carries the orange priority-band highlight marker, the right is ringed in blue because its target holds a figure" src="../assets/pin-with-image-ringed.png" width="800" /></p>
+<p>The pin next to it in that screenshot shows the two markers are independent: the <strong>orange dotted box</strong> is the <a href="../Prioritization-%26-Sorting/">priority band</a> of the linked highlight, the <strong>blue ring</strong> is "leads to an image". A pin can carry both.</p>
+<p><strong>The ring shares its box with the priority band.</strong> Pins to highlights also carry the <a href="../Prioritization-%26-Sorting/">priority band</a> marker of the linked highlight, which sets the <strong>bottom and right</strong> edges. Rather than avoid that, the ring takes the <strong>top and left</strong> — so an extracted highlight's pin shows one box, half band colour and half ring colour, instead of two nested ones. On an area highlight the top edge is yellow and the left is blue for exactly this reason: those are the two edges that survive when a band is present. All three rings are <strong>solid</strong>, keeping them clear of the band marker's dotted and dashed vocabulary.</p>
+<p>The blue ring is drawn in RemNote's <strong>accent</strong> colour — the same one the app uses for links and selection, which reads correctly on something that <em>is</em> a navigation target. It was neutral grey at first, on the theory that hue is already spoken for in this plugin (<a href="../Prioritization-%26-Sorting/">priority bands</a> own the red→green ramp, <code>#pdfextract</code> is blue, <code>#incremental</code> green); in practice a grey hairline around an 18px icon in running text was invisible until hovered, which is no marker at all. The accent can't be confused with any of those, because this ring is an <strong>outline on an icon</strong> — never a background fill, never a left border — and it appears on nothing but pins. There is no fill either, so a pin sitting inside a highlighted extract never paints over the highlight's own colour, and both colours come from RemNote's own border tokens, so the ring follows light and dark mode.</p>
+<p><strong>Why an area highlight is worth its own state.</strong> When you clip a <em>region</em> of a PDF instead of selecting its text, RemNote stores the <strong>image</strong> on the highlight Rem in place of the text — an <strong>area highlight</strong>. It is a highlight <em>and</em> an image, which is why it wears both colours rather than a third one of its own.</p>
+<p>What identifies one is that the Rem holds an image <strong>and nothing else</strong> — no caption, no prose. That matters, because <em>adding</em> a figure to an ordinary text highlight is common, and such a Rem holds an image and is a highlight, yet is not an area highlight; it keeps the blue ring. The scan decides this and records it as <strong><code>PdfAreaHighlight</code></strong>, since "image and nothing else" is a property of the Rem's text that no filter or stylesheet can inspect on its own.</p>
+<p><img alt="Two reference pins on a document title, each ringed yellow and blue because their target is a PDF area highlight — confirmed by the PdfAreaHighlight tag in the hover preview" src="../assets/ring-pdf-area-highlight.png" width="800" /></p>
+<p><strong>The two tags are mutually exclusive.</strong> An area highlight carries <code>PdfAreaHighlight</code> and <em>not</em> <code>HasImage</code>; every other Rem holding an image carries <code>HasImage</code>. Tagging area highlights with both would make <code>HasImage</code> a complete list of every figure, which is tidier to filter — but RemNote collapses two or more tags into a <strong>"N tags" chip</strong> that no rule can hide without also hiding your own tags, and that clutter is not worth a filter you would rarely run on a highlights document. So: filter <code>HasImage</code> for figures in your notes, <code>PdfAreaHighlight</code> for clippings from a source. <code>PdfAreaHighlight</code>'s chip is hidden from the tag bar exactly like <code>HasImage</code>'s.</p>
+<p>Two consequences worth knowing: caption an area highlight and the next scan swaps its tags — <code>PdfAreaHighlight</code> off, <code>HasImage</code> on — and the ring turns blue; and a Rem holding only an image that did <strong>not</strong> come from a PDF, a figure pasted into your own notes, gets <code>HasImage</code> and stays blue, since the yellow means "this leads into the source document".</p>
+<blockquote>
+<p><strong>Only image pins.</strong> Pins to ordinary Rems are left alone. Ringing <em>every</em> pin was tried and says nothing — a marker that appears on all of them carries no information.</p>
+</blockquote>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
