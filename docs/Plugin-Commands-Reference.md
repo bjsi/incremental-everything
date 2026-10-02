@@ -188,6 +188,18 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Pin Source Quote](Source-Pins.md#pin-source-quote)** (`Opt+Shift+Q` / `Alt+Shift+Q`) — `quick: psq`
   Pins the source of the focused Rem's text: finds the passage in the PDF or saved web article open in a pane and appends a pin to its highlight, reusing a highlight that already covers it or creating one. Works in a PDF's page view, a saved web article and a PDF's Text Reader view (asking which, when a PDF has both). Needs the local helper — see [Source Pins](Source-Pins.md).
 
+- <a id="store-linked-images-audio-in-remnote"></a>**Store linked images & audio in RemNote** — `quick: slm`
+  An image or audio added through **Embed Link** (or **Audio Search**) is saved as the bare web address: nothing is copied, so the Rem breaks the day that server moves or removes the file, and it does not play offline. This command fetches each such file, stores it in RemNote the way an uploaded file is stored, and points the Rem at the stored copy.
+  Run it on the focused Rem or on a selection of Rems; front and back are both handled. The Rem itself is edited in place — only the address inside the image or audio changes — so its flashcards and their history are untouched. Files RemNote already stores, and video embeds such as YouTube, are left alone, so it is safe to re-run.
+  One toast reports the result when everything is stored; anything that could not be fetched stays linked and is listed in a dialog. Each file is also logged to the console under `[localize-media]`.
+  Works best in the desktop app, which may fetch from any server. In the browser a file is only reachable when its server allows cross-site requests.
+
+  > [!NOTE]
+  > Storing **audio** goes through a throwaway Rem that the command deletes again, but RemNote creates one more empty top-level Rem alongside it that the plugin cannot reach. Expect one empty Rem per run (per 20 audio files) among your top-level Rems; it is harmless and can be deleted. Images normally leave nothing behind.
+
+- **Store linked images & audio in RemNote (with descendants)**
+  The same, over the focused or selected Rems and their whole subtree — point it at a document to store everything it links to.
+
 ### Queue Display Commands
 
 These commands tag a Rem with one of the [Utilities#queue-display-utilities](Utilities-Queue-Display.md) powerups. The tagged Rem then renders differently (or is removed entirely) during queue review. All commands work both from the editor and directly inside the Queue. See the [Utilities](Utilities-Queue-Display.md) page for visual examples and full behavior of each powerup.

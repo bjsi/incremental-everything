@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.141 - October 2nd, 2026
+
+### ✨ New - store linked images and audio in RemNote
+
+**Commands**: *Store linked images & audio in RemNote* (`slm`) fetches the images and audio a Rem only links to and stores them in RemNote like uploaded files, so the Rem no longer breaks when the outside server moves the file; a second command covers a whole subtree.
+
+📖 [Store linked images & audio in RemNote](Plugin-Commands-Reference.md#store-linked-images-audio-in-remnote)
+
 ## v1.0.140 - September 30th, 2026
 
 ### ✨ Improved

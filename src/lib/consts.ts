@@ -618,6 +618,9 @@ export const aiTranscribeHighlightCommandId = 'ai-transcribe-highlight';
 export const restoreHighlightBeforeAiCommandId = 'restore-highlight-before-ai';
 // Pin the source passage of the focused Rem's text in the open PDF (lib/source_pins).
 export const pinSourceQuoteCommandId = 'pin-source-quote';
+// Store externally linked images/audio in RemNote itself (lib/localize_media.ts).
+export const localizeMediaCommandId = 'localize-external-media';
+export const localizeMediaTreeCommandId = 'localize-external-media-tree';
 
 // Logos Bible Software bridge (lib/logos_bridge.ts + scripts/logos_bridge/).
 export const logosBridgeEnabledId = 'logos-bridge-enabled';
