@@ -191,11 +191,8 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - <a id="store-linked-images-audio-in-remnote"></a>**Store linked images & audio in RemNote** — `quick: slm`
   An image or audio added through **Embed Link** (or **Audio Search**) is saved as the bare web address: nothing is copied, so the Rem breaks the day that server moves or removes the file, and it does not play offline. This command fetches each such file, stores it in RemNote the way an uploaded file is stored, and points the Rem at the stored copy.
   Run it on the focused Rem or on a selection of Rems; front and back are both handled. The Rem itself is edited in place — only the address inside the image or audio changes — so its flashcards and their history are untouched. Files RemNote already stores, and video embeds such as YouTube, are left alone, so it is safe to re-run.
-  One toast reports the result when everything is stored; anything that could not be fetched stays linked and is listed in a dialog. Each file is also logged to the console under `[localize-media]`.
-  Works best in the desktop app, which may fetch from any server. In the browser a file is only reachable when its server allows cross-site requests.
-
-  > [!NOTE]
-  > Storing **audio** goes through a throwaway Rem that the command deletes again, but RemNote creates one more empty top-level Rem alongside it that the plugin cannot reach. Expect one empty Rem per run (per 20 audio files) among your top-level Rems; it is harmless and can be deleted. Images normally leave nothing behind.
+  Works best in the desktop app, which may fetch from any server. Storing audio leaves one empty top-level Rem behind per run.
+  📖 See [Utilities → Store Linked Images & Audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio).
 
 - **Store linked images & audio in RemNote (with descendants)**
   The same, over the focused or selected Rems and their whole subtree — point it at a document to store everything it links to.

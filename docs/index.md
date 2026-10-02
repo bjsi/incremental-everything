@@ -257,7 +257,7 @@ Happy learning! 📚✨
         * **[Outline & Headings](Utilities-Outline-and-Headings.md)**: Restructure Outline by Headings (`roh`) for fixing flat or mis-pasted documents, and heading-level tools.
         * **[Finding & Navigating](Utilities-Finding-and-Navigating.md)**: **Find Rem — Reference or Open** (`Opt+Shift+F`) for Rems RemNote's own search can't find, source popups, and filtering a document by images.
         * **[Queue Display](Utilities-Queue-Display.md)**: Hide in Queue, Remove Parent and the other powerups that control how a card's context shows in the queue.
-        * **[Cleaning Up](Utilities-Cleaning-Up.md)**: delete empty Extra Card Detail Rems and audit disabled cards.
+        * **[Cleaning Up](Utilities-Cleaning-Up.md)**: delete empty Extra Card Detail Rems, audit disabled cards, and store linked images and audio in RemNote.
         * **[Under the Hood](Utilities-Under-the-Hood.md)**: infrastructure several commands rely on.
 
 * **8. Essential References**
