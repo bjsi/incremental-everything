@@ -1,5 +1,5 @@
 import { AppEvents, PluginRem, RemId, RNPlugin } from '@remnote/plugin-sdk';
-import { coolingInQueuesId, currentScopeRemIdsKey } from './consts';
+import { coolingInQueuesId, coolingNewCardsInQueuesId, currentScopeRemIdsKey } from './consts';
 import { getIESetting } from './settings';
 import { shouldUseLightMode } from './mobileUtils';
 import { QueueRouteKind, queueRouteKind } from './queue_route';
@@ -37,8 +37,10 @@ import { hasCardClusterPowerup } from './priority_review_document/cluster';
  *     Mastery Drill (a Practice All route): never. Card Cluster members: never,
  *     as a cluster is shown as one unit.
  *
- * The "just created" rule stays with the Priority Queue: in a queue it would
- * skip every card written today.
+ * The "just created" rule stays with the Priority Queue by default: in a queue
+ * it would skip every card written today. A setting (coolingNewCardsInQueuesId)
+ * brings it to the spaced-repetition queues; never to Learn New, whose cards are
+ * opened precisely to be learned.
  *
  * HOW: decided ahead, looked up on load — like the drill, whose live checks
  * were too slow for its mask.
@@ -133,6 +135,8 @@ interface Session {
   firstCardHold: boolean;
   tripped: boolean;
   toastShown: boolean;
+  /** The new-card toast, shown once: a document written today skips every card for that reason. */
+  newCardToastShown: boolean;
 }
 
 let session: Session | null = null;
@@ -151,13 +155,17 @@ export const deferDuringLearnNew = () =>
     ? new Promise<void>((resolve) => setTimeout(resolve, DEFER_MS))
     : Promise.resolve();
 
-async function openScanner(plugin: RNPlugin): Promise<CoolingScanner | null> {
+async function openScanner(plugin: RNPlugin, kind: SessionKind): Promise<CoolingScanner | null> {
   try {
-    const [params, cardSource] = await Promise.all([getCoolingParams(plugin), loadCardSource(plugin)]);
+    const [params, cardSource, newCardsToo] = await Promise.all([
+      getCoolingParams(plugin),
+      loadCardSource(plugin),
+      kind === 'spaced' ? getIESetting(plugin, coolingNewCardsInQueuesId) : false,
+    ]);
     const scanner = new CoolingScanner(plugin, {
-      // Never the "just created" rule here: it would skip every card written today in the
-      // daily queue, and in Learn New the cards are opened precisely to be learned.
-      params: { ...params, newCardDays: 0 },
+      // The "just created" rule only where the user asked for it: it skips every card written
+      // today in the daily queue, and in Learn New the cards are opened precisely to be learned.
+      params: newCardsToo === true ? params : { ...params, newCardDays: 0 },
       cardSource,
       // Priorities only label verdicts; skip the second read of the card cache.
       priorityByRemId: new Map(),
@@ -188,7 +196,7 @@ async function startSession(plugin: RNPlugin, enteredAt: number, subQueueId: str
     path,
     subQueueId,
     enteredAt,
-    scanner: openScanner(plugin),
+    scanner: openScanner(plugin, kind),
     scopeTaken: false,
     pending: Promise.resolve(),
     currentCardId: null,
@@ -207,6 +215,7 @@ async function startSession(plugin: RNPlugin, enteredAt: number, subQueueId: str
     firstCardHold: kind === 'learn-new',
     tripped: false,
     toastShown: false,
+    newCardToastShown: false,
   };
   session = s;
   if (kind === 'learn-new') setMask(plugin, FIRST_CARD_HOLD_MS);
@@ -406,6 +415,12 @@ function announce(plugin: RNPlugin, s: Session, verdict: CoolingVerdict) {
     return;
   }
   const reason = verdict.reasons[0];
+  if (reason?.relation === 'just-created') {
+    if (s.newCardToastShown) return;
+    s.newCardToastShown = true;
+    void plugin.app.toast('Cooling: cards you just created are held back until their cooling ends.');
+    return;
+  }
   const why = reason
     ? coolingReasonText(reason.relation, ago(reason.seenAt))
     : 'its cooling was extended';

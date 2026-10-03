@@ -48,6 +48,7 @@ import {
   coolingMaxDaysId,
   coolingNewCardDaysId,
   coolingInQueuesId,
+  coolingNewCardsInQueuesId,
   displayWeightedShieldId,
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
@@ -126,6 +127,7 @@ export interface IESettings {
   [coolingMaxDaysId]: number;
   [coolingNewCardDaysId]: number;
   [coolingInQueuesId]: boolean;
+  [coolingNewCardsInQueuesId]: boolean;
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
@@ -206,6 +208,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [coolingMaxDaysId]: 15,
   [coolingNewCardDaysId]: 1,
   [coolingInQueuesId]: true,
+  [coolingNewCardsInQueuesId]: false,
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
@@ -643,7 +646,22 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Where a card of a cooling Rem is skipped. Learn New Cards is always covered. With All queues, ' +
       'RemNote\u2019s spaced-repetition queues are too (a document, the daily queue), with a toast ' +
       'saying why; the card flashes briefly before it goes, stays due, and returns once cooling ends. ' +
-      'Practice All Flashcards (shuffled or in order), Card Clusters and Light Mode are left alone.',
+      'Practice All Flashcards (shuffled or in order), Card Clusters and Light Mode are left alone. ' +
+      'Cards you just created are not skipped there unless the next setting is on.',
+  },
+  [coolingNewCardsInQueuesId]: {
+    kind: 'boolean',
+    group: 'priorityQueue',
+    helpPath: 'Priority-Review-Document/#cooling-in-remnotes-own-queues',
+    title: 'Cooling: where new cards cool',
+    onLabel: 'RemNote\u2019s queues too',
+    offLabel: 'Priority Queue only',
+    description:
+      'Where a card you just created is held back for the days set in Cooling: new cards. ' +
+      'With RemNote\u2019s queues too, it is also skipped in the spaced-repetition queues ' +
+      '(a document, the daily queue), not only kept out of the Priority Queue. Off by default: with it on, ' +
+      'the queue of a document you wrote today opens empty. Needs All queues above; ' +
+      'Learn New Cards is never affected.',
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',

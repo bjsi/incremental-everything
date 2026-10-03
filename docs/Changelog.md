@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.145 - October 3rd, 2026
+
+### ✨ New - new-card cooling in RemNote's own queues
+
+**Setting**: *Cooling: where new cards cool* — set it to **RemNote's queues too** and a card you just created is also skipped in RemNote's spaced-repetition queues (a document, the daily queue) until its new-card cooling ends, not only kept out of the Priority Queue; off by default.
+
+📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
 ## v1.0.144 - October 3rd, 2026
 
 ### ✨ New - True or False cards

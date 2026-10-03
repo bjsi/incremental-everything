@@ -685,3 +685,6 @@ export const COOLING_NEW_CARD_DAYS_MAX = 10;
 // Queue setting: skip a card in RemNote's own spaced-repetition queues while its
 // Rem is cooling (lib/queue_cooling_skip.ts). The Learn New queue is always covered.
 export const coolingInQueuesId = 'cooling-in-queues';
+// Queue setting, off by default: the "just created" rule (coolingNewCardDaysId) also skips
+// cards in RemNote's spaced-repetition queues. Never in Learn New. Needs coolingInQueuesId on.
+export const coolingNewCardsInQueuesId = 'cooling-new-cards-in-queues';
