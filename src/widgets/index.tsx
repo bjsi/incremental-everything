@@ -35,6 +35,7 @@ import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerLogosBridge } from '../lib/logos_bridge';
+import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
@@ -129,6 +130,9 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerPrefetchTrackers(plugin);
   // Long-polls the local Logos helper while the Logos Bridge setting is on.
   registerLogosBridge(plugin);
+  // Publishes this window's open PDFs/articles so a command run in another
+  // RemNote window can find them.
+  registerWindowSourcesPresence(plugin);
   await registerWidgets(plugin);
 
   // Register CSS rules

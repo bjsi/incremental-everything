@@ -10,6 +10,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [True/False cards in a Card Cluster](Utilities-True-or-False-Cards.md#card-clusters)
 
+**Pin Source Quote**: The source can now be open in another RemNote window: when this window has no PDF or web article in a pane, the command uses the one open in the other.
+
+📖 [Pin Source Quote](Source-Pins.md#pin-source-quote)
+
 ## v1.0.145 - October 3rd, 2026
 
 ### ✨ New - new-card cooling in RemNote's own queues

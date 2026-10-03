@@ -466,6 +466,8 @@ export const noIncRemTimerKey = 'no-inc-rem-timer-end';
 export const noIncRemMenuItemId = 'no-inc-rem-15-min';
 export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 export const incRemDisabledDeviceKey = 'inc-rem-disabled-device';
+// Local key: the sources open in each RemNote window (see lib/window_sources.ts).
+export const openSourcesByWindowKey = 'open-sources-by-window';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // Rem IDs whose cards exist but whose parent rem could not be found during the
