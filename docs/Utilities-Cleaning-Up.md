@@ -224,3 +224,57 @@ In the **browser**, a file is only reachable when its server allows other sites 
 
 !!! note "Audio leaves one empty Rem behind"
     Storing **audio** goes through a throwaway Rem, which the command deletes again. RemNote creates one more empty Rem alongside it that the plugin has no way to reach, so each run leaves **one empty top-level Rem** (one per 20 audio files on a large run). It is harmless and can be deleted. Images normally leave nothing behind.
+
+---
+
+## Cycle Image Size { #cycle-image-size }
+
+**`Cycle Image Size`** (`Opt+Shift+G` / `Alt+Shift+G`, `quick: cis`) gives a size to the images that never got one in RemNote — typically the images of imported cards — so they stop showing up cropped in the flashcard queue. Press it again to move to the next size.
+
+![A queue card whose imported diagram is cropped behind scrollbars; the command is pressed and the image redraws whole](assets/cycle-image-size.gif){ width="900" }
+
+### The problem it solves
+
+In the queue, RemNote draws an image inside a small zoomable frame. An image you have resized in RemNote fills that frame correctly. An image that still carries the size it was imported with — an Anki import, for instance — can come out **zoomed in and cut off, with scrollbars around it**, until you resize it by hand. The same image looks fine in the editor.
+
+This command does that resizing for you, on every such image of a card at once.
+
+### How to use it
+
+In the **queue**, press the shortcut on the card that shows a cropped image: the image redraws straight away. If you have a Rem selected in the previewer (`P`), the command acts on that Rem instead of the card.
+
+In the **editor**, put the cursor in a Rem, or select several, and press the shortcut.
+
+Either way it covers the Rem **and three levels below it** — children, grandchildren and great-grandchildren — front and back.
+
+### The four sizes
+
+Each press moves all the images it found one step along:
+
+| Step | Result |
+|---|---|
+| **Fit** | The image at its real size, never wider than the card. The same as dragging its edge. |
+| **Large** | Full width — RemNote's own *Large Image*. |
+| **Medium** | Half width — RemNote's own *Medium Image*. |
+| **Original** | Back to how the image was before the first press. |
+
+After *Original* the next press starts again at *Fit*. A message names the step and says how many images changed.
+
+### Which images it changes
+
+Only images **nobody has sized in RemNote**: those with no stored size at all, and those whose stored size is still the file's own pixel size.
+
+Left alone:
+
+* images **you have resized**, by dragging or through the image menu;
+* **Image Occlusion** images, drawings and cropped images — their boxes are placed relative to the image's size;
+* the image of a **PDF or web highlight**;
+* an image whose file cannot be loaded to measure it.
+
+The message tells you how many images were skipped, and why.
+
+### Good to know
+
+* The cycle is remembered **until you restart RemNote**. After that, the images you sized with this command count as sized, and the command leaves them alone — use RemNote's image menu to change them.
+* The Rem is edited in place and only the image's size changes, so its **flashcards and their history are untouched**.
+

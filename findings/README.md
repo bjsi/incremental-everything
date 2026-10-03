@@ -10,7 +10,7 @@ A finding earns a file here when getting it wrong costs real time: a silent fail
 | [REMNOTE_POWERUP_CODES.md](REMNOTE_POWERUP_CODES.md) | RemNote's built-in powerup and slot codes compared with the SDK's (e.g. Card Cluster `cc`, missing from the SDK) |
 | [REM_REFERENCES_AND_MERGE.md](REM_REFERENCES_AND_MERGE.md) | References, pins, inline links, tags, portals: how they are stored, and how RemNote's merge repoints them |
 | [PDF_AND_HTML_HIGHLIGHTS.md](PDF_AND_HTML_HIGHLIGHTS.md) | PDF and web-article highlight Rems: `Data` shapes, text vs area highlights, creating highlights, the Highlights container |
-| [QUEUE_AND_PRACTICE.md](QUEUE_AND_PRACTICE.md) | The flashcard queue from a plugin: the GetNextCard deadline, queue events, bury, Need to Learn cards, launching queues, the `<Queue>` embed, flashcard widget slots and the Beautiful queue bottom layout |
+| [QUEUE_AND_PRACTICE.md](QUEUE_AND_PRACTICE.md) | The flashcard queue from a plugin: the GetNextCard deadline, queue events, bury, Need to Learn cards, launching queues, the `<Queue>` embed, flashcard widget slots, the Beautiful queue bottom layout, and how queue images are drawn and sized |
 | [EDITOR_DOM_AND_CSS.md](EDITOR_DOM_AND_CSS.md) | The editor's DOM and what plugin CSS can reach: `data-rem-tags`, the bullet, the tag bar, table cells |
 | [MEDIA_AND_FILE_STORAGE.md](MEDIA_AND_FILE_STORAGE.md) | Linked vs stored images and audio (`%LOCAL_FILE%`), and the two importer calls through which a plugin can upload |
 | [PLUGIN_BRIDGE_AND_SDK.md](PLUGIN_BRIDGE_AND_SDK.md) | Plugin bridge and SDK traps: storage limits, built-in powerup membership, retired slots, lazy children, shortcuts, build pitfalls |

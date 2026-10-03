@@ -197,6 +197,11 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **Store linked images & audio in RemNote (with descendants)**
   The same, over the focused or selected Rems and their whole subtree — point it at a document to store everything it links to.
 
+- <a id="cycle-image-size"></a>**Cycle Image Size (Fit / Large / Medium / Original)** (`Opt+Shift+G` / `Alt+Shift+G`) — `quick: cis`
+  Sizes the images that were never sized in RemNote — typically those of imported cards, which the queue can show zoomed in and cut off. Each press moves them one step along **Fit → Large → Medium → Original**.
+  Acts on the current queue card (or the Rem selected in the previewer), or on the focused or selected Rems in the editor, and three levels below. Images you have resized, Image Occlusions and highlight images are left alone.
+  📖 See [Utilities → Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size).
+
 ### Queue Display Commands
 
 These commands tag a Rem with one of the [Utilities#queue-display-utilities](Utilities-Queue-Display.md) powerups. The tagged Rem then renders differently (or is removed entirely) during queue review. All commands work both from the editor and directly inside the Queue. See the [Utilities](Utilities-Queue-Display.md) page for visual examples and full behavior of each powerup.

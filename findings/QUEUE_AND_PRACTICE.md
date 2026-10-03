@@ -103,6 +103,18 @@ Read from the 1.28.19 bundle (`renderSR`, `SwipeQueueHOC`, the insight scroll la
 - **Anything between the widget and the HOC root that becomes a stacking context hides a relocated widget.** Its z-index is then scoped below the mask (`z-[9998]`). An opacity animation on `.rn-queue__content` with a forwards fill (`both`) does this for the whole card, even though the final opacity is 1. Use `backwards` when the end value is the natural one.
 - **The suggested-grade tab.** After a type-in answer is graded, RemNote highlights one button (`suggestedAnswerButton()`: Good or Easy if right, Again if wrong). It hangs an absolute "↵ Enter" tab above it (height 25, `top: -25px`; "Say 'Done'" while voice-listening). On desktop only that button gets `border-t-transparent rounded-t-none`, so `.rn-queue__answer-btn.border-t-transparent.rounded-t-none` detects it. With swipe gestures on (`tF.t()`), every button instead shows a 25px "← Left"/"→ Right" label above it, with no class hook.
 
+## Images in the queue are drawn by the drawing canvas
+
+Read from the 1.28.19 bundle and a real knowledge base (2026-09-30). The exact cause of the crop below was **not** proven; the data shapes are.
+
+- **Every plain image on a queue card goes through the zoomable drawing canvas**, not an `<img>`. The test (`Uc`, module 322262) is `no blocks && currentQueueCard && url is not .gif/.webp/.bin`. The scrollbars seen around a cropped image are the canvas's own. The editor uses a plain `<img>`.
+- **Canvas world** = `{width: element.width ?? 800, height: element.height ?? 800}` (module 29269), and the image is stretched to it. **Initial zoom** = `min(containerW / world.width, containerH / world.height)` (`hc`, module 246687), recomputed only when the canvas's `containerWidth` prop or the bounds type changes.
+- **Box size** (`i1`, module 536824): with `percent`, `percent% × min(editor width − 10, 800)`, height from the stored aspect ratio; without, the stored size shrunk to fit.
+- **What the UI writes.** A drag-resize: on-screen `width`/`height`, `percent` removed. Small / Medium / Large: `percent` 25 / 50 / 100, with `width`/`height` passed through `xD(w, h, editorClientWidth − 10)`, which shrinks and never enlarges. So anything sized in the UI has a stored width no wider than the editor. An image with no stored size gets its natural one written the first time it loads in an editable editor, never in the queue.
+- **What imports leave.** Anki imports store `percent: 50` with the file's full pixel size, or no size at all. One such image (`{percent: 50, width: 1071, height: 1017}`) showed in the queue as a centred crop of about 78%.
+- **`setText` accepts** fractional `width`/`height` and `percent` of 5, 25, 50 or 100 only; other percents make it throw, so `sanitizeRichTextForSetText` drops them.
+- "Cycle Image Size" (`lib/image_sizing.ts`, `lib/image_size_cycle.ts`) rewrites unsized images into the UI's shapes.
+
 ## Cross-plugin side channel
 
 `messaging.broadcast` reaches only the caller's own widgets, but plugin events are keyed by event and key, not by plugin. So `storage.setSession(k, v)` fires `StorageSessionChange` for **any** plugin listening on `k`. This is undocumented and may be closed.

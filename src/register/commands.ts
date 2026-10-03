@@ -120,6 +120,8 @@ import {
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 import { resolveQueueCommandTarget } from '../lib/queue_target';
+import { cycleImageSizes, resolveImageSizeTargets } from '../lib/image_size_cycle';
+import { IMAGE_SIZE_STEP_LABEL } from '../lib/image_sizing';
 import {
   setRemReadPoint,
   isDescendantOf,
@@ -4102,6 +4104,50 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await plugin.app.toast(
         `Probed ${children.length + 1} Rems — open the developer console to read the result.`
       );
+    },
+  });
+
+  // Imported images keep the size they arrived with, which the queue's image
+  // canvas can show as a zoomed crop. Each press moves the unsized images of the
+  // target Rem and three levels below it one step along Fit, Large, Medium and
+  // back to Original; images the user has sized are never touched.
+  plugin.app.registerCommand({
+    id: 'cycle-image-size',
+    name: 'Cycle Image Size (Fit / Large / Medium / Original)',
+    description:
+      'Sizes the images of the focused Rem (or the current card) and three levels below it that were never sized in RemNote. Press again to move to the next size.',
+    keyboardShortcut: 'opt+shift+g',
+    quickCode: 'cis',
+    action: async () => {
+      try {
+        const targets = await resolveImageSizeTargets(plugin);
+        if (targets.length === 0) {
+          await plugin.app.toast('No Rem focused and no card on screen.');
+          return;
+        }
+        const result = await cycleImageSizes(plugin, targets);
+        const notes = [
+          result.userSized > 0 ? `${result.userSized} already sized by you` : '',
+          result.protectedImages > 0 ? `${result.protectedImages} occlusion/highlight` : '',
+          result.unmeasurable > 0 ? `${result.unmeasurable} could not be measured` : '',
+          result.failed > 0 ? `${result.failed} Rem(s) failed` : '',
+        ].filter(Boolean);
+        const skipped = notes.length > 0 ? ` Skipped: ${notes.join(', ')}.` : '';
+        if (!result.step) {
+          await plugin.app.toast(`No unsized images found here.${skipped}`);
+          return;
+        }
+        await plugin.app.toast(
+          `Images → ${IMAGE_SIZE_STEP_LABEL[result.step]} (${result.changed} changed).${skipped}`
+        );
+      } catch (error) {
+        console.error('[ImageSize] command failed', error);
+        await showMessageDialog(plugin, {
+          title: 'Could not resize the images',
+          message: error instanceof Error ? error.message : String(error),
+          tone: 'error',
+        });
+      }
     },
   });
 

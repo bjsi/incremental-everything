@@ -10,6 +10,14 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Store Linked Images & Audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio)
 
+### ✨ New - size imported images that show cropped in the queue
+
+**Command**: *Cycle Image Size* (`Opt+Shift+G` / `Alt+Shift+G`) sizes the images of a card that were never sized in RemNote — the ones the queue shows zoomed in behind scrollbars — and each press steps through Fit, Large, Medium and back to Original; images you have resized are left alone.
+
+![A queue card whose imported diagram is cropped behind scrollbars; the command is pressed and the image redraws whole](assets/cycle-image-size.gif){ width="900" }
+
+📖 [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size)
+
 ## v1.0.140 - September 30th, 2026
 
 ### ✨ Improved

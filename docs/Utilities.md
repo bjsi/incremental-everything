@@ -43,11 +43,12 @@ Control how parents, ancestors and card details show during queue review.
 
 ## [Cleaning Up](Utilities-Cleaning-Up.md)
 
-Clear out Rems an import left behind, audit disabled cards, and store the images and audio a Rem only links to.
+Clear out Rems an import left behind, audit disabled cards, store the images and audio a Rem only links to, and size imported images that show cropped in the queue.
 
 - [Delete Empty Extra Card Detail Rems](Utilities-Cleaning-Up.md#delete-empty-extra-card-detail-rems)
 - [Card Enablement Audit](Utilities-Cleaning-Up.md#card-enablement-audit)
 - [Store Linked Images & Audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio)
+- [Cycle Image Size (`Opt+Shift+G`) — New](Utilities-Cleaning-Up.md#cycle-image-size)
 
 ## [Under the Hood](Utilities-Under-the-Hood.md)
 
