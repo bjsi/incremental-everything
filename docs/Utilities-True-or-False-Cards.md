@@ -10,17 +10,17 @@ Statement cards whose answer is "true" or "false", marked with one command and m
 
 **Front of the card**: a large ✔ / ✘ badge sits above the statement, so the kind of question is obvious before you read it. The badge is the same for true and false statements.
 
-![The question side of a card: the split green ✔ / red ✘ badge above the statement](assets/true-or-false-question.png){ width="700" }
+![The question side of a card: the split green ✔ / red ✘ badge above the statement, with Reveal Answer below](assets/true-or-false-question.png){ width="700" }
 
 **Back of the card**: the statement and its answer sit in a green (true) or red (false) block closed by a full-width ✔ or ✘ bar, and the answer is set on its own line in large bold type. The colour stays inside that block; the rest of the card is untouched.
 
-![The answer side of a false statement: a red block holding the statement, the ❌ and its correction in large bold type, and a red ✘ bar](assets/true-or-false-answer-false.png){ width="700" }
+![The answer side of a false statement: a red block holding the statement, the ❌ and its correction in large bold type, and a red ✘ bar; the Card Info Bar and answer buttons below keep their normal background](assets/true-or-false-answer-false.png){ width="700" }
 
-![The answer side of a true statement: a green block holding the statement, the ✅ and a green ✔ bar](assets/true-or-false-answer-true.png){ width="700" }
+![The answer side of a true statement: a green block holding the statement, the ✅ and a green ✔ bar, above the answer buttons](assets/true-or-false-answer-true.png){ width="700" }
 
 **Editor**: the bullet of the Rem becomes a small green ✔ or red ✘.
 
-![Two statement Rems in the editor, the first with a green ✔ bullet and ✅ on its back, the second with a red ✘ bullet and ❌ followed by a correction](assets/true-or-false-editor.png){ width="700" }
+![Two statement Rems in the editor, the first with a green ✔ bullet and ✅ on its back, the second with a red ✘ bullet and ❌ followed by a correction; each shows a "2 tags" chip](assets/true-or-false-editor.png){ width="700" }
 
 It works in both the Compact and the Beautiful queue, in light and dark mode.
 
