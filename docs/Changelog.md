@@ -2,13 +2,7 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
-## v1.0.141 - October 2nd, 2026
-
-### ✨ New - store linked images and audio in RemNote
-
-**Commands**: *Store linked images & audio in RemNote* (`slm`) fetches the images and audio a Rem only links to and stores them in RemNote like uploaded files, so the Rem no longer breaks when the outside server moves the file; a second command covers a whole subtree.
-
-📖 [Store Linked Images & Audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio)
+## v1.0.143 - October 3rd, 2026
 
 ### ✨ New - size imported images that show cropped in the queue
 
@@ -17,6 +11,14 @@ This page documents the major changes and improvements for each version of the I
 ![A queue card whose imported diagram is cropped behind scrollbars; the command is pressed and the image redraws whole](assets/cycle-image-size.gif){ width="900" }
 
 📖 [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size)
+
+## v1.0.141 - October 2nd, 2026
+
+### ✨ New - store linked images and audio in RemNote
+
+**Commands**: *Store linked images & audio in RemNote* (`slm`) fetches the images and audio a Rem only links to and stores them in RemNote like uploaded files, so the Rem no longer breaks when the outside server moves the file; a second command covers a whole subtree.
+
+📖 [Store Linked Images & Audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio)
 
 ## v1.0.140 - September 30th, 2026
 
