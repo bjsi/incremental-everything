@@ -291,12 +291,15 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     };
     // Registered from the index realm (this listener runs there): the only place registerCSS works.
     // The animation restarts for every card because RemNote mounts a new .rn-queue__content per card.
+    // `backwards`, not `both`: a forwards fill keeps .rn-queue__content a stacking context
+    // for as long as the card is up, which traps the docked card_info_bar under RemNote's
+    // bottom mask (lib/card_info_bar_dock). The end value is the natural opacity anyway.
     const delay = Math.max(0, Number(await getIESetting(plugin, masteryDrillRevealDelayId)) || 0);
     void plugin.app.registerCSS(
       MASK_CSS_ID,
       delay
         ? `@keyframes ie-mastery-drill-reveal { from { opacity: 0; } to { opacity: 1; } }
-.rn-queue__content { animation: ie-mastery-drill-reveal 120ms ease-out ${delay}ms both; }`
+.rn-queue__content { animation: ie-mastery-drill-reveal 120ms ease-out ${delay}ms backwards; }`
         : ''
     );
     void publishState(plugin, { active: true, buried: false });

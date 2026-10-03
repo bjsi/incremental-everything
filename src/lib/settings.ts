@@ -59,6 +59,7 @@ import {
   showDismissedIndicatorSettingId,
   hideDismissedTagSettingId,
   showPinRingIndicatorsSettingId,
+  showLinkedAudioIndicatorSettingId,
   enableHideInQueueIntegrationId,
   logosBridgeEnabledId,
   logosAutoOpenId,
@@ -137,6 +138,7 @@ export interface IESettings {
   [showDismissedIndicatorSettingId]: boolean;
   [hideDismissedTagSettingId]: boolean;
   [showPinRingIndicatorsSettingId]: boolean;
+  [showLinkedAudioIndicatorSettingId]: boolean;
 
   // Integrations / performance
   [enableHideInQueueIntegrationId]: boolean;
@@ -215,6 +217,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [showDismissedIndicatorSettingId]: true,
   [hideDismissedTagSettingId]: true,
   [showPinRingIndicatorsSettingId]: false,
+  [showLinkedAudioIndicatorSettingId]: false,
 
   [enableHideInQueueIntegrationId]: false,
   [logosBridgeEnabledId]: false,
@@ -728,6 +731,17 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'highlight (a clipped figure). The image states need "Tag Rems With Images" to have been ' +
       'run. With this off, pins are left unmarked — including the priority-band border that the ' +
       'highlight styling would otherwise draw on them.',
+  },
+  [showLinkedAudioIndicatorSettingId]: {
+    kind: 'boolean',
+    group: 'editor',
+    reloadRequired: true,
+    helpPath: 'Utilities-Cleaning-Up/#spotting-linked-audio',
+    title: 'Mark Audio That Is Only Linked',
+    description:
+      'Draws a dashed orange outline and a link glyph on an audio player whose file lives on an ' +
+      'outside server instead of in RemNote, so it would break if that server moved the file. ' +
+      'Run "Store linked images & audio in RemNote" on the Rem to store it; the outline then goes.',
   },
   [showPriorityBandsInTablesId]: {
     kind: 'boolean',

@@ -18,6 +18,20 @@ An image is a rich-text element `{ i: 'i', url }`, an audio or video `{ i: 'a', 
 
 **RemNote's own re-upload of linked images is unreliable.** The image node re-uploads an outside `url` when it renders (synced knowledge base only), and the markdown importer queues the same job for every Rem it creates. It has demonstrably run on some images and skipped others inserted the same way: about 200 images in a 400k-Rem knowledge base were still bare links. Audio elements are never touched.
 
+## The audio player's DOM
+
+An `onlyAudio` element renders RemNote's own player, not the browser's controls (read from the bundle, 1.28.19; the stored-file `src` forms below are inferred from the URL resolver, not observed):
+
+```
+span.AudioVideoNode
+  div.max-w-full > div.w-full.h-full
+    div[data-prevent-editor-refocus="true"]     ← the bordered box, a flex row
+      audio[src]                                ← no `controls`; the buttons around it drive it
+      [data-test="Inline Audio Play Button"] … [data-test="Inline Audio More Menu"]
+```
+
+`audio[src]` is the only place the address reaches the DOM, and it is the *resolved* one: the outside address for a linked file; for a stored file the S3 address or a local/blob URL, never `%LOCAL_FILE%`. So `audio[src^="http"]:not([src*="remnote-user-data"])` selects linked audio, and `:has()` lifts that to the box. The "Mark Audio That Is Only Linked" setting is built on it (`src/register/settings.ts`).
+
 ## Uploading from a plugin
 
 The SDK (0.0.46) exposes nothing that uploads. Two calls reach RemNote's upload code as a side effect:

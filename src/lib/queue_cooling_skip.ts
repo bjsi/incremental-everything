@@ -335,13 +335,15 @@ function ratingsOf(s: Session, remId: RemId): Map<string, number> {
 /**
  * Every card mounts hidden and fades in after `delayMs`. Registered from the index realm
  * (these listeners run there): the only place registerCSS works. The animation restarts for
- * every card because RemNote mounts a new .rn-queue__content per card.
+ * every card because RemNote mounts a new .rn-queue__content per card. The fill is
+ * `backwards`, not `both`: a forwards fill keeps the content a stacking context and hides
+ * the docked card_info_bar under RemNote's bottom mask (lib/card_info_bar_dock).
  */
 function setMask(plugin: RNPlugin, delayMs: number) {
   void plugin.app.registerCSS(
     MASK_CSS_ID,
     `@keyframes ie-learn-new-reveal { from { opacity: 0; } to { opacity: 1; } }
-.rn-queue__content { animation: ie-learn-new-reveal 120ms ease-out ${delayMs}ms both; }`
+.rn-queue__content { animation: ie-learn-new-reveal 120ms ease-out ${delayMs}ms backwards; }`
   );
 }
 

@@ -183,6 +183,12 @@ A linked file is fetched from the outside server every time the Rem is shown. Th
 
 RemNote does sometimes copy a linked *image* by itself, but not dependably — a knowledge base can hold hundreds of images that are still bare links — and it never copies linked *audio*. Pronunciation audio embedded from a dictionary site is the typical case: every one of those players is a link.
 
+### Spotting linked audio { #spotting-linked-audio }
+
+Turn on **Mark Audio That Is Only Linked** ([Settings → Editor Indicators](Plugin-Settings-Reference.md#editor-indicators)) and every audio player whose file is still on an outside server gets a **dashed orange outline** and a 🔗 at its right end. A player whose file RemNote stores looks as it always did.
+
+Run the command on the Rem and the outline goes, which is also the quickest check that it worked. The marker is drawn in the editor only, not in the queue, and covers audio only: a linked image is not marked.
+
 ### How to use it
 
 Put the cursor in a Rem, or select several, and run the command from the omnibar. Both the front and the back of each Rem are handled.

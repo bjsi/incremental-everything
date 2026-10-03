@@ -84,6 +84,9 @@ export const hideDismissedTagSettingId = 'hideDismissedTag';
 // meaning once "Tag Rems With Images" has been run, and an unasked-for marker on
 // every pin is exactly the clutter this setting exists to opt into.
 export const showPinRingIndicatorsSettingId = 'showPinRingIndicators';
+// Dashed orange outline on an audio player whose file is only linked, not stored
+// in RemNote (see lib/localize_media.ts). Off by default.
+export const showLinkedAudioIndicatorSettingId = 'showLinkedAudioIndicator';
 export const performanceModeId = 'performanceMode';
 export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
 /** Custom acronyms the Text Case Converter keeps uppercase in Title Case. */
