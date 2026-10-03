@@ -8,6 +8,8 @@ This page documents the major changes and improvements for each version of the I
 
 **Commands**: *True/False: Mark as True* (`tft`) and *Mark as False* (`tff`) turn a statement into a True/False card — the back gets its ✅ or ❌ with the rest of it kept, the queue shows a large ✔ / ✘ badge on the question and a green or red answer block on the back, and the editor bullet becomes the verdict; *Convert Pasted Tags* (`tfc`) does the same for cards imported from text with `#[[TFT]]` / `#[[TFF]]`.
 
+![Two statements in the editor with ✔ and ✘ bullets; the queue opens, shows the ✔/✘ badge over a statement, and the answer is revealed in a red block, then the next one in a green block](assets/true-or-false.gif){ width="900" }
+
 📖 [True or False Cards](Utilities-True-or-False-Cards.md)
 
 ## v1.0.143 - October 3rd, 2026

@@ -2,13 +2,25 @@
 
 Statement cards whose answer is "true" or "false", marked with one command and made unmistakable in the queue. RemNote has no card type for them: you write the statement, type a ✅ or ❌ on the back, and hope to notice in the queue that a verdict is what is being asked.
 
+![Two statements in the editor with ✔ and ✘ bullets; the queue opens, shows the ✔/✘ badge over a statement, and the answer is revealed in a red block, then the next one in a green block](assets/true-or-false.gif){ width="900" }
+
 ---
 
 ## What a True/False card looks like { #what-it-looks-like }
 
-- **Front of the card**: a large ✔ / ✘ badge sits above the statement, so the kind of question is obvious before you read it. The badge is the same for true and false statements.
-- **Back of the card**: the statement and its answer sit in a green (true) or red (false) block closed by a full-width ✔ or ✘ bar, and the answer is set on its own line in large bold type. The colour stays inside that block; the rest of the card is untouched.
-- **Editor**: the bullet of the Rem becomes a small green ✔ or red ✘.
+**Front of the card**: a large ✔ / ✘ badge sits above the statement, so the kind of question is obvious before you read it. The badge is the same for true and false statements.
+
+![The question side of a card: the split green ✔ / red ✘ badge above the statement](assets/true-or-false-question.png){ width="700" }
+
+**Back of the card**: the statement and its answer sit in a green (true) or red (false) block closed by a full-width ✔ or ✘ bar, and the answer is set on its own line in large bold type. The colour stays inside that block; the rest of the card is untouched.
+
+![The answer side of a false statement: a red block holding the statement, the ❌ and its correction in large bold type, and a red ✘ bar](assets/true-or-false-answer-false.png){ width="700" }
+
+![The answer side of a true statement: a green block holding the statement, the ✅ and a green ✔ bar](assets/true-or-false-answer-true.png){ width="700" }
+
+**Editor**: the bullet of the Rem becomes a small green ✔ or red ✘.
+
+![Two statement Rems in the editor, the first with a green ✔ bullet and ✅ on its back, the second with a red ✘ bullet and ❌ followed by a correction](assets/true-or-false-editor.png){ width="700" }
 
 It works in both the Compact and the Beautiful queue, in light and dark mode.
 
