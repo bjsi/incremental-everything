@@ -1,4 +1,4 @@
-import { PluginRem, ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
+import { AppEvents, PluginRem, ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
 import { getEffectiveSelection } from '../lib/editor_selection';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { backTextWithVerdict, referencedRemIds, Verdict, VERDICT_MARK } from '../lib/true_false';
@@ -119,6 +119,124 @@ const TRUE_FALSE_CSS = `
 ${verdictCss('tft', GREEN, '22, 163, 74', CHECK_PATH)}
 ${verdictCss('tff', RED, '220, 38, 38', CROSS_PATH)}
 `;
+
+/* Card Cluster cards. A cluster is drawn by its own renderer (both variants),
+   which prints no tag attribute and no Rem id: the tag-keyed rules above have
+   nothing to match (saved DOM + app.asar, 2026-10-03). The one hook is
+   `cluster-answer-container`, set on the Rem being tested on both sides of the
+   card. So the verdict comes from the plugin instead: this stylesheet is
+   registered for the verdict of the card on screen, or emptied.
+
+   The row is the container's own first line; its children (the other cards of
+   the cluster) sit in a sibling div and stay unstyled. Beautiful's row is
+   `.min-w-0.items-start`, Compact's is `.justify-between`. */
+const CLUSTER_CSS_ID = 'true-false-cluster-card';
+// Written by src/widgets/card_info_bar.tsx on every card and cluster sibling.
+const CLUSTER_VISIBLE_REM_KEY = 'clusterVisibleRemId';
+const CLUSTER_ROW =
+  '.cluster-answer-container:not(.cluster-answer-container .cluster-answer-container) > :is(.min-w-0.items-start, .justify-between)';
+
+const VERDICT_STYLE: Record<Verdict, { color: string; tint: string; path: string }> = {
+  true: { color: GREEN, tint: '22, 163, 74', path: CHECK_PATH },
+  false: { color: RED, tint: '220, 38, 38', path: CROSS_PATH },
+};
+
+const clusterCss = ({ color, tint, path }: { color: string; tint: string; path: string }) => `
+.rn-queue__content ${CLUSTER_ROW} {
+  flex-wrap: wrap;
+  border-radius: 14px;
+  padding: 12px 16px;
+}
+.rn-queue__content ${CLUSTER_ROW}::before {
+  content: "";
+  flex: 0 0 100%;
+  height: 84px;
+  margin: 4px 0 10px;
+  background: ${QUESTION_BADGE} center / contain no-repeat;
+}
+.rn-queue__content--answer-revealed ${CLUSTER_ROW} {
+  background-color: rgba(${tint}, 0.2);
+  box-shadow: inset 0 0 0 3px ${color};
+}
+.rn-queue__content--answer-revealed ${CLUSTER_ROW}::after {
+  content: "";
+  flex: 0 0 100%;
+  height: 72px;
+  margin-top: 14px;
+  border-radius: 10px;
+  background: ${color} ${whiteIcon(path)} center / 52px 52px no-repeat;
+}
+/* Compact draws a bullet in front of the statement (span > .rn-rem-bullet inside
+   the row's .relative wrapper; saved DOM, 2026-10-03). Inside the framed block it
+   ended up alone on a line above the statement, and the frame already marks the
+   card, so it is dropped. Beautiful's dot is a different element and stays. */
+.rn-queue__content ${CLUSTER_ROW}.justify-between > .relative > span:has(> .rn-rem-bullet) {
+  display: none;
+}
+/* The answer: Beautiful prints it as the viewer after the "→" delimiter,
+   Compact as the revealed fill-in-the-blank. */
+.rn-queue__content--answer-revealed ${CLUSTER_ROW} :is(.mx-2 ~ .RichTextViewer, .rn-fill-in-blank--revealed) {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.6em;
+  line-height: 1.3;
+  font-weight: 700;
+}
+`;
+
+// What is registered now, so a card with the same verdict (or none, the usual
+// case) costs no registerCSS call.
+let clusterCssVerdict: Verdict | null = null;
+
+async function setClusterCardCss(plugin: ReactRNPlugin, verdict: Verdict | null) {
+  if (verdict === clusterCssVerdict) return;
+  clusterCssVerdict = verdict;
+  await plugin.app.registerCSS(CLUSTER_CSS_ID, verdict ? clusterCss(VERDICT_STYLE[verdict]) : '');
+}
+
+async function applyClusterCardCss(plugin: ReactRNPlugin, remId: string | undefined) {
+  let verdict: Verdict | null = null;
+  try {
+    const rem = remId ? await plugin.rem.findOne(remId) : undefined;
+    if (rem) {
+      if (await rem.hasPowerup(TRUE_FALSE_TRUE_POWERUP_CODE)) verdict = 'true';
+      else if (await rem.hasPowerup(TRUE_FALSE_FALSE_POWERUP_CODE)) verdict = 'false';
+    }
+  } catch {
+    /* unreadable Rem: clear */
+  }
+  await setClusterCardCss(plugin, verdict);
+}
+
+/* Index-only (registerCSS no-ops from other iframes).
+
+   Two sources for "the Rem on screen":
+   - `clusterVisibleRemId`, the session key card_info_bar already broadcasts for
+     every card it sits under. It is the only one that follows the siblings of a
+     cluster: QueueLoadCard fires once for the whole cluster, not per sibling.
+   - QueueLoadCard, for cards the bar is not mounted on (its powerupFilter is
+     cardPriority, so a card with no priority never broadcasts). */
+export function registerTrueFalseClusterTracker(plugin: ReactRNPlugin) {
+  plugin.track(async (rp) => {
+    const remId = await rp.storage.getSession<string>(CLUSTER_VISIBLE_REM_KEY);
+    await applyClusterCardCss(plugin, remId);
+  });
+  plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async () => {
+    // getCurrentCard, not the event payload: QueueLoadCard also fires id-less.
+    const card = await plugin.queue.getCurrentCard().catch(() => undefined);
+    await applyClusterCardCss(plugin, card?.remId);
+  });
+  plugin.event.addListener(AppEvents.QueueExit, undefined, () => setClusterCardCss(plugin, null));
+  // Leaving by navigation fires no QueueExit. Only while something is registered
+  // is the URL read at all; entering a queue also fires URLChange, hence the check.
+  plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
+    if (!clusterCssVerdict) return;
+    const url = await plugin.window.getURL();
+    if (!url.includes('/flashcards') && !url.startsWith('/need_to_learn')) {
+      await setClusterCardCss(plugin, null);
+    }
+  });
+}
 
 export async function registerTrueFalsePowerups(plugin: ReactRNPlugin) {
   await plugin.app.registerPowerup({

@@ -49,6 +49,7 @@ Mark a statement as true or false with one command, and make that kind of questi
 - [Mark as True (`tft`) / Mark as False (`tff`) — New](Utilities-True-or-False-Cards.md#mark-as-true-or-false)
 - [Remove Marking (`tfx`)](Utilities-True-or-False-Cards.md#remove-marking)
 - [Importing True/False cards from text (`tfc`)](Utilities-True-or-False-Cards.md#importing-from-text)
+- [In a Card Cluster](Utilities-True-or-False-Cards.md#card-clusters)
 
 ## [Cleaning Up](Utilities-Cleaning-Up.md)
 

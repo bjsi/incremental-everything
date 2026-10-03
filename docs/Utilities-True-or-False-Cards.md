@@ -66,6 +66,18 @@ The command swaps each plain `TFT` / `TFF` tag for the powerup, writes the ✅ /
 
 ---
 
+## In a Card Cluster { #card-clusters }
+
+A common layout is one question Rem ("mark each item true or false") with the statements as its children, the parent being a **Card Cluster**. Mark each statement with `tft` / `tff` as usual.
+
+In the queue, the statement being tested gets the badge and, once revealed, the green or red block with the large answer and the verdict bar. The other statements of the cluster stay as RemNote draws them, and the styling moves along as you go from one statement to the next.
+
+- The styling appears a moment after each statement loads, not with it.
+- In the Compact queue the tested statement loses its bullet; the frame marks it instead.
+- A statement with no [card priority](Priorities-for-Flashcards.md) is only styled when it is the first one shown from its cluster.
+
+---
+
 ## Notes { #notes }
 
 - The whole back is enlarged, not only the mark, so keep long explanations in a child Rem (for example an Extra Card Detail) rather than on the back itself.

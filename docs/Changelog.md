@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.146 - October 3rd, 2026
+
+### ✨ Improved
+
+**True or False cards**: Statements inside a Card Cluster now get the ✔ / ✘ badge and the green or red answer block too, in both queue variants.
+
+📖 [True/False cards in a Card Cluster](Utilities-True-or-False-Cards.md#card-clusters)
+
 ## v1.0.145 - October 3rd, 2026
 
 ### ✨ New - new-card cooling in RemNote's own queues

@@ -51,6 +51,12 @@ In both the Compact and the Beautiful queue, the back of a basic card is rendere
 
 The question Rem's bullet is `absolute left-[-24px]`: a border or background on `.rn-question-rem` needs about 36px of left padding to clear it.
 
+## Card Cluster cards carry no tags and no Rem ids
+
+A card whose parent is a Card Cluster is drawn by a separate renderer in both queue variants (`data-test="Beautiful Queue Card Cluster"` in Beautiful). It emits plain flex divs: no `.rn-question-rem`, no `data-queue-rem-container-tags`, no Rem id, and the answer is a bare `.RichTextViewer` after a `span.mx-2` delimiter instead of a fill-in-the-blank. Tag-keyed CSS cannot reach these cards at all (saved DOM + `app.asar`, 2026-10-03).
+
+The only hook is the class `cluster-answer-container`, put on the wrapper of the Rem being tested on both sides of the card (`currentCompoundCardIdToTest.remId === rem._id`). Its first row child is the card's own line (`.min-w-0.items-start` in Beautiful, `.justify-between` in Compact); the cluster's other cards are in a sibling div. To style by tag, the plugin has to read the current card on `QueueLoadCard` and register CSS against that class (`refreshClusterCardCss` in `src/register/true_false.ts`).
+
 ## Text import cannot name a powerup
 
 Pasting `#[[TFT]]` (RemNote's flashcards-from-text syntax) resolves the name among ordinary Rems only. With a powerup of that name registered, it still creates a plain tag Rem. The plain tag slugifies to the same `data-rem-tags` value, so CSS keyed on the slug applies either way; converting it to the powerup takes a command (`convertPlainTags` in `src/register/true_false.ts`). Observed 2026-10-03.
