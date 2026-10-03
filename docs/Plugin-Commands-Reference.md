@@ -234,6 +234,22 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 - **Hide Grandparent** — `quick: hgp`
   Hides the grandparent on the front side of the tagged flashcard (revealed on the back).
 
+### True or False Card Commands
+
+Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). All of them act on the focused Rem, a multi-Rem selection, or the current queue card.
+
+- **True/False: Mark as True** — `quick: tft`
+  Tags the Rem `TFT` and makes sure its back says ✅, keeping whatever the back already holds. A Rem with no back becomes a forward-only card.
+
+- **True/False: Mark as False** — `quick: tff`
+  The same with the `TFF` tag and ❌. Running it on a card marked true flips the verdict, swapping only the mark.
+
+- **True/False: Convert Pasted Tags** — `quick: tfc`
+  For cards [imported from text](Utilities-True-or-False-Cards.md#importing-from-text) with `#[[TFT]]` / `#[[TFF]]`: swaps those plain tags for the powerups, writes the mark where it is missing, and deletes the plain tag Rem once unused. Covers the selected Rems, or the focused Rem and everything under it.
+
+- **True/False: Remove Marking** — `quick: tfx`
+  Removes the tag and its styling. The card and its back text are left as they are.
+
 ### Other utilities
 
 - **Toggle Ignore Tag** (`Ctrl+Shift+I`) — `quick: ign`

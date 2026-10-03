@@ -28,6 +28,7 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
+import { registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
 import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
@@ -72,6 +73,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   // newly-created rems. These powerup codes don't exist in the standalone
   // Hide in Queue plugin, so they cannot collide with it.
   await registerCoreQueueDisplayPowerups(plugin);
+  // True/False cards: the TFT / TFF powerups and the CSS keyed on them.
+  await registerTrueFalsePowerups(plugin);
   // Settings appear in RemNote's own panel only while this KB still has to read
   // them across — the migration reads through getSetting, which throws for an
   // unregistered id. For an up-to-date KB this list is empty, so the plugin's
@@ -192,6 +195,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Remove Parent / Remove Grandparent commands are always available — they
   // wrap powerups that are always registered and don't conflict with anything.
   await registerCoreQueueDisplayCommands(plugin);
+  await registerTrueFalseCommands(plugin);
 
   // Hide-in-Queue legacy commands gated on the same setting as the legacy
   // powerups above (must be in lockstep — registering commands without their

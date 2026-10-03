@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.144 - October 3rd, 2026
+
+### ✨ New - True or False cards
+
+**Commands**: *True/False: Mark as True* (`tft`) and *Mark as False* (`tff`) turn a statement into a True/False card — the back gets its ✅ or ❌ with the rest of it kept, the queue shows a large ✔ / ✘ badge on the question and a green or red answer block on the back, and the editor bullet becomes the verdict; *Convert Pasted Tags* (`tfc`) does the same for cards imported from text with `#[[TFT]]` / `#[[TFF]]`.
+
+📖 [True or False Cards](Utilities-True-or-False-Cards.md)
+
 ## v1.0.143 - October 3rd, 2026
 
 ### ✨ New - size imported images that show cropped in the queue
