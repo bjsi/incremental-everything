@@ -26,6 +26,12 @@ Treat a card the queue has left behind as seen when the next card loads, not whe
 
 Going back with the left arrow reloads the previous card with an ordinary `QueueLoadCard`. The card you left gets no `QueueCompleteCard`, and it loads again when you move forward. Observed 2026-09-29: a card rated Again, the next card left unrated after 3.5 s, then both loaded again. So a card seen earlier in the session can come back. It must never cool itself: its own sighting is left out when it is judged (`verdictForCard`).
 
+## Card Cluster ratings emit no QueueCompleteCard
+
+Read from the bundle and confirmed in the database, 2026-10-04. The queue's `answerCard` emits `QueueCompleteCard` only when `this.answerCardOverride?.(score)` is falsy. The Card Cluster renderer defines `answerCardOverride`, writes the repetition itself (`submitAnswerWrite` → `updateRepStatusInner`), moves to the next sibling (`goToNextCompoundCard`) and returns `true`. So a cluster member's rating reaches no plugin event, even when it is the only member of its cluster in the queue. `GlobalRemChanged` is not a substitute: the Rem changes only when the rating moves its mastery level.
+
+Two cards of `cc` parents had Good ratings stored with the drill document as `subQueueId` and were still in `finalDrillIds`. The card's `repetitionHistory` is the only reliable source: read it back after the next card change (`reconcileRatings` in `src/lib/mastery_drill_native.ts`; the popup drill's `registerDrillCardRatingListener` does the same for the card `QueueLoadCard` named).
+
 ## A skip buries the card's siblings
 
 `removeCurrentCardFromQueue` runs every provider's "before pop" hook. The bury provider records the card in `UserDataStore.recentlySeenCardsTuples` (synced, entries last 60 minutes), exactly as if it had been answered.

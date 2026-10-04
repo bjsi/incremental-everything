@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.147 - October 4th, 2026
+
+### 🐛 Fixed
+
+**Mastery Drill**: Fixed Card Cluster cards staying in the regular-queue drill after being rated *Good* or *Easy*; cluster cards already stuck in the list are removed the next time the drill starts.
+
+📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill)
+
 ## v1.0.146 - October 3rd, 2026
 
 ### ✨ Improved

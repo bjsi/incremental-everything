@@ -287,6 +287,8 @@ Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused s
 
     This is a limitation of what RemNote exposes, not something the plugin can work around, and it is left as-is: clusters rarely reach a drill queue, and the failure mode is an under-populated drill — never a wrong rating, and never a lost repetition. Everything outside clusters is unaffected.
 
+    The [regular-queue drill](#regular-queue-drill) does not depend on those reports for ratings: it reads them back from each card's history, so a cluster card rated *Good* or *Easy* there leaves the drill.
+
 ### Why Use It
 
 Use the Mastery Drill to review only items you struggled with recently, ensuring you master them before they fall back into the scheduled queue. Working in a difficult-only mode puts your brain on an emergency alertness level — you approach repetitions differently when recall failure is expected, which is often enough to finally wrap your mind around harder material.
@@ -310,7 +312,7 @@ The drill runs in one of two places, chosen with **Where the Drill Runs** in the
 
 `dri`, the sidebar notification and the panel's 🎯 follow the setting. The commands **Mastery Drill (popup)** and **Mastery Drill (regular queue)** start either one whatever it says.
 
-#### The regular-queue drill
+#### The regular-queue drill { #regular-queue-drill }
 
 ![The Mastery Drill running in the regular queue: the queue titled "Mastery Drill" with 12 cards left, the drill bar above the card with Remove from Drill, Card List and the note that RemNote hid some drill cards, the card info bar with priority and FSRS figures under the cloze, and the Queue Dashboard on the right recording a Mastery Drill session with the card's forgetting curve](assets/native-drill.png){ width="900" }
 
@@ -320,6 +322,7 @@ RemNote practises whole Rems, not a hand-picked set of cards. So each session cr
 - **"Time to Take a Break"**: skipping a card counts as seeing it, and RemNote then hides the other cards of that Rem for an hour, sometimes including its drill card. When RemNote shows its "Time to Take a Break" screen for them, the drill presses **Keep Practicing** itself and a toast says how many drill cards it is continuing with. It affects only the drill session, not your other queues. If the press ever fails, the screen stays up with Keep Practicing highlighted and a note under the buttons: press it, or **Esc**.
 - **The drill bar**, under the queue's top bar, has **Remove from Drill** (takes the card on screen out of the drill) and **Card List** (the [Card List](#card-list), in its own popup).
 - Ratings work as in any queue: *Again*/*Hard* keep the card in the drill and restart its [minimum delay](#minimum-delay), *Good*/*Easy* take it out. The session is recorded as **Mastery Drill** in the [Practiced Queues History](#practiced-queues-history-live-dashboard).
+- **[Card Cluster](https://help.remnote.com/en/articles/10104223-card-clusters) cards**: RemNote tells plugins nothing when a cluster card is rated, so the drill reads the rating from the card's own history a moment after the next card appears (or after you leave the queue). A cluster card rated *Good* or *Easy* leaves the drill like any other, and *Again*/*Hard* restarts its delay. When the drill starts, it also drops any card whose last rating since it entered the drill was *Good* or *Easy* — which catches cluster cards rated *Good* in an ordinary queue.
 
 The Queue Management, Editor Access and Keyboard Shortcuts sections below describe the popup drill.
 
