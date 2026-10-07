@@ -197,10 +197,12 @@ This is your most-used button (shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Win
 
 #### The Scheduling Algorithm
 
-The "Next" button uses a simple but effective exponential scheduling algorithm. The interval for the next repetition is calculated with the formula:
-`newInterval = multiplier ** numberOfReviews`
+The "Next" button calculates the next interval from **how many times you have reviewed the item**. Which formula it uses depends on the scheduler chosen in the plugin settings:
 
-In simple terms: each time you review an item, the plugin looks at how many times you've seen it before and raises a **multiplier** (a value you can set in the plugin settings, defaulting to 1.5) to that power. This causes the review intervals to grow exponentially (e.g., 2 days, 3 days, 5 days, 7 days, 11 days, and so on), ensuring you see familiar material less frequently over time.
+* **Default scheduler (exponential):** `newInterval = ⌈multiplier ^ numberOfReviews⌉`. Each review raises a **multiplier** (a plugin setting, defaulting to 1.5) to the power of the review number, so intervals grow exponentially (2 days, 3 days, 4 days, 6 days, 8 days, 12 days, and so on) and you see familiar material less often over time.
+* **Beta scheduler (saturating curve):** intervals start at a comfortable **First Review Interval** (default 5 days) and gradually approach a **Max Interval** ceiling (default 30 days) without ever exceeding it — better suited to material that needs many reviews, such as a whole book.
+
+📖 **Full details:** the [IncRem Scheduler](IncRem-Scheduler.md) page covers both schedulers, with formulas, progression tables and the [settings](IncRem-Scheduler.md#settings-reference) that control them. To see how a due item is then picked for the queue, read [Scheduling and the Queue](IncRem-Scheduler.md#scheduling-and-the-queue).
 
 #### The "One Memory, One Action" Principle
 
@@ -226,7 +228,7 @@ Use "Reschedule" when you encounter a complex topic that you're not mentally pre
 Instead of struggling or just clicking "Next" (a futile review), you can use "Reschedule" to punt the advanced topic a month into the future. This gives you time to encounter and process first the more basic foundational material you have already imported to your knowledge base, so you'll be ready when the complex topic reappears.
 
 **A caveat:**
-Using "Reschedule" is a **one-time override**. The custom interval you set applies only to the next review. After that, the "Next" button will resume its normal scheduling based on your total number of reviews, not the custom interval you previously set. If an interval feels off again in the future, simply use "Reschedule" again.
+Using "Reschedule" is a **one-time override**. The custom interval you set applies only to the next review. After that, the "Next" button will resume its normal scheduling based on your total number of reviews, not the custom interval you previously set. If an interval feels off again in the future, simply use "Reschedule" again. The [IncRem Scheduler](IncRem-Scheduler.md) page explains how those intervals are calculated.
 
 **📝 Note field:**
 The popup includes an optional **Note** input — record *why* you postponed ("waiting for prerequisite chapter", "revisit after exam"). The note is stored on this reschedule's history entry and shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), so future-you knows what past-you was thinking.
