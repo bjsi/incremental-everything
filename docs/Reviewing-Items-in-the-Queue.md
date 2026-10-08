@@ -68,7 +68,7 @@ This hold is within a session. Its counterpart across days is **cooling** in the
 Here is a breakdown of each button and its function, from left to right.
 
 * **[Next](#next):** (Shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Windows/Linux)
-This is your primary action. Clicking "Next" marks the item as reviewed, calculates the next time you should see it based on the scheduling algorithm, and advances to the next item in your queue. The subtitle (e.g., "in 3 days") shows you the new interval that was just calculated.
+This is your primary action. Clicking "Next" marks the item as reviewed, calculates the next time you should see it based on the scheduling algorithm, and advances to the next item in your queue. The subtitle (e.g., "×1.5 in 3 days") shows the interval that will be set, preceded by a chip naming the [scheduler](IncRem-Scheduler.md#scheduler-indicator) that produced it.
 
   * **Swipe-to-Reschedule:** (New!) A new gesture for faster scheduling when reviewing Incremental Rems:
       * **Click and slide UP:** Automatically schedules for **tomorrow**.
@@ -197,10 +197,16 @@ This is your most-used button (shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Win
 
 #### The Scheduling Algorithm
 
-The "Next" button uses a simple but effective exponential scheduling algorithm. The interval for the next repetition is calculated with the formula:
-`newInterval = multiplier ** numberOfReviews`
+The "Next" button calculates the next interval with one of two schedulers:
 
-In simple terms: each time you review an item, the plugin looks at how many times you've seen it before and raises a **multiplier** (a value you can set in the plugin settings, defaulting to 1.5) to that power. This causes the review intervals to grow exponentially (e.g., 2 days, 3 days, 5 days, 7 days, 11 days, and so on), ensuring you see familiar material less frequently over time.
+* **Multiplier:** `next interval = ⌈current interval × multiplier⌉`. The multiplier defaults to 1.5, so an item left alone goes 2, 3, 5, 8, 12, 18 days — and an interval you chose yourself is carried forward: 50 days becomes 75, then 113.
+* **Saturating Curve:** intervals depend only on the number of reviews. They start at a comfortable **First Review Interval** (default 5 days) and gradually approach a **Max Interval** ceiling (default 30 days) without ever exceeding it — better suited to material that needs many reviews, such as a whole book.
+
+Each Incremental Rem uses one of them: its own choice if you set one, otherwise the setting for its type, otherwise the *Default Scheduler*. A small chip on the Next button tells you which — `×1.5` for the multiplier, `curve` for the saturating curve.
+
+![The Next button with a ×1.5 chip before "in 24 days"](assets/scheduler-indication-in-next-button.png){ width="900" }
+
+📖 **Full details:** the [IncRem Scheduler](IncRem-Scheduler.md) page covers both schedulers, [how one is chosen for each item](IncRem-Scheduler.md#which-scheduler) and the [settings](IncRem-Scheduler.md#settings-reference) that control them. To see how a due item is then picked for the queue, read [Scheduling and the Queue](IncRem-Scheduler.md#scheduling-and-the-queue).
 
 #### The "One Memory, One Action" Principle
 
@@ -225,13 +231,18 @@ Use "Reschedule" when you encounter a complex topic that you're not mentally pre
 
 Instead of struggling or just clicking "Next" (a futile review), you can use "Reschedule" to punt the advanced topic a month into the future. This gives you time to encounter and process first the more basic foundational material you have already imported to your knowledge base, so you'll be ready when the complex topic reappears.
 
-**A caveat:**
-Using "Reschedule" is a **one-time override**. The custom interval you set applies only to the next review. After that, the "Next" button will resume its normal scheduling based on your total number of reviews, not the custom interval you previously set. If an interval feels off again in the future, simply use "Reschedule" again.
+**What happens at the next review depends on the item's scheduler:**
+
+- On the **Saturating Curve**, Reschedule is a **one-time override**. The next "Next" returns to the curve, which only counts reviews — right for a book you are merely postponing.
+- On the **Multiplier** scheduler, the interval you set is **kept**: the next "Next" multiplies it. Set 50 days and the following intervals are 75, then 113.
+
+**Scheduler row:**
+The popup shows which scheduler the item uses and lets you change it for this Rem alone: `←` / `→` switch between **× Multiplier** and **Saturating Curve**, and with the multiplier selected `↑` / `↓` (or typing) set this Rem's own value. A preview line shows the intervals that would follow. See [Changing it for one Rem](IncRem-Scheduler.md#per-rem-scheduler).
 
 **📝 Note field:**
 The popup includes an optional **Note** input — record *why* you postponed ("waiting for prerequisite chapter", "revisit after exam"). The note is stored on this reschedule's history entry and shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), so future-you knows what past-you was thinking.
 
-![Reschedule Widget](assets/reschedule.png){ width="400" }
+![The Reschedule popup with its Scheduler row: × Multiplier selected, the multiplier at 1.5 and the preview "After that: 36 → 54 → 81 days"](assets/reschedule-with-scheduler.png){ width="400" }
 
 #### Technical Note: Reschedule Event Types
 
@@ -250,7 +261,9 @@ The plugin differentiates how repetition/reschedule events are tracked based on 
 **Key distinction:**
 
 - **Review actions** (`rep`, `rescheduledInQueue`, `executeRepetition`) count for interval calculation because you engaged with and reviewed the content before scheduling the next review
-- **Administrative adjustments** (`rescheduledInEditor`, `manualDateReset`) only change the schedule without confirming a review—useful for planning but don't advance the SRS algorithm
+- **Administrative adjustments** (`rescheduledInEditor`, `manualDateReset`) only change the schedule without confirming a review—useful for planning but don't advance the review count
+
+"Counts for Interval" is about the **review count**, which is what the Saturating Curve uses. The [Multiplier scheduler](IncRem-Scheduler.md#multiplier-scheduler) works from the interval the item is on instead, so there an editor reschedule or a manual date edit does set the interval the next review multiplies.
 
 ### Dismiss
 
@@ -358,6 +371,12 @@ See also: [Using the RemNote Clipper](https://help.remnote.com/en/articles/60308
 ## Card Stats & FSRS Integration
 
 When reviewing flashcards in the queue, the **Card Info Bar** widget (formerly *Card Priority Display*) shows additional card statistics and FSRS memory state information alongside the priority and shield data.
+
+In the Beautiful queue variant the bar is docked just above the answer buttons. See [Card Info Bar in the Beautiful queue](Plugin-Widgets-Reference.md#card-info-bar-beautiful).
+
+![The answer side of a card in the Beautiful queue: the AI Explanation panel, then the Card Info Bar with priority, shields and FSRS figures, then the four answer buttons](assets/card-info-bar-docked-answer.png){ width="900" }
+
+![The question side of a card in the Beautiful queue: the Card Info Bar docked just above the Reveal Answer button, well below the card text](assets/card-info-bar-docked-question.png){ width="900" }
 
 ### What's Displayed
 

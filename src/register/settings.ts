@@ -6,6 +6,7 @@ import {
   showLeftBorderForIncRemsSettingId,
   showDismissedIndicatorSettingId,
   hideDismissedTagSettingId,
+  showLinkedAudioIndicatorSettingId,
 } from '../lib/consts';
 import { PRIORITY_BAND_TAG_HIDE_CSS } from '../lib/priority_bands';
 import {
@@ -95,6 +96,33 @@ const hideDismissedTagId = 'hide-dismissed-tag';
 const HIDE_DISMISSED_TAG_CSS = `
   [data-rem-tags~="dismissed"] .hierarchy-editor__tag-bar__tag {
     display: none;
+  }
+`;
+
+const showLinkedAudioIndicatorId = 'show-linked-audio-indicator';
+// An inline audio player is a bordered box holding a real <audio src> element
+// (findings/MEDIA_AND_FILE_STORAGE.md). A stored file plays from RemNote's S3
+// bucket or from a local/blob URL; a file that is only linked plays from the
+// outside address itself, which is the one case an http(s) src is left with.
+// The localhost exclusions cover a file still waiting in the upload cache.
+const LINKED_AUDIO_SRC = [
+  'audio[src^="http"]',
+  ':not([src*="remnote-user-data"])',
+  ':not([src^="http://localhost"])',
+  ':not([src^="http://127.0.0.1"])',
+  ':not([src^="https://127.0.0.1"])',
+].join('');
+// Editor marker only: in the queue it would be noise on every audio card.
+const LINKED_AUDIO_BOX = `.AudioVideoNode:not(.rn-queue *) div:has(> ${LINKED_AUDIO_SRC})`;
+const SHOW_LINKED_AUDIO_INDICATOR_CSS = `
+  ${LINKED_AUDIO_BOX} {
+    border: 1px dashed #f97316 !important;
+  }
+  ${LINKED_AUDIO_BOX}::after {
+    content: "🔗";
+    font-size: 10px;
+    line-height: 1;
+    flex: none;
   }
 `;
 
@@ -228,6 +256,9 @@ export async function registerPluginSettings(
   }
   if (await getIESetting(plugin, hideDismissedTagSettingId)) {
     await plugin.app.registerCSS(hideDismissedTagId, HIDE_DISMISSED_TAG_CSS);
+  }
+  if (await getIESetting(plugin, showLinkedAudioIndicatorSettingId)) {
+    await plugin.app.registerCSS(showLinkedAudioIndicatorId, SHOW_LINKED_AUDIO_INDICATOR_CSS);
   }
 
   // Unconditional: the band tags are an implementation detail, so their tag-bar

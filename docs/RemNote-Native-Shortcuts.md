@@ -1,6 +1,6 @@
 # RemNote Native Shortcuts
 
-Every default keyboard shortcut of RemNote itself, read out of the desktop app (RemNote 1.28.19, September 15, 2026): 236 commands, 39 of them unbound by default. The plugin's own shortcuts are on [Keyboard Shortcuts](Keyboard-Shortcuts.md).
+Every default keyboard shortcut of RemNote itself, read out of the desktop app (RemNote 1.28.19, October 3, 2026): 236 commands, 39 of them unbound by default. The plugin's own shortcuts are on [Keyboard Shortcuts](Keyboard-Shortcuts.md).
 
 The same shortcuts are listed **twice**:
 
@@ -598,6 +598,7 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 | `Opt + Shift + C` / `Alt + Shift + C` | [Batch Assign Card Priority for tagged/referencing rems](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + D` / `Alt + Shift + D` | Add Today's Document In New Pane | Global |  |
 | `Opt + Shift + F` / `Alt + Shift + F` | [Find Rem (insert reference / open in pane)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
+| `Opt + Shift + G` / `Alt + Shift + G` | [Cycle Image Size (Fit / Large / Medium / Original)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + I` / `Alt + Shift + I` | [Open Incremental Rems Main View](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + L` / `Alt + Shift + L` | [Priority Queue](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Opt + Shift + M` / `Alt + Shift + M` | [Convert extracted markup to rich text](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |

@@ -7,6 +7,7 @@ import {
   prioritySlotCode,
   nextRepDateSlotCode,
   repHistorySlotCode,
+  schedulerSlotCode,
   originalIncrementalDateSlotCode,
 } from '../consts';
 import { IncrementalRep, repCountsForStats } from './types';
@@ -219,6 +220,10 @@ export async function executeTransferIncRemToParent(
       readRawPdfState(source, powerupCode),
       source.getPowerupProperty(powerupCode, repHistorySlotCode),
     ]);
+    // The rem's own scheduler choice travels with the schedule it governs.
+    const schedulerRaw = await source
+      .getPowerupProperty(powerupCode, schedulerSlotCode)
+      .catch(() => '');
 
     const storedHistory = tryParseJson(historyRaw);
     const sourceHistory: IncrementalRep[] = Array.isArray(storedHistory)
@@ -273,6 +278,12 @@ export async function executeTransferIncRemToParent(
     if (priority !== null) {
       slotWrites.push(
         destination.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()])
+      );
+    }
+
+    if (schedulerRaw) {
+      slotWrites.push(
+        destination.setPowerupProperty(powerupCode, schedulerSlotCode, [schedulerRaw])
       );
     }
 

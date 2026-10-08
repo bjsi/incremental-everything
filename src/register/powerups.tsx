@@ -19,6 +19,7 @@ import {
   priorityQueueSkipPausedSlotCode,
   priorityQueuePausedThresholdSlotCode,
   pdfStateSlotCode,
+  schedulerSlotCode,
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
@@ -119,6 +120,16 @@ export async function registerPluginPowerups(
           code: repHistorySlotCode,
           name: 'History',
           hidden: true,
+        },
+        {
+          // Per-rem scheduler override ('curve' / 'mult' / 'mult:<factor>'), set
+          // from the Reschedule and Priority & Interval popups. Absent on every
+          // rem that simply follows the settings.
+          code: schedulerSlotCode,
+          name: 'Scheduler',
+          propertyType: PropertyType.TEXT,
+          hidden: true,
+          onlyProgrammaticModifying: true,
         },
         {
           // PDF reading state — page, range, page history and active PDF, as

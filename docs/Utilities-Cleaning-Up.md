@@ -1,6 +1,6 @@
 # Cleaning Up
 
-Commands that clear out Rems an import left behind, and find flashcards that cannot be practised.
+Commands that clear out Rems an import left behind, find flashcards that cannot be practised, and store the images and audio a Rem only links to.
 
 ## Delete Empty Extra Card Detail Rems
 
@@ -165,3 +165,116 @@ The current state of every Rem — its **Enable Cards** flag and its **direction
 
 !!! tip "Try a handful first"
     Select five rows and apply. The report tells you exactly how many cards that produced, which is the honest way to find out what a run over the whole deck will do to your queue before you commit to it.
+
+## Store Linked Images & Audio in RemNote { #store-linked-images-audio }
+
+**`Store linked images & audio in RemNote`** (`quick: slm`) takes the images and audio a Rem only *links to*, fetches them, and stores them in RemNote the way an uploaded file is stored — so the Rem stops depending on somebody else's server.
+
+### Linked or stored: the difference you cannot see
+
+An image and an audio player look the same in the editor whichever way they were added. What RemNote saved is not the same:
+
+| Added through | What RemNote saves | If the outside server drops the file |
+|---|---|---|
+| **Upload**, **Record**, paste, drag and drop | its own copy of the file | nothing happens |
+| **Embed Link**, **Audio Search**, an image picked from Wikimedia | only the web address | the image or player is dead |
+
+A linked file is fetched from the outside server every time the Rem is shown. That is fine until a dictionary reorganises its audio folder or a site takes an image down — and it never plays **offline**. A stored file is kept with your knowledge base and syncs with it.
+
+RemNote does sometimes copy a linked *image* by itself, but not dependably — a knowledge base can hold hundreds of images that are still bare links — and it never copies linked *audio*. Pronunciation audio embedded from a dictionary site is the typical case: every one of those players is a link.
+
+### Spotting linked audio { #spotting-linked-audio }
+
+Turn on **Mark Audio That Is Only Linked** ([Settings → Editor Indicators](Plugin-Settings-Reference.md#editor-indicators)) and every audio player whose file is still on an outside server gets a **dashed orange outline** and a 🔗 at its right end. A player whose file RemNote stores looks as it always did.
+
+Run the command on the Rem and the outline goes, which is also the quickest check that it worked. The marker is drawn in the editor only, not in the queue, and covers audio only: a linked image is not marked.
+
+### How to use it
+
+Put the cursor in a Rem, or select several, and run the command from the omnibar. Both the front and the back of each Rem are handled.
+
+* **Store linked images & audio in RemNote** (`slm`) — the focused Rem, or the selected Rems.
+* **Store linked images & audio in RemNote (with descendants)** — the same Rems *and their whole subtree*. Point it at a document, or at a folder of vocabulary, to store everything in it.
+
+It takes a couple of seconds per file. Nothing shows while it works; the result arrives at the end.
+
+### What it changes, and what it leaves alone
+
+**The Rem is edited in place.** Only the address inside the image or the audio player is replaced; the text, the size of the image and everything else stay as they were. It is the same Rem, so its **flashcards and their history are untouched**.
+
+Left alone:
+
+* files RemNote **already stores** — which makes the command safe to re-run;
+* **video** embeds such as YouTube, which are pages rather than files;
+* anything it **could not fetch**, which simply stays linked.
+
+### Reading the result
+
+When everything was stored, a single toast says how many files were stored and how many Rems were updated — or that there was nothing linked to begin with.
+
+When some files could not be fetched, a dialog lists their addresses instead. The rest were still stored.
+
+Every file is also logged to the console under `[localize-media]`, old address and new, for when you want to see exactly what a large run did.
+
+### Desktop app or browser
+
+Use the **desktop app** for this. It may fetch a file from any server.
+
+In the **browser**, a file is only reachable when its server allows other sites to request it. Wikimedia does; most dictionary sites do not, so their audio fails there.
+
+!!! note "Audio leaves one empty Rem behind"
+    Storing **audio** goes through a throwaway Rem, which the command deletes again. RemNote creates one more empty Rem alongside it that the plugin has no way to reach, so each run leaves **one empty top-level Rem** (one per 20 audio files on a large run). It is harmless and can be deleted. Images normally leave nothing behind.
+
+---
+
+## Cycle Image Size { #cycle-image-size }
+
+**`Cycle Image Size`** (`Opt+Shift+G` / `Alt+Shift+G`, `quick: cis`) gives a size to the images that never got one in RemNote — typically the images of imported cards — so they stop showing up cropped in the flashcard queue. Press it again to move to the next size.
+
+![A queue card whose imported diagram is cropped behind scrollbars; the command is pressed and the image redraws whole](assets/cycle-image-size.gif){ width="900" }
+
+### The problem it solves
+
+In the queue, RemNote draws an image inside a small zoomable frame. An image you have resized in RemNote fills that frame correctly. An image that still carries the size it was imported with — an Anki import, for instance — can come out **zoomed in and cut off, with scrollbars around it**, until you resize it by hand. The same image looks fine in the editor.
+
+This command does that resizing for you, on every such image of a card at once.
+
+### How to use it
+
+In the **queue**, press the shortcut on the card that shows a cropped image: the image redraws straight away. If you have a Rem selected in the previewer (`P`), the command acts on that Rem instead of the card.
+
+In the **editor**, put the cursor in a Rem, or select several, and press the shortcut.
+
+Either way it covers the Rem **and three levels below it** — children, grandchildren and great-grandchildren — front and back.
+
+### The four sizes
+
+Each press moves all the images it found one step along:
+
+| Step | Result |
+|---|---|
+| **Fit** | The image at its real size, never wider than the card. The same as dragging its edge. |
+| **Large** | Full width — RemNote's own *Large Image*. |
+| **Medium** | Half width — RemNote's own *Medium Image*. |
+| **Original** | Back to how the image was before the first press. |
+
+After *Original* the next press starts again at *Fit*. A message names the step and says how many images changed.
+
+### Which images it changes
+
+Only images **nobody has sized in RemNote**: those with no stored size at all, and those whose stored size is still the file's own pixel size.
+
+Left alone:
+
+* images **you have resized**, by dragging or through the image menu;
+* **Image Occlusion** images, drawings and cropped images — their boxes are placed relative to the image's size;
+* the image of a **PDF or web highlight**;
+* an image whose file cannot be loaded to measure it.
+
+The message tells you how many images were skipped, and why.
+
+### Good to know
+
+* The cycle is remembered **until you restart RemNote**. After that, the images you sized with this command count as sized, and the command leaves them alone — use RemNote's image menu to change them.
+* The Rem is edited in place and only the image's size changes, so its **flashcards and their history are untouched**.
+

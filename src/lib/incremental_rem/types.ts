@@ -54,6 +54,13 @@ export const IncrementalRep = z.object({
    */
   interval: z.number().optional(),
   /**
+   * True when this entry moved the next-rep date WITHOUT choosing a new interval
+   * for the item — the queue's swipe-to-tomorrow / swipe-to-today gestures. The
+   * multiplier scheduler skips such an entry when it looks for the interval the
+   * item is on, so "carry on tomorrow" does not collapse a long interval to 1.
+   */
+  keepsInterval: z.boolean().optional(),
+  /**
    * Time spent reviewing in seconds
    */
   reviewTimeSeconds: z.number().optional(),

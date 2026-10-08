@@ -164,7 +164,9 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('reschedule', WidgetLocation.Popup, {
     dimensions: {
-      width: '100%',
+      // Same width as priority_interval: both carry the scheduler picker, whose
+      // two segments and multiplier field need the room to stay on one line.
+      width: '370px',
       height: 'auto',
     },
   });

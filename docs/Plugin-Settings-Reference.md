@@ -6,11 +6,11 @@ Every setting lives in **one place**: the plugin's own settings popup.
 
 ## Where the settings are { #where-the-settings-are }
 
-Open the popup with the command **`Incremental RemNote: Settings`** (quick code `is`). It groups the settings by area, hides the ones that do not apply — the Beta Scheduler's parameters stay out of sight until you switch that scheduler on — and links each entry to the section of this manual that explains it.
+Open the popup with the command **`Incremental RemNote: Settings`** (quick code `is`). It groups the settings by area, hides the ones that do not apply — the Mastery Drill's parameters stay out of sight until you switch the drill on — and links each entry to the section of this manual that explains it.
 
-![The Incremental RemNote settings popup](assets/settings-popup.png){ width="900" }
+![The Incremental RemNote settings popup, open on the Scheduling group](assets/settings-popup-scheduler.png){ width="900" }
 
-*Above: the Scheduling group with the Beta Scheduler on, so its two parameters are shown and the Multiplier is hidden. The **?** opens this manual at the matching section; **Reset** appears on anything changed from its default, next to a **modified** badge.*
+*Above: the Scheduling group. The **?** opens this manual at the matching section; **Reset** appears on anything changed from its default, next to a **modified** badge.*
 
 **RemNote's own plugin settings panel is empty for this plugin.** Up to v1.0.44, five of them stayed behind there — *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches and *Enable Hide-in-Queue Powerups and Commands* — on the theory that RemNote's panel is where you would look first if the plugin ever felt heavy. It never was: there was no performance problem to chase, and the split only gave you a second place to look. Since **v1.0.45** they are in the popup with everything else, and editable there.
 
@@ -45,13 +45,20 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 
 *In the IE Settings popup.*
 
+![The Scheduling group of the settings popup: Initial Interval and its four per-type settings, Default Scheduler, Multiplier, the two Saturating Curve settings and the four per-type schedulers](assets/settings-popup-all-scheduling-options.png){ width="600" }
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| **Initial Interval** | Number | `1` | Number of days until the first repetition of a new Incremental Rem. |
-| **Multiplier** | Number | `1.5` | Base of the exponential spacing formula: after your Nth review, the next interval is `⌈Multiplier ^ N⌉` days. The interval depends only on how many reviews you have done, not on the previous interval. With the default `1.5`: 1st review → 2 days, 2nd → 3, 3rd → 4, 5th → 8, 6th → 12. **Hidden while the Beta Scheduler is on**, which ignores it. See [IncRem Scheduler](IncRem-Scheduler.md). |
-| **Use Beta Scheduler (Saturating Curve)** | Boolean | `false` | Enable the beta saturating scheduler. Intervals start at the First Review Interval and gradually approach the Max Interval, instead of growing exponentially. See [IncRem Scheduler](IncRem-Scheduler.md#beta-scheduler) for full details. |
-| **First Review Interval (Beta Scheduler)** | Number | `5` | Interval in days assigned after completing the first review. Different from *Initial Interval* above, which controls when a new IncRem first appears in the queue. **Shown only while the Beta Scheduler is on.** |
-| **Max Interval (Beta Scheduler)** | Number | `30` | Upper bound in days the interval gradually approaches. The interval will never exceed this value. **Shown only while the Beta Scheduler is on.** |
+| **Initial Interval** | Number | `1` | Number of days until the first repetition of a new Incremental Rem, whichever scheduler it uses. On the **Multiplier** scheduler it is also the interval the following ones grow from (10 with a multiplier of 1.5 gives 10, 15, 23…); the Saturating Curve ignores it after the first repetition. The per-type settings below prevail over it. |
+| **Initial Interval for Documents / Videos / Highlights and Video Extracts / Regular Rems** | Text | *(empty)* | Four settings giving a kind of Incremental Rem its own Initial Interval, in days. Leave one empty to use the general Initial Interval; `0` means due today. The types are the same as for the per-type schedulers — see [Per-type defaults](IncRem-Scheduler.md#per-type-defaults). |
+| **Default Scheduler** | Multiplier / Saturating Curve | `Multiplier` | How Next calculates the following interval when neither the Rem nor its type says otherwise. **Multiplier**: the interval the item is on × its multiplier, so an interval you choose in Reschedule is carried forward. **Saturating Curve**: intervals depend only on the number of reviews. Formerly *Use Beta Scheduler*. See [IncRem Scheduler](IncRem-Scheduler.md#two-schedulers). |
+| **Multiplier** | Number | `1.5` | Multiplier scheduler: `next interval = ⌈current interval × multiplier⌉`. This is the value suggested for every Incremental Rem; a different one can be set per Rem in the Reschedule and Priority & Interval popups. `1` keeps the interval constant. See [Multiplier scheduler](IncRem-Scheduler.md#multiplier-scheduler). |
+| **First Review Interval (Saturating Curve)** | Number | `5` | Saturating Curve: interval in days assigned after completing the first review. Different from *Initial Interval* above, which controls when a new IncRem first appears in the queue. |
+| **Max Interval (Saturating Curve)** | Number | `30` | Saturating Curve: upper bound in days the interval gradually approaches. The interval will never exceed this value. |
+| **Scheduler for Documents (PDF / web page)** | Dropdown | `Use the Default Scheduler` | Scheduler for Incremental Rems that open a whole PDF or web page. Prevails over the Default Scheduler. See [Per-type defaults](IncRem-Scheduler.md#per-type-defaults). |
+| **Scheduler for Videos** | Dropdown | `Use the Default Scheduler` | Scheduler for Incremental Rems that open a whole video. |
+| **Scheduler for Highlights and Video Extracts** | Dropdown | `Use the Default Scheduler` | Scheduler for highlights that are themselves Incremental Rems (the toolbar toggle) and for video extracts. A Rem made with the toolbar's **Create Incremental Rem** button is a regular Rem and follows the next setting instead. |
+| **Scheduler for Regular Rems** | Dropdown | `Use the Default Scheduler` | Scheduler for every other Incremental Rem — a paragraph, a sentence, a note — including Rems made from a highlight with **Create Incremental Rem**. |
 
 ---
 
@@ -94,8 +101,9 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 | **Cooling: share of the interval** | Number | `5` % | How long a Rem stays out of the Priority Queue after a card that gives its answer away was reviewed, as a share of the cooled card's own interval, rounded up to whole days — a 100-day card cools for 5 days. 📖 [How long](Priority-Review-Document.md#how-long). |
 | **Cooling: minimum** | Number | `1` day | The shortest cooling window — what a brand-new card gets when its sibling was just reviewed. |
 | **Cooling: maximum** | Number | `15` days | The longest cooling window, reached by cards with intervals of a year or more at the default share. |
-| **Cooling: new cards** | Number | `1` day | How long a card you just created stays out of the Priority Queue before its first review, counted from the card's own creation time — SuperMemo counts creating an item as its first repetition. `0` turns it off; at most 10 days. 📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler). |
-| **Cooling in RemNote's queues** | Boolean | `All queues` | Where a card of a cooling Rem is skipped: *All queues* or *Learn New only*. **Learn New Cards** is always covered. *All queues* adds RemNote's spaced-repetition queues (a document, the daily queue), with a toast saying why. Practice All Flashcards (shuffled or in order), Card Clusters and Light Mode are left alone. 📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues). |
+| **Cooling: new cards** | Number | `1` day | How long a card you just created stays out of the Priority Queue (and, with **Cooling: where new cards cool**, RemNote's own queues) before its first review, counted from the card's own creation time — SuperMemo counts creating an item as its first repetition. `0` turns it off; at most 10 days. 📖 [What counts as a spoiler](Priority-Review-Document.md#what-counts-as-a-spoiler). |
+| **Cooling in RemNote's queues** | Boolean | `All queues` | Where a card of a cooling Rem is skipped: *All queues* or *Learn New only*. **Learn New Cards** is always covered. *All queues* adds RemNote's spaced-repetition queues (a document, the daily queue), with a toast saying why. Practice All Flashcards (shuffled or in order), Card Clusters and Light Mode are left alone. Cards you just created are not skipped there unless the next setting is on. 📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues). |
+| **Cooling: where new cards cool** | Boolean | `Priority Queue only` | Where a card you just created is held back for the days set in **Cooling: new cards**: *Priority Queue only* or *RemNote's queues too*. *RemNote's queues too* also skips it in the spaced-repetition queues (a document, the daily queue) — the queue of a document you wrote today then opens empty. Needs **Cooling in RemNote's queues** set to *All queues*; **Learn New Cards** is never affected. 📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues). |
 
 ---
 
@@ -107,6 +115,7 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 |---------|------|---------|-------------|
 | **Green Left Border for IncRems** | Boolean | `true` | Adds a green left border to IncRems in the editor, making your "extracts" easy to spot. The border spans the Rem and its descendants; the document you are currently inside is marked on its title only. |
 | **Enable Pin Reference Colour Rings** | Boolean | `false` | Rings reference **pins** by where they lead — blue for a Rem holding an image, yellow for a text highlight on a PDF page, purple for a text highlight in a web article or a PDF's Text Reader view, yellow and blue for a PDF area highlight. Needs [Tag Rems With Images](Utilities-Finding-and-Navigating.md#filter-a-document-by-images) to have been run for the image states. With this **off**, pins are left unmarked, including the priority-band border the highlight styling would otherwise draw on them. 📖 [Colour Coding Reference](Colour-Coding-Reference.md#reference-pin-rings) |
+| **Mark Audio That Is Only Linked** | Boolean | `false` | Draws a dashed orange outline and a 🔗 on an audio player whose file lives on an outside server rather than in RemNote, so it would break if that server moved the file. [Store linked images & audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio) stores it, and the outline goes. Editor only; audio only. |
 | **Yellow Left Border for Dismissed Rems** | Boolean | `true` | Rems dismissed from Incremental learning (via the Dismiss button/command) display a yellow left border to indicate they have been already processed (and preserved history). The border spans the Rem and its descendants. |
 | **Hide CardPriority Tag in Editor** | Boolean | `true` | Hides the `CardPriority` powerup tag in the editor to reduce visual clutter. Priority can still be set with `Alt+P`. |
 | **Hide Dismissed Tag in Editor** | Boolean | `true` | Hides the `Dismissed` powerup tag in the editor to reduce clutter. |

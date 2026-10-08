@@ -188,6 +188,20 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Pin Source Quote](Source-Pins.md#pin-source-quote)** (`Opt+Shift+Q` / `Alt+Shift+Q`) — `quick: psq`
   Pins the source of the focused Rem's text: finds the passage in the PDF or saved web article open in a pane and appends a pin to its highlight, reusing a highlight that already covers it or creating one. Works in a PDF's page view, a saved web article and a PDF's Text Reader view (asking which, when a PDF has both). Needs the local helper — see [Source Pins](Source-Pins.md).
 
+- <a id="store-linked-images-audio-in-remnote"></a>**Store linked images & audio in RemNote** — `quick: slm`
+  An image or audio added through **Embed Link** (or **Audio Search**) is saved as the bare web address: nothing is copied, so the Rem breaks the day that server moves or removes the file, and it does not play offline. This command fetches each such file, stores it in RemNote the way an uploaded file is stored, and points the Rem at the stored copy.
+  Run it on the focused Rem or on a selection of Rems; front and back are both handled. The Rem itself is edited in place — only the address inside the image or audio changes — so its flashcards and their history are untouched. Files RemNote already stores, and video embeds such as YouTube, are left alone, so it is safe to re-run.
+  Works best in the desktop app, which may fetch from any server. Storing audio leaves one empty top-level Rem behind per run.
+  📖 See [Utilities → Store Linked Images & Audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio).
+
+- **Store linked images & audio in RemNote (with descendants)**
+  The same, over the focused or selected Rems and their whole subtree — point it at a document to store everything it links to.
+
+- <a id="cycle-image-size"></a>**Cycle Image Size (Fit / Large / Medium / Original)** (`Opt+Shift+G` / `Alt+Shift+G`) — `quick: cis`
+  Sizes the images that were never sized in RemNote — typically those of imported cards, which the queue can show zoomed in and cut off. Each press moves them one step along **Fit → Large → Medium → Original**.
+  Acts on the current queue card (or the Rem selected in the previewer), or on the focused or selected Rems in the editor, and three levels below. Images you have resized, Image Occlusions and highlight images are left alone.
+  📖 See [Utilities → Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size).
+
 ### Queue Display Commands
 
 These commands tag a Rem with one of the [Utilities#queue-display-utilities](Utilities-Queue-Display.md) powerups. The tagged Rem then renders differently (or is removed entirely) during queue review. All commands work both from the editor and directly inside the Queue. See the [Utilities](Utilities-Queue-Display.md) page for visual examples and full behavior of each powerup.
@@ -219,6 +233,22 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
 - **Hide Grandparent** — `quick: hgp`
   Hides the grandparent on the front side of the tagged flashcard (revealed on the back).
+
+### True or False Card Commands
+
+Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). All of them act on the focused Rem, a multi-Rem selection, or the current queue card.
+
+- **True/False: Mark as True** — `quick: tft`
+  Tags the Rem `TFT` and makes sure its back says ✅, keeping whatever the back already holds. A Rem with no back becomes a forward-only card.
+
+- **True/False: Mark as False** — `quick: tff`
+  The same with the `TFF` tag and ❌. Running it on a card marked true flips the verdict, swapping only the mark.
+
+- **True/False: Convert Pasted Tags** — `quick: tfc`
+  For cards [imported from text](Utilities-True-or-False-Cards.md#importing-from-text) with `#[[TFT]]` / `#[[TFF]]`: swaps those plain tags for the powerups, writes the mark where it is missing, and deletes the plain tag Rem once unused. Covers the selected Rems, or the focused Rem and everything under it.
+
+- **True/False: Remove Marking** — `quick: tfx`
+  Removes the tag and its styling. The card and its back text are left as they are.
 
 ### Other utilities
 

@@ -57,8 +57,8 @@ const isDefault = (id: IESettingId, value: unknown) =>
 
 /**
  * How to tell the user to reveal the settings this one gates. A switch can gate
- * in either direction — the Beta Scheduler hides its parameters when off and
- * hides the Multiplier when on — so the phrase follows the required value.
+ * in either direction — some settings show only while it is off, others only
+ * while it is on — so the phrase follows the required value.
  */
 function requirementPhrase(spec: SettingSpec, requires: unknown): string {
   if (spec.kind === 'boolean') {

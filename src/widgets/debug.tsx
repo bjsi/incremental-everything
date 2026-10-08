@@ -27,6 +27,7 @@ import {
   resetAcknowledgedTips,
 } from '../lib/onboarding_tips';
 import { dumpRawPowerupSlots } from '../lib/raw_slot_dump';
+import { getRemSchedulerInfo } from '../lib/scheduler_choice';
 import { scanKbForDetachedSlots, SlotScanReport } from '../lib/raw_slot_scan';
 import { repairDetachedCardPriorities, testDeleteOrphanProperties, RepairReport } from '../lib/raw_slot_repair';
 import {
@@ -85,7 +86,7 @@ import {
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
-import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode, prioritySlotCode,
+import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode, prioritySlotCode, schedulerSlotCode,
   priorityShieldHistoryKey, documentPriorityShieldHistoryKey,
   cardPriorityShieldHistoryKey, documentCardPriorityShieldHistoryKey,
   cardShieldCleanupBackupIndexKey, cardShieldCleanupBackupPrefix,
@@ -449,11 +450,29 @@ function Debug() {
         }
       };
 
+      // The Scheduler slot, verbatim, beside what it resolves to. The slot is
+      // empty on every rem that simply follows the settings, so `stored: null`
+      // with a resolved scheduler is the normal case, not a read failure.
+      const probeSchedulerSlot = async () => {
+        try {
+          const stored = await rem.getPowerupProperty(powerupCode, schedulerSlotCode);
+          const info = await getRemSchedulerInfo(rp, rem);
+          return {
+            stored: stored === '' || stored == null ? null : String(stored),
+            effective: info.scheduler,
+            fromSettings: info.inherited,
+          };
+        } catch (e) {
+          return { error: String(e) };
+        }
+      };
+
       const rawSlotProbe = (await rem.hasPowerup(powerupCode))
         ? {
             priority: await probePrioritySlot(),
             nextRepDate: await probeDateSlot(nextRepDateSlotCode),
             originalIncDate: await probeDateSlot(originalIncrementalDateSlotCode),
+            scheduler: await probeSchedulerSlot(),
           }
         : null;
 
@@ -4473,6 +4492,11 @@ function Debug() {
             className="probe-created"
             label="Created reference"
             data={<pre style={preStyle}>{JSON.stringify(rawSlotProbe.originalIncDate, null, 2)}</pre>}
+          />
+          <Info
+            className="probe-scheduler"
+            label="Scheduler slot"
+            data={<pre style={preStyle}>{JSON.stringify(rawSlotProbe.scheduler, null, 2)}</pre>}
           />
         </div>
       )}

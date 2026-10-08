@@ -114,7 +114,7 @@ Seven relations, each a distinct way one review puts another card's answer on sc
 * **Its multi-line card**, when the Rem is one of that card's answer lines: the multi-line card's back shows the line in full.
 * **Its concept, for a descriptor's backward card.** A descriptor's backward card shows the descriptor and asks for the concept it belongs to: the nearest ancestor that is not itself a descriptor, which is a grandparent or higher when descriptors are nested. Reviewing any card of that concept, forward, backward or a cloze in it, puts the answer on screen, so the descriptor waits. RemNote buries this pairing for an hour; cooling extends it for the whole window.
 
-**And one rule about the card itself: new cards.** In the Priority Queue only, a card you have just created and never reviewed cools too, for a fixed number of days counted from the moment the card was created (**Cooling: new cards**, 1 day by default, up to 10, 0 to turn it off). SuperMemo counts creating an item as its first repetition, so a cloze you wrote while reading is never asked the same day, while its answer is still in view. The date is the card's own: a cloze added today to an old Rem counts as new, and a direction you switch off and back on keeps its original card and history, so it does not. A direction switched on for the first time is a new card.
+**And one rule about the card itself: new cards.** In the Priority Queue — and in RemNote's own queues only [if you ask for it](#cooling-in-remnotes-own-queues) — a card you have just created and never reviewed cools too, for a fixed number of days counted from the moment the card was created (**Cooling: new cards**, 1 day by default, up to 10, 0 to turn it off). SuperMemo counts creating an item as its first repetition, so a cloze you wrote while reading is never asked the same day, while its answer is still in view. The date is the card's own: a cloze added today to an old Rem counts as new, and a direction you switch off and back on keeps its original card and history, so it does not. A direction switched on for the first time is a new card.
 
 Card Cluster siblings never cool each other: a cluster is designed to be shown together, and RemNote treats it as one unit. A sibling rated *Again* that is still due does not cool anything either — RemNote's own rule already separates that pair within the hour.
 
@@ -174,7 +174,12 @@ A few things work as they do in the Priority Queue:
 * **Card Cluster** members are never skipped: a cluster is shown as one unit.
 * **Image Occlusion** cards are never skipped: see [Image Occlusion is never cooled](#image-occlusion-is-never-cooled).
 * A card never cools itself: when it comes back in the same session — after **Forgot**, say — it is shown, even while its siblings are being skipped.
-* **Cooling: new cards** does not apply: in the daily queue it would skip every card you wrote today, and Learn New Cards exists to learn new cards.
+* **Cooling: new cards** does not apply unless you switch it on: in the daily queue it would skip every card you wrote today, and Learn New Cards exists to learn new cards.
+
+**New cards, if you want them cooled here too.** Set **Cooling: where new cards cool** to **RemNote's queues too** (it is **Priority Queue only** by default) and a card you just created and never reviewed is also skipped in the spaced-repetition queues — a document, the daily queue, a Priority Queue document — for the days set in **Cooling: new cards**. It needs **Cooling in RemNote's queues** on **All queues**, and never touches Learn New Cards. Two things to expect:
+
+* The queue of a document you wrote today opens empty: every card in it is skipped, with a single toast for the session, *Cooling: cards you just created are held back until their cooling ends.*
+* The rule holds the whole Rem, as in the Priority Queue: a cloze added today to an old Rem keeps that Rem's other due cards out as well.
 
 In Light Mode only Learn New Cards is covered: judging the other queues would mean reading every card in the knowledge base each time a queue opens.
 

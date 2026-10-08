@@ -1,5 +1,5 @@
 import { AppEvents, PluginRem, RemId, RNPlugin } from '@remnote/plugin-sdk';
-import { coolingInQueuesId, currentScopeRemIdsKey } from './consts';
+import { coolingInQueuesId, coolingNewCardsInQueuesId, currentScopeRemIdsKey } from './consts';
 import { getIESetting } from './settings';
 import { shouldUseLightMode } from './mobileUtils';
 import { QueueRouteKind, queueRouteKind } from './queue_route';
@@ -37,8 +37,10 @@ import { hasCardClusterPowerup } from './priority_review_document/cluster';
  *     Mastery Drill (a Practice All route): never. Card Cluster members: never,
  *     as a cluster is shown as one unit.
  *
- * The "just created" rule stays with the Priority Queue: in a queue it would
- * skip every card written today.
+ * The "just created" rule stays with the Priority Queue by default: in a queue
+ * it would skip every card written today. A setting (coolingNewCardsInQueuesId)
+ * brings it to the spaced-repetition queues; never to Learn New, whose cards are
+ * opened precisely to be learned.
  *
  * HOW: decided ahead, looked up on load — like the drill, whose live checks
  * were too slow for its mask.
@@ -83,11 +85,12 @@ type SessionKind = Exclude<QueueRouteKind, 'other'>;
 /**
  * Why the session counts a card as seen — the trace behind a skip whose reason is a card seen in
  * this session. A card is "left behind" when another card loads after it (RemNote reports the
- * rating only after the next card has loaded), "rated" when QueueCompleteCard names it first.
+ * rating only after the next card has loaded), "rated" when QueueCompleteCard names it first,
+ * "navigated away" when the user left the queue for the editor with it on screen.
  */
 interface Sighting {
   at: number;
-  how: 'left-behind' | 'rated';
+  how: 'left-behind' | 'rated' | 'navigated-away';
   /** How long it was the current card before the queue moved on. */
   currentForMs?: number;
   /** The card whose load moved the queue past it. */
@@ -133,6 +136,8 @@ interface Session {
   firstCardHold: boolean;
   tripped: boolean;
   toastShown: boolean;
+  /** The new-card toast, shown once: a document written today skips every card for that reason. */
+  newCardToastShown: boolean;
 }
 
 let session: Session | null = null;
@@ -151,13 +156,17 @@ export const deferDuringLearnNew = () =>
     ? new Promise<void>((resolve) => setTimeout(resolve, DEFER_MS))
     : Promise.resolve();
 
-async function openScanner(plugin: RNPlugin): Promise<CoolingScanner | null> {
+async function openScanner(plugin: RNPlugin, kind: SessionKind): Promise<CoolingScanner | null> {
   try {
-    const [params, cardSource] = await Promise.all([getCoolingParams(plugin), loadCardSource(plugin)]);
+    const [params, cardSource, newCardsToo] = await Promise.all([
+      getCoolingParams(plugin),
+      loadCardSource(plugin),
+      kind === 'spaced' ? getIESetting(plugin, coolingNewCardsInQueuesId) : false,
+    ]);
     const scanner = new CoolingScanner(plugin, {
-      // Never the "just created" rule here: it would skip every card written today in the
-      // daily queue, and in Learn New the cards are opened precisely to be learned.
-      params: { ...params, newCardDays: 0 },
+      // The "just created" rule only where the user asked for it: it skips every card written
+      // today in the daily queue, and in Learn New the cards are opened precisely to be learned.
+      params: newCardsToo === true ? params : { ...params, newCardDays: 0 },
       cardSource,
       // Priorities only label verdicts; skip the second read of the card cache.
       priorityByRemId: new Map(),
@@ -188,7 +197,7 @@ async function startSession(plugin: RNPlugin, enteredAt: number, subQueueId: str
     path,
     subQueueId,
     enteredAt,
-    scanner: openScanner(plugin),
+    scanner: openScanner(plugin, kind),
     scopeTaken: false,
     pending: Promise.resolve(),
     currentCardId: null,
@@ -207,6 +216,7 @@ async function startSession(plugin: RNPlugin, enteredAt: number, subQueueId: str
     firstCardHold: kind === 'learn-new',
     tripped: false,
     toastShown: false,
+    newCardToastShown: false,
   };
   session = s;
   if (kind === 'learn-new') setMask(plugin, FIRST_CARD_HOLD_MS);
@@ -292,7 +302,7 @@ function noteSeen(plugin: RNPlugin, s: Session, cardId: string, sighting: Omit<S
         if (!remId) return;
         s.remByCard.set(cardId, remId);
       }
-      if (sighting.how === 'left-behind') {
+      if (sighting.how !== 'rated') {
         // The rating of a card left behind arrives after the next card's load: wait for it, and
         // trace only a card the queue passed without one, or too soon to have been read.
         const traced = remId;
@@ -313,7 +323,9 @@ function describeSighting(x: Sighting): string {
   parts.push(
     x.how === 'left-behind'
       ? `left behind at ${new Date(x.at).toLocaleTimeString()} when card ${x.nextCardId} loaded`
-      : `rated at ${new Date(x.at).toLocaleTimeString()}`
+      : x.how === 'navigated-away'
+        ? `on screen when the queue was left for another page at ${new Date(x.at).toLocaleTimeString()}`
+        : `rated at ${new Date(x.at).toLocaleTimeString()}`
   );
   if (typeof x.currentForMs === 'number') {
     parts.push(`current for ${x.currentForMs} ms${x.currentForMs < BRIEF_MS ? ' (too brief to have been read)' : ''}`);
@@ -321,7 +333,7 @@ function describeSighting(x: Sighting): string {
   if (x.idlessLoads) {
     parts.push(`${x.idlessLoads} id-less load${x.idlessLoads === 1 ? '' : 's'} in between (first at +${x.firstIdlessAfterMs} ms)`);
   }
-  if (x.how === 'left-behind') parts.push(typeof x.score === 'number' ? `rated afterwards (score ${x.score})` : 'no rating reported');
+  if (x.how !== 'rated') parts.push(typeof x.score === 'number' ? `rated afterwards (score ${x.score})` : 'no rating reported');
   return parts.join(', ');
 }
 
@@ -335,13 +347,15 @@ function ratingsOf(s: Session, remId: RemId): Map<string, number> {
 /**
  * Every card mounts hidden and fades in after `delayMs`. Registered from the index realm
  * (these listeners run there): the only place registerCSS works. The animation restarts for
- * every card because RemNote mounts a new .rn-queue__content per card.
+ * every card because RemNote mounts a new .rn-queue__content per card. The fill is
+ * `backwards`, not `both`: a forwards fill keeps the content a stacking context and hides
+ * the docked card_info_bar under RemNote's bottom mask (lib/card_info_bar_dock).
  */
 function setMask(plugin: RNPlugin, delayMs: number) {
   void plugin.app.registerCSS(
     MASK_CSS_ID,
     `@keyframes ie-learn-new-reveal { from { opacity: 0; } to { opacity: 1; } }
-.rn-queue__content { animation: ie-learn-new-reveal 120ms ease-out ${delayMs}ms both; }`
+.rn-queue__content { animation: ie-learn-new-reveal 120ms ease-out ${delayMs}ms backwards; }`
   );
 }
 
@@ -360,7 +374,7 @@ function endSession(plugin: RNPlugin, reason: string) {
   );
   // Cards counted as seen that RemNote never reported rated: each one cooled its relatives on
   // the strength of having been on screen. The last card's rating may not have arrived yet.
-  const unrated = [...s.sightings].filter(([, x]) => x.how === 'left-behind' && typeof x.score !== 'number');
+  const unrated = [...s.sightings].filter(([, x]) => x.how !== 'rated' && typeof x.score !== 'number');
   if (unrated.length) {
     console.log(
       `${LOG} ${unrated.length} card(s) counted as seen without a rating:\n` +
@@ -404,6 +418,12 @@ function announce(plugin: RNPlugin, s: Session, verdict: CoolingVerdict) {
     return;
   }
   const reason = verdict.reasons[0];
+  if (reason?.relation === 'just-created') {
+    if (s.newCardToastShown) return;
+    s.newCardToastShown = true;
+    void plugin.app.toast('Cooling: cards you just created are held back until their cooling ends.');
+    return;
+  }
   const why = reason
     ? coolingReasonText(reason.relation, ago(reason.seenAt))
     : 'its cooling was extended';
@@ -572,6 +592,33 @@ export function registerQueueCoolingListeners(plugin: RNPlugin) {
       score,
       currentForMs: current && s.currentLoadedAt !== null ? receivedAt - s.currentLoadedAt : undefined,
     });
+  });
+
+  // Leaving the queue by navigating (a link, Review in Editor) fires no QueueExit, and the session
+  // lives on for the way back. The card that was current stops being current here: the time spent
+  // on the other page is not time on screen, and the card the queue opens with on return did not
+  // "leave it behind". Measured Oct 2026: a card that loaded as the user left for the editor was
+  // counted as seen for the 158 s of the detour, and its sibling was skipped as "reviewed".
+  plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
+    const leftAt = Date.now();
+    const s = session;
+    if (!s || !s.currentCardId) return;
+    const cardId = s.currentCardId;
+    const loadedAt = s.currentLoadedAt;
+    const path = await plugin.window.getURL();
+    // Entering the queue fires URLChange too; and a newer card may have loaded meanwhile.
+    if (session !== s || path === s.path || s.currentCardId !== cardId) return;
+    s.currentCardId = null;
+    s.currentLoadedAt = null;
+    s.idlessSinceLoad = 0;
+    s.firstIdlessAt = null;
+    const shownForMs = loadedAt === null ? 0 : leftAt - loadedAt;
+    // Long enough to have been read: its siblings are spoiled all the same.
+    if (shownForMs >= BRIEF_MS && !s.skipped.has(cardId)) {
+      noteSeen(plugin, s, cardId, { how: 'navigated-away', currentForMs: shownForMs });
+    } else {
+      console.log(`${LOG} card ${cardId} not counted as seen: the queue was left ${shownForMs} ms after it loaded.`);
+    }
   });
 
   plugin.event.addListener(AppEvents.QueueExit, undefined, () => {

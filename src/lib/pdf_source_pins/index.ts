@@ -15,6 +15,7 @@ import DOMPurify from 'dompurify';
 import { broadestMatch, quoteCandidates } from './quote';
 import { getEffectiveSelection } from '../editor_selection';
 import { MessageDialog, showMessageDialog } from '../message_dialog';
+import { sourcesInOtherWindows } from '../window_sources';
 import { highlightDataFor, highlightSpan, mathPlaceholder, parseArticle, viewerHtml } from './html';
 import {
   LocatedWord,
@@ -576,9 +577,9 @@ export async function pinQuotesInViews(
 /**
  * Command: pin the sources of the selected Rems' text — a multi-Rem selection
  * takes precedence, else the focused Rem — in the PDF or web article open in a
- * pane. For each Rem the front, the back and both joined are tried (without pins
- * or a leading list marker) and the best match is pinned, at the end of the back
- * when the Rem has one. A PDF that also has a Text Reader version asks which
+ * pane of this window, else of another RemNote window. For each Rem the front,
+ * the back and both joined are tried (without pins or a leading list marker) and
+ * the best match is pinned, at the end of the back when the Rem has one. A PDF that also has a Text Reader version asks which
  * view(s) to use, once for the whole selection.
  */
 export async function pinSourceQuote(plugin: ReactRNPlugin) {
@@ -609,7 +610,10 @@ export async function pinSourceQuote(plugin: ReactRNPlugin) {
     return;
   }
 
-  for (const id of await plugin.window.getOpenPaneRemIds()) {
+  // This window's panes first; then the sources open in the other RemNote
+  // windows, which only they can see (lib/window_sources.ts).
+  const candidates = [...(await plugin.window.getOpenPaneRemIds()), ...(await sourcesInOtherWindows(plugin))];
+  for (const id of candidates) {
     const rem = await plugin.rem.findOne(id);
     const views = rem ? await sourceViews(rem) : [];
     if (!views.length) continue;
@@ -623,7 +627,7 @@ export async function pinSourceQuote(plugin: ReactRNPlugin) {
     if (!outcome.ok) await showMessageDialog(plugin, outcome.dialog);
     return;
   }
-  await plugin.app.toast('Open the source PDF or web article in a pane first.');
+  await plugin.app.toast('Open the source PDF or web article in a pane first (in any RemNote window).');
 }
 
 export interface OtherViewPinOutcome {

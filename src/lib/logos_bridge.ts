@@ -23,7 +23,6 @@ import {
   currentIncRemKey,
   defaultPriorityId,
   editorReviewTimerRemIdKey,
-  initialIntervalId,
   logosAutoOpenId,
   logosBridgeEnabledId,
   openInLogosCommandId,
@@ -35,6 +34,7 @@ import { initIncrementalRem } from './incremental_rem';
 import { safeRemTextToString } from './pdfUtils';
 import { findClosestAncestorWithAnyPriority } from './priority_inheritance';
 import { getIESetting } from './settings';
+import { getInitialIntervalForRem } from './scheduler_choice';
 import {
   isLogosLink,
   LOGOS_BOOKMARK_PREFIX,
@@ -262,7 +262,8 @@ async function inheritedPriority(plugin: ReactRNPlugin, parent: PluginRem): Prom
   return (await getIESetting(plugin, defaultPriorityId)) || 10;
 }
 
-const defaultInterval = async (plugin: ReactRNPlugin) => (await getIESetting(plugin, initialIntervalId)) ?? 1;
+// Everything the bridge creates is a plain rem, so the regular-rems Initial Interval applies.
+const defaultInterval = async (plugin: ReactRNPlugin) => getInitialIntervalForRem(plugin, null, 'rems');
 
 async function computeContext(plugin: ReactRNPlugin) {
   const { target, incRem, targetIsFocused, problem } = await resolveTarget(plugin);

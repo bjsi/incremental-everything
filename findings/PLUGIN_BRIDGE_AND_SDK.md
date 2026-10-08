@@ -47,6 +47,12 @@ RemNote's built-in defaults are listed in [RemNote-Native-Shortcuts](../docs/Rem
 
 **A second toast can vanish.** A toast raised while another plugin toast is still visible can be swallowed: the call succeeds and nothing shows. Don't raise a "working…" toast before a result that may follow within seconds. Report failures with `showMessageDialog` (`src/lib/message_dialog.ts`) and keep toasts for success.
 
+## Multiple windows
+
+**Each desktop window is its own renderer with its own plugin instance.** "New Window" (1.28.19+) creates another Electron `BrowserWindow` on the same `app://js/index.html`, so every window activates a separate copy of the plugin. Session storage, module state, `window.getOpenPaneRemIds()`, focus and URL all answer for that window alone, and the SDK has no call that reaches another one. The plugin iframe is sandboxed, so `BroadcastChannel` is not a channel either.
+
+**`storage.setLocal` is the cross-window channel.** The windows share one database and relay store writes to each other (`upsertDocsFromOtherWindow`); plugin local storage lives in one of those stores (`local_stored_data`, key `plugin|<id>|<key>`). A value written in one window is readable with `getLocal` in the others a second or two later. Verified Oct 2026 with Pin Source Quote. The `StorageLocalChange` event fires only in the writing window, and a closing window cannot clean up after itself, so shared state needs a heartbeat and a TTL. See `src/lib/window_sources.ts`.
+
 ## Build traps
 
 **Never import from a widget file.** Every `src/widgets/*.tsx` is a webpack entry that calls `renderWidget(...)` when loaded. Importing a component from one runs that `renderWidget` inside the importing widget: the wrong widget renders, and React throws minified error #40 on deactivate. It only shows in the production build. Shared UI belongs in `src/components/` or `src/lib/`.

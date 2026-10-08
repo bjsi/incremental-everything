@@ -256,8 +256,9 @@ Happy learning! 📚✨
         * **[Text & Lists](Utilities-Text-and-Lists.md)**: the Word-like Text Case Converter (Shift+F3), bulletizing, and inlinizing or breaking lists from PDF highlights.
         * **[Outline & Headings](Utilities-Outline-and-Headings.md)**: Restructure Outline by Headings (`roh`) for fixing flat or mis-pasted documents, and heading-level tools.
         * **[Finding & Navigating](Utilities-Finding-and-Navigating.md)**: **Find Rem — Reference or Open** (`Opt+Shift+F`) for Rems RemNote's own search can't find, source popups, and filtering a document by images.
+        * **[True or False Cards](Utilities-True-or-False-Cards.md)**: Mark statements as true or false with one command; the queue shows a large ✔ / ✘ badge and a green or red answer.
         * **[Queue Display](Utilities-Queue-Display.md)**: Hide in Queue, Remove Parent and the other powerups that control how a card's context shows in the queue.
-        * **[Cleaning Up](Utilities-Cleaning-Up.md)**: delete empty Extra Card Detail Rems and audit disabled cards.
+        * **[Cleaning Up](Utilities-Cleaning-Up.md)**: delete empty Extra Card Detail Rems, audit disabled cards, and store linked images and audio in RemNote.
         * **[Under the Hood](Utilities-Under-the-Hood.md)**: infrastructure several commands rely on.
 
 * **8. Essential References**
@@ -266,7 +267,7 @@ Happy learning! 📚✨
         * **[Plugin Widgets Reference](Plugin-Widgets-Reference.md)**: Comprehensive visual manual of all widgets (History, Graphs, Trackers, etc).
         * **[Plugin Commands Reference](Plugin-Commands-Reference.md)**: Complete list of all keyboard and palette commands registered in RemNote by the plugin.
         * **[Plugin Settings Reference](Plugin-Settings-Reference.md)**: Every configurable option explained, with defaults and context.
-        * **[IncRem Scheduler](IncRem-Scheduler.md)**: How the plugin calculates review intervals — default exponential and beta saturating schedulers explained.
+        * **[IncRem Scheduler](IncRem-Scheduler.md)**: How the plugin calculates review intervals — the Multiplier and Saturating Curve schedulers, and how to choose one per type or per Rem.
         * **[Keyboard Shortcuts](Keyboard-Shortcuts.md)**: Quick cheatsheet mapping essential actions to default keys.
 
 * **9. FAQ & Troubleshooting**

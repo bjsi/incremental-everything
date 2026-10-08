@@ -12,7 +12,7 @@ A **source pin** is a pin reference to the highlight that holds a passage: click
 
 ## Using it { #pin-source-quote }
 
-1. Open the source in a pane: a **PDF**, a **saved web article** (RemNote's reader view of a page), or a **PDF in Text Reader mode**.
+1. Open the source in a pane: a **PDF**, a **saved web article** (RemNote's reader view of a page), or a **PDF in Text Reader mode**. It can sit next to your notes or in another RemNote window: the command looks in the current window first, then in the others.
 2. Focus the Rem whose text comes from that source, or select several Rems.
 3. Run **Pin Source Quote**: `Opt+Shift+Q` / `Alt+Shift+Q`, or quick code `psq`.
 
@@ -72,7 +72,7 @@ This happens after the Rem is created and never slows down or interrupts Create 
 
 | Message | What to do |
 |---|---|
-| *Open the source PDF or web article in a pane first.* | Open the source next to your notes, then run the command again. |
+| *Open the source PDF or web article in a pane first (in any RemNote window).* | Open the source next to your notes or in another RemNote window, then run the command again. A source just opened in another window can take a couple of seconds to be seen. |
 | *AI helper is not running* | Start the helper ([Setup](AI-Transcription-of-PDF-Highlights.md#setup)). |
 | *This PDF has no Highlights document yet — make one highlight in it first.* | Highlight anything in the source once, so RemNote creates its Highlights document, then try again. |
 | *Passage not found* | Check that the Rem's text was taken from this source, and that the right PDF or article is open. |

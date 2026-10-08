@@ -30,6 +30,7 @@ It appears wherever a priority is shown as colour: the **table-cell badges** (`7
 |---|---|---|---|
 | Left border, 3px | **green** | The Rem is an Incremental Rem — spans the Rem **and its descendants** | Green Left Border for IncRems |
 | Left border, 3px | **amber** `#f59e0b` | Dismissed, with preserved history — spans the Rem **and its descendants** | Yellow Left Border for Dismissed Rems |
+| Dashed outline + 🔗 on an audio player | **orange** `#f97316` | The audio file is only linked, not stored in RemNote — see [Spotting linked audio](Utilities-Cleaning-Up.md#spotting-linked-audio) | Mark Audio That Is Only Linked |
 | Text background | **blue** `#8ad0f3` (dark `#1e496b`) | A PDF/web highlight you have **extracted** from (`#pdfextract`) | — |
 | Text background | **green** `#75f8b2` (dark `#1a5c3a`) | A highlight that is itself an Incremental Rem | — |
 | Dimmed, shrunk text | — | Tagged `#ignore` — archived, still readable; applies to the Rem **and its descendants** | — |

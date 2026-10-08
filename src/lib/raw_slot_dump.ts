@@ -38,6 +38,7 @@ import {
   repHistorySlotCode,
   originalIncrementalDateSlotCode,
   pdfStateSlotCode,
+  schedulerSlotCode,
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
@@ -64,6 +65,7 @@ const SPECS = [
       repHistorySlotCode,
       originalIncrementalDateSlotCode,
       pdfStateSlotCode,
+      schedulerSlotCode,
     ],
   },
   {

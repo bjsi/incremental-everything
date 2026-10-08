@@ -3,6 +3,9 @@ export const powerupCode = 'incremental';
 export const prioritySlotCode = 'priority';
 export const nextRepDateSlotCode = 'nextRepDate';
 export const repHistorySlotCode = 'repHist';
+// Per-rem scheduler override: 'curve', 'mult' or 'mult:<factor>'. Absent = follow the
+// settings. Parsed and written only through lib/scheduler_choice.ts.
+export const schedulerSlotCode = 'scheduler';
 export const originalIncrementalDateSlotCode = 'originalIncDate';
 
 // PDF reading state (page, page range, page history, active PDF) as serialized
@@ -58,6 +61,19 @@ export const multiplierId = 'multiplier';
 export const betaSchedulerEnabledId = 'beta-scheduler-enabled';
 export const betaFirstReviewIntervalId = 'beta-first-review-interval';
 export const betaMaxIntervalId = 'beta-max-interval';
+// Per-type default scheduler. 'default' defers to the Default Scheduler setting
+// (betaSchedulerEnabledId); 'multiplier' / 'curve' prevail over it for that kind of
+// Incremental Rem. A scheduler pinned on the rem itself (schedulerSlotCode) beats both.
+export const schedulerForDocumentsId = 'scheduler-type-documents';
+export const schedulerForVideosId = 'scheduler-type-videos';
+export const schedulerForHighlightsId = 'scheduler-type-highlights';
+export const schedulerForRemsId = 'scheduler-type-rems';
+// Per-type Initial Interval. Text, not a number, so it can be left EMPTY to mean
+// "use the general Initial Interval" — 0 is a real value (due today).
+export const initialIntervalForDocumentsId = 'initial-interval-type-documents';
+export const initialIntervalForVideosId = 'initial-interval-type-videos';
+export const initialIntervalForHighlightsId = 'initial-interval-type-highlights';
+export const initialIntervalForRemsId = 'initial-interval-type-rems';
 export const collapseQueueTopBar = 'collapse-queue-top-bar';
 export const defaultPriorityId = 'default-priority';
 export const defaultCardPriorityId = 'defaultCardPriority';
@@ -84,6 +100,9 @@ export const hideDismissedTagSettingId = 'hideDismissedTag';
 // meaning once "Tag Rems With Images" has been run, and an unasked-for marker on
 // every pin is exactly the clutter this setting exists to opt into.
 export const showPinRingIndicatorsSettingId = 'showPinRingIndicators';
+// Dashed orange outline on an audio player whose file is only linked, not stored
+// in RemNote (see lib/localize_media.ts). Off by default.
+export const showLinkedAudioIndicatorSettingId = 'showLinkedAudioIndicator';
 export const performanceModeId = 'performanceMode';
 export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
 /** Custom acronyms the Text Case Converter keeps uppercase in Title Case. */
@@ -386,6 +405,11 @@ export const pdfHighlightBordersReloadKey = 'pdf-highlight-borders-reload';
 // --- Keys for our successful fixes ---
 export const queueLayoutFixId = 'incremental-everything-queue-layout-fix';
 export const queueHideElementsId = 'incremental-everything-queue-hide-elements';
+// registerCSS id for docking card_info_bar above the Beautiful queue's answer
+// buttons, and the session key the widget writes its height to. registerCSS is
+// index-only, so a plugin.track in index.tsx re-registers on each new height.
+export const cardInfoBarDockCssId = 'incremental-everything-card-info-bar-dock';
+export const cardInfoBarHeightKey = 'card-info-bar-height';
 export const collapseTopBarCssId = 'incremental-everything-collapse-top-bar'; // CSS registration ID
 export const incrementalQueueActiveKey = 'incremental-queue-active';
 export const activeHighlightIdKey = 'active-highlight-id-key';
@@ -458,6 +482,8 @@ export const noIncRemTimerKey = 'no-inc-rem-timer-end';
 export const noIncRemMenuItemId = 'no-inc-rem-15-min';
 export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 export const incRemDisabledDeviceKey = 'inc-rem-disabled-device';
+// Local key: the sources open in each RemNote window (see lib/window_sources.ts).
+export const openSourcesByWindowKey = 'open-sources-by-window';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // Rem IDs whose cards exist but whose parent rem could not be found during the
@@ -613,6 +639,9 @@ export const aiTranscribeHighlightCommandId = 'ai-transcribe-highlight';
 export const restoreHighlightBeforeAiCommandId = 'restore-highlight-before-ai';
 // Pin the source passage of the focused Rem's text in the open PDF (lib/source_pins).
 export const pinSourceQuoteCommandId = 'pin-source-quote';
+// Store externally linked images/audio in RemNote itself (lib/localize_media.ts).
+export const localizeMediaCommandId = 'localize-external-media';
+export const localizeMediaTreeCommandId = 'localize-external-media-tree';
 
 // Logos Bible Software bridge (lib/logos_bridge.ts + scripts/logos_bridge/).
 export const logosBridgeEnabledId = 'logos-bridge-enabled';
@@ -674,3 +703,6 @@ export const COOLING_NEW_CARD_DAYS_MAX = 10;
 // Queue setting: skip a card in RemNote's own spaced-repetition queues while its
 // Rem is cooling (lib/queue_cooling_skip.ts). The Learn New queue is always covered.
 export const coolingInQueuesId = 'cooling-in-queues';
+// Queue setting, off by default: the "just created" rule (coolingNewCardDaysId) also skips
+// cards in RemNote's spaced-repetition queues. Never in Learn New. Needs coolingInQueuesId on.
+export const coolingNewCardsInQueuesId = 'cooling-new-cards-in-queues';

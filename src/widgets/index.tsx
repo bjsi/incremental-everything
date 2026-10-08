@@ -28,11 +28,14 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
+import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey } from '../lib/consts';
+import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerLogosBridge } from '../lib/logos_bridge';
+import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
@@ -71,6 +74,9 @@ async function onActivate(plugin: ReactRNPlugin) {
   // newly-created rems. These powerup codes don't exist in the standalone
   // Hide in Queue plugin, so they cannot collide with it.
   await registerCoreQueueDisplayPowerups(plugin);
+  // True/False cards: the TFT / TFF powerups and the CSS keyed on them.
+  await registerTrueFalsePowerups(plugin);
+  registerTrueFalseClusterTracker(plugin);
   // Settings appear in RemNote's own panel only while this KB still has to read
   // them across — the migration reads through getSetting, which throws for an
   // unregistered id. For an up-to-date KB this list is empty, so the plugin's
@@ -124,6 +130,9 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerPrefetchTrackers(plugin);
   // Long-polls the local Logos helper while the Logos Bridge setting is on.
   registerLogosBridge(plugin);
+  // Publishes this window's open PDFs/articles so a command run in another
+  // RemNote window can find them.
+  registerWindowSourcesPresence(plugin);
   await registerWidgets(plugin);
 
   // Register CSS rules
@@ -139,6 +148,14 @@ async function onActivate(plugin: ReactRNPlugin) {
     // marker tint is emitted inside this stylesheet.
     await rp.storage.getSession(priorityBandColorsReloadKey);
     await registerPdfHighlightCSS(plugin);
+  });
+
+  // card_info_bar docks above the Beautiful queue's answer buttons, in a band the
+  // size of the bar. The widget reports its height here because it can't call
+  // registerCSS from its own iframe. Also runs at activation with the default height.
+  plugin.track(async (rp) => {
+    const barHeight = await rp.storage.getSession<number>(cardInfoBarHeightKey);
+    await registerCardInfoBarDockCss(plugin, barHeight);
   });
 
   // Band badge colours come from the RELATIVE position of each band in the
@@ -183,6 +200,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Remove Parent / Remove Grandparent commands are always available — they
   // wrap powerups that are always registered and don't conflict with anything.
   await registerCoreQueueDisplayCommands(plugin);
+  await registerTrueFalseCommands(plugin);
 
   // Hide-in-Queue legacy commands gated on the same setting as the legacy
   // powerups above (must be in lockstep — registering commands without their

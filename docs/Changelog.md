@@ -2,6 +2,101 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.150 - October 8th, 2026
+
+### 🐛 Fixed
+
+**Cooling**: A card that had only just loaded when you left the queue for the editor is no longer counted as seen, so its sibling is not skipped as "reviewed 1 min ago" when you come back.
+
+📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
+## v1.0.148 - October 7th, 2026
+
+### ✨ New - Multiplier scheduler, and a scheduler per Incremental Rem
+
+**Scheduling**: The default scheduler now multiplies the interval the item is on (`current interval × multiplier`) instead of counting reviews, so an interval you choose is kept: an extract created at 50 days goes to 75, then 113.
+
+- **What changes for you**: on the Multiplier scheduler a Reschedule is no longer a one-time override, it is the interval the next ones grow from. On the Saturating Curve it stays a one-off.
+- **Per Rem**: the Reschedule and Priority & Interval popups have a **Scheduler** row to switch a single Rem between Multiplier and Saturating Curve (`←`/`→`) and to give it its own multiplier.
+- **Per type**: new settings pick a scheduler and an Initial Interval for documents, videos, highlights and regular Rems, prevailing over the *Default Scheduler* (the former *Use Beta Scheduler* switch) and the general *Initial Interval*.
+- **At a glance**: the Next button shows `×1.5` or `curve`, and the Repetition History popup names the scheduler in use.
+
+![The Reschedule popup with its Scheduler row: × Multiplier selected, the multiplier at 1.5 and the preview "After that: 36 → 54 → 81 days"](assets/reschedule-with-scheduler.png){ width="400" }
+
+![The Next button with a ×1.5 chip before "in 24 days"](assets/scheduler-indication-in-next-button.png){ width="900" }
+
+![The Scheduling group of the settings popup: Initial Interval and its four per-type settings, Default Scheduler, Multiplier, the two Saturating Curve settings and the four per-type schedulers](assets/settings-popup-all-scheduling-options.png){ width="600" }
+
+📖 [IncRem Scheduler](IncRem-Scheduler.md#two-schedulers)
+
+## v1.0.147 - October 4th, 2026
+
+### 🐛 Fixed
+
+**Mastery Drill**: Fixed Card Cluster cards staying in the regular-queue drill after being rated *Good* or *Easy*; cluster cards already stuck in the list are removed the next time the drill starts.
+
+📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill)
+
+## v1.0.146 - October 3rd, 2026
+
+### ✨ Improved
+
+**True or False cards**: Statements inside a Card Cluster now get the ✔ / ✘ badge and the green or red answer block too, in both queue variants.
+
+📖 [True/False cards in a Card Cluster](Utilities-True-or-False-Cards.md#card-clusters)
+
+**Pin Source Quote**: The source can now be open in another RemNote window: when this window has no PDF or web article in a pane, the command uses the one open in the other.
+
+📖 [Pin Source Quote](Source-Pins.md#pin-source-quote)
+
+## v1.0.145 - October 3rd, 2026
+
+### ✨ New - new-card cooling in RemNote's own queues
+
+**Setting**: *Cooling: where new cards cool* — set it to **RemNote's queues too** and a card you just created is also skipped in RemNote's spaced-repetition queues (a document, the daily queue) until its new-card cooling ends, not only kept out of the Priority Queue; off by default.
+
+📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
+## v1.0.144 - October 3rd, 2026
+
+### ✨ New - True or False cards
+
+**Commands**: *True/False: Mark as True* (`tft`) and *Mark as False* (`tff`) turn a statement into a True/False card — the back gets its ✅ or ❌ with the rest of it kept, the queue shows a large ✔ / ✘ badge on the question and a green or red answer block on the back, and the editor bullet becomes the verdict; *Convert Pasted Tags* (`tfc`) does the same for cards imported from text with `#[[TFT]]` / `#[[TFF]]`.
+
+![Two statements in the editor with ✔ and ✘ bullets; the queue opens, shows the ✔/✘ badge over a statement, and the answer is revealed in a red block, then the next one in a green block](assets/true-or-false.gif){ width="900" }
+
+📖 [True or False Cards](Utilities-True-or-False-Cards.md)
+
+## v1.0.143 - October 3rd, 2026
+
+### ✨ New - size imported images that show cropped in the queue
+
+**Command**: *Cycle Image Size* (`Opt+Shift+G` / `Alt+Shift+G`) sizes the images of a card that were never sized in RemNote — the ones the queue shows zoomed in behind scrollbars — and each press steps through Fit, Large, Medium and back to Original; images you have resized are left alone.
+
+![A queue card whose imported diagram is cropped behind scrollbars; the command is pressed and the image redraws whole](assets/cycle-image-size.gif){ width="900" }
+
+📖 [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size)
+
+## v1.0.141 - October 2nd, 2026
+
+### ✨ New - store linked images and audio in RemNote
+
+**Commands**: *Store linked images & audio in RemNote* (`slm`) fetches the images and audio a Rem only links to and stores them in RemNote like uploaded files, so the Rem no longer breaks when the outside server moves the file; a second command covers a whole subtree.
+
+📖 [Store Linked Images & Audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio)
+
+## v1.0.140 - September 30th, 2026
+
+### ✨ Improved
+
+**Card Info Bar**: In the Beautiful queue the bar now stays docked above the answer buttons, below RemNote's AI Explanation, instead of moving with the card's length.
+
+![The answer side of a card in the Beautiful queue: the AI Explanation panel, then the Card Info Bar with priority, shields and FSRS figures, then the four answer buttons](assets/card-info-bar-docked-answer.png){ width="900" }
+
+![The question side of a card in the Beautiful queue: the Card Info Bar docked just above the Reveal Answer button, well below the card text](assets/card-info-bar-docked-question.png){ width="900" }
+
+📖 [Card Info Bar in the Beautiful queue](Plugin-Widgets-Reference.md#card-info-bar-beautiful)
+
 ## v1.0.139 - September 30th, 2026
 
 ### ♻️ Changed

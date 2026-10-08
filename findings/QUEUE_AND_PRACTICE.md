@@ -26,6 +26,12 @@ Treat a card the queue has left behind as seen when the next card loads, not whe
 
 Going back with the left arrow reloads the previous card with an ordinary `QueueLoadCard`. The card you left gets no `QueueCompleteCard`, and it loads again when you move forward. Observed 2026-09-29: a card rated Again, the next card left unrated after 3.5 s, then both loaded again. So a card seen earlier in the session can come back. It must never cool itself: its own sighting is left out when it is judged (`verdictForCard`).
 
+## Card Cluster ratings emit no QueueCompleteCard
+
+Read from the bundle and confirmed in the database, 2026-10-04. The queue's `answerCard` emits `QueueCompleteCard` only when `this.answerCardOverride?.(score)` is falsy. The Card Cluster renderer defines `answerCardOverride`, writes the repetition itself (`submitAnswerWrite` → `updateRepStatusInner`), moves to the next sibling (`goToNextCompoundCard`) and returns `true`. So a cluster member's rating reaches no plugin event, even when it is the only member of its cluster in the queue. `GlobalRemChanged` is not a substitute: the Rem changes only when the rating moves its mastery level.
+
+Two cards of `cc` parents had Good ratings stored with the drill document as `subQueueId` and were still in `finalDrillIds`. The card's `repetitionHistory` is the only reliable source: read it back after the next card change (`reconcileRatings` in `src/lib/mastery_drill_native.ts`; the popup drill's `registerDrillCardRatingListener` does the same for the card `QueueLoadCard` named).
+
 ## A skip buries the card's siblings
 
 `removeCurrentCardFromQueue` runs every provider's "before pop" hook. The bury provider records the card in `UserDataStore.recentlySeenCardsTuples` (synced, entries last 60 minutes), exactly as if it had been answered.
@@ -89,6 +95,31 @@ The SDK has no `startQueue`, but `plugin.window.setURL(url)` is implemented as `
 - It renders RemNote's queue with **`inArticle: true`** on every path, and `QueueProps` offers only `cardIds`/`folderId`. Every flashcard and queue widget slot is `enabled: !inArticle && …`, so **no plugin widget renders under a card inside it**: Flashcard, FlashcardAnswer, FlashcardAnswerButtons, FlashcardExtraDetail, FlashcardUnder, QueueToolbar and QueueBelowTopBar are all off.
 - It is a **fake embed**: the plugin iframe holds only an empty `div.js-fake-embed` placeholder, and RemNote paints the real component in a layer **above** the iframe at that position. Plugin overlays, whatever their z-index, are hidden beneath it. The SDK re-sends the position on any attribute change in the plugin's DOM (a MutationObserver), so moving the wrapper off-screen (`position: fixed; top: 200vh`) hides the embed without unmounting it. Unmounting a `<Queue>` fires QueueEnter again and starts a new session.
 - The `DocumentViewer` fake embed mounts the real `Document` component, where DocumentBelowTitle and DocumentAboveToolbar widgets **are** enabled. Not yet confirmed at runtime.
+
+## Flashcard widget slots and the Beautiful queue's bottom
+
+Read from the 1.28.19 bundle (`renderSR`, `SwipeQueueHOC`, the insight scroll layout `sQ`). Not yet tried at runtime.
+
+- **FlashcardAnswerButtons replaces the native buttons.** The slot's `componentToRenderIfNoWidgets` holds the answer buttons, type-in answer, MCAT indicator and "Grade yourself" hint. Any matching widget swaps all of them out. It is only safe for Plugin queue items, which is how `answer_buttons` uses it.
+- **FlashcardUnder** is the last child of the card content, inside the scroll surface. Its widget is part of the height RemNote measures for the card.
+- **QueueBelowTopBar** is the only slot pinned in place, at the top of the box.
+- Every widget iframe sits in `div.fade-in-first-load.relative` with inline `transform: rotate(0); overflow: hidden`. That wrapper is a containing block and a stacking context, so a `position: fixed` iframe stays trapped inside it. To relocate a widget, move the wrapper.
+- **Beautiful bottom controls** are `div.beautiful-queue-bottom-controls-overlay` (`absolute bottom-0`, `z-[10000]`, `pointer-events-none`) wrapping a transparent `.spaced-repetition__bottom`. The backdrop behind the buttons is `.beautiful-queue-bottom-fade-mask` (`z-[9998]`). A ResizeObserver reads the overlay's `offsetHeight` into `--beautiful-queue-bottom-controls-height` on the HOC root (`.spacedRepetition`), and also into `bottomControlsHeight`.
+- **The AI insights panel ("Explanation") is not pinned.** It is in-flow after the card content. A computed spacer (`scroll height − controlsHeight − 16 − card height − 16 − min(insights, 100)`) lands it just above the controls, and the card content goes `--sticky` (`position: sticky`, so it is a stacking context) when there is room. If the controls get taller, the Explanation moves up with them. Padding on `.spaced-repetition__bottom` does this, because it grows the overlay's content box and the ResizeObserver fires. Padding on the overlay itself would not trigger the observer.
+- **Anything between the widget and the HOC root that becomes a stacking context hides a relocated widget.** Its z-index is then scoped below the mask (`z-[9998]`). An opacity animation on `.rn-queue__content` with a forwards fill (`both`) does this for the whole card, even though the final opacity is 1. Use `backwards` when the end value is the natural one.
+- **The suggested-grade tab.** After a type-in answer is graded, RemNote highlights one button (`suggestedAnswerButton()`: Good or Easy if right, Again if wrong). It hangs an absolute "↵ Enter" tab above it (height 25, `top: -25px`; "Say 'Done'" while voice-listening). On desktop only that button gets `border-t-transparent rounded-t-none`, so `.rn-queue__answer-btn.border-t-transparent.rounded-t-none` detects it. With swipe gestures on (`tF.t()`), every button instead shows a 25px "← Left"/"→ Right" label above it, with no class hook.
+
+## Images in the queue are drawn by the drawing canvas
+
+Read from the 1.28.19 bundle and a real knowledge base (2026-09-30). The exact cause of the crop below was **not** proven; the data shapes are.
+
+- **Every plain image on a queue card goes through the zoomable drawing canvas**, not an `<img>`. The test (`Uc`, module 322262) is `no blocks && currentQueueCard && url is not .gif/.webp/.bin`. The scrollbars seen around a cropped image are the canvas's own. The editor uses a plain `<img>`.
+- **Canvas world** = `{width: element.width ?? 800, height: element.height ?? 800}` (module 29269), and the image is stretched to it. **Initial zoom** = `min(containerW / world.width, containerH / world.height)` (`hc`, module 246687), recomputed only when the canvas's `containerWidth` prop or the bounds type changes.
+- **Box size** (`i1`, module 536824): with `percent`, `percent% × min(editor width − 10, 800)`, height from the stored aspect ratio; without, the stored size shrunk to fit.
+- **What the UI writes.** A drag-resize: on-screen `width`/`height`, `percent` removed. Small / Medium / Large: `percent` 25 / 50 / 100, with `width`/`height` passed through `xD(w, h, editorClientWidth − 10)`, which shrinks and never enlarges. So anything sized in the UI has a stored width no wider than the editor. An image with no stored size gets its natural one written the first time it loads in an editable editor, never in the queue.
+- **What imports leave.** Anki imports store `percent: 50` with the file's full pixel size, or no size at all. One such image (`{percent: 50, width: 1071, height: 1017}`) showed in the queue as a centred crop of about 78%.
+- **`setText` accepts** fractional `width`/`height` and `percent` of 5, 25, 50 or 100 only; other percents make it throw, so `sanitizeRichTextForSetText` drops them.
+- "Cycle Image Size" (`lib/image_sizing.ts`, `lib/image_size_cycle.ts`) rewrites unsized images into the UI's shapes.
 
 ## Cross-plugin side channel
 

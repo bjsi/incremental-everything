@@ -10,7 +10,7 @@ This page serves as a comprehensive visual and functional guide to every widget 
 
 *(Formerly **Card Priority Display** — renamed as its scope grew beyond priority to full review, memory, and scheduling stats. Older Changelog entries refer to it by the old name.)*
 
-Displayed immediately below flashcards in the queue, this widget shows the card's priority, review statistics, and FSRS memory state.
+Displayed below flashcards in the queue (and, in the Beautiful queue variant, [docked above the answer buttons](#card-info-bar-beautiful)), this widget shows the card's priority, review statistics, and FSRS memory state.
 
 ![Card Stats with FSRS DSR](assets/DSR-stats.png){ width="900" }
 
@@ -30,10 +30,18 @@ Displayed immediately below flashcards in the queue, this widget shows the card'
 
 ![Card Toolbar in the Queue](assets/card-priority-display-full-queue.png){ width="900" }
 
+#### In the Beautiful queue variant { #card-info-bar-beautiful }
+
+In RemNote's **Beautiful** queue variant the bar no longer follows the end of the card. It stays docked just above the answer buttons, so it is always in the same place, however long the card is. RemNote's AI **Explanation** panel moves up to make room: the order from top to bottom is Explanation → Card Info Bar → answer buttons. When a typed answer has been graded, the bar also moves up to leave room for RemNote's **↵ Enter** tab over the suggested button. In the *Compact* variant the bar stays under the card, as before.
+
+![The answer side of a card in the Beautiful queue: the AI Explanation panel, then the Card Info Bar with priority, shields and FSRS figures, then the four answer buttons](assets/card-info-bar-docked-answer.png){ width="900" }
+
+![The question side of a card in the Beautiful queue: the Card Info Bar docked just above the Reveal Answer button, well below the card text](assets/card-info-bar-docked-question.png){ width="900" }
+
 ### 1.2. Queue Toolbar Priority
 Installed directly into the native RemNote Queue Toolbar, this widget guarantees that the **absolute priority** of the current item (both Flashcards and Incremental Rems) is persistently visible during review.
 
-Unlike the *Card Info Bar*, which lives at the bottom of flashcards and can be easily scrolled out of view on long documents, the Queue Toolbar Priority widget is anchored to the top toolbar, making it accessible instantly. 
+Unlike the *Card Info Bar*, which in the Compact queue lives at the bottom of flashcards and can be easily scrolled out of view on long documents, the Queue Toolbar Priority widget is anchored to the top toolbar, making it accessible instantly. 
 
 - **Supports both types**: Shows absolute priorities for both Incremental Rems (e.g. `P10`) and Flashcards (percentile rank - relative priority - is shown on hover and also indicated by the badge color).
 - **Opt-in setting**: Controlled via the `Display Queue Toolbar Priority` plugin setting (enabled by default).
@@ -131,7 +139,7 @@ Three things to know about the figures:
 
 Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`:
 
-- **Single History** — triggered on an individual IncRem (in the queue via the 📊 button, or in the editor via `Ctrl+Shift+H`). Shows the Rem's full repetition log: date, time spent, scheduled interval, priority at the time of review, and event type markers (📅 reschedule, ⌨️ editor review, etc.). Repetition rows carry the wall-clock time under the date, and the event banners (▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset) show theirs next to it — several lifecycle events on one day stay distinguishable.
+- **Single History** — triggered on an individual IncRem (in the queue via the 📊 button, or in the editor via `Ctrl+Shift+H`). Shows the Rem's full repetition log: date, time spent, scheduled interval, priority at the time of review, and event type markers (📅 reschedule, ⌨️ editor review, etc.). The line under the totals names the [scheduler](IncRem-Scheduler.md#scheduler-indicator) the Rem uses and where that choice comes from. Repetition rows carry the wall-clock time under the date, and the event banners (▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset) show theirs next to it — several lifecycle events on one day stay distinguishable.
   - **📝 Notes & context sub-lines** — entries carrying a [review note](Reviewing-Items-in-the-Queue.md#the-answer-buttons) show it under the row (📝, full text); entries with an automatic **reading-context snapshot** show a compact line like `p.57 of 40–80 · Book.pdf · 🔖 "bookmark…"` — the page you were on **at that rep**, so your reading trajectory across sessions is visible. Event banners (Dismissed, Rescheduled in Editor, …) show their note the same way — a dismissal reason lives right on the dismissal marker.
   - **PDF reading-progress footer** — when the Rem (active *or* dismissed) reads from a PDF with a **page range** set, a footer shows the PDF name, the page range, your current page, the **degree of processing** (`% read`, with a progress bar), and an **estimated remaining time** (extrapolated from the total time spent and the degree of processing reached). The percentage and estimate are omitted for open-ended ranges (`start–∞`), where there's no finite end to measure against.
   - **🔖 Read-point footer** — when the Rem has a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) set, a footer shows the path from the Rem itself down to the bookmarked descendant (`Chapter › Section › Read point`), with the date it was set. Every segment is clickable and navigates to that Rem. It works for dismissed Rems too, and if the read point has since been moved out of the outline the footer says so and shows its nearest ancestors instead.
@@ -282,14 +290,15 @@ A combined popup that appears automatically when a new Incremental Rem is create
 - **Rem Name Header**: Confirms which rem you just created (truncated, with full tooltip on hover).
 - **Priority Slider** (auto-focused): Same color-coded gradient slider as the Light Priority Widget; supports ↑/↓ arrow acceleration.
 - **Interval Input**: Orange number field (same style as the Reschedule widget) specifying how many days until the first queue appearance. Defaults to your configured **Initial Interval** setting and shows a live "Next review: [date]" preview.
-- **Tab Cycling**: Tab moves focus through all interactive elements — priority → interval → **Save** → **Next 7 Days** → **Next 30 Days** → priority (wraps). Shift+Tab reverses the direction.
+- **Scheduler row**: Shows the [scheduler](IncRem-Scheduler.md#per-rem-scheduler) the Rem will use and lets you change it for this Rem — `←`/`→` switch between **× Multiplier** and **Saturating Curve**, `↑`/`↓` set its own multiplier. In batch mode it is applied to the selected Rems only if you change it.
+- **Tab Cycling**: Tab moves focus through all interactive elements — priority → interval → scheduler → **Save** → **Next 7 Days** → **Next 30 Days** → priority (wraps). Shift+Tab reverses the direction.
 - **Preset Buttons**:
   - **Next 7 Days** — saves priority and schedules in 7 days.
   - **Next 30 Days** — saves priority and schedules in 30 days.
 - **Batch Mode**: When triggered via `Alt+Shift+X` with multiple Rems selected, the popup shows a blue "📋 N rems selected" banner instead of a single Rem name. On save, the chosen priority and interval are applied to all selected Rems at once.
 - **Enter** saves; **Esc** cancels without saving.
 
-![Priority & Interval Popup Widget](assets/priority-interval-widget.png){ width="400" }
+![The Priority & Interval popup with its Scheduler row under the priority slider and the interval field](assets/priority-interval-widget-with-scheduler.png){ width="400" }
 
 ![Extract with Priority - Multi-Rem Batch Mode](assets/extract-multiple-rems-with-priority.gif){ width="800" }
 
@@ -444,16 +453,16 @@ A feature-rich table of all your Incremental Rems with two entry points:
 
 The plugin's own settings window: every setting it owns, grouped by area rather than listed flat, with a search box, a *Reset* on anything changed from its default, and a **?** beside entries that opens the section of this manual explaining them. Settings whose parent switch is off are hidden — the Beta Scheduler's parameters, the Mastery Drill's — and the switch that governs them says so. The five settings that stay in RemNote's own panel are shown here read-only, with a pointer to where they are changed.
 
-![The Incremental RemNote settings popup](assets/settings-popup.png){ width="900" }
+![The Incremental RemNote settings popup, open on the Scheduling group](assets/settings-popup-scheduler.png){ width="900" }
 
 📖 **Full documentation:** [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are)
 
 ### 6.1. Reschedule Widget
 **Shortcut:** `Ctrl+J` (works in both queue and editor)
 
-Lets you manually override the next review date and adjust priority in one popup. Use `↑`/`↓` arrows with acceleration to adjust days and priority, `Tab` to cycle between fields, and `Esc` to cancel.
+Lets you manually override the next review date, adjust priority and choose the item's [scheduler](IncRem-Scheduler.md#per-rem-scheduler) in one popup. Use `↑`/`↓` arrows with acceleration to adjust days and priority, `←`/`→` on the Scheduler row to switch between **× Multiplier** and **Saturating Curve**, `Tab` to cycle between fields, and `Esc` to cancel.
 
-![Reschedule Widget](assets/reschedule.png){ width="400" }
+![The Reschedule popup with its Scheduler row: × Multiplier selected, the multiplier at 1.5 and the preview "After that: 36 → 54 → 81 days"](assets/reschedule-with-scheduler.png){ width="400" }
 
 📖 **Full documentation:** [Reschedule](Reviewing-Items-in-the-Queue.md#reschedule)
 

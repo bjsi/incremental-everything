@@ -13,6 +13,8 @@ import { openMasteryDrill } from '../lib/mastery_drill_launch';
 import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote } from '../lib/pdf_source_pins';
+import { localizeMediaInRems } from '../lib/localize_media';
+import { showMessageDialog } from '../lib/message_dialog';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import { isHintNode } from '../lib/richTextSanitize';
 import {
@@ -34,6 +36,8 @@ import {
   aiTranscribeHighlightCommandId,
   restoreHighlightBeforeAiCommandId,
   pinSourceQuoteCommandId,
+  localizeMediaCommandId,
+  localizeMediaTreeCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
   allCardPriorityInfoKey,
@@ -116,6 +120,8 @@ import {
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 import { resolveQueueCommandTarget } from '../lib/queue_target';
+import { cycleImageSizes, resolveImageSizeTargets } from '../lib/image_size_cycle';
+import { IMAGE_SIZE_STEP_LABEL } from '../lib/image_sizing';
 import {
   setRemReadPoint,
   isDescendantOf,
@@ -265,6 +271,74 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
       await restoreHighlightBeforeAi(plugin, focused._id);
     },
+  });
+
+  // Store externally linked images and audio in RemNote itself, so the rem no
+  // longer depends on the server the link points at.
+  const runLocalizeMedia = async (includeDescendants: boolean) => {
+    const selection = await plugin.editor.getSelection();
+    const focused = await plugin.focus.getFocusedRem();
+    const roots =
+      selection?.type === SelectionType.Rem
+        ? (await plugin.rem.findMany(selection.remIds)) ?? []
+        : focused
+        ? [focused]
+        : [];
+    if (roots.length === 0) {
+      await plugin.app.toast('No focused rem — place your cursor in a rem first.');
+      return;
+    }
+    const rems = new Map<string, PluginRem>();
+    for (const root of roots) {
+      rems.set(root._id, root);
+      if (!includeDescendants) continue;
+      for (const descendant of await root.getDescendants()) rems.set(descendant._id, descendant);
+    }
+    // One report, at the end: a toast raised while another is still on screen
+    // can vanish, so there is no progress toast (progress goes to the console),
+    // and anything that failed is reported in a dialog rather than a toast.
+    let result;
+    try {
+      result = await localizeMediaInRems(plugin, [...rems.values()]);
+    } catch (error) {
+      console.error('[localize-media] aborted', error);
+      await showMessageDialog(plugin, {
+        title: 'Storing linked media failed',
+        message: String(error),
+        tone: 'error',
+      });
+      return;
+    }
+    const { scanned, updatedRems, localized, failed } = result;
+    const stored = `Stored ${localized} file${localized === 1 ? '' : 's'} in RemNote, updating ${updatedRems} rem${updatedRems === 1 ? '' : 's'}.`;
+    if (failed.length > 0) {
+      await showMessageDialog(plugin, {
+        title: `${failed.length} linked file${failed.length === 1 ? '' : 's'} could not be stored`,
+        message: `${stored} The following could not be fetched and stay linked:`,
+        quote: failed.join('\n'),
+        detail: 'In the browser a file is only reachable when its server allows cross-site requests; the desktop app has no such limit.',
+        tone: 'error',
+      });
+      return;
+    }
+    await plugin.app.toast(
+      localized === 0
+        ? `No externally linked images or audio (${scanned} rem${scanned === 1 ? '' : 's'} scanned).`
+        : stored
+    );
+  };
+
+  await plugin.app.registerCommand({
+    id: localizeMediaCommandId,
+    name: 'Store linked images & audio in RemNote',
+    quickCode: 'slm',
+    action: async () => runLocalizeMedia(false),
+  });
+
+  await plugin.app.registerCommand({
+    id: localizeMediaTreeCommandId,
+    name: 'Store linked images & audio in RemNote (with descendants)',
+    action: async () => runLocalizeMedia(true),
   });
   // Pin the focused Rem's source passage in the open PDF, reusing highlights already on the page.
   await plugin.app.registerCommand({
@@ -4030,6 +4104,50 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await plugin.app.toast(
         `Probed ${children.length + 1} Rems — open the developer console to read the result.`
       );
+    },
+  });
+
+  // Imported images keep the size they arrived with, which the queue's image
+  // canvas can show as a zoomed crop. Each press moves the unsized images of the
+  // target Rem and three levels below it one step along Fit, Large, Medium and
+  // back to Original; images the user has sized are never touched.
+  plugin.app.registerCommand({
+    id: 'cycle-image-size',
+    name: 'Cycle Image Size (Fit / Large / Medium / Original)',
+    description:
+      'Sizes the images of the focused Rem (or the current card) and three levels below it that were never sized in RemNote. Press again to move to the next size.',
+    keyboardShortcut: 'opt+shift+g',
+    quickCode: 'cis',
+    action: async () => {
+      try {
+        const targets = await resolveImageSizeTargets(plugin);
+        if (targets.length === 0) {
+          await plugin.app.toast('No Rem focused and no card on screen.');
+          return;
+        }
+        const result = await cycleImageSizes(plugin, targets);
+        const notes = [
+          result.userSized > 0 ? `${result.userSized} already sized by you` : '',
+          result.protectedImages > 0 ? `${result.protectedImages} occlusion/highlight` : '',
+          result.unmeasurable > 0 ? `${result.unmeasurable} could not be measured` : '',
+          result.failed > 0 ? `${result.failed} Rem(s) failed` : '',
+        ].filter(Boolean);
+        const skipped = notes.length > 0 ? ` Skipped: ${notes.join(', ')}.` : '';
+        if (!result.step) {
+          await plugin.app.toast(`No unsized images found here.${skipped}`);
+          return;
+        }
+        await plugin.app.toast(
+          `Images → ${IMAGE_SIZE_STEP_LABEL[result.step]} (${result.changed} changed).${skipped}`
+        );
+      } catch (error) {
+        console.error('[ImageSize] command failed', error);
+        await showMessageDialog(plugin, {
+          title: 'Could not resize the images',
+          message: error instanceof Error ? error.message : String(error),
+          tone: 'error',
+        });
+      }
     },
   });
 

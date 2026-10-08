@@ -452,6 +452,8 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
        * 'rescheduledInEditor' entry — one user action, one history entry.
        */
       foldRemIds?: string[];
+      /** Present only when the user changed the scheduler in the popup. */
+      scheduler?: import('../lib/scheduler_core').SchedulerChoice;
     }>(pendingIntervalBatchSaveKey);
 
     if (!job || intervalBatchSaveRunning) return;
@@ -480,6 +482,11 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         // below (either a 'rescheduledInEditor' entry or a fold into the
         // 'madeIncremental' marker), from a snapshot taken after this call.
         await setIncRemPriority(plugin as any, rem, job.priority, { recordHistory: false });
+
+        if (job.scheduler) {
+          const { applySchedulerChoice } = await import('../lib/scheduler_choice');
+          await applySchedulerChoice(plugin as any, rem, job.scheduler);
+        }
 
         // 2. Compute and write SRS schedule
         const incRem = await getIncrementalRemFromRem(plugin as any, rem);

@@ -21,6 +21,8 @@ import {
     isNewestEntry,
 } from '../lib/history_edit';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
+import { getRemSchedulerInfo } from '../lib/scheduler_choice';
+import { describeScheduler } from '../lib/scheduler_core';
 import { MAX_NOTE_LENGTH } from '../lib/history_notes';
 import { priorityEventIcon, priorityEventLabel } from '../lib/priority_history';
 
@@ -736,8 +738,14 @@ function RepetitionHistoryPopup() {
             const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
 
             if (incRemInfo) {
+                // Which scheduler Next uses for this rem, for the summary strip.
+                const scheduler = await getRemSchedulerInfo(plugin, rem)
+                    .then((info) => info.scheduler)
+                    .catch(() => null);
+
                 // Active incremental rem
                 return {
+                    scheduler,
                     history: incRemInfo.history || [],
                     remName: remName || 'Unknown Rem',
                     remId,
@@ -963,6 +971,7 @@ function RepetitionHistoryPopup() {
 
     // Calculate days late/early for next scheduled rep
     const now = Date.now();
+    const schedulerText = 'scheduler' in data && data.scheduler ? describeScheduler(data.scheduler) : null;
     const daysLate = nextRepDate ? Math.round((now - nextRepDate) / (1000 * 60 * 60 * 24)) : null;
     const daysLateText = daysLate !== null
         ? (daysLate > 0 ? `${daysLate}d late` : daysLate < 0 ? `${Math.abs(daysLate)}d early` : 'today')
@@ -978,7 +987,8 @@ function RepetitionHistoryPopup() {
     const secondaryStatsStyle: React.CSSProperties = {
         display: 'flex',
         justifyContent: 'center',
-        gap: '24px',
+        flexWrap: 'wrap',
+        gap: '4px 24px',
         padding: '8px 16px',
         backgroundColor: 'var(--rn-clr-background-primary)',
         borderBottom: '1px solid var(--rn-clr-border-primary)',
@@ -1150,6 +1160,11 @@ function RepetitionHistoryPopup() {
                         <span style={{ color: daysLate !== null && daysLate > 0 ? 'var(--rn-clr-red, #ef4444)' : daysLate !== null && daysLate < 0 ? 'var(--rn-clr-green, #22c55e)' : 'inherit' }}>
                             {daysLateText}
                         </span>
+                        {schedulerText && (
+                            <span title={schedulerText.explanation}>
+                                Scheduler: <strong>{schedulerText.name}</strong> ({schedulerText.source})
+                            </span>
+                        )}
                     </>
                 )}
             </div>

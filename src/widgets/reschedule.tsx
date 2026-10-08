@@ -14,7 +14,22 @@ import { IncrementalRep, IncrementalRem } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
-import { PrioritySlider, PrioritySliderRef } from '../components';
+import {
+  DocsHelpButton,
+  PrioritySlider,
+  PrioritySliderRef,
+  SchedulerPicker,
+  SchedulerPickerRef,
+  SchedulerPickerValue,
+  pickerValueToChoice,
+  schedulerHint,
+} from '../components';
+import { applySchedulerChoice } from '../lib/scheduler_choice';
+import {
+  previewMultiplierIntervals,
+  ResolvedScheduler,
+  SchedulerChoice,
+} from '../lib/scheduler_core';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { stampNoteAndContext, MAX_NOTE_LENGTH } from '../lib/history_notes';
 
@@ -24,7 +39,9 @@ async function handleRescheduleAndPriorityUpdate(
   intervalDays: number,
   newPriority: number,
   context: 'queue' | 'editor' = 'queue',
-  note?: string
+  note?: string,
+  // Only passed when the user changed the scheduler in the popup.
+  schedulerChoice?: SchedulerChoice
 ) {
   // Suppress GlobalRemChanged
   await plugin.storage.setSession('plugin_operation_active', true);
@@ -40,6 +57,10 @@ async function handleRescheduleAndPriorityUpdate(
     // recordHistory: false — the reschedule entry appended below already carries
     // this priority, and it is written from a snapshot taken before this call.
     await setIncRemPriority(plugin, rem, newPriority, { recordHistory: false });
+
+    if (schedulerChoice) {
+      await applySchedulerChoice(plugin, rem, schedulerChoice);
+    }
 
     const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
 
@@ -122,8 +143,46 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
   const [note, setNote] = useState('');
   const [futureDate, setFutureDate] = useState('');
   const [ancestorInfo, setAncestorInfo] = useState<any>(null);
+  const [scheduler, setScheduler] = useState<SchedulerPickerValue | null>(null);
+  const [inheritedScheduler, setInheritedScheduler] = useState<ResolvedScheduler | null>(null);
   const intervalInputRef = useRef<HTMLInputElement>(null);
   const prioritySliderRef = useRef<PrioritySliderRef>(null);
+  const schedulerPickerRef = useRef<SchedulerPickerRef>(null);
+  // The scheduler as stored when the popup opened — the slot is only touched if
+  // the user moves away from it.
+  const initialScheduler = useRef<SchedulerPickerValue | null>(null);
+  // Once the user types an interval, switching scheduler no longer replaces it.
+  const daysEdited = useRef(false);
+  const inLookbackModeRef = useRef(false);
+
+  const changeDays = (value: string) => {
+    daysEdited.current = true;
+    setDays(value);
+  };
+
+  const schedulerChanged =
+    !!scheduler &&
+    !!initialScheduler.current &&
+    !!inheritedScheduler &&
+    (scheduler.kind !== initialScheduler.current.kind ||
+      pickerValueToChoice(scheduler, inheritedScheduler).factor !==
+        pickerValueToChoice(initialScheduler.current, inheritedScheduler).factor);
+
+  // Switching scheduler changes what Next would suggest, so re-project the
+  // interval — unless the user has already typed their own.
+  const handleSchedulerChange = async (next: SchedulerPickerValue) => {
+    setScheduler(next);
+    if (daysEdited.current || !inheritedScheduler) return;
+    const projected = await getNextSpacingDateForRem(
+      plugin,
+      remId,
+      inLookbackModeRef.current,
+      pickerValueToChoice(next, inheritedScheduler)
+    );
+    if (projected && !daysEdited.current) {
+      setDays(String(projected.newInterval));
+    }
+  };
 
   // --- KEYBOARD HANDLERS ---
   const daysKeyboard = useAcceleratedKeyboardHandler(
@@ -132,7 +191,7 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
     (val) => {
       // Min 0, no practical max but let's keep it sane
       const newVal = Math.max(0, val);
-      setDays(newVal.toString());
+      changeDays(newVal.toString());
     }
   );
 
@@ -149,10 +208,15 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
     if (e.key !== 'Tab' || e.shiftKey) return;
     e.preventDefault();
 
-    // Cycle between interval input and priority slider
-    if (document.activeElement === intervalInputRef.current) {
+    // Cycle: interval → priority → scheduler → interval
+    const section = (document.activeElement as HTMLElement | null)
+      ?.closest?.('[data-section]')
+      ?.getAttribute('data-section');
+    if (section === 'days') {
       prioritySliderRef.current?.focus();
       prioritySliderRef.current?.select();
+    } else if (section === 'priority') {
+      schedulerPickerRef.current?.focus();
     } else {
       intervalInputRef.current?.focus();
       intervalInputRef.current?.select();
@@ -162,7 +226,17 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
   useEffect(() => {
     const fetchInitialData = async () => {
       const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+      inLookbackModeRef.current = inLookbackMode;
       const scheduleData = await getNextSpacingDateForRem(plugin, remId, inLookbackMode);
+      if (scheduleData) {
+        const current: SchedulerPickerValue = {
+          kind: scheduleData.scheduler.kind,
+          factor: String(scheduleData.scheduler.factor),
+        };
+        initialScheduler.current = current;
+        setScheduler(current);
+        setInheritedScheduler(scheduleData.inheritedScheduler);
+      }
       const incRemData = await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(remId));
 
       setDays(String(scheduleData?.newInterval || 1));
@@ -203,7 +277,17 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
     e.preventDefault();
     const numDays = parseInt(days || '');
     if (!isNaN(numDays) && priority !== null) {
-      await handleRescheduleAndPriorityUpdate(plugin, remId, numDays, priority, context, note);
+      await handleRescheduleAndPriorityUpdate(
+        plugin,
+        remId,
+        numDays,
+        priority,
+        context,
+        note,
+        schedulerChanged && scheduler && inheritedScheduler
+          ? pickerValueToChoice(scheduler, inheritedScheduler)
+          : undefined
+      );
     }
   };
 
@@ -234,7 +318,7 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
             type="number"
             min="0"
             value={days}
-            onChange={(e) => setDays(e.target.value)}
+            onChange={(e) => changeDays(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 handleSubmit(e);
@@ -289,6 +373,27 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
           }}
         />
       </div>
+      {scheduler && inheritedScheduler && (
+        <SchedulerPicker
+          ref={schedulerPickerRef}
+          value={scheduler}
+          onChange={handleSchedulerChange}
+          inherited={inheritedScheduler}
+          hint={schedulerHint(
+            scheduler,
+            inheritedScheduler,
+            parseInt(days),
+            previewMultiplierIntervals
+          )}
+          onKeyDown={(e) => {
+            if (e.key === 'Tab') {
+              handleTabCycle(e);
+            } else if (e.key === 'Enter') {
+              handleSubmit(e);
+            }
+          }}
+        />
+      )}
       {/* Optional note — stored on this reschedule's history entry ("why postponed") */}
       <div className="flex flex-col gap-1" data-section="note">
         <div className="flex justify-between text-xs font-semibold mb-1">
@@ -398,6 +503,7 @@ export function Reschedule() {
               style={{ width: '24px', height: '24px' }}
             />
             <h3 className="text-lg font-bold">Reschedule</h3>
+            <DocsHelpButton path="Reviewing-Items-in-the-Queue/#reschedule" label="Reschedule" />
           </div>
           <button
             className="text-xs opacity-50 hover:opacity-100 px-2 transition-opacity"
