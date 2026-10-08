@@ -13,6 +13,8 @@ This page documents the major changes and improvements for each version of the I
 - **Per type**: new settings pick a scheduler and an Initial Interval for documents, videos, highlights and regular Rems, prevailing over the *Default Scheduler* (the former *Use Beta Scheduler* switch) and the general *Initial Interval*.
 - **At a glance**: the Next button shows `×1.5` or `curve`, and the Repetition History popup names the scheduler in use.
 
+![The Reschedule popup with its Scheduler row: × Multiplier selected, the multiplier at 1.5 and the preview "After that: 36 → 54 → 81 days"](assets/reschedule-with-scheduler.png){ width="400" }
+
 ![The Next button with a ×1.5 chip before "in 24 days"](assets/scheduler-indication-in-next-button.png){ width="900" }
 
 ![The Scheduling group of the settings popup: Initial Interval and its four per-type settings, Default Scheduler, Multiplier, the two Saturating Curve settings and the four per-type schedulers](assets/settings-popup-all-scheduling-options.png){ width="600" }

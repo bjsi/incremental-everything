@@ -242,7 +242,7 @@ The popup shows which scheduler the item uses and lets you change it for this Re
 **📝 Note field:**
 The popup includes an optional **Note** input — record *why* you postponed ("waiting for prerequisite chapter", "revisit after exam"). The note is stored on this reschedule's history entry and shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), so future-you knows what past-you was thinking.
 
-![Reschedule Widget](assets/reschedule.png){ width="400" }
+![The Reschedule popup with its Scheduler row: × Multiplier selected, the multiplier at 1.5 and the preview "After that: 36 → 54 → 81 days"](assets/reschedule-with-scheduler.png){ width="400" }
 
 #### Technical Note: Reschedule Event Types
 

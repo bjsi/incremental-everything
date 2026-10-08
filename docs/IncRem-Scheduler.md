@@ -132,6 +132,12 @@ The [Reschedule](Reviewing-Items-in-the-Queue.md#reschedule) popup (`Ctrl+J`) an
 - With the multiplier selected, `↑` / `↓` step its value by 0.1, or type a number.
 - A line underneath previews what follows the interval you are setting, e.g. *After that: 75 → 113 → 170 days*, and another says whether the Rem now differs from the settings.
 
+![The Reschedule popup with its Scheduler row: × Multiplier selected, the multiplier at 1.5 and the preview "After that: 36 → 54 → 81 days"](assets/reschedule-with-scheduler.png){ width="400" }
+
+![The Priority & Interval popup with its Scheduler row under the priority slider and the interval field](assets/priority-interval-widget-with-scheduler.png){ width="400" }
+
+*Above: the Reschedule popup (top) and the Priority & Interval popup shown when a Rem is made Incremental. Both report "Same as the setting for this type", so nothing is stored on the Rem.*
+
 The choice is saved with the popup. A Rem only stores it when it **differs** from what the settings give it; choosing the same thing again clears it, and the Rem goes back to following the settings as you change them.
 
 ### Seeing which one is in use { #scheduler-indicator }

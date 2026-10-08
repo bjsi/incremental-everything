@@ -231,7 +231,7 @@ Designed specifically for **Flashcards**. You can now assign `CardPriority` to h
 
 *   **Reschedule Command (`Ctrl+J`):** The reschedule popup also includes a priority slider, allowing you to change both the due date and the priority in one go.
 
-![Reschedule Widget](assets/reschedule.png){ width="400" }
+![The Reschedule popup with its Scheduler row: × Multiplier selected, the multiplier at 1.5 and the preview "After that: 36 → 54 → 81 days"](assets/reschedule-with-scheduler.png){ width="400" }
 
 *   **Extract with Priority (`Opt+Shift+X`):** When focused on a Rem or having a text selection, you can immediately create an extract and open the priority popup for the new item.
 

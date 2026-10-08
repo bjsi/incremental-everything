@@ -298,7 +298,7 @@ A combined popup that appears automatically when a new Incremental Rem is create
 - **Batch Mode**: When triggered via `Alt+Shift+X` with multiple Rems selected, the popup shows a blue "📋 N rems selected" banner instead of a single Rem name. On save, the chosen priority and interval are applied to all selected Rems at once.
 - **Enter** saves; **Esc** cancels without saving.
 
-![Priority & Interval Popup Widget](assets/priority-interval-widget.png){ width="400" }
+![The Priority & Interval popup with its Scheduler row under the priority slider and the interval field](assets/priority-interval-widget-with-scheduler.png){ width="400" }
 
 ![Extract with Priority - Multi-Rem Batch Mode](assets/extract-multiple-rems-with-priority.gif){ width="800" }
 
@@ -462,7 +462,7 @@ The plugin's own settings window: every setting it owns, grouped by area rather 
 
 Lets you manually override the next review date, adjust priority and choose the item's [scheduler](IncRem-Scheduler.md#per-rem-scheduler) in one popup. Use `↑`/`↓` arrows with acceleration to adjust days and priority, `←`/`→` on the Scheduler row to switch between **× Multiplier** and **Saturating Curve**, `Tab` to cycle between fields, and `Esc` to cancel.
 
-![Reschedule Widget](assets/reschedule.png){ width="400" }
+![The Reschedule popup with its Scheduler row: × Multiplier selected, the multiplier at 1.5 and the preview "After that: 36 → 54 → 81 days"](assets/reschedule-with-scheduler.png){ width="400" }
 
 📖 **Full documentation:** [Reschedule](Reviewing-Items-in-the-Queue.md#reschedule)
 
