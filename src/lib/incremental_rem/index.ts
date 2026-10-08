@@ -12,7 +12,6 @@ import {
   prioritySlotCode,
   repHistorySlotCode,
   originalIncrementalDateSlotCode,
-  initialIntervalId,
   defaultPriorityId,
   currentIncRemKey,
   incremReviewStartTimeKey,
@@ -21,6 +20,7 @@ import {
 } from '../consts';
 import { readRawPdfState, writeRawPdfState } from '../pdf_state';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
+import { getInitialIntervalForRem } from '../scheduler_choice';
 import { IncrementalRem, IncrementalRep, UNREADABLE_PRIORITY_FALLBACK } from './types';
 import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
@@ -405,6 +405,8 @@ export async function handleNextRepetitionManualOffset(
       date: Date.now(),
       scheduled: targetDay,
       interval: Math.max(offsetDays, 0),
+      // A "carry on today / tomorrow" gesture, not a new rhythm for the item.
+      keepsInterval: true,
     };
     // Same note/context stamping as the regular review funnel.
     const remForStamp = await plugin.rem.findOne(incRem.remId);
@@ -663,7 +665,8 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
       const [dismissedHistory, initialIntervalSetting, defaultPrioritySetting] = await Promise.all([
         // Check for dismissed history to import (merge from previous learning sessions)
         mergeHistoryFromDismissed(plugin, rem),
-        getIESetting(plugin, initialIntervalId),
+        // Per-type Initial Interval when one is set, else the general setting.
+        getInitialIntervalForRem(plugin, rem),
         getIESetting(plugin, defaultPriorityId),
       ]);
       const hasExistingHistory = dismissedHistory && dismissedHistory.length > 0;

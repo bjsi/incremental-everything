@@ -10,11 +10,20 @@ import {
     powerupCode,
     prioritySlotCode,
     defaultPriorityId,
-    initialIntervalId,
     pendingIntervalBatchSaveKey,
     creationFoldRemIdsKey,
 } from '../lib/consts';
-import { PrioritySlider, PrioritySliderRef } from '../components';
+import {
+    PrioritySlider,
+    PrioritySliderRef,
+    SchedulerPicker,
+    SchedulerPickerRef,
+    SchedulerPickerValue,
+    pickerValueToChoice,
+    schedulerHint,
+} from '../components';
+import { getInitialIntervalForRem, getRemSchedulerInfo } from '../lib/scheduler_choice';
+import { previewMultiplierIntervals } from '../lib/scheduler_core';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import dayjs from 'dayjs';
 import { getIESetting } from '../lib/settings';
@@ -25,6 +34,7 @@ function PriorityInterval() {
     // Refs
     const prioritySliderRef = useRef<PrioritySliderRef>(null);
     const intervalInputRef = useRef<HTMLInputElement>(null);
+    const schedulerPickerRef = useRef<SchedulerPickerRef>(null);
     const saveButtonRef = useRef<HTMLButtonElement>(null);
     const next7ButtonRef = useRef<HTMLButtonElement>(null);
     const next30ButtonRef = useRef<HTMLButtonElement>(null);
@@ -71,17 +81,21 @@ function PriorityInterval() {
         const [incPStr, defaultPriority, defaultInterval] = await Promise.all([
             rem.getPowerupProperty(powerupCode, prioritySlotCode),
             getIESetting(rp, defaultPriorityId),
-            getIESetting(rp, initialIntervalId),
+            getInitialIntervalForRem(rp, rem),
         ]);
 
         const remContent = await getRemCardContent(rp, rem);
+        const schedulerInfo = await getRemSchedulerInfo(rp, rem);
 
         return {
             rem,
             remId: rem._id,
             incPriority: incPStr ? parseInt(incPStr) : null,
             defaultPriority: defaultPriority || 50,
-            defaultInterval: defaultInterval || 1,
+            // ?? not ||: 0 (due today) is a legitimate Initial Interval.
+            defaultInterval: defaultInterval ?? 1,
+            scheduler: schedulerInfo.scheduler,
+            inheritedScheduler: schedulerInfo.inherited,
             front: remContent.front,
             back: remContent.back,
         };
@@ -91,6 +105,11 @@ function PriorityInterval() {
     const [priorityVal, setPriorityVal] = useState<number | null>(null);
     const [intervalVal, setIntervalVal] = useState<string | null>(null);
     const [futureDate, setFutureDate] = useState('');
+    const [schedulerVal, setSchedulerVal] = useState<SchedulerPickerValue | null>(null);
+    // The scheduler as stored when the popup opened. It is only written back if
+    // the user moves away from it — in batch mode that keeps a plain
+    // priority/interval save from flattening every selected rem's scheduler.
+    const initialScheduler = useRef<SchedulerPickerValue | null>(null);
 
     // Sync state from data (only once)
     useEffect(() => {
@@ -100,6 +119,14 @@ function PriorityInterval() {
             }
             if (intervalVal === null) {
                 setIntervalVal(String(data.defaultInterval));
+            }
+            if (schedulerVal === null) {
+                const current: SchedulerPickerValue = {
+                    kind: data.scheduler.kind,
+                    factor: String(data.scheduler.factor),
+                };
+                initialScheduler.current = current;
+                setSchedulerVal(current);
             }
         }
     }, [data]);
@@ -138,11 +165,12 @@ function PriorityInterval() {
         }, 50);
     }, [!!data]);
 
-    // Tab cycling: priority → interval → Save → Next 7 Days → Next 30 Days → priority
+    // Tab cycling: priority → interval → scheduler → Save → Next 7 Days → Next 30 Days → priority
     // Shift+Tab reverses the cycle.
     const focusCycle = [
         () => { prioritySliderRef.current?.focus(); prioritySliderRef.current?.select(); },
         () => { intervalInputRef.current?.focus(); intervalInputRef.current?.select(); },
+        () => schedulerPickerRef.current?.focus(),
         () => saveButtonRef.current?.focus(),
         () => next7ButtonRef.current?.focus(),
         () => next30ButtonRef.current?.focus(),
@@ -160,17 +188,27 @@ function PriorityInterval() {
             currentIdx = 0;
         } else if (active === intervalInputRef.current) {
             currentIdx = 1;
-        } else if (active === saveButtonRef.current) {
+        } else if (active?.closest?.('[data-section="scheduler"]')) {
             currentIdx = 2;
-        } else if (active === next7ButtonRef.current) {
+        } else if (active === saveButtonRef.current) {
             currentIdx = 3;
-        } else if (active === next30ButtonRef.current) {
+        } else if (active === next7ButtonRef.current) {
             currentIdx = 4;
+        } else if (active === next30ButtonRef.current) {
+            currentIdx = 5;
         }
         const step = e.shiftKey ? -1 : 1;
         const nextIdx = (currentIdx + step + focusCycle.length) % focusCycle.length;
         focusCycle[nextIdx]?.();
     };
+
+    const schedulerChanged =
+        !!data &&
+        !!schedulerVal &&
+        !!initialScheduler.current &&
+        (schedulerVal.kind !== initialScheduler.current.kind ||
+            pickerValueToChoice(schedulerVal, data.inheritedScheduler).factor !==
+                pickerValueToChoice(initialScheduler.current, data.inheritedScheduler).factor);
 
     // handleSave: writes job to session storage, closes popup immediately.
     // ALL heavy work (DB writes, cache, cascade) is delegated to the tracker
@@ -206,6 +244,9 @@ function PriorityInterval() {
                 priority: effectivePriority,
                 interval: effectiveInterval,
                 foldRemIds,
+                ...(schedulerChanged && schedulerVal
+                    ? { scheduler: pickerValueToChoice(schedulerVal, data.inheritedScheduler) }
+                    : {}),
             });
 
             // Clean up batch session storage
@@ -217,7 +258,7 @@ function PriorityInterval() {
         } finally {
             isSaving.current = false;
         }
-    }, [data, priorityVal, intervalVal, plugin, isBatchMode, batchRemIds, creationFoldRemIds]);
+    }, [data, priorityVal, intervalVal, schedulerVal, schedulerChanged, plugin, isBatchMode, batchRemIds, creationFoldRemIds]);
 
     if (!data) {
         return <div className="h-20 flex items-center justify-center text-sm">Loading...</div>;
@@ -347,6 +388,22 @@ function PriorityInterval() {
                     <span className="text-xs opacity-60 italic">{futureDate}</span>
                 </div>
             </div>
+
+            {schedulerVal && (
+                <SchedulerPicker
+                    ref={schedulerPickerRef}
+                    value={schedulerVal}
+                    onChange={setSchedulerVal}
+                    inherited={data.inheritedScheduler}
+                    hint={schedulerHint(
+                        schedulerVal,
+                        data.inheritedScheduler,
+                        parseInt(intervalVal ?? ''),
+                        previewMultiplierIntervals
+                    )}
+                    onKeyDown={handleTab}
+                />
+            )}
 
             {/* Buttons */}
             <div className="flex gap-2 mt-2 flex-wrap">

@@ -37,7 +37,7 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
 - **PDF Reading History Sync**: If the Incremental Rem is a PDF or has a PDF source, the modal will automatically render the tracking **PDF Page Controls**. You can manipulate your current reading page directly from the popup and any time tracked by the Timer mode will perfectly log into your PDF Reading Analytics!
 - **Multi-PDF support**: If the Inc Rem has **more than one PDF source**, a PDF dropdown appears just above the Page Controls. Selecting a different PDF pins it as active for this Inc Rem (★ marks the `#preferthispdf` one) — Start Timer will then open and scroll to that PDF, and any subsequent reading-time writes target it. See the [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) section for the resolution chain.
 - **Records review time**: The time you enter is saved in the repetition history.
-- **Schedules next review**: Uses the same exponential algorithm as the queue's "Next" button.
+- **Schedules next review**: Uses the same [scheduler](IncRem-Scheduler.md) as the queue's "Next" button.
 - **Indicator in history**: Shows with a ⌨️ indicator in the Repetition History widget.
 - **Ahead-of-Schedule Warning Banner**: If you review an Incremental Rem before its scheduled due date, an amber warning banner will appear at the top of the popup informing you how many days early you are:
 

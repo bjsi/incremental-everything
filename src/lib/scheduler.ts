@@ -1,13 +1,5 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
-import {
-  multiplierId,
-  nextRepDateSlotCode,
-  powerupCode,
-  repHistorySlotCode,
-  betaSchedulerEnabledId,
-  betaFirstReviewIntervalId,
-  betaMaxIntervalId,
-} from './consts';
+import { nextRepDateSlotCode, powerupCode, repHistorySlotCode } from './consts';
 import { IncrementalRep } from './incremental_rem';
 import { repCountsForScheduling } from './incremental_rem/types';
 import * as _ from 'remeda';
@@ -15,7 +7,13 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { getDailyDocReferenceForDate } from './utils';
-import { getIESetting } from './settings';
+import { getRemSchedulerInfo } from './scheduler_choice';
+import {
+  computeNextInterval,
+  getCurrentInterval,
+  ResolvedScheduler,
+  SchedulerChoice,
+} from './scheduler_core';
 dayjs.extend(relativeTime);
 
 function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
@@ -103,20 +101,6 @@ export function timeWhenCardAppearsInQueueFromScheduled(
   return useRealScheduledTime ? new Date(scheduled) : dayjs(scheduled).startOf('day').toDate();
 }
 
-export const getMultiplier = async (plugin: RNPlugin) => {
-  const multiplier = await getIESetting(plugin, multiplierId);
-  return multiplier;
-};
-
-export const getBetaSchedulerSettings = async (plugin: RNPlugin) => {
-  const enabled = await getIESetting(plugin, betaSchedulerEnabledId);
-  const firstReviewInterval =
-    await getIESetting(plugin, betaFirstReviewIntervalId);
-  const maxInterval =
-    await getIESetting(plugin, betaMaxIntervalId);
-  return { enabled: !!enabled, firstReviewInterval, maxInterval };
-};
-
 export const removeLastInteraction = (history: IncrementalRep[]): IncrementalRep[] => {
   if (history.length === 0) {
     return history;
@@ -124,10 +108,17 @@ export const removeLastInteraction = (history: IncrementalRep[]): IncrementalRep
   return history.slice(0, -1);
 };
 
+/**
+ * Project what a repetition of this rem would schedule, without writing anything.
+ *
+ * @param schedulerOverride Compute with this scheduler instead of the rem's own —
+ *   the popups use it to preview a switch before it is saved.
+ */
 export async function getNextSpacingDateForRem(
   plugin: RNPlugin,
   remId: string,
-  inLookbackMode: boolean
+  inLookbackMode: boolean,
+  schedulerOverride?: SchedulerChoice
 ) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) {
@@ -139,10 +130,12 @@ export async function getNextSpacingDateForRem(
   }
 
   const rawHistory = incrementalRemInfo.history || [];
+  // In lookback mode the last interaction is the one being redone, so neither
+  // scheduler may see it.
+  const effectiveHistory = inLookbackMode ? removeLastInteraction(rawHistory) : rawHistory;
   const cleansedHistory = _.pipe(
     rawHistory,
     removeResponsesBeforeEarlyResponses,
-    // remove the last repetition if we're in lookback mode
     inLookbackMode ? removeLastInteraction : _.identity
   );
 
@@ -150,23 +143,20 @@ export async function getNextSpacingDateForRem(
   // This ensures interval calculation restarts after re-activating a dismissed Rem
   const sessionHistory = getRepsSinceLastMadeIncremental(cleansedHistory);
 
-  // NOTE: if you change to use nextRepDate, you'll need to handle lookback mode
-  const beta = await getBetaSchedulerSettings(plugin);
-  let newInterval: number;
-  if (beta.enabled) {
-    // Saturating curve: starts at firstReviewInterval, asymptotically approaches maxInterval
-    // k=4 controls how fast saturation happens (at review k+1 you're halfway)
-    const k = 4;
-    const N = Math.max(sessionHistory.length + 1, 1); // review number
-    newInterval = Math.ceil(
-      beta.firstReviewInterval +
-      (beta.maxInterval - beta.firstReviewInterval) * ((N - 1) / (N - 1 + k))
-    );
-  } else {
-    // Original exponential scheduler
-    const multiplier = await getMultiplier(plugin);
-    newInterval = Math.ceil(multiplier ** Math.max(sessionHistory.length + 1, 1));
-  }
+  const schedulerInfo = await getRemSchedulerInfo(plugin, rem);
+  const scheduler: ResolvedScheduler = schedulerOverride
+    ? { ...schedulerOverride, source: 'item' }
+    : schedulerInfo.scheduler;
+  const newInterval = computeNextInterval({
+    scheduler,
+    reviewNumber: sessionHistory.length + 1,
+    // The multiplier scheduler works from the interval the item is on, read off
+    // the unfiltered history: an editor reschedule or a manual date edit counts
+    // here even though it never counts as a review.
+    currentInterval: getCurrentInterval(effectiveHistory),
+    curveFirstInterval: schedulerInfo.settings.curveFirstInterval,
+    curveMaxInterval: schedulerInfo.settings.curveMaxInterval,
+  });
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
 
   // Calculate if review was early/late and by how many days
@@ -184,7 +174,6 @@ export async function getNextSpacingDateForRem(
     {
       date: actualDate,
       // TODO: wrong in lookbackMode, but no way to compute because the old nextRepDate has been overwritten
-      // should fix if algo changes to use nextRepDate / scheduled / actual interval
       scheduled: scheduledDate,
       interval: newInterval,
       wasEarly: wasEarly,
@@ -205,6 +194,9 @@ export async function getNextSpacingDateForRem(
     newHistory,
     remId,
     newInterval,
+    /** The scheduler this projection used, and what the settings alone would give. */
+    scheduler,
+    inheritedScheduler: schedulerInfo.inherited,
   };
 }
 

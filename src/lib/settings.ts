@@ -34,6 +34,14 @@ import {
   betaSchedulerEnabledId,
   betaFirstReviewIntervalId,
   betaMaxIntervalId,
+  schedulerForDocumentsId,
+  schedulerForVideosId,
+  schedulerForHighlightsId,
+  schedulerForRemsId,
+  initialIntervalForDocumentsId,
+  initialIntervalForVideosId,
+  initialIntervalForHighlightsId,
+  initialIntervalForRemsId,
   collapseQueueTopBar,
   defaultPriorityId,
   defaultCardPriorityId,
@@ -103,6 +111,9 @@ import type { PerformanceMode } from './utils';
  * RemNote; adding a setting means adding it here, to `IE_SETTINGS_DEFAULTS` and
  * to `IE_SETTINGS_SCHEMA` (TypeScript enforces all three).
  */
+/** A per-type scheduler default: defer to the Default Scheduler, or prevail over it. */
+export type SchedulerTypeDefault = 'default' | 'multiplier' | 'curve';
+
 export interface IESettings {
   // Scheduling
   [initialIntervalId]: number;
@@ -110,6 +121,14 @@ export interface IESettings {
   [betaSchedulerEnabledId]: boolean;
   [betaFirstReviewIntervalId]: number;
   [betaMaxIntervalId]: number;
+  [schedulerForDocumentsId]: SchedulerTypeDefault;
+  [schedulerForVideosId]: SchedulerTypeDefault;
+  [schedulerForHighlightsId]: SchedulerTypeDefault;
+  [schedulerForRemsId]: SchedulerTypeDefault;
+  [initialIntervalForDocumentsId]: string;
+  [initialIntervalForVideosId]: string;
+  [initialIntervalForHighlightsId]: string;
+  [initialIntervalForRemsId]: string;
 
   // Priority
   [defaultPriorityId]: number;
@@ -193,6 +212,14 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [betaSchedulerEnabledId]: false,
   [betaFirstReviewIntervalId]: 5,
   [betaMaxIntervalId]: 30,
+  [schedulerForDocumentsId]: 'default',
+  [schedulerForVideosId]: 'default',
+  [schedulerForHighlightsId]: 'default',
+  [schedulerForRemsId]: 'default',
+  [initialIntervalForDocumentsId]: '',
+  [initialIntervalForVideosId]: '',
+  [initialIntervalForHighlightsId]: '',
+  [initialIntervalForRemsId]: '',
 
   [defaultPriorityId]: 50,
   [defaultCardPriorityId]: 50,
@@ -421,6 +448,12 @@ export type SettingSpec =
  * popup renders and what register/settings.ts registers from — the descriptions
  * used to be duplicated between the two.
  */
+const SCHEDULER_TYPE_OPTIONS: Array<{ value: SchedulerTypeDefault; label: string }> = [
+  { value: 'default', label: 'Use the Default Scheduler' },
+  { value: 'multiplier', label: 'Multiplier' },
+  { value: 'curve', label: 'Saturating Curve' },
+];
+
 export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   // --- Flashcard prioritisation (the opt-in gate) ---
   [enableFlashcardPrioritisationId]: {
@@ -457,51 +490,131 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     integer: true,
     unit: 'days',
     title: 'Initial Interval',
-    description: 'Number of days until the first repetition of a new Incremental Rem.',
-  },
-  [multiplierId]: {
-    kind: 'number',
-    group: 'scheduling',
-    showWhen: { id: betaSchedulerEnabledId, equals: false },
-    min: 1,
-    title: 'Multiplier',
     description:
-      'Multiplier used to calculate the next interval: multiplier × previous interval = next ' +
-      'interval. Ignored when the Beta Scheduler is enabled.',
+      'Number of days until the first repetition of a new Incremental Rem, whichever scheduler ' +
+      'it uses. On the Multiplier scheduler it is also the interval the following ones grow ' +
+      'from: an Initial Interval of 10 with a multiplier of 1.5 gives 10, 15, 23… The ' +
+      'Saturating Curve ignores it after the first repetition. The per-type settings below ' +
+      'prevail over this one.',
+  },
+  [initialIntervalForDocumentsId]: {
+    kind: 'string',
+    group: 'scheduling',
+    placeholder: 'Use the Initial Interval',
+    title: 'Initial Interval for Documents (PDF / web page)',
+    description:
+      'Days until the first repetition of Incremental Rems that open a whole PDF or web page. Leave empty to use the Initial Interval above.',
+  },
+  [initialIntervalForVideosId]: {
+    kind: 'string',
+    group: 'scheduling',
+    placeholder: 'Use the Initial Interval',
+    title: 'Initial Interval for Videos',
+    description:
+      'Days until the first repetition of Incremental Rems that open a whole video. Leave empty to use the Initial Interval above.',
+  },
+  [initialIntervalForHighlightsId]: {
+    kind: 'string',
+    group: 'scheduling',
+    placeholder: 'Use the Initial Interval',
+    title: 'Initial Interval for Highlights and Video Extracts',
+    description:
+      'Days until the first repetition of highlights that are themselves Incremental Rems (the toolbar toggle) and video extracts. A Rem made with the toolbar\'s "Create Incremental Rem" button is a regular Rem and uses the setting below instead. Leave empty to use the Initial Interval above.',
+  },
+  [initialIntervalForRemsId]: {
+    kind: 'string',
+    group: 'scheduling',
+    placeholder: 'Use the Initial Interval',
+    title: 'Initial Interval for Regular Rems',
+    description:
+      'Days until the first repetition of every other Incremental Rem — a paragraph, a sentence, a note — including the Rems made from a highlight with the toolbar\'s "Create Incremental Rem" button. Leave empty to use the Initial Interval above.',
   },
   [betaSchedulerEnabledId]: {
     kind: 'boolean',
     group: 'scheduling',
-    helpPath: 'IncRem-Scheduler/#beta-scheduler',
-    title: 'Use Beta Scheduler (Saturating Curve)',
+    helpPath: 'IncRem-Scheduler/',
+    title: 'Default Scheduler',
+    onLabel: 'Saturating Curve',
+    offLabel: 'Multiplier',
     description:
-      'Intervals start at the First Review Interval and gradually approach the Max Interval ' +
-      'instead of growing exponentially. When enabled, the Multiplier above is ignored.',
+      'How Next calculates the following interval. Multiplier: the interval the item is on × ' +
+      'its multiplier, so an interval you choose in Reschedule is carried forward. Saturating ' +
+      'Curve: intervals depend only on the number of reviews, starting at the First Review ' +
+      'Interval and approaching the Max Interval. The per-type settings below prevail over this ' +
+      'one, and either can be changed for a single Incremental Rem in the Reschedule and ' +
+      'Priority & Interval popups.',
+  },
+  [multiplierId]: {
+    kind: 'number',
+    group: 'scheduling',
+    min: 1,
+    title: 'Multiplier',
+    description:
+      'Multiplier scheduler: next interval = current interval × multiplier. This is the value ' +
+      'suggested for every Incremental Rem; a different one can be set per Rem in the Reschedule ' +
+      'and Priority & Interval popups. 1 keeps the interval constant.',
   },
   [betaFirstReviewIntervalId]: {
     kind: 'number',
     group: 'scheduling',
-    showWhen: { id: betaSchedulerEnabledId, equals: true },
     min: 1,
     integer: true,
     unit: 'days',
-    title: 'First Review Interval (Beta Scheduler)',
+    title: 'First Review Interval (Saturating Curve)',
     description:
-      'Interval assigned after completing the first review. Not to be confused with "Initial ' +
-      'Interval", which controls when a new IncRem first appears in the queue, before any review. ' +
-      'Only used when the Beta Scheduler is enabled.',
+      'Saturating Curve scheduler: interval assigned after completing the first review. Not to ' +
+      'be confused with "Initial Interval", which controls when a new IncRem first appears in ' +
+      'the queue, before any review.',
   },
   [betaMaxIntervalId]: {
     kind: 'number',
     group: 'scheduling',
-    showWhen: { id: betaSchedulerEnabledId, equals: true },
     min: 1,
     integer: true,
     unit: 'days',
-    title: 'Max Interval (Beta Scheduler)',
+    title: 'Max Interval (Saturating Curve)',
     description:
-      'Upper bound the interval gradually approaches; it will never exceed this value. Only used ' +
-      'when the Beta Scheduler is enabled.',
+      'Saturating Curve scheduler: upper bound the interval gradually approaches; it will never ' +
+      'exceed this value.',
+  },
+  [schedulerForDocumentsId]: {
+    kind: 'dropdown',
+    group: 'scheduling',
+    title: 'Scheduler for Documents (PDF / web page)',
+    description:
+      'Scheduler used for Incremental Rems that open a whole PDF or web page. Prevails over the ' +
+      'Default Scheduler.',
+    options: SCHEDULER_TYPE_OPTIONS,
+  },
+  [schedulerForVideosId]: {
+    kind: 'dropdown',
+    group: 'scheduling',
+    title: 'Scheduler for Videos',
+    description:
+      'Scheduler used for Incremental Rems that open a whole video. Prevails over the Default ' +
+      'Scheduler.',
+    options: SCHEDULER_TYPE_OPTIONS,
+  },
+  [schedulerForHighlightsId]: {
+    kind: 'dropdown',
+    group: 'scheduling',
+    title: 'Scheduler for Highlights and Video Extracts',
+    description:
+      'Scheduler used for highlights that are themselves Incremental Rems — a PDF or web page ' +
+      'highlight tagged with the toolbar toggle — and for video extracts. A Rem made with the ' +
+      'toolbar\'s "Create Incremental Rem" button is a regular Rem and follows the setting below ' +
+      'instead. Prevails over the Default Scheduler.',
+    options: SCHEDULER_TYPE_OPTIONS,
+  },
+  [schedulerForRemsId]: {
+    kind: 'dropdown',
+    group: 'scheduling',
+    title: 'Scheduler for Regular Rems',
+    description:
+      'Scheduler used for every other Incremental Rem — a paragraph, a sentence, a note — ' +
+      'including the Rems made from a highlight with the toolbar\'s "Create Incremental Rem" ' +
+      'button. Prevails over the Default Scheduler.',
+    options: SCHEDULER_TYPE_OPTIONS,
   },
 
   // --- Priority ---
@@ -1283,8 +1396,8 @@ export function isSettingVisible(id: IESettingId, values: IESettings | undefined
  * value, grouped by the value each needs.
  *
  * Grouped rather than flat because a setting can gate others in both directions
- * — the Beta Scheduler hides its own parameters when off and hides the
- * Multiplier when on — and the popup's hint has to name the right direction.
+ * — one group shown only while a switch is off, another only while it is on —
+ * and the popup's hint has to name the right direction.
  */
 export function hiddenDependentsOf(
   id: IESettingId,

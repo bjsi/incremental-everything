@@ -473,8 +473,14 @@ export function AnswerButtons() {
           dragThreshold={12}
           title="Next (Cmd+Right on Mac; Ctrl+Right on Windows/Linux): Mark as reviewed, calculate next interval, and advance to next item"
         >
-          <div style={buttonStyles.label}>Next</div>
-          <div style={buttonStyles.sublabel}><NextRepTime rem={incRemInfo} /></div>
+          {/* DraggableButton lays its children out in a row (beside the ↕ grip),
+              so the two lines are stacked here. */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+            <div style={buttonStyles.label}>Next</div>
+            <div style={{ ...buttonStyles.sublabel, whiteSpace: 'nowrap' }}>
+              <NextRepTime rem={incRemInfo} showScheduler />
+            </div>
+          </div>
         </DraggableButton>
 
         <Button

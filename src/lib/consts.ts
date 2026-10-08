@@ -3,6 +3,9 @@ export const powerupCode = 'incremental';
 export const prioritySlotCode = 'priority';
 export const nextRepDateSlotCode = 'nextRepDate';
 export const repHistorySlotCode = 'repHist';
+// Per-rem scheduler override: 'curve', 'mult' or 'mult:<factor>'. Absent = follow the
+// settings. Parsed and written only through lib/scheduler_choice.ts.
+export const schedulerSlotCode = 'scheduler';
 export const originalIncrementalDateSlotCode = 'originalIncDate';
 
 // PDF reading state (page, page range, page history, active PDF) as serialized
@@ -58,6 +61,19 @@ export const multiplierId = 'multiplier';
 export const betaSchedulerEnabledId = 'beta-scheduler-enabled';
 export const betaFirstReviewIntervalId = 'beta-first-review-interval';
 export const betaMaxIntervalId = 'beta-max-interval';
+// Per-type default scheduler. 'default' defers to the Default Scheduler setting
+// (betaSchedulerEnabledId); 'multiplier' / 'curve' prevail over it for that kind of
+// Incremental Rem. A scheduler pinned on the rem itself (schedulerSlotCode) beats both.
+export const schedulerForDocumentsId = 'scheduler-type-documents';
+export const schedulerForVideosId = 'scheduler-type-videos';
+export const schedulerForHighlightsId = 'scheduler-type-highlights';
+export const schedulerForRemsId = 'scheduler-type-rems';
+// Per-type Initial Interval. Text, not a number, so it can be left EMPTY to mean
+// "use the general Initial Interval" — 0 is a real value (due today).
+export const initialIntervalForDocumentsId = 'initial-interval-type-documents';
+export const initialIntervalForVideosId = 'initial-interval-type-videos';
+export const initialIntervalForHighlightsId = 'initial-interval-type-highlights';
+export const initialIntervalForRemsId = 'initial-interval-type-rems';
 export const collapseQueueTopBar = 'collapse-queue-top-bar';
 export const defaultPriorityId = 'default-priority';
 export const defaultCardPriorityId = 'defaultCardPriority';

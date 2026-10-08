@@ -139,7 +139,7 @@ Three things to know about the figures:
 
 Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`:
 
-- **Single History** — triggered on an individual IncRem (in the queue via the 📊 button, or in the editor via `Ctrl+Shift+H`). Shows the Rem's full repetition log: date, time spent, scheduled interval, priority at the time of review, and event type markers (📅 reschedule, ⌨️ editor review, etc.). Repetition rows carry the wall-clock time under the date, and the event banners (▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset) show theirs next to it — several lifecycle events on one day stay distinguishable.
+- **Single History** — triggered on an individual IncRem (in the queue via the 📊 button, or in the editor via `Ctrl+Shift+H`). Shows the Rem's full repetition log: date, time spent, scheduled interval, priority at the time of review, and event type markers (📅 reschedule, ⌨️ editor review, etc.). The line under the totals names the [scheduler](IncRem-Scheduler.md#scheduler-indicator) the Rem uses and where that choice comes from. Repetition rows carry the wall-clock time under the date, and the event banners (▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset) show theirs next to it — several lifecycle events on one day stay distinguishable.
   - **📝 Notes & context sub-lines** — entries carrying a [review note](Reviewing-Items-in-the-Queue.md#the-answer-buttons) show it under the row (📝, full text); entries with an automatic **reading-context snapshot** show a compact line like `p.57 of 40–80 · Book.pdf · 🔖 "bookmark…"` — the page you were on **at that rep**, so your reading trajectory across sessions is visible. Event banners (Dismissed, Rescheduled in Editor, …) show their note the same way — a dismissal reason lives right on the dismissal marker.
   - **PDF reading-progress footer** — when the Rem (active *or* dismissed) reads from a PDF with a **page range** set, a footer shows the PDF name, the page range, your current page, the **degree of processing** (`% read`, with a progress bar), and an **estimated remaining time** (extrapolated from the total time spent and the degree of processing reached). The percentage and estimate are omitted for open-ended ranges (`start–∞`), where there's no finite end to measure against.
   - **🔖 Read-point footer** — when the Rem has a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) set, a footer shows the path from the Rem itself down to the bookmarked descendant (`Chapter › Section › Read point`), with the date it was set. Every segment is clickable and navigates to that Rem. It works for dismissed Rems too, and if the read point has since been moved out of the outline the footer says so and shows its nearest ancestors instead.
@@ -290,7 +290,8 @@ A combined popup that appears automatically when a new Incremental Rem is create
 - **Rem Name Header**: Confirms which rem you just created (truncated, with full tooltip on hover).
 - **Priority Slider** (auto-focused): Same color-coded gradient slider as the Light Priority Widget; supports ↑/↓ arrow acceleration.
 - **Interval Input**: Orange number field (same style as the Reschedule widget) specifying how many days until the first queue appearance. Defaults to your configured **Initial Interval** setting and shows a live "Next review: [date]" preview.
-- **Tab Cycling**: Tab moves focus through all interactive elements — priority → interval → **Save** → **Next 7 Days** → **Next 30 Days** → priority (wraps). Shift+Tab reverses the direction.
+- **Scheduler row**: Shows the [scheduler](IncRem-Scheduler.md#per-rem-scheduler) the Rem will use and lets you change it for this Rem — `←`/`→` switch between **× Multiplier** and **Saturating Curve**, `↑`/`↓` set its own multiplier. In batch mode it is applied to the selected Rems only if you change it.
+- **Tab Cycling**: Tab moves focus through all interactive elements — priority → interval → scheduler → **Save** → **Next 7 Days** → **Next 30 Days** → priority (wraps). Shift+Tab reverses the direction.
 - **Preset Buttons**:
   - **Next 7 Days** — saves priority and schedules in 7 days.
   - **Next 30 Days** — saves priority and schedules in 30 days.
@@ -459,7 +460,7 @@ The plugin's own settings window: every setting it owns, grouped by area rather 
 ### 6.1. Reschedule Widget
 **Shortcut:** `Ctrl+J` (works in both queue and editor)
 
-Lets you manually override the next review date and adjust priority in one popup. Use `↑`/`↓` arrows with acceleration to adjust days and priority, `Tab` to cycle between fields, and `Esc` to cancel.
+Lets you manually override the next review date, adjust priority and choose the item's [scheduler](IncRem-Scheduler.md#per-rem-scheduler) in one popup. Use `↑`/`↓` arrows with acceleration to adjust days and priority, `←`/`→` on the Scheduler row to switch between **× Multiplier** and **Saturating Curve**, `Tab` to cycle between fields, and `Esc` to cancel.
 
 ![Reschedule Widget](assets/reschedule.png){ width="400" }
 

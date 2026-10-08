@@ -2,6 +2,19 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.148 - October 7th, 2026
+
+### ✨ New - Multiplier scheduler, and a scheduler per Incremental Rem
+
+**Scheduling**: The default scheduler now multiplies the interval the item is on (`current interval × multiplier`) instead of counting reviews, so an interval you choose is kept: an extract created at 50 days goes to 75, then 113.
+
+- **What changes for you**: on the Multiplier scheduler a Reschedule is no longer a one-time override, it is the interval the next ones grow from. On the Saturating Curve it stays a one-off.
+- **Per Rem**: the Reschedule and Priority & Interval popups have a **Scheduler** row to switch a single Rem between Multiplier and Saturating Curve (`←`/`→`) and to give it its own multiplier.
+- **Per type**: new settings pick a scheduler and an Initial Interval for documents, videos, highlights and regular Rems, prevailing over the *Default Scheduler* (the former *Use Beta Scheduler* switch) and the general *Initial Interval*.
+- **At a glance**: the Next button shows `×1.5` or `curve`, and the Repetition History popup names the scheduler in use.
+
+📖 [IncRem Scheduler](IncRem-Scheduler.md#two-schedulers)
+
 ## v1.0.147 - October 4th, 2026
 
 ### 🐛 Fixed

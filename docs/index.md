@@ -267,7 +267,7 @@ Happy learning! 📚✨
         * **[Plugin Widgets Reference](Plugin-Widgets-Reference.md)**: Comprehensive visual manual of all widgets (History, Graphs, Trackers, etc).
         * **[Plugin Commands Reference](Plugin-Commands-Reference.md)**: Complete list of all keyboard and palette commands registered in RemNote by the plugin.
         * **[Plugin Settings Reference](Plugin-Settings-Reference.md)**: Every configurable option explained, with defaults and context.
-        * **[IncRem Scheduler](IncRem-Scheduler.md)**: How the plugin calculates review intervals — default exponential and beta saturating schedulers explained.
+        * **[IncRem Scheduler](IncRem-Scheduler.md)**: How the plugin calculates review intervals — the Multiplier and Saturating Curve schedulers, and how to choose one per type or per Rem.
         * **[Keyboard Shortcuts](Keyboard-Shortcuts.md)**: Quick cheatsheet mapping essential actions to default keys.
 
 * **9. FAQ & Troubleshooting**
