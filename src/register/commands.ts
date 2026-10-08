@@ -120,6 +120,7 @@ import {
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 import { resolveQueueCommandTarget } from '../lib/queue_target';
+import { getQueueVisibleCard } from '../lib/queue_visible_card';
 import { cycleImageSizes, resolveImageSizeTargets } from '../lib/image_size_cycle';
 import { IMAGE_SIZE_STEP_LABEL } from '../lib/image_sizing';
 import {
@@ -2637,7 +2638,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!remId) {
         const url = await plugin.window.getURL();
         if (url.includes('/flashcards')) {
-          const card = await plugin.queue.getCurrentCard();
+          const card = await getQueueVisibleCard(plugin);
           if (card) {
             remId = card.remId;
           } else {

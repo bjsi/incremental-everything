@@ -2,6 +2,16 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.151 - October 8th, 2026
+
+### 🐛 Fixed
+
+**Card Clusters**: The Priority popups (`Opt+P`, `Ctrl+Opt+P`), the Quick Priority shortcuts and the priority badge in the queue's top bar now act on the cluster sibling on screen instead of the cluster's first card.
+
+**Priority popup**: Fixed it opening in the queue for a Rem you had just selected in the editor instead of the current card.
+
+📖 [Priority in the queue, and in a Card Cluster](Priorities-for-Flashcards.md#priority-in-card-clusters)
+
 ## v1.0.150 - October 8th, 2026
 
 ### 🐛 Fixed

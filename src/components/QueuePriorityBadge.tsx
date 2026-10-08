@@ -13,6 +13,7 @@ import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { calculateRelativePercentile } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { useIESetting } from '../lib/settings';
+import { getQueueVisibleCard } from '../lib/queue_visible_card';
 
 /**
  * The current queue item's priority badge; click opens the priority popup.
@@ -40,7 +41,8 @@ export function QueuePriorityBadge({ active = true }: { active?: boolean }) {
     let isMounted = true;
     const checkCard = async () => {
       try {
-        const card = await plugin.queue.getCurrentCard();
+        // Cluster-aware: follows the sibling on screen, not the cluster's anchor card.
+        const card = await getQueueVisibleCard(plugin);
         if (isMounted) setPolledCardRemId(card?.remId);
       } catch (e) {
         // ignore

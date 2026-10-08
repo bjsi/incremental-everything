@@ -10,6 +10,7 @@ import {
     getCurrentIncrementalRem,
 } from './incremental_rem';
 import { getIESetting } from './settings';
+import { getQueueVisibleCard } from './queue_visible_card';
 import { PriorityChangeEvent } from './priority_history';
 
 // Module-level promise chain used as a mutex for the session-storage append.
@@ -56,7 +57,8 @@ export async function handleQuickPriorityChange(
     const isQueue = url.includes('/flashcards');
 
     if (isQueue) {
-        const card = await plugin.queue.getCurrentCard();
+        // Cluster-aware: the sibling on screen, not the cluster's anchor card.
+        const card = await getQueueVisibleCard(plugin);
         const sel = await plugin.editor.getSelection();
         const selType = sel?.type;
 

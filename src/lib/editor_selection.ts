@@ -15,7 +15,10 @@ import {
 } from '@remnote/plugin-sdk';
 
 export const SELECTION_CACHE_KEY = 'lastEditorSelectionCache';
-export const SELECTION_CACHE_TTL_MS = 30_000;
+export const SELECTION_CACHE_TTL_MS = 20_000;
+
+/** Which of getEffectiveSelection's three sources answered. */
+export type SelectionSource = 'live' | 'selected-rem' | 'cache';
 
 export type CachedSelection =
   | { kind: 'rem'; remIds: string[]; capturedAt: number }
@@ -67,33 +70,49 @@ export function registerSelectionTracker(plugin: RNPlugin) {
 // Returns a value in the SDK's RemSelection|TextSelection shape so callers
 // can drop it in without other refactor.
 export async function getEffectiveSelection(plugin: RNPlugin): Promise<any> {
+  return (await getEffectiveSelectionWithSource(plugin)).selection;
+}
+
+// Drop the cached selection. Called on entering a queue: a selection made in
+// the editor says nothing about what the user wants once a card is on screen,
+// yet queue commands let a selection outrank the card (for the previewer).
+export async function clearSelectionCache(plugin: RNPlugin): Promise<void> {
+  await plugin.storage.setSession(SELECTION_CACHE_KEY, undefined);
+}
+
+export async function getEffectiveSelectionWithSource(
+  plugin: RNPlugin
+): Promise<{ selection: any; source?: SelectionSource }> {
   const live = await plugin.editor.getSelection();
-  if (live) return live;
+  if (live) return { selection: live, source: 'live' };
 
   const remSel = await (plugin.editor as any).getSelectedRem?.();
-  if (remSel?.remIds?.length) return remSel;
+  if (remSel?.remIds?.length) return { selection: remSel, source: 'selected-rem' };
 
   const cached =
     (await plugin.storage.getSession<CachedSelection>(
       SELECTION_CACHE_KEY
     )) || null;
   const ageMs = cached ? Date.now() - cached.capturedAt : Infinity;
-  if (!cached || ageMs >= SELECTION_CACHE_TTL_MS) return undefined;
+  if (!cached || ageMs >= SELECTION_CACHE_TTL_MS) return { selection: undefined };
 
   if (cached.kind === 'rem') {
     return {
-      type: SelectionType.Rem,
-      remIds: cached.remIds,
+      selection: { type: SelectionType.Rem, remIds: cached.remIds },
+      source: 'cache',
     };
   }
   // Single-rem cache → synthesize a zero-width text-cursor selection. The
   // richText/range fields are required by the SDK type but unused by the
   // multi-rem code paths we care about (they only read remId).
   return {
-    type: SelectionType.Text,
-    remId: cached.remId,
-    richText: [],
-    isReverse: false,
-    range: { start: 0, end: 0 },
+    selection: {
+      type: SelectionType.Text,
+      remId: cached.remId,
+      richText: [],
+      isReverse: false,
+      range: { start: 0, end: 0 },
+    },
+    source: 'cache',
   };
 }
