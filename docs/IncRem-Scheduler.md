@@ -136,12 +136,23 @@ The choice is saved with the popup. A Rem only stores it when it **differs** fro
 
 ### Seeing which one is in use { #scheduler-indicator }
 
-- **Next button** — a small chip before the interval: `×1.5` for the multiplier, `curve` for the saturating curve. The chip is outlined when the scheduler was chosen for that Rem. Hover it for the details.
-- **Repetition History popup** — the line under the totals reads, for example, *Scheduler: Multiplier ×1.5 (set for this Rem)*.
+**Next button** — a small chip before the interval: `×1.5` for the multiplier, `curve` for the saturating curve. The chip is outlined when the scheduler was chosen for that Rem. Hover it for the details.
+
+![The Next button with a ×1.5 chip before "in 24 days"](assets/scheduler-indication-in-next-button.png){ width="900" }
+
+**Repetition History popup** — the line under the totals names the scheduler and where the choice comes from: *set for this Rem*, *type setting* or *default*.
+
+![The Repetition History popup; the line under the totals reads "Scheduler: Multiplier ×1.5 (type setting)"](assets/incremental-history-scheduler-indication.png){ width="500" }
 
 ---
 
 ## Settings Reference
+
+All of these are in the **Scheduling** group of the [settings popup](Plugin-Settings-Reference.md#where-the-settings-are).
+
+![The Scheduling group of the settings popup: Initial Interval and its four per-type settings, Default Scheduler, Multiplier, the two Saturating Curve settings and the four per-type schedulers](assets/settings-popup-all-scheduling-options.png){ width="600" }
+
+*Above: an example setup — whole documents on the Saturating Curve, highlights and regular Rems on the Multiplier with a 10-day Initial Interval.*
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|

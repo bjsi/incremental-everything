@@ -204,6 +204,8 @@ The "Next" button calculates the next interval with one of two schedulers:
 
 Each Incremental Rem uses one of them: its own choice if you set one, otherwise the setting for its type, otherwise the *Default Scheduler*. A small chip on the Next button tells you which — `×1.5` for the multiplier, `curve` for the saturating curve.
 
+![The Next button with a ×1.5 chip before "in 24 days"](assets/scheduler-indication-in-next-button.png){ width="900" }
+
 📖 **Full details:** the [IncRem Scheduler](IncRem-Scheduler.md) page covers both schedulers, [how one is chosen for each item](IncRem-Scheduler.md#which-scheduler) and the [settings](IncRem-Scheduler.md#settings-reference) that control them. To see how a due item is then picked for the queue, read [Scheduling and the Queue](IncRem-Scheduler.md#scheduling-and-the-queue).
 
 #### The "One Memory, One Action" Principle

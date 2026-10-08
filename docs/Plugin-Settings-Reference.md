@@ -8,9 +8,9 @@ Every setting lives in **one place**: the plugin's own settings popup.
 
 Open the popup with the command **`Incremental RemNote: Settings`** (quick code `is`). It groups the settings by area, hides the ones that do not apply — the Mastery Drill's parameters stay out of sight until you switch the drill on — and links each entry to the section of this manual that explains it.
 
-![The Incremental RemNote settings popup](assets/settings-popup.png){ width="900" }
+![The Incremental RemNote settings popup, open on the Scheduling group](assets/settings-popup-scheduler.png){ width="900" }
 
-*Above: the Scheduling group as it looked before v1.0.148 added the per-type schedulers. The **?** opens this manual at the matching section; **Reset** appears on anything changed from its default, next to a **modified** badge.*
+*Above: the Scheduling group. The **?** opens this manual at the matching section; **Reset** appears on anything changed from its default, next to a **modified** badge.*
 
 **RemNote's own plugin settings panel is empty for this plugin.** Up to v1.0.44, five of them stayed behind there — *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches and *Enable Hide-in-Queue Powerups and Commands* — on the theory that RemNote's panel is where you would look first if the plugin ever felt heavy. It never was: there was no performance problem to chase, and the split only gave you a second place to look. Since **v1.0.45** they are in the popup with everything else, and editable there.
 
@@ -44,6 +44,8 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 ## Scheduling
 
 *In the IE Settings popup.*
+
+![The Scheduling group of the settings popup: Initial Interval and its four per-type settings, Default Scheduler, Multiplier, the two Saturating Curve settings and the four per-type schedulers](assets/settings-popup-all-scheduling-options.png){ width="600" }
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
