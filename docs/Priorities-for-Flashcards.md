@@ -165,6 +165,16 @@ Press [`Alt+P`](Keyboard-Shortcuts.md#priority-commands) (or `Opt+P`) on any Rem
 **Handling Conflicts:**
 If a Rem is both an Incremental Rem (reading material) AND has Flashcards, you might want different priorities for each. The widget allows this, but warns you if they diverge, offering buttons to sync them with a single click.
 
+#### In the queue, and in a Card Cluster { #priority-in-card-clusters }
+
+In the queue the widget opens for the card on screen, unless you have selected another Rem (in the previewer, for instance), which then wins. A selection left over from the editor does not count: it is forgotten when you enter a queue.
+
+Inside a [Card Cluster](https://help.remnote.com/en/articles/10104223-card-clusters) the widget, the [Quick Priority shortcuts](Prioritization-&-Sorting.md#quick-priority-shortcuts) and the priority badge in the queue's top bar all follow the **sibling being shown**, not the first card of the cluster.
+
+!!! note "Limits"
+    - A cluster sibling with no card priority recorded on it (the priority bar is not shown under the card) is not followed: the commands act on the first card of the cluster.
+    - It can take up to half a second after a sibling appears for the commands to switch to it.
+
 ### 2. Batch Assignment (For Tag or Reference Migration)
 
 If you previously used tags like `#HighPriority` or `#P1` to organise your cards, or if you want to bulk-assign priorities to all rems that reference a given rem, you can do so in bulk:

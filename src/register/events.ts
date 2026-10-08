@@ -1,3 +1,4 @@
+import { clearSelectionCache } from '../lib/editor_selection';
 import { AppEvents, ReactRNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
 import { deferDuringNativeDrill, isNativeDrillQueue, registerNativeDrillListeners } from '../lib/mastery_drill_native';
 import { deferDuringLearnNew, registerQueueCoolingListeners } from '../lib/queue_cooling_skip';
@@ -466,8 +467,16 @@ async function schedulePriorityQueueAutoRefresh(plugin: ReactRNPlugin, queueId: 
  * @param plugin Plugin instance for accessing window and UI helpers.
  */
 export function registerURLChangeListener(plugin: ReactRNPlugin) {
+  let wasInQueue = false;
   plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
     const url = await plugin.window.getURL();
+    // Entering a queue: forget the editor selection, or a queue command run in the
+    // next seconds would act on it instead of the card. Here as well as in
+    // QueueEnter, which does not always fire (iOS). Only on the way in, so a
+    // previewer selection made during the session is kept.
+    const inQueue = /\/(flashcards|need_to_learn)/.test(url);
+    if (inQueue && !wasInQueue) await clearSelectionCache(plugin);
+    wasInQueue = inQueue;
     if (!url.includes('/flashcards')) {
       clearQueueUI(plugin);
       await setCurrentIncrementalRem(plugin, undefined);
@@ -477,6 +486,12 @@ export function registerURLChangeListener(plugin: ReactRNPlugin) {
       // the rest of the session, and every "is a queue open?" check believes it.
       await plugin.storage.setSession(incrementalQueueActiveKey, false);
       await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
+    }
+    // Same gap for the cluster sibling broadcast (card_info_bar): outside a queue it
+    // describes a card nobody is looking at. See lib/queue_visible_card.
+    if (!/\/(flashcards|need_to_learn)/.test(url)) {
+      await plugin.storage.setSession('clusterVisibleCardId', undefined);
+      await plugin.storage.setSession('clusterVisibleCardLoadTime', undefined);
     }
 
     // Trigger inc rem counter widget reactivity by updating current document ID
@@ -512,6 +527,8 @@ export function registerQueueEnterListener(
     // whose iframe cleanup may not have fired.
     await plugin.storage.setSession(incrementalQueueActiveKey, false);
     await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
+    // An editor selection must not outrank the first cards (see registerURLChangeListener).
+    await clearSelectionCache(plugin);
 
     resetSessionItemCounter();
     await clearSeenItems(plugin);

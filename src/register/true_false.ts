@@ -1,5 +1,6 @@
 import { AppEvents, PluginRem, ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
 import { getEffectiveSelection } from '../lib/editor_selection';
+import { getQueueVisibleCard } from '../lib/queue_visible_card';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { backTextWithVerdict, referencedRemIds, Verdict, VERDICT_MARK } from '../lib/true_false';
 
@@ -258,7 +259,8 @@ export async function registerTrueFalsePowerups(plugin: ReactRNPlugin) {
    else the focused Rem. */
 async function targetRems(plugin: ReactRNPlugin): Promise<{ rems: PluginRem[]; inQueue: boolean }> {
   const url = await plugin.window.getURL();
-  const currentCard = await plugin.queue.getCurrentCard();
+  // Cluster-aware: the sibling on screen, not the cluster's anchor card.
+  const currentCard = await getQueueVisibleCard(plugin);
   const live = await plugin.editor.getSelection();
   if (url.includes('/flashcards') && currentCard && !live) {
     const rem = await plugin.rem.findOne(currentCard.remId);

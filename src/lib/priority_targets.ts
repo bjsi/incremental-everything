@@ -14,7 +14,8 @@
 import { RNPlugin, ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
 import { currentIncRemKey, powerupCode, prioritySlotCode } from './consts';
 import { CARD_PRIORITY_CODE, getCardPriorityValue } from './card_priority';
-import { getEffectiveSelection } from './editor_selection';
+import { getEffectiveSelectionWithSource } from './editor_selection';
+import { getQueueVisibleCard } from './queue_visible_card';
 
 export type PriorityTargets = {
   remIds: string[];
@@ -134,7 +135,7 @@ export async function resolvePriorityTargets(
   plugin: ReactRNPlugin
 ): Promise<PriorityTargets> {
   const url = await plugin.window.getURL();
-  const sel = await getEffectiveSelection(plugin);
+  const { selection: sel, source: selectionSource } = await getEffectiveSelectionWithSource(plugin);
   const selType = sel?.type;
 
   const selectedRemIds: string[] =
@@ -147,7 +148,8 @@ export async function resolvePriorityTargets(
   // Queue: the visible card wins unless the user explicitly selected something
   // else. Same precedence the two commands had before, just factored out.
   if (url.includes('/flashcards')) {
-    const currentQueueItem = await plugin.queue.getCurrentCard();
+    // Cluster-aware: the sibling on screen, not the cluster's anchor card.
+    const currentQueueItem = await getQueueVisibleCard(plugin);
     const currentIncRemId =
       (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
     const queueRemId = currentQueueItem?.remId ?? currentIncRemId;
@@ -162,6 +164,11 @@ export async function resolvePriorityTargets(
         : { remIds: [], source: 'none' };
     }
     if (selectedRemIds.length) {
+      // Names the source so a popup opening on the wrong Rem can be traced to a
+      // live selection or to the Omnibar cache.
+      console.log(
+        `[PriorityTargets] ${selectionSource} selection outranks the queue item ${queueRemId ?? '(none)'}`
+      );
       return { remIds: selectedRemIds, source: 'selection' };
     }
   }

@@ -1,5 +1,6 @@
 import { RNPlugin, SelectionType } from '@remnote/plugin-sdk';
 import { currentIncRemKey } from './consts';
+import { getQueueVisibleCard } from './queue_visible_card';
 
 /**
  * What a queue command should act on.
@@ -36,7 +37,8 @@ export interface QueueCommandTarget {
  * Both halves are required — see `incRemTurnRemId` above.
  */
 export async function resolveQueueCommandTarget(plugin: RNPlugin): Promise<QueueCommandTarget> {
-    const card = await plugin.queue.getCurrentCard();
+    // Cluster-aware: the sibling on screen, not the cluster's anchor card.
+    const card = await getQueueVisibleCard(plugin);
     const sel = await plugin.editor.getSelection();
     const selType = sel?.type;
 
