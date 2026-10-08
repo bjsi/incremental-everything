@@ -15,6 +15,7 @@ import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import {
+  DocsHelpButton,
   PrioritySlider,
   PrioritySliderRef,
   SchedulerPicker,
@@ -502,6 +503,7 @@ export function Reschedule() {
               style={{ width: '24px', height: '24px' }}
             />
             <h3 className="text-lg font-bold">Reschedule</h3>
+            <DocsHelpButton path="Reviewing-Items-in-the-Queue/#reschedule" label="Reschedule" />
           </div>
           <button
             className="text-xs opacity-50 hover:opacity-100 px-2 transition-opacity"

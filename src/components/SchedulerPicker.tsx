@@ -1,4 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import { DocsHelpButton } from './DocsHelpButton';
 import {
   MAX_FACTOR,
   MIN_FACTOR,
@@ -109,6 +110,7 @@ export const SchedulerPicker = forwardRef<SchedulerPickerRef, SchedulerPickerPro
             <span>⚙️</span> Scheduler
             <span className="text-[10px] font-normal opacity-70 italic">(←/→ to switch)</span>
           </span>
+          <DocsHelpButton path="IncRem-Scheduler/#per-rem-scheduler" label="Scheduler" />
         </div>
         <div
           ref={containerRef}

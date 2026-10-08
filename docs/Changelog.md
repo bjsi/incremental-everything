@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.150 - October 8th, 2026
+
+### 🐛 Fixed
+
+**Cooling**: A card that had only just loaded when you left the queue for the editor is no longer counted as seen, so its sibling is not skipped as "reviewed 1 min ago" when you come back.
+
+📖 [Cooling in RemNote's own queues](Priority-Review-Document.md#cooling-in-remnotes-own-queues)
+
 ## v1.0.148 - October 7th, 2026
 
 ### ✨ New - Multiplier scheduler, and a scheduler per Incremental Rem
