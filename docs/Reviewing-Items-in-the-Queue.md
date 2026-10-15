@@ -343,7 +343,7 @@ This new button instantly opens the full source document in a new browser tab, r
 A highlight sparks a complex new idea that requires more space than a simple comment. Or you want to take notes of what you are reading in a PDF section, and paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation). Use the button to open the full editor, where you have access to all of RemNote's formatting tools, can link to other ideas, and can write extensive notes alongside the original PDF. This allows you to capture detailed thoughts without being constrained by the queue's limited interface.
 
 
-![open editor new tab button](assets/uploaded/138c8770-1786-41c8-87a5-2fb3c4e12979.png){ width="900" }
+![The answer buttons bar with an arrow pointing to the New Tab button](assets/open-editor-new-tab.png){ width="900" }
 
 
 ####  ⚙️  Related Setting: Preferred RemNote Environment
