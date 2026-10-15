@@ -10,6 +10,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
 
+### 🐛 Fixed
+
+**Queue**: Fixed documents with due Incremental Rems but no due flashcards opening on "You've finished practicing for now"; the first Incremental Rem now appears after a brief flash of that screen.
+
 ## v1.0.156 - October 15th, 2026
 
 ### ✨ New

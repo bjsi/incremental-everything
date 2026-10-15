@@ -29,6 +29,7 @@ import {
   scheduleQueuePrefetchRefill,
   takePrefetchedCandidate,
 } from '../lib/queue_prefetch';
+import { GetNextCardProbe, rescueEmptyQueueStart, resetEmptyQueueRescue } from '../lib/queue_empty_start';
 
 
 // Registered once globally — safe because all selectors are highly specific to the
@@ -118,6 +119,7 @@ export const resetSessionItemCounter = () => {
   // runs on both queue enter and queue exit, so nothing from a finished session
   // can leak into the next one.
   resetQueuePrefetch();
+  resetEmptyQueueRescue();
 };
 
 /**
@@ -208,6 +210,11 @@ type Decision = {
 
 let callSeq = 0;
 let lastDecision: Decision | null = null;
+
+const emptyQueueProbe: GetNextCardProbe = {
+  seq: () => callSeq,
+  answeredWithIncRem: () => !!lastDecision?.remId,
+};
 
 /**
  * Confirms (or refutes) that the item returned by the PREVIOUS GetNextCard call
@@ -387,6 +394,13 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         clearStaleIncRemSignals();
         scheduleQueuePrefetchRefill(plugin, prefetchInfo);
         return finish(null, gates.reason ?? 'blocked');
+      }
+
+      // No flashcards left: RemNote may be showing its end screen with our answer
+      // parked for a pop that never comes — always so when a queue opens with
+      // only IncRems due. See lib/queue_empty_start. Never awaited.
+      if (queueInfo.numCardsRemaining === 0) {
+        rescueEmptyQueueStart(plugin, prefetchInfo, emptyQueueProbe);
       }
 
       const cardsPerRem = readCardsPerRem();

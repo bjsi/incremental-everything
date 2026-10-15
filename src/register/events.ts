@@ -573,6 +573,11 @@ export function registerQueueEnterListener(
     let overdueCardsInKB: CardPriorityInfo[] = [];
     let overdueCardsInScope: CardPriorityInfo[] = [];
 
+    if (!scopeForItemSelection) {
+      // No document scope to wait for (the global queue): prime straight away.
+      void primeQueuePrefetch(plugin, subQueueId);
+    }
+
     if (scopeForItemSelection) {
       console.log('QUEUE ENTER: Setting up scopes...');
 
@@ -584,6 +589,11 @@ export function registerQueueEnterListener(
       console.log(`QUEUE ENTER: ${scopeType} scope: ${itemSelectionScope.size} items (${elapsed}ms)`);
 
       await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
+      // The IncRem prefetch needs only the scope, so it starts now rather than
+      // after the priority and shield calculations below. Fire-and-forget: the
+      // GetNextCard callback answers from module state once it lands, and yields
+      // a flashcard turn if asked before.
+      void primeQueuePrefetch(plugin, subQueueId);
 
       let priorityCalcScope: Set<RemId> = new Set<RemId>();
       // Tree-walked scopes don't consult the caches, so they start out complete;
@@ -758,14 +768,6 @@ export function registerQueueEnterListener(
     );
 
     registerQueueCounter(plugin, dueIncRemCount);
-
-    // Prime the IncRem prefetch buffer LAST, once the document scope and the
-    // session caches it depends on are all resolved. From here the GetNextCard
-    // callback answers from module state without a single await, which is what
-    // keeps it clear of RemNote's ~1s deadline in large KBs. Fire-and-forget:
-    // nothing in this handler depends on it, and the callback degrades to a
-    // flashcard turn if it is asked before the first build lands.
-    void primeQueuePrefetch(plugin, subQueueId);
   });
 }
 

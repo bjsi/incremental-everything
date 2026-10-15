@@ -12,6 +12,14 @@ The fix (v1.0.39): `src/lib/queue_prefetch.ts` keeps gates, settings, the due co
 
 A served candidate counts as shown only once the *next* call's `queueInfo` proves it: `cardsPracticed` rose by one while `numCardsRemaining` held. The duplicate call at queue open is a queue-entry artifact, not a timeout retry.
 
+## The first card of a queue is never a plugin card
+
+When a queue opens, `loadCards` picks the first card in a `"critical"` preload, and the plugin card provider returns early in that mode (`if (this.pendingPluginCard || mode === "critical") return`, read from `app.asar` in October 2026). `GetNextCard` is first called in the `"full"` preload that runs **after** the first pop, and its answer is stored as `pendingPluginCard` for the next pop.
+
+So a queue with due IncRems but **no due flashcards** always opens on "Great job! You've finished practicing for now.", however fast the plugin answers: the first pop finds nothing, and the end screen never pops again. The November 2025 fix (computing the scope inside `GetNextCard`) only addressed the timing, and RemNote's provider no longer allows timing to matter.
+
+`queue.removeCurrentCardFromQueue` is the way out. On the end screen there is no current card to remove, so the call only pops: it shows the pending plugin card if there is one, and its trailing `"full"` preload calls `GetNextCard` again if there is not. An empty pop runs `notifyClearedQueue`, which plays the confetti again. `queue.rateCurrentCard` is the wrong tool here: off a card it calls the screen's `onContinueLearning` / `onStopLearning`. The end screen is the one state where `getCurrentQueueScreenType()` returns `undefined`. `src/lib/queue_empty_start.ts` implements the rescue.
+
 ## QueueLoadCard fires without a card id
 
 In a document's Practice All queue, every card change also fires a `QueueLoadCard` **with no `cardId`**, and RemNote moves past it by itself. Calling `removeCurrentCardFromQueue` on those lands 100–400 ms later, after the real card has loaded, and removes the real card instead. The emptied queue reloads and the loop repeats (440 removals in one test).
