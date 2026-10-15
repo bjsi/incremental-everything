@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.157 - October 15th, 2026
+
+### ✨ Improved
+
+**Answer Buttons**: Redesigned the buttons with icons and smaller text, and made Change Priority, Review in Editor and Open Editor compact so the row no longer breaks into two lines.
+
+📖 [The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
+
 ## v1.0.156 - October 15th, 2026
 
 ### ✨ New

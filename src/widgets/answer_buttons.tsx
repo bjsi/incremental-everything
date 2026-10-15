@@ -15,6 +15,7 @@ import { NextRepTime } from '../components/NextRepTime';
 import { DraggableButton } from '../components/buttons/DraggableButton';
 import { Button } from '../components/buttons/Button';
 import { getButtonStyles } from '../components/buttons/styles';
+import { RescheduleIcon, DismissIcon, PriorityIcon, ReviewInEditorIcon, NewTabIcon } from '../components/buttons/ActionIcons';
 import {
   allIncrementalRemKey,
   powerupCode,
@@ -409,6 +410,31 @@ export function AnswerButtons() {
     margin: '0 6px',
   };
 
+  // Icon + one-word label stacked: the secondary actions stay narrow so the
+  // button row fits on one line beside the conditional buttons.
+  const compactButtonStyle: React.CSSProperties = {
+    minWidth: '58px',
+    padding: '6px 8px',
+    gap: '4px',
+  };
+
+  const compactLabelStyle: React.CSSProperties = {
+    fontSize: '10.5px',
+    fontWeight: 500,
+    lineHeight: '1.1',
+    whiteSpace: 'nowrap',
+  };
+
+  // Icon beside the label, sublabel underneath (Reschedule / Dismiss).
+  const iconLabelStyle: React.CSSProperties = {
+    ...buttonStyles.label,
+    fontSize: '11.5px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    whiteSpace: 'nowrap',
+  };
+
   const priorityBadgeStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -488,9 +514,10 @@ export function AnswerButtons() {
           onClick={async () => {
             await plugin.widget.openPopup('reschedule', { remId: ctx.remId });
           }}
+          style={{ minWidth: '88px', padding: '8px 12px' }}
           title="Reschedule (Ctrl+J): Manually set custom interval and adjust priority"
         >
-          <div style={buttonStyles.label}>Reschedule</div>
+          <div style={iconLabelStyle}><RescheduleIcon size={13} />Reschedule</div>
           <div style={buttonStyles.sublabel}>Set interval</div>
         </Button>
 
@@ -539,9 +566,10 @@ export function AnswerButtons() {
             ]);
             console.log('[Dismiss] Both operations settled');
           }}
+          style={{ minWidth: '80px', padding: '8px 12px' }}
           title="Dismiss (Ctrl+D): Permanently finish item by removing its Incremental power-up"
         >
-          <div style={buttonStyles.label}>Dismiss</div>
+          <div style={iconLabelStyle}><DismissIcon size={13} />Dismiss</div>
         </Button>
 
         {/* Divider */}
@@ -552,27 +580,29 @@ export function AnswerButtons() {
           onClick={async () => {
             await plugin.widget.openPopup('priority', { remId: ctx.remId });
           }}
+          style={compactButtonStyle}
           title="Change Priority (Ctrl+P / Ctrl+Alt+P): Adjust item's priority on the fly"
         >
-          <div style={buttonStyles.label}>Change</div>
-          <div style={buttonStyles.label}>Priority</div>
+          <PriorityIcon size={15} />
+          <div style={compactLabelStyle}>Priority</div>
         </Button>
 
         <Button
           onClick={() => handleReviewInEditorRem(plugin, rem, remType)}
+          style={compactButtonStyle}
           title="Review in Editor (Ctrl+Shift+J): Reschedule item, open in editor, and start Editor Review Timer"
         >
-          <div style={buttonStyles.label}>Review</div>
-          <div style={buttonStyles.label}>in Editor</div>
+          <ReviewInEditorIcon size={15} />
+          <div style={compactLabelStyle}>In Editor</div>
         </Button>
 
         <Button
           onClick={() => openRemInBrowserTab(plugin, rem._id)}
-          style={{ minWidth: '100px' }}
+          style={compactButtonStyle}
           title="Open Editor in New Tab: Instantly open the full source document in a new browser tab"
         >
-          <div style={buttonStyles.label}>Open Editor</div>
-          <div style={buttonStyles.sublabel}>New Tab</div>
+          <NewTabIcon size={15} />
+          <div style={compactLabelStyle}>New Tab</div>
         </Button>
 
         {/* Review-note toggle — compact icon (styled like the ℹ️ help icon).

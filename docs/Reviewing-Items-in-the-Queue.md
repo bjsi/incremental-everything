@@ -65,7 +65,7 @@ This hold is within a session. Its counterpart across days is **cooling** in the
 
 ## The Answer Buttons
 
-Here is a breakdown of each button and its function, from left to right.
+Here is a breakdown of each button and its function, from left to right. The secondary actions are compact icon buttons — **↕ Priority**, **✎ In Editor** and **↗ New Tab** — so the whole row fits on one line; hover over any button for its full name and shortcut.
 
 * **[Next](#next):** (Shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Windows/Linux)
 This is your primary action. Clicking "Next" marks the item as reviewed, calculates the next time you should see it based on the scheduling algorithm, and advances to the next item in your queue. The subtitle (e.g., "×1.5 in 3 days") shows the interval that will be set, preceded by a chip naming the [scheduler](IncRem-Scheduler.md#scheduler-indicator) that produced it.
@@ -83,13 +83,13 @@ This button opens a popup that gives you manual control over the item's schedule
 When you have finished processing an item and no longer wish to see it in your queue, click "Dismiss" (or press `Ctrl+D`). This permanently finishes the item by removing its `Incremental` power-up. This shortcut also works in the Editor to dismiss the focused Incremental Rem.
 
 * **[Change Priority](#change-priority):** (Shortcut: `Opt+P` / `Alt+P` for full widget and `Ctrl+Opt+P` / `Ctrl+Alt+P` for light widget)
-This opens the advanced priority popup. The label on the button itself provides rich, at-a-glance information:
+The **↕ Priority** button opens the advanced priority popup. The priority badge in the info bar below the buttons gives the at-a-glance information:
 
   * **The Number:** The Rem's absolute priority value (0-100, lower is more important).
   * **The Percentiles:** The Rem's rank within your entire Knowledge Base (`% of KB`) and within the current document (`% of Doc`).
   * **The Color:** The background color shifts from red (high priority) to blue (low priority) for an instant visual cue of its importance.
 
-* **[Review in Editor](#review-in-editor):** (Shortcut: `Ctrl+Shift+J`) *(Previously called "Review & Open")*
+* **[Review in Editor](#review-in-editor):** (Shortcut: `Ctrl+Shift+J`) *(Previously called "Review & Open"; the button reads **✎ In Editor**)*
 This is a powerful workflow tool. It performs a sequence of actions:
 
   1. It first **reviews** the item (rescheduling it) and **opens** the Rem in the editor, exiting the queue.
@@ -110,10 +110,10 @@ This button appears when a **PDF/HTML IncRem also has a [read point](Reviewing-I
 * **📑 View outline / 📄 Read document (hybrid toggle):**
 For the same hybrid IncRems (a **PDF/HTML reading source that also has a read point** on a descendant), a toggle appears in the **top-right corner** of the queue card. **📑 View outline** flips the card from the PDF/HTML reader to a **read-only outline view** of the IncRem — the same [ExtractViewer](#read-point-and-status-emphasis-in-rem-type-cards) used for Rem-type cards, where the read point is **emphasized and auto-scrolled into view** — *without leaving the queue*. **📄 Read document** flips back to the reader. This lets you read the document and consult your outline/notes in the same session. *(To instead make a chapter **always** open as an outline in the queue, add the **`#extractviewer`** tag — see [PDF-Incremental-Reading-Workflow#extractviewer-mode](PDF-Incremental-Reading-Workflow.md#extractviewer-mode).)*
 
-* **[Open Editor in New Tab](#open-editor-in-new-tab)**:
+* **[Open Editor in New Tab](#open-editor-in-new-tab)** (the **↗ New Tab** button):
 Clicking this button instantly opens the full source document in a new browser tab, right at the location of your highlight/PDF document/Rem. Use it to take notes of what you are reading in a PDF section, to paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation), to have access to all of RemNote's formatting tools, and to link to other ideas.
 
-* **📝 Review Note** (compact icon, next to *Open Editor*):
+* **📝 Review Note** (compact icon, next to *New Tab*):
 Toggles an inline text field to attach a short **observation to this repetition's history entry** — *"stopped mid-proof"*, *"re-read section 3 first"*, *"dismissing: superseded by newer source"*. The note is parked as you type and saved with whichever action ends the review: **Next**, **Reschedule** (`Ctrl+J`), or **Dismiss** (where it becomes the *dismissal reason*). The icon stays highlighted while a note is pending. Notes appear later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), the Aggregated view, and the [Study Dashboard](Study-Dashboard.md#hierarchy-section). Each entry also gets an **automatic reading-context snapshot** (current page, page range, PDF name, last bookmark) — no typing needed for that part.
 
 * **Open URL for Web Clipper 📎** (for HTML-type Incremental Rems): When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.
