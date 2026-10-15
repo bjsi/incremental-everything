@@ -36,6 +36,7 @@ import { isHtmlSource, getPdfInfoFromHighlight, addPageToHistory, setIncremental
 import { pinOtherReaderViewOnCreateIncRemId } from './consts';
 import { getIESetting } from './settings';
 import { pinOtherViewOfHighlight } from './pdf_source_pins';
+import { endParentPick, isParentPickActive } from './parent_pick';
 
 type CreateRemFromHighlightOptions = {
   makeIncremental: boolean;
@@ -582,6 +583,9 @@ export const createRemFromHighlight = async (
     highlightIsAlreadyIncremental,
     highlightPageIndex
   );
+
+  // A new highlight replaces a Rem still waiting for a parent picked in the editor.
+  if (await isParentPickActive(plugin)) await endParentPick(plugin);
 
   await plugin.storage.setSession('parentSelectorContext', context);
   await plugin.widget.openPopup(parentSelectorWidgetId);

@@ -17,7 +17,7 @@ import {
   parentSelectorHeadingsOnlyKey,
   parentSelectorHeadingsFirstKey,
 } from '../lib/consts';
-import { calculateRelativePercentile, percentileToHslColor } from '../lib/utils';
+import { calculateRelativePercentile, percentileToHslColor, screenFittedHeight } from '../lib/utils';
 import { IncrementalRem, initIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import {
@@ -38,20 +38,28 @@ import { getIncrementalPageRange } from '../lib/pdfUtils';
 import { RemTextSegments } from '../components';
 import { applyHeadingLevel, getHeadingLevel } from '../lib/outline_restructure';
 import { HeadingBadge } from '../components/HeadingBadge';
+import { startParentPick } from '../lib/parent_pick';
 
 // ============================================================================
 // STYLES
 // ============================================================================
 
+// Fills the popup frame exactly: same height formula as the registration in
+// register/widgets.ts, and the frame's width rather than a min-width of its own.
+// Any overshoot puts a scrollbar on the frame, and the vertical one then eats
+// enough width to force a horizontal one too.
 const containerStyle: React.CSSProperties = {
   backgroundColor: 'var(--rn-clr-background-primary)',
-  minWidth: '400px',
-  maxWidth: '500px',
+  width: '100%',
+  height: `${screenFittedHeight(560)}px`,
+  boxSizing: 'border-box',
+  overflow: 'hidden',
   display: 'flex',
   flexDirection: 'column',
 };
 
 const headerStyle: React.CSSProperties = {
+  flexShrink: 0,
   borderBottom: '1px solid var(--rn-clr-border-primary)',
   backgroundColor: 'var(--rn-clr-background-secondary)',
   padding: '12px 16px',
@@ -60,9 +68,12 @@ const headerStyle: React.CSSProperties = {
   justifyContent: 'space-between',
 };
 
+// Takes whatever height the header, instructions and footer leave.
 const listContainerStyle: React.CSSProperties = {
-  maxHeight: '600px',
+  flex: 1,
+  minHeight: 0,
   overflowY: 'auto',
+  overflowX: 'hidden',
   padding: '8px 0',
   position: 'relative', // Ensures children's offsetTop is relative precisely to this container
 };
@@ -1097,6 +1108,13 @@ function ParentSelectorWidget() {
     plugin.widget.closePopup();
   }, [plugin]);
 
+  // Hand the choice over to the editor: this popup closes and a floating card
+  // waits for the user to confirm a destination there (lib/parent_pick.ts).
+  const handlePickInEditor = useCallback(async () => {
+    if (isCreating || creatingChildForNodeId) return;
+    await startParentPick(plugin);
+  }, [plugin, isCreating, creatingChildForNodeId]);
+
   // The rem the popup opened on: the remembered destination if there is one,
   // otherwise whatever we suggested. This is what "restore" jumps back to.
   const recoverTarget = useMemo(() => {
@@ -1224,6 +1242,12 @@ function ParentSelectorWidget() {
           handleRecoverSelection();
           break;
 
+        case 'e':
+        case 'E':
+          e.preventDefault();
+          handlePickInEditor();
+          break;
+
         // NEW: '+' or 'n' to add a child to the selected node
         case '+':
         case '=': // Handle both + and = (without shift)
@@ -1248,6 +1272,7 @@ function ParentSelectorWidget() {
     handleClose,
     handleStartAddChild,
     handleRecoverSelection,
+    handlePickInEditor,
     disarmHover,
   ]);
 
@@ -1493,6 +1518,7 @@ function ParentSelectorWidget() {
       {/* Instructions */}
       <div
         style={{
+          flexShrink: 0,
           padding: '12px 16px',
           borderBottom: '1px solid var(--rn-clr-border-primary)',
           fontSize: '12px',
@@ -1513,7 +1539,8 @@ function ParentSelectorWidget() {
           Use <kbd style={kbdStyle}>↑</kbd>/<kbd style={kbdStyle}>↓</kbd> to navigate,{' '}
           <kbd style={kbdStyle}>→</kbd> to expand, <kbd style={kbdStyle}>←</kbd> to collapse,{' '}
           <kbd style={kbdStyle}>Enter</kbd> to select,{' '}
-          <kbd style={kbdStyle}>+</kbd>/<kbd style={kbdStyle}>n</kbd> to add child
+          <kbd style={kbdStyle}>+</kbd>/<kbd style={kbdStyle}>n</kbd> to add child,{' '}
+          <kbd style={kbdStyle}>E</kbd> to pick in the editor
           {recoverTarget && (
             <>
               , <kbd style={kbdStyle}>L</kbd> to reselect {recoverTarget.label.toLowerCase()}
@@ -1549,6 +1576,25 @@ function ParentSelectorWidget() {
             />
             List headings first
           </label>
+
+          <button
+            onClick={handlePickInEditor}
+            title="Close this list and pick the parent in the editor (E)"
+            style={{
+              marginLeft: 'auto',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: 500,
+              borderRadius: '4px',
+              border: '1px solid var(--rn-clr-border-primary)',
+              background: 'transparent',
+              color: 'var(--rn-clr-content-secondary)',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            📍 Pick in editor
+          </button>
         </div>
       </div>
 
@@ -1560,15 +1606,18 @@ function ParentSelectorWidget() {
       {/* Footer */}
       <div
         style={{
+          flexShrink: 0,
           padding: '12px 16px',
           borderTop: '1px solid var(--rn-clr-border-primary)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: '12px',
         }}
       >
         <span
           style={{
+            minWidth: 0,
             fontSize: '11px',
             color: 'var(--rn-clr-content-tertiary)',
           }}
@@ -1589,6 +1638,8 @@ function ParentSelectorWidget() {
             color: 'white',
             cursor: isCreating || creatingChildForNodeId ? 'not-allowed' : 'pointer',
             transition: 'background-color 0.15s ease',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
           }}
         >
           {isCreating ? 'Creating...' : actionText}

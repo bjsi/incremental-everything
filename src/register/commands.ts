@@ -54,7 +54,12 @@ import {
   enableFlashcardPrioritisationId,
   hasImagePowerupName,
   cardEnablementAnchorKey,
+  parentPickConfirmCommandId,
+  parentPickCancelCommandId,
+  parentPickActiveIdKey,
+  parentPickConfirmRequestKey,
 } from '../lib/consts';
+import { endParentPick } from '../lib/parent_pick';
 import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
 import {
   planPreserveHistoryAndRemove,
@@ -1111,6 +1116,34 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         kind: target.kind,
         pageIndex: target.pageIndex,
       });
+    },
+  });
+
+  // "Pick in editor" (lib/parent_pick.ts). The card holds the target and the
+  // outside-the-IncRem confirmation, so the shortcut only asks it to act.
+  // opt+shift+enter because mod+shift+enter is RemNote's Add Portal.
+  plugin.app.registerCommand({
+    id: parentPickConfirmCommandId,
+    name: 'Place Pending Rem Here',
+    quickCode: 'pph',
+    description: 'Create the Rem waiting for a parent under the Rem that has the cursor',
+    keyboardShortcut: 'opt+shift+enter',
+    action: async () => {
+      if (!(await plugin.storage.getSession<string>(parentPickActiveIdKey))) {
+        await plugin.app.toast('No Rem is waiting for a parent. Use 📍 Pick in editor in the Select Parent popup first.');
+        return;
+      }
+      await plugin.storage.setSession(parentPickConfirmRequestKey, Date.now());
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: parentPickCancelCommandId,
+    name: 'Cancel Parent Pick',
+    quickCode: 'cpp',
+    description: 'Drop the Rem waiting for a parent picked in the editor',
+    action: async () => {
+      await endParentPick(plugin);
     },
   });
 

@@ -84,6 +84,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | `Ctrl` + `Shift` + `F1` | [Copy Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Copies all sources of the **focused Rem** into a session clipboard (and registers it in the PDF index). | Editor Only |
 | `Alt` + `Shift` + `V` | [Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Adds the copied sources to **every selected Rem** (or the focused Rem). Sources already present are skipped, so it is safe to re-run. | Editor Only |
 | `Alt` + `Shift` + `Q` | [Pin Source Quote](Source-Pins.md) | Finds the focused Rem's text in the open PDF or article, reuses the highlight that covers it or creates one, and pins it to the Rem. | Editor Only |
+| `Alt` + `Shift` + `Enter` | [Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | After **📍 Pick in editor** in the Select Parent popup, creates the new Rem under the Rem that has the cursor. Outside the IncRem under review, press it twice to confirm. *(Not `Cmd/Ctrl+Shift+Enter`: that is RemNote's Add Portal.)* | Editor Only |
 
 ### In Logos Bible Software (LogosBridge helper)
 
@@ -160,6 +161,7 @@ Function keys carry the utilities whose natural letter combination was already t
 | Shortcut | Command | Context |
 | :--- | :--- | :--- |
 | `Alt` + `Shift` + `C` | Batch Assign Card Priority | Editor |
+| `Alt` + `Shift` + `Enter` | [Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | Editor |
 | `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open) | Editor |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Global |
 | `Alt` + `Shift` + `L` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Editor |
@@ -200,6 +202,7 @@ These commands ship **without** a shortcut, so nothing collides with your own bi
 | Open Priority Shield Graph | `shi` |
 | Open Weighted Shield Popup | `wsh` |
 | PDF Control Panel | `pdf` |
+| [Cancel Parent Pick](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | `cpp` |
 
 The [Plugin Commands Reference](Plugin-Commands-Reference.md) lists every command, bound or not.
 
@@ -227,6 +230,9 @@ These keys are active **while a plugin popup or floating window is open** — th
 | | `Enter` | Run the selected scope — or, on the report, close the popup |
 | | `Esc` | Cancel and close (ignored **while a scan is running**, so a reflex Esc can't abort it) |
 | [Floating source window](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing) | `Esc` | Close the window **without** closing the queue |
+| [Select Parent popup](Create-Incremental-Rem-from-PDF-Highlights.md#keyboard-shortcuts) | `E` | Close the list and [pick the parent in the editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) |
+| [Pick-in-editor card](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | `Esc` | Cancel the pick, **even while typing in the editor** |
+| | `←` / `→` + `Enter` | Move between the card's buttons and press one (when the card has focus) |
 
 ---
 ## Important Native RemNote Shortcuts
