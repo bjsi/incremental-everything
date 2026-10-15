@@ -17,7 +17,7 @@ import {
   parentSelectorHeadingsOnlyKey,
   parentSelectorHeadingsFirstKey,
 } from '../lib/consts';
-import { calculateRelativePercentile, percentileToHslColor } from '../lib/utils';
+import { calculateRelativePercentile, percentileToHslColor, screenFittedHeight } from '../lib/utils';
 import { IncrementalRem, initIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import {
@@ -43,15 +43,22 @@ import { HeadingBadge } from '../components/HeadingBadge';
 // STYLES
 // ============================================================================
 
+// Fills the popup frame exactly: same height formula as the registration in
+// register/widgets.ts, and the frame's width rather than a min-width of its own.
+// Any overshoot puts a scrollbar on the frame, and the vertical one then eats
+// enough width to force a horizontal one too.
 const containerStyle: React.CSSProperties = {
   backgroundColor: 'var(--rn-clr-background-primary)',
-  minWidth: '400px',
-  maxWidth: '500px',
+  width: '100%',
+  height: `${screenFittedHeight(560)}px`,
+  boxSizing: 'border-box',
+  overflow: 'hidden',
   display: 'flex',
   flexDirection: 'column',
 };
 
 const headerStyle: React.CSSProperties = {
+  flexShrink: 0,
   borderBottom: '1px solid var(--rn-clr-border-primary)',
   backgroundColor: 'var(--rn-clr-background-secondary)',
   padding: '12px 16px',
@@ -60,9 +67,12 @@ const headerStyle: React.CSSProperties = {
   justifyContent: 'space-between',
 };
 
+// Takes whatever height the header, instructions and footer leave.
 const listContainerStyle: React.CSSProperties = {
-  maxHeight: '600px',
+  flex: 1,
+  minHeight: 0,
   overflowY: 'auto',
+  overflowX: 'hidden',
   padding: '8px 0',
   position: 'relative', // Ensures children's offsetTop is relative precisely to this container
 };
@@ -1493,6 +1503,7 @@ function ParentSelectorWidget() {
       {/* Instructions */}
       <div
         style={{
+          flexShrink: 0,
           padding: '12px 16px',
           borderBottom: '1px solid var(--rn-clr-border-primary)',
           fontSize: '12px',
@@ -1560,15 +1571,18 @@ function ParentSelectorWidget() {
       {/* Footer */}
       <div
         style={{
+          flexShrink: 0,
           padding: '12px 16px',
           borderTop: '1px solid var(--rn-clr-border-primary)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: '12px',
         }}
       >
         <span
           style={{
+            minWidth: 0,
             fontSize: '11px',
             color: 'var(--rn-clr-content-tertiary)',
           }}
@@ -1589,6 +1603,8 @@ function ParentSelectorWidget() {
             color: 'white',
             cursor: isCreating || creatingChildForNodeId ? 'not-allowed' : 'pointer',
             transition: 'background-color 0.15s ease',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
           }}
         >
           {isCreating ? 'Creating...' : actionText}

@@ -393,9 +393,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: { height: 'auto', width: 620 },
   });
 
-  // Register parent selector popup for creating rems under incremental rems
+  // Register parent selector popup for creating rems under incremental rems.
+  // The height follows the screen; keep it in sync with the container height in
+  // widgets/parent_selector.tsx, whose tree list absorbs the difference.
   plugin.app.registerWidget(parentSelectorWidgetId, WidgetLocation.Popup, {
-    dimensions: { height: 850, width: 400 },
+    dimensions: { height: screenFittedHeight(560), width: 400 },
   });
 
   plugin.app.registerWidget('priority_review_graph', WidgetLocation.UnderRemEditor, {
