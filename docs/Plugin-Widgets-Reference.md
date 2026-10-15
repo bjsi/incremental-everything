@@ -40,6 +40,8 @@ On a **phone**, RemNote puts the answer buttons below the card instead of inside
 
 ![The question side of a card in the Beautiful queue: the Card Info Bar docked just above the Reveal Answer button, well below the card text](assets/card-info-bar-docked-question.png){ width="900" }
 
+![The Card Info Bar on an iPhone in dark mode, docked at the bottom of the card, just above the Forgot, Hard, Got it and Instant buttons](assets/card-info-bar-docked-phone.jpg){ width="320" }
+
 ### 1.2. Queue Toolbar Priority
 Installed directly into the native RemNote Queue Toolbar, this widget guarantees that the **absolute priority** of the current item (both Flashcards and Incremental Rems) is persistently visible during review.
 
