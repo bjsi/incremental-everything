@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.154 - October 15th, 2026
+
+### 🐛 Fixed
+
+**Card Info Bar**: Fixed the bar not showing in the Beautiful queue on phones; it is now docked at the bottom of the card, just above the answer buttons.
+
+📖 [In the Beautiful queue variant](Plugin-Widgets-Reference.md#card-info-bar-beautiful)
+
 ## v1.0.153 - October 9th, 2026
 
 ### ⚡ Improved

@@ -34,6 +34,8 @@ Displayed below flashcards in the queue (and, in the Beautiful queue variant, [d
 
 In RemNote's **Beautiful** queue variant the bar no longer follows the end of the card. It stays docked just above the answer buttons, so it is always in the same place, however long the card is. RemNote's AI **Explanation** panel moves up to make room: the order from top to bottom is Explanation → Card Info Bar → answer buttons. When a typed answer has been graded, the bar also moves up to leave room for RemNote's **↵ Enter** tab over the suggested button. In the *Compact* variant the bar stays under the card, as before.
 
+On a **phone**, RemNote puts the answer buttons below the card instead of inside it, so the bar docks at the bottom of the card itself, right above them. The order is the same.
+
 ![The answer side of a card in the Beautiful queue: the AI Explanation panel, then the Card Info Bar with priority, shields and FSRS figures, then the four answer buttons](assets/card-info-bar-docked-answer.png){ width="900" }
 
 ![The question side of a card in the Beautiful queue: the Card Info Bar docked just above the Reveal Answer button, well below the card text](assets/card-info-bar-docked-question.png){ width="900" }
