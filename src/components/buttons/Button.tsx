@@ -37,7 +37,10 @@ export function Button({ children, onClick, variant = 'secondary', style, disabl
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
         e.currentTarget.style.boxShadow = styles.defaultShadow;
-        if (variant === 'primary') {
+        if (style?.backgroundColor) {
+          // A caller-coloured button (e.g. the yellow Scroll to Highlight) keeps its colour.
+          e.currentTarget.style.backgroundColor = String(style.backgroundColor);
+        } else if (variant === 'primary') {
           e.currentTarget.style.backgroundColor = 'var(--rn-clr-button-primary-bg, #3b82f6)';
         } else {
           e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)';
