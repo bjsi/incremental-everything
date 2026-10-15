@@ -63,6 +63,12 @@ const QUEUE_LAYOUT_FIX_CSS = `
     flex-grow: 1 !important;
     min-height: 0;
   }
+  /* The layout's own filler (an empty "grow" div after the card, added by RemNote
+     in Oct 2026) would take half of the free space beside the stage above,
+     leaving a blank band between the reader and the answer buttons. */
+  .queue-beautiful-box:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .beautiful-queue-card-free-space {
+    flex-grow: 0 !important;
+  }
   /* RemNote sizes both the trailing spacer and the bottom fade mask as
      gradient (56px) + controls height + solid padding (24px), so scrolling text
      fades out behind the answer buttons. Our card fills the box and never scrolls
