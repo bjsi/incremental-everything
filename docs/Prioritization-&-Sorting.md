@@ -283,6 +283,8 @@ The same band mechanism carries priorities back into your **PDF and web highligh
 
 **Two places it shows.** A small coloured pill on the highlight in the **Highlights side panel**, and the highlight's **marker in the PDF itself** takes the band colour, so importance is legible while skimming the document.
 
+The colours come from the plugin's [priority ramp](Colour-Coding-Reference.md#steeper-at-the-top), which changes fastest across the top 35% of your material — so a `10s` highlight and a `20s` one are easy to tell apart, while the low-priority bands settle into a single quiet stretch of blue.
+
 **Colour means priority; line style means provenance.** Both markers carry the band colour, and the line distinguishes what the highlight is to you:
 
 | Highlight | Underline | Side bar |

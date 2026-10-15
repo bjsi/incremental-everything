@@ -17,9 +17,11 @@ import { hasCardClusterPowerup } from './priority_review_document/cluster';
  * every other queue serves them — and within a session a card can start cooling
  * after the refill (its Alt+Z sibling was just graded). RemNote's own bury only
  * covers other cards of the same Rem, for an hour. In the Learn New queue it is
- * off altogether: that page opens the queue with `skipCheckpoints: true`, and
- * the bury provider reads the same flag as "practice buried cards", so the
- * clozes of one Rem run back to back (findings/QUEUE_AND_PRACTICE.md).
+ * absent with In Order (that queue has no bury provider), and with Shuffled it
+ * only defers siblings to the end of the batch: the page opens the queue with
+ * `skipCheckpoints: true`, which the bury provider reads as "practice buried
+ * cards". Either way the clozes of one Rem can run back to back; RemNote 1.28.48
+ * only reorders the released cards (findings/QUEUE_AND_PRACTICE.md).
  *
  * WHERE (decided from the URL when the queue opens, see queue_route.ts):
  *   - Learn New: always, with a CSS mask that hides each card for a moment,

@@ -53,6 +53,12 @@ RemNote's built-in defaults are listed in [RemNote-Native-Shortcuts](../docs/Rem
 
 **`storage.setLocal` is the cross-window channel.** The windows share one database and relay store writes to each other (`upsertDocsFromOtherWindow`); plugin local storage lives in one of those stores (`local_stored_data`, key `plugin|<id>|<key>`). A value written in one window is readable with `getLocal` in the others a second or two later. Verified Oct 2026 with Pin Source Quote. The `StorageLocalChange` event fires only in the writing window, and a closing window cannot clean up after itself, so shared state needs a heartbeat and a TTL. See `src/lib/window_sources.ts`.
 
+## Theme variables in widget iframes
+
+**`--rn-clr-*` reaches a widget only through RemNote's own stylesheets.** On activation the host sends `styleSheetHREFs`: every `<link>` in its document whose URL contains `/static`, `/assets` or `/offline_assets` (module 361710 in 1.28.48). The SDK links them into the iframe. Besides that, the iframe gets only the `setCustomCSS` channel (Custom CSS rems and active theme `theme.css`) and a `dark`/`light` class on `<body>`. The SDK itself defines no variables.
+
+**On iOS the variables never arrive** (seen Oct 2026). Every `var(--rn-clr-*)` resolves to nothing: text turns black and backgrounds transparent, which is unreadable in dark mode. The cause is unconfirmed, possibly the app-local stylesheet URLs not loading from the plugin's origin. `src/rn_theme_vars.css` defines RemNote's values as a zero-specificity fallback keyed on `body.dark`. A widget has to import it to get them.
+
 ## Build traps
 
 **Never import from a widget file.** Every `src/widgets/*.tsx` is a webpack entry that calls `renderWidget(...)` when loaded. Importing a component from one runs that `renderWidget` inside the importing widget: the wrong widget renders, and React throws minified error #40 on deactivate. It only shows in the production build. Shared UI belongs in `src/components/` or `src/lib/`.

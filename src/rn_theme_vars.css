@@ -1,0 +1,56 @@
+/*
+ * Fallback for RemNote's colour variables, for widgets that use var(--rn-clr-*).
+ *
+ * RemNote defines --rn-clr-* in its own stylesheets. A widget iframe gets them only
+ * because the host sends their URLs on activation (styleSheetHREFs: its /static,
+ * /assets and /offline_assets links) and the SDK links them in. On desktop that works.
+ * On iOS the variables never arrive, so text falls back to black and backgrounds to
+ * transparent, unreadable on a dark card. The SDK still puts `dark` or `light` on
+ * <body> (setDarkMode).
+ *
+ * Values are RemNote's own (1.28 bundle). Its gray scale flips between the modes and the
+ * semantic colours map onto it, so only the grays change below. Every selector is wrapped
+ * in :where(), so it has no specificity: RemNote's stylesheets, or a custom theme, win
+ * wherever they load.
+ */
+
+:where(:root) {
+  --rn-colors-gray-0-val: 252 252 255;
+  --rn-colors-gray-5-val: 244 244 250;
+  --rn-colors-gray-10-val: 231 231 239;
+  --rn-colors-gray-20-val: 202 202 217;
+  --rn-colors-gray-40-val: 145 145 168;
+  --rn-colors-gray-60-val: 99 99 123;
+  --rn-colors-gray-80-val: 65 65 85;
+  --rn-colors-gray-100-val: 41 41 54;
+  --rn-clr-background-primary: #fff;
+  --rn-clr-blue: #3b82f6;
+}
+
+:where(:root:has(> body.dark)) {
+  --rn-colors-gray-0-val: 35 35 41;
+  --rn-colors-gray-5-val: 43 43 51;
+  --rn-colors-gray-10-val: 52 52 60;
+  --rn-colors-gray-20-val: 70 70 80;
+  --rn-colors-gray-40-val: 108 108 119;
+  --rn-colors-gray-60-val: 148 148 159;
+  --rn-colors-gray-80-val: 190 190 198;
+  --rn-colors-gray-100-val: 235 235 237;
+  --rn-clr-background-primary: rgb(var(--rn-colors-gray-0-val));
+  --rn-clr-blue: #768dff;
+}
+
+:where(:root) {
+  --rn-clr-content-primary: rgb(var(--rn-colors-gray-100-val));
+  --rn-clr-content-secondary: rgb(var(--rn-colors-gray-60-val));
+  --rn-clr-content-tertiary: rgb(var(--rn-colors-gray-40-val));
+  --rn-clr-background-secondary: rgb(var(--rn-colors-gray-5-val));
+  --rn-clr-background-tertiary: rgb(var(--rn-colors-gray-10-val));
+  --rn-clr-border-opaque: rgb(var(--rn-colors-gray-10-val));
+  /* Not a RemNote variable, but used throughout the plugin. */
+  --rn-clr-border-primary: var(--rn-clr-border-opaque);
+}
+
+:where(body) {
+  color: var(--rn-clr-content-primary);
+}

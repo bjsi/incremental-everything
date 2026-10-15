@@ -410,6 +410,10 @@ export const queueHideElementsId = 'incremental-everything-queue-hide-elements';
 // index-only, so a plugin.track in index.tsx re-registers on each new height.
 export const cardInfoBarDockCssId = 'incremental-everything-card-info-bar-dock';
 export const cardInfoBarHeightKey = 'card-info-bar-height';
+// Same arrangement for the pinned Editor Review Timer: its instances write their
+// heights (per document id) and index.tsx moves RemNote's sticky headers below it.
+export const editorReviewTimerHeadersCssId = 'incremental-everything-editor-review-timer-headers';
+export const editorReviewTimerHeightsKey = 'editor-review-timer-heights';
 export const collapseTopBarCssId = 'incremental-everything-collapse-top-bar'; // CSS registration ID
 export const incrementalQueueActiveKey = 'incremental-queue-active';
 export const activeHighlightIdKey = 'active-highlight-id-key';

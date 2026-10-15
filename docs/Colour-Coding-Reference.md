@@ -6,17 +6,32 @@ Every colour the plugin draws in one place. Nothing here is configurable per-col
 
 ## The priority ramp
 
-One scale underlies every priority colour in the plugin. An item's **percentile** within its population — Incremental Rems ranked against Incremental Rems, flashcards against flashcards — maps onto a hue:
-
-`hsl(percentile ÷ 100 × 240, 80%, 55%)`
+One scale underlies every priority colour in the plugin. An item's **percentile** within its population — Incremental Rems ranked against Incremental Rems, flashcards against flashcards — maps onto a hue, drawn as `hsl(hue, 80%, 55%)`:
 
 | Percentile | Hue | Reads as |
 |---|---|---|
-| 1 | 0° | red |
-| 25 | 60° | yellow |
-| 50 | 120° | green |
-| 75 | 180° | cyan |
+| 0 | 0° | red |
+| 10 | 28° | orange |
+| 19 | 52° | yellow |
+| 27 | 85° | lime |
+| 35 | 130° | green |
+| 45 | 175° | teal |
+| 60 | 210° | sky blue |
 | 100 | 240° | blue |
+
+Between two rows the hue shifts evenly, so a percentile of 31 sits halfway between lime and green.
+
+### More colour where it matters { #steeper-at-the-top }
+
+The ramp is **deliberately uneven**. The top 35% of your material — where a difference in rank changes what you do today — is spread over 130° of hue and five colours you can name at a glance. The next quarter runs quickly through teal to sky blue, and everything below the 60th percentile shares a single stretch of blue, where telling a 70 from an 80 matters far less.
+
+| Zone | Hue span | Reads as | Hue per percentile point |
+|---|---|---|---|
+| **Top 35%** | 0° → 130° | red, orange, yellow, lime, green | about 3.7° |
+| **35 – 60%** | 130° → 210° | green, teal, sky blue | about 3.2° |
+| **Lower 40%** | 210° → 240° | sky blue to blue | about 0.75° |
+
+A straight line from red to blue would give every point 2.4°, and would spend much of that on the wide band of greens the eye cannot tell apart. Here the greens are crossed fastest of all — over 5° per point between lime and green — precisely because it takes more hue to see a difference there, while red to yellow needs less than 3° per point to stay clearly distinct.
 
 **Red is urgent, blue is background.** The ramp is relative, not absolute: a Rem at priority 30 is red in a knowledge base where everything else is lower-numbered, and green in one where it is typical. That is deliberate — the colour answers "how does this rank against my other material?", which a fixed scale cannot.
 

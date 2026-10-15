@@ -46,6 +46,37 @@ const QUEUE_VARIANT_CSS = `
   }
 `;
 
+/* Keeps the Editor Review Timer in view while the document scrolls.
+
+   DocumentAboveToolbar widgets are ordinary flow content at the top of the
+   pane's scroller, so they scroll away with the title:
+
+     div#tile__document.rn-pane__body          <- the scroller (overflow-y-scroll)
+       div.w-full.h-full.relative
+         div.document-inner-container          <- overflow-hidden
+           div.fade-in-first-load.relative     <- one per widget (overflow:hidden)
+             div > iframe[data-plugin-id]
+           div.rn-document-wrapper             <- the document itself
+
+   position:sticky on the widget's wrapper is the whole fix, but a sticky box
+   sticks to its nearest ancestor with a scrolling mechanism, and overflow:hidden
+   makes .document-inner-container one (that never scrolls) — so it would stick
+   to nothing. overflow:clip clips the same way without being a scroll container,
+   which hands the sticky box to #tile__document. The wrapper is a direct child
+   of .document-inner-container, which spans the whole document, so it stays
+   pinned to the end. With no review running the widget renders nothing and the
+   pinned box is 0px tall. */
+const EDITOR_REVIEW_TIMER_STICKY_CSS = `
+  .document-inner-container:has(> .fade-in-first-load > div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=editor_review_timer&"]) {
+    overflow: clip !important;
+  }
+  .document-inner-container > .fade-in-first-load:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=editor_review_timer&"]) {
+    position: sticky !important;
+    top: 0;
+    z-index: 100;
+  }
+`;
+
 /* SidebarEnd widgets lose 64px per side to RemNote, not to anything we set.
 
    The sidebar mounts its plugin slot as
@@ -251,6 +282,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   });
   await plugin.app.registerCSS('queue-beautiful-bar', QUEUE_VARIANT_CSS);
   await plugin.app.registerCSS('sidebar-end-padding', SIDEBAR_END_PADDING_CSS);
+  await plugin.app.registerCSS('editor-review-timer-sticky', EDITOR_REVIEW_TIMER_STICKY_CSS);
 
   // The Priority Queue popup: status, refresh/drain/refill/practise for the
   // persistent review document, and the Cooling list. Replaces the snapshot

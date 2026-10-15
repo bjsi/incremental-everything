@@ -56,20 +56,65 @@ export async function getDailyDocReferenceForDate(plugin: RNPlugin, date: Date) 
 }
 
 /**
+ * The priority ramp: [percentile, hue] stops, interpolated linearly in between.
+ *
+ * Deliberately NOT a straight line from red to blue. What a priority colour has
+ * to tell apart is the top of the list, so the top 35% is given 130° of hue —
+ * five colours with names (red, orange, yellow, lime, green) — the next quarter
+ * runs through teal to sky blue, and everything below the 60th percentile shares
+ * the last 30° of blue. Stops rather than a curve because HSL
+ * hue is not perceptually even: 90–150° all reads as "green", and a power curve
+ * would spend part of the top zone's extra range there.
+ */
+export const PRIORITY_HUE_STOPS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [10, 28],
+  [19, 52],
+  [27, 85],
+  [35, 130],
+  [45, 175],
+  [60, 210],
+  [100, 240],
+];
+
+/** Hue on the priority ramp for a percentile (0-100). */
+export function percentileToHue(percentile: number): number {
+  const p = Math.max(0, Math.min(100, percentile));
+  for (let i = 1; i < PRIORITY_HUE_STOPS.length; i++) {
+    const [p1, h1] = PRIORITY_HUE_STOPS[i];
+    if (p <= p1) {
+      const [p0, h0] = PRIORITY_HUE_STOPS[i - 1];
+      return Math.round((h0 + ((p - p0) / (p1 - p0)) * (h1 - h0)) * 10) / 10;
+    }
+  }
+  return PRIORITY_HUE_STOPS[PRIORITY_HUE_STOPS.length - 1][1];
+}
+
+/**
  * Converts a percentile (1-100) into an HSL color string.
  * Lower percentiles (higher priority) are mapped to red/orange (hue ~0).
  * Higher percentiles (lower priority) are mapped to green/blue (hue ~240).
+ * The mapping follows PRIORITY_HUE_STOPS, so it is steeper in the top 35%.
  * @param percentile A number from 1 to 100.
- * @returns An HSL color string (e.g., "hsl(120, 80%, 55%)").
+ * @returns An HSL color string (e.g., "hsl(130, 80%, 55%)").
  */
 export function percentileToHslColor(percentile: number): string {
   const roundedPercentile = Math.round(percentile);
   const clampedPercentile = Math.max(1, Math.min(100, roundedPercentile));
-  const hue = (clampedPercentile / 100) * 240;
+  const hue = percentileToHue(clampedPercentile);
   const saturation = '80%';
   const lightness = '55%';
 
   return `hsl(${hue}, ${saturation}, ${lightness})`;
+}
+
+/**
+ * The whole ramp as a CSS gradient, for tracks and legends that draw the scale
+ * itself. Built from the same stops so it cannot drift from the colours above.
+ */
+export function priorityRampGradient(direction = 'to right'): string {
+  const stops = PRIORITY_HUE_STOPS.map(([p, hue]) => `hsl(${hue}, 80%, 55%) ${p}%`);
+  return `linear-gradient(${direction}, ${stops.join(', ')})`;
 }
 
 

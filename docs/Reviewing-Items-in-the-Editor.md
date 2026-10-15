@@ -139,6 +139,14 @@ The timer widget is designed to be fully responsive. If used in a narrow sidebar
 
 ![Editor Review Timer with new Dismiss button and two-line labels](assets/review-timer-done-button.png){ width="800" }
 
+#### Always in view { #timer-stays-in-view }
+
+The timer stays pinned to the top of the pane while you scroll, so **Next**, **Dismiss** and **End Review** are always within reach, however long the document is. Each pane showing the document has its own pinned bar.
+
+RemNote's **sticky headers** (the parent Rems that stay visible while you scroll their descendants) are moved down to sit just below the timer, and return to the top of the pane when the review ends. In a split view with panes of different widths, the pane whose timer is shorter shows a small gap above its sticky headers: one offset is used for all panes, sized for the tallest timer.
+
+RemNote does not show this bar inside the PDF viewer itself: press **Notes** to open the Rem that holds the PDF, and the timer is there.
+
 This flow provides the best of both worlds: the queue sorting, combined with the unrestricted creative workspace of the full editor!
 
 ![Sequential Review flow using IncRem List](assets/sequential-review-increm-list.gif){ width="800" }

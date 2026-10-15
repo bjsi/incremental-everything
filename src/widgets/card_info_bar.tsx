@@ -7,6 +7,7 @@ import {
   AppEvents,
 } from '@remnote/plugin-sdk';
 import React, { useMemo, useCallback } from 'react';
+import '../rn_theme_vars.css';
 import {
   powerupCode,
   allCardPriorityInfoKey,
@@ -777,7 +778,10 @@ export function CardInfoBar() {
                 pointerEvents: 'none',
               }}
             >|</span>
-            <div ref={statsContainerRef} className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
+            {/* Labels in the secondary colour, figures in the primary one: the
+                tertiary grey is too faint for the numbers on a dark card. */}
+            <style>{`.card-info-bar-stats strong { color: var(--rn-clr-content-primary); }`}</style>
+            <div ref={statsContainerRef} className="card-info-bar-stats flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)' }}>
               <span
                 title={`Total number of gradeable repetitions.\n\nThe number in red parentheses — (${historyStats.lapses}) — is the number of lapses (AGAIN ratings).\n\nThe following number is the total time spent reviewing this card.\n\nThe card age is the time elapsed since the first repetition.\n\nThe cost is the average time spent reviewing this card per year.`}
                 style={{ cursor: 'help' }}

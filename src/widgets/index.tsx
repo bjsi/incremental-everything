@@ -29,8 +29,9 @@ import {
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
+import { registerEditorReviewTimerHeadersCss } from '../lib/editor_review_timer_sticky';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
@@ -156,6 +157,13 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     const barHeight = await rp.storage.getSession<number>(cardInfoBarHeightKey);
     await registerCardInfoBarDockCss(plugin, barHeight);
+  });
+
+  // The pinned Editor Review Timer sits where RemNote draws its sticky headers, so
+  // they are moved below it by the height the timer reports (lib/editor_review_timer_sticky).
+  plugin.track(async (rp) => {
+    const heights = await rp.storage.getSession<Record<string, number>>(editorReviewTimerHeightsKey);
+    await registerEditorReviewTimerHeadersCss(plugin, heights);
   });
 
   // Band badge colours come from the RELATIVE position of each band in the

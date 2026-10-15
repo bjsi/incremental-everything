@@ -27,6 +27,7 @@ import {
   stampNoteAndContext,
   MAX_NOTE_LENGTH,
 } from '../lib/history_notes';
+import { clearEditorReviewTimerHeights, reportEditorReviewTimerHeight } from '../lib/editor_review_timer_sticky';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
@@ -804,6 +805,30 @@ function EditorReviewTimer() {
     await plugin.app.toast('Timer cancelled');
   };
 
+  // Report how much of the pane the pinned bar covers, so RemNote's sticky headers
+  // can be moved below it (lib/editor_review_timer_sticky).
+  const barObserverRef = React.useRef<ResizeObserver | null>(null);
+  const reportBarHeight = useCallback(async (height: number) => {
+    const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
+    if (ctx?.documentId) await reportEditorReviewTimerHeight(plugin, ctx.documentId, height);
+  }, [plugin]);
+  const barRef = useCallback((el: HTMLDivElement | null) => {
+    barObserverRef.current?.disconnect();
+    barObserverRef.current = null;
+    if (!el) return;
+    // The bar's bottom edge in the iframe, which starts at the top of the pane.
+    const observer = new ResizeObserver(() => {
+      void reportBarHeight(el.getBoundingClientRect().bottom);
+    });
+    observer.observe(el);
+    barObserverRef.current = observer;
+  }, [reportBarHeight]);
+  // null is "no review"; undefined is the tracker still loading, which must not
+  // wipe what the other panes' timers have reported.
+  useEffect(() => {
+    if (timerData === null) void clearEditorReviewTimerHeights(plugin);
+  }, [timerData === null, plugin]);
+
   if (!timerData || !timerData.startTime) {
     return null;
   }
@@ -815,6 +840,7 @@ function EditorReviewTimer() {
 
   return (
     <div
+      ref={barRef}
       style={{
         display: 'flex',
         alignItems: 'center',

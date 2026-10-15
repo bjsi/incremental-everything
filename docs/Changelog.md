@@ -2,6 +2,40 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.155 - October 15th, 2026
+
+### 🐛 Fixed
+
+**Card Info Bar**: Fixed the bar not showing in the Beautiful queue on phones; it is now docked at the bottom of the card, just above the answer buttons.
+
+**Card Info Bar**: Fixed unreadable black text on the bar in dark mode on iOS.
+
+![The Card Info Bar docked above the answer buttons in the Beautiful queue on an iPhone, in dark mode](assets/card-info-bar-docked-phone.jpg){ width="320" }
+
+📖 [In the Beautiful queue variant](Plugin-Widgets-Reference.md#card-info-bar-beautiful)
+
+## v1.0.153 - October 9th, 2026
+
+### ⚡ Improved
+
+**Priority colours**: The red → blue ramp now changes fastest across the top 35% of your material and flattens into blue below the 60th percentile, so high-priority items are easier to tell apart on PDF highlights, table badges, priority badges and the priority slider.
+
+📖 [More colour where it matters](Colour-Coding-Reference.md#steeper-at-the-top)
+
+### 🐛 Fixed
+
+**Editor Review Timer**: RemNote's sticky headers now appear just below the pinned timer instead of on top of it.
+
+📖 [Always in view](Reviewing-Items-in-the-Editor.md#timer-stays-in-view)
+
+## v1.0.152 - October 8th, 2026
+
+### ⚡ Improved
+
+**Editor Review Timer**: The timer bar now stays pinned to the top of the document while you scroll, instead of scrolling away with the title.
+
+📖 [Always in view](Reviewing-Items-in-the-Editor.md#timer-stays-in-view)
+
 ## v1.0.151 - October 8th, 2026
 
 ### 🐛 Fixed

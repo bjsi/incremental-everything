@@ -60,3 +60,35 @@ The only hook is the class `cluster-answer-container`, put on the wrapper of the
 ## Text import cannot name a powerup
 
 Pasting `#[[TFT]]` (RemNote's flashcards-from-text syntax) resolves the name among ordinary Rems only. With a powerup of that name registered, it still creates a plain tag Rem. The plain tag slugifies to the same `data-rem-tags` value, so CSS keyed on the slug applies either way; converting it to the powerup takes a command (`convertPlainTags` in `src/register/true_false.ts`). Observed 2026-10-03.
+
+## A document pane's scroller, and pinning a DocumentAboveToolbar widget
+
+Measured Oct 8 2026 from a pane's DOM:
+
+```
+div#tile__document.rn-pane__body          <- the scroller (overflow-y-scroll)
+  div.w-full.h-full.relative
+    div.document-inner-container          <- overflow-hidden
+      div.fade-in-first-load.relative     <- one per DocumentAboveToolbar widget
+        div > iframe[data-plugin-id]
+      div.rn-document-wrapper             <- the document
+```
+
+`position: sticky` on the widget's wrapper does nothing by itself: `overflow: hidden` makes `.document-inner-container` the wrapper's scroll container, and that box never scrolls. Setting it to `overflow: clip` keeps the clipping without creating a scroll container, so the wrapper sticks to `#tile__document`. Shipped in v1.0.152 for the Editor Review Timer (`EDITOR_REVIEW_TIMER_STICKY_CSS` in `src/register/widgets.ts`).
+
+The PDF viewer does not render this location at all; only the "Notes" view of the Rem does.
+
+## Sticky headers are a fixed layer, not document flow
+
+Read from the 1.28 bundle (`renderStickyBar`) and a pane's DOM, Oct 9 2026. The parent Rems RemNote keeps visible while their descendants scroll are rendered inside `.rn-editor` as:
+
+```
+div.fixed.h-full.pointer-events-none.z-[6000]   <- inline translateY(<top of the scroller>), width, clip-path; .invisible when empty
+  div.relative.w-full.h-full
+    div.rn-sticky-header.absolute.z-[6000]      <- inline top: <extraOffsetFromTop || 0>, width, translateX; data-portalid-sticky-header
+```
+
+So anything a plugin pins to the top of the pane is painted over by them. `.rn-sticky-header` is the stable hook: it is absolutely positioned, so a `margin-top` adds to its inline `top` and moves the whole stack down. A Rem turns sticky when it passes the top of the scroller, whatever the margin, so it is hidden behind the pinned element for that last stretch.
+
+Shipped in v1.0.153 (`src/lib/editor_review_timer_sticky.ts`): the Editor Review Timer reports its height through a session key and the index widget registers the margin. DocumentAboveToolbar's widget context has a `documentId` but no pane id, so the offset cannot be per pane; the tallest reported timer is used.
+
