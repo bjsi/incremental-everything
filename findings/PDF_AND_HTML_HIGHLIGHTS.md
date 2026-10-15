@@ -80,3 +80,9 @@ None of it is in the SDK.
 - **Highlight Rem**: HTML Highlight powerup `hh`. `Data` is `{startXPath, endXPath, startOffset, endOffset, text, textBefore, textAfter}`, and `HTMLId` references the source Rem. It is parented **directly** under the source's "Highlights" child, with no Page Rems. RemNote also calls an internal `addToPortal("htmlHighlight", …)`.
 - **The XPath root** is the viewer's `<div>`, mounted as follows: `<inline_math>`/`<block_math>` replaced with `katex.renderToString`, then `DOMPurify.sanitize` (default config), then `dangerouslySetInnerHTML`. Each XPath step is `nodeName.toLowerCase()` (`#text` → `text()`) plus `[n]`, counting previous siblings with the same name, itself included. Resolve with `document.evaluate('.' + xpath, root)`. `src/lib/pdf_source_pins/html.ts` reproduces it.
 - **PDF Text Reader view**: converting a PDF adds a Link powerup `b` to the PDF Rem itself (`FileURL` = the full S3 URL of an `.html`), plus `ShouldOpenInTextReader = "true"`, which is **never cleared**. So a plugin cannot tell which view is on screen. Text Reader highlights are ordinary HTML highlights under the PDF's Highlights container, next to the Page Rems of the PDF view. They carry no page position.
+
+## Reader zoom steps
+
+The PDF reader (the `PDFWebReader` embed, drawn by the drawing canvas) changed its zoom buttons in RemNote 1.28.48 (October 2026). In 1.28.45 `zoomIn`/`zoomOut` added or removed 0.25. In 1.28.48 they snap to the next preset in `[0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8]`, with an animated transition, so one click goes from 100% straight to 200%. The `⌘+` / `⌘−` shortcuts use the same steps. Zooming with Cmd, Ctrl or Option held while scrolling (or pinching) is still continuous.
+
+The SDK's `PDFWebReader` component takes no zoom props, and the toolbar is a host layer above the plugin iframe, so a plugin cannot change the steps.

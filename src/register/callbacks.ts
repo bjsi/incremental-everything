@@ -94,6 +94,14 @@ const QUEUE_LAYOUT_FIX_CSS = `
   .spaced-repetition__bottom:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=answer_buttons&"]) {
     padding-top: 0 !important;
   }
+  /* Same for the bottom: the bar's sm:pb-8 (32px) sat on top of the widget's own
+     12px bottom padding, a blank band under the info bar. Desktop widths only — on
+     phones the default pb-6 also clears the home indicator. */
+  @media (min-width: 640px) {
+    .spaced-repetition__bottom:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=answer_buttons&"]) {
+      padding-bottom: 4px !important;
+    }
+  }
 `;
 
 // Registered once globally — safe because the :has(iframe[...widgetName=queue...]) gate

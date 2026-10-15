@@ -6,13 +6,17 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ Improved
 
-**Answer Buttons**: Redesigned the buttons with icons and smaller text, and made Change Priority, Review in Editor and Open Editor compact so the row no longer breaks into two lines.
+**Answer Buttons**: Redesigned the bar so it fits on one line: every button after Next is now a compact icon button, and Scroll to Highlight / Scroll to Bookmark became **To Highlight** / **To Bookmark**, next to the other reader actions.
+
+![A PDF highlight in the queue with the redesigned answer buttons bar](assets/answer-buttons-new-design.png){ width="500" }
 
 📖 [The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
 
 ### 🐛 Fixed
 
 **Queue**: Fixed documents with due Incremental Rems but no due flashcards opening on "You've finished practicing for now"; the first Incremental Rem now appears after a brief flash of that screen.
+
+**Queue**: Fixed a blank band between the PDF reader and the answer buttons in the Beautiful queue, and removed the empty space below the buttons.
 
 ## v1.0.156 - October 15th, 2026
 

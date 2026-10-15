@@ -65,7 +65,9 @@ This hold is within a session. Its counterpart across days is **cooling** in the
 
 ## The Answer Buttons
 
-Here is a breakdown of each button and its function, from left to right. The secondary actions are compact icon buttons — **↕ Priority**, **✎ In Editor** and **↗ New Tab** — so the whole row fits on one line; hover over any button for its full name and shortcut.
+![The answer buttons bar: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, followed by the review-note, P Edit and help icons](assets/answer-buttons-bar.png){ width="900" }
+
+Here is a breakdown of each button and its function, from left to right. Every button after **Next** is a compact icon button — icon above, one-word label below — so the whole row fits on one line; hover over any button for its full name and shortcut.
 
 * **[Next](#next):** (Shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Windows/Linux)
 This is your primary action. Clicking "Next" marks the item as reviewed, calculates the next time you should see it based on the scheduling algorithm, and advances to the next item in your queue. The subtitle (e.g., "×1.5 in 3 days") shows the interval that will be set, preceded by a chip naming the [scheduler](IncRem-Scheduler.md#scheduler-indicator) that produced it.
@@ -96,16 +98,8 @@ This is a powerful workflow tool. It performs a sequence of actions:
   2. It immediately starts an **Editor Review Timer**. When finished, clicking **"End Review"** stops the timer and routes you back to your queue document.
 This is perfect to avoid friction with the queue interface, and when an item inspires you to do more detailed work, like extensive note-taking or using other features like the AI assistant.
 
-* **Scroll to Highlight / Scroll to Bookmark:**
-This button appears for **PDF highlights, HTML highlights, and Incremental Rems with PDF sources**. 
-
-  * If you are reviewing a highlight, clicking this instantly snaps your view back to the highlight's position in the document.
-  * If you are reviewing a full PDF chapter (an Incremental Rem with a PDF source), this button acts as a **Scroll to Bookmark**. It jumps directly to your last recorded reading position within that chapter/PDF/IncRem.
-  * *See the [PDF-Incremental-Reading-Workflow#4-pdf-highlight-toolbar-utilities](PDF-Incremental-Reading-Workflow.md) guide to learn how bookmark positions are automatically tracked when extracting highlights.*
-  * *See also: **[Create-Incremental-Rem-from-PDF-Highlights](Create-Incremental-Rem-from-PDF-Highlights.md)** for how to turn highlights into active learning material.*
-
 * **🔖 Read point (hybrid PDF/HTML IncRems):**
-This button appears when a **PDF/HTML IncRem also has a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems)** set on one of its own descendant rems (a "hybrid" — a reading source *and* its own outline content). Because the in-queue reader can't jump into the outline without leaving the queue, clicking it shows a **confirmation dialog** with the read point's rem name; on confirm it behaves like **[Review in Editor](#review-in-editor)** — it records a review for the current IncRem and starts its timer — but opens the **read-point descendant** in the editor so you can resume reading there. A small **`• latest`** marker appears on whichever of *Scroll to Bookmark* / *Read point* was saved most recently. (Pure Rem-type cards don't need this button — their read point is shown directly in the [read-only card](#read-point-and-status-emphasis-in-rem-type-cards).)
+This button appears when a **PDF/HTML IncRem also has a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems)** set on one of its own descendant rems (a "hybrid" — a reading source *and* its own outline content). Because the in-queue reader can't jump into the outline without leaving the queue, clicking it shows a **confirmation dialog** with the read point's rem name; on confirm it behaves like **[Review in Editor](#review-in-editor)** — it records a review for the current IncRem and starts its timer — but opens the **read-point descendant** in the editor so you can resume reading there. Whichever of the two was saved most recently is marked: a **`• latest`** label on this button, or a blue dot on the *To Bookmark* button. (Pure Rem-type cards don't need this button — their read point is shown directly in the [read-only card](#read-point-and-status-emphasis-in-rem-type-cards).)
 
 * **📑 View outline / 📄 Read document (hybrid toggle):**
 For the same hybrid IncRems (a **PDF/HTML reading source that also has a read point** on a descendant), a toggle appears in the **top-right corner** of the queue card. **📑 View outline** flips the card from the PDF/HTML reader to a **read-only outline view** of the IncRem — the same [ExtractViewer](#read-point-and-status-emphasis-in-rem-type-cards) used for Rem-type cards, where the read point is **emphasized and auto-scrolled into view** — *without leaving the queue*. **📄 Read document** flips back to the reader. This lets you read the document and consult your outline/notes in the same session. *(To instead make a chapter **always** open as an outline in the queue, add the **`#extractviewer`** tag — see [PDF-Incremental-Reading-Workflow#extractviewer-mode](PDF-Incremental-Reading-Workflow.md#extractviewer-mode).)*
@@ -113,7 +107,15 @@ For the same hybrid IncRems (a **PDF/HTML reading source that also has a read po
 * **[Open Editor in New Tab](#open-editor-in-new-tab)** (the **↗ New Tab** button):
 Clicking this button instantly opens the full source document in a new browser tab, right at the location of your highlight/PDF document/Rem. Use it to take notes of what you are reading in a PDF section, to paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation), to have access to all of RemNote's formatting tools, and to link to other ideas.
 
-* **📝 Review Note** (compact icon, next to *New Tab*):
+* **To Highlight / To Bookmark** (scroll the reader; they do not create anything):
+These buttons appear for **PDF highlights, HTML highlights, and Incremental Rems with PDF sources**, right after *New Tab*.
+
+  * **To Highlight** (yellow, crosshair icon): if you are reviewing a highlight, clicking it instantly snaps your view back to the highlight's position in the document.
+  * **To Bookmark** (blue outline, bookmark icon): if you are reviewing a full PDF chapter (an Incremental Rem with a PDF source), it jumps directly to your last recorded reading position within that chapter/PDF/IncRem. A small blue dot in its corner means the bookmark is more recent than the read point (see *🔖 Read point* below).
+  * *See the [PDF-Incremental-Reading-Workflow#4-pdf-highlight-toolbar-utilities](PDF-Incremental-Reading-Workflow.md) guide to learn how bookmark positions are automatically tracked when extracting highlights.*
+  * *See also: **[Create-Incremental-Rem-from-PDF-Highlights](Create-Incremental-Rem-from-PDF-Highlights.md)** for how to turn highlights into active learning material.*
+
+* **📝 Review Note** (compact icon, after *New Tab* and the *To Highlight / To Bookmark* buttons):
 Toggles an inline text field to attach a short **observation to this repetition's history entry** — *"stopped mid-proof"*, *"re-read section 3 first"*, *"dismissing: superseded by newer source"*. The note is parked as you type and saved with whichever action ends the review: **Next**, **Reschedule** (`Ctrl+J`), or **Dismiss** (where it becomes the *dismissal reason*). The icon stays highlighted while a note is pending. Notes appear later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), the Aggregated view, and the [Study Dashboard](Study-Dashboard.md#hierarchy-section). Each entry also gets an **automatic reading-context snapshot** (current page, page range, PDF name, last bookmark) — no typing needed for that part.
 
 * **Open URL for Web Clipper 📎** (for HTML-type Incremental Rems): When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.
@@ -141,7 +143,7 @@ This is a non-clickable hint that appears **only for certain card types** (like 
 ![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
 
-![answer buttons bar](assets/uploaded/94b5bfab-4860-46f3-8997-bea085d8f595.png){ width="900" }
+![A PDF highlight in the queue: the reader on top, then the answer buttons bar and the priority info bar below it](assets/answer-buttons-new-design.png){ width="600" }
 
 
 
