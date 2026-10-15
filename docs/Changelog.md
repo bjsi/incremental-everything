@@ -8,7 +8,7 @@ This page documents the major changes and improvements for each version of the I
 
 **Answer Buttons**: Redesigned the bar so it fits on one line: every button after Next is now a compact icon button, and Scroll to Highlight / Scroll to Bookmark became **To Highlight** / **To Bookmark**, next to the other reader actions.
 
-![A PDF highlight in the queue with the redesigned answer buttons bar](assets/answer-buttons-new-design.png){ width="500" }
+![A PDF highlight in the queue with the redesigned answer buttons bar](assets/answer-buttons-new-design.png){ width="1000" }
 
 📖 [The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
 

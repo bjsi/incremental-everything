@@ -143,7 +143,7 @@ This is a non-clickable hint that appears **only for certain card types** (like 
 ![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
 
-![A PDF highlight in the queue: the reader on top, then the answer buttons bar and the priority info bar below it](assets/answer-buttons-new-design.png){ width="600" }
+![A PDF highlight in the queue: the reader on top, then the answer buttons bar and the priority info bar below it](assets/answer-buttons-new-design.png){ width="1000" }
 
 
 
