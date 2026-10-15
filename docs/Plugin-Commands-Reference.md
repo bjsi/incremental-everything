@@ -144,6 +144,12 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources)** (`Opt+Shift+V` / `Alt+Shift+V`) — `quick: paste`
   Adds the previously copied sources to **all selected Rems** (multi-select supported), or to the focused Rem if nothing is selected. Sources already present are silently skipped (idempotent). Together with **Copy Rem Sources**, this automates the [PDF-Incremental-Reading-Workflow#2-copying-and-pasting-sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources).
 
+- **[Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** (`Opt+Shift+Enter` / `Alt+Shift+Enter`) — `quick: pph`
+  Creates the Rem waiting for a parent (after **📍 Pick in editor** in the Select Parent popup) under the Rem that has the cursor. A target outside the IncRem under review needs a second press to confirm.
+
+- **[Cancel Parent Pick](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** — `quick: cpp`
+  Drops the Rem waiting for a parent and closes its card, like `Esc`.
+
 - **No Inc Rem for 15 min** (Queue Menu)
   Temporarily disables the injection of Incremental Rems into your queue for 15 minutes, allowing you to focus purely on flashcards. A timer countdown widget appears in the queue to show the remaining time.
 

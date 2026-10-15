@@ -38,6 +38,7 @@ import { getIncrementalPageRange } from '../lib/pdfUtils';
 import { RemTextSegments } from '../components';
 import { applyHeadingLevel, getHeadingLevel } from '../lib/outline_restructure';
 import { HeadingBadge } from '../components/HeadingBadge';
+import { startParentPick } from '../lib/parent_pick';
 
 // ============================================================================
 // STYLES
@@ -1107,6 +1108,13 @@ function ParentSelectorWidget() {
     plugin.widget.closePopup();
   }, [plugin]);
 
+  // Hand the choice over to the editor: this popup closes and a floating card
+  // waits for the user to confirm a destination there (lib/parent_pick.ts).
+  const handlePickInEditor = useCallback(async () => {
+    if (isCreating || creatingChildForNodeId) return;
+    await startParentPick(plugin);
+  }, [plugin, isCreating, creatingChildForNodeId]);
+
   // The rem the popup opened on: the remembered destination if there is one,
   // otherwise whatever we suggested. This is what "restore" jumps back to.
   const recoverTarget = useMemo(() => {
@@ -1234,6 +1242,12 @@ function ParentSelectorWidget() {
           handleRecoverSelection();
           break;
 
+        case 'e':
+        case 'E':
+          e.preventDefault();
+          handlePickInEditor();
+          break;
+
         // NEW: '+' or 'n' to add a child to the selected node
         case '+':
         case '=': // Handle both + and = (without shift)
@@ -1258,6 +1272,7 @@ function ParentSelectorWidget() {
     handleClose,
     handleStartAddChild,
     handleRecoverSelection,
+    handlePickInEditor,
     disarmHover,
   ]);
 
@@ -1524,7 +1539,8 @@ function ParentSelectorWidget() {
           Use <kbd style={kbdStyle}>↑</kbd>/<kbd style={kbdStyle}>↓</kbd> to navigate,{' '}
           <kbd style={kbdStyle}>→</kbd> to expand, <kbd style={kbdStyle}>←</kbd> to collapse,{' '}
           <kbd style={kbdStyle}>Enter</kbd> to select,{' '}
-          <kbd style={kbdStyle}>+</kbd>/<kbd style={kbdStyle}>n</kbd> to add child
+          <kbd style={kbdStyle}>+</kbd>/<kbd style={kbdStyle}>n</kbd> to add child,{' '}
+          <kbd style={kbdStyle}>E</kbd> to pick in the editor
           {recoverTarget && (
             <>
               , <kbd style={kbdStyle}>L</kbd> to reselect {recoverTarget.label.toLowerCase()}
@@ -1560,6 +1576,25 @@ function ParentSelectorWidget() {
             />
             List headings first
           </label>
+
+          <button
+            onClick={handlePickInEditor}
+            title="Close this list and pick the parent in the editor (E)"
+            style={{
+              marginLeft: 'auto',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: 500,
+              borderRadius: '4px',
+              border: '1px solid var(--rn-clr-border-primary)',
+              background: 'transparent',
+              color: 'var(--rn-clr-content-secondary)',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            📍 Pick in editor
+          </button>
         </div>
       </div>
 

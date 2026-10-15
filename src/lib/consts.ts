@@ -363,6 +363,17 @@ export const scrollToHighlightId = 'scroll-to-highlight';
 export const pageRangeWidgetId = 'page-range';
 export const parentSelectorWidgetId = 'parent_selector';
 
+// "Pick in editor" (lib/parent_pick.ts): the parent selector hands its context
+// to a floating card and closes, and the user confirms the destination from the
+// editor. The context and the card's widget id live in session storage; the
+// confirm command asks the card to place the Rem by bumping the request key.
+export const parentPickWidgetId = 'parent_pick_floating';
+export const parentPickContextKey = 'parent-pick-context';
+export const parentPickActiveIdKey = 'parent-pick-active-id';
+export const parentPickConfirmRequestKey = 'parent-pick-confirm-request';
+export const parentPickConfirmCommandId = 'place-pending-rem-here';
+export const parentPickCancelCommandId = 'cancel-parent-pick';
+
 // css
 export const collapseTopBarId = 'collapse-top-bar';
 export const collapseTopBarKey = 'collapseTopBarState';

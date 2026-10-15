@@ -5,7 +5,7 @@ This feature allows you to extract PDF highlights into standalone Incremental Re
 1. **Create a highlight** in a PDF by selecting text
 2. **Click the highlight** to open the popup menu
 3. **Click "Create Incremental Rem"** (the funnel icon button)
-4. **Select a parent** from the hierarchical tree that appears
+4. **Select a parent** from the hierarchical tree that appears — or press `E` to [pick it in the editor](#pick-in-editor) instead
 5. **Press Enter** to confirm — your new Incremental Rem is created
 
 ![Create Inc Rem pdf highlight menu button](assets/pdfhighlight-create-inc-rem.png){ width="700" }
@@ -62,6 +62,20 @@ The popup opens on your last destination (or its suggestion) and scrolls it into
 - **Clicks are ignored for a moment after the popup opens**, so a quick second click can't create the Rem under whatever row landed beneath the cursor.
 - If the selection still drifts, press **`L`** or click the **↩ Last destination** / **↩ Suggested** button in the header to jump back to it. If you collapsed the path in the meantime, it re-expands to reach it.
 
+### Picking the Parent in the Editor { #pick-in-editor }
+
+The tree only lists Rems linked to the PDF. When the right place is somewhere you'd rather find in your own outline, hand the choice over to the editor:
+
+1. In the popup, press **`E`** or click **📍 Pick in editor**. The popup closes and a small card appears at the top right.
+2. **Click into the Rem that should become the parent.** The card follows the cursor, showing the target with its last three parents and its heading level. Expanding, collapsing and navigating are free: nothing happens until you confirm.
+3. Press **`Opt+Shift+Enter`** (`Alt+Shift+Enter` on Windows), or click **Place here** on the card. The new Rem is created exactly as from the list: same priority popup, and the destination is remembered for next time.
+
+**Outside the IncRem you are reviewing.** When the target isn't inside the Incremental Rem under review, the card warns you in amber (**⚠ Outside …**). The first confirm then only turns the warning red and asks again; a second `Opt+Shift+Enter` (or **Place anyway**) places it. Moving to another Rem cancels the pending confirmation. With no IncRem under review — a highlight made outside a review session — there's nothing to compare against, so there's no warning. The highlight itself can't be chosen.
+
+**Leaving the card.** **`Esc`** cancels, even while you are typing in the editor. **Back to list** reopens the popup, and the **Cancel Parent Pick** command (`quick: cpp`) does the same as `Esc`. Starting another highlight replaces a pick still pending.
+
+The card works with the keyboard too: when it has focus, the arrow keys move between its buttons and `Enter` presses the selected one.
+
 ### Keyboard Shortcuts
 
 | Key | Action |
@@ -72,6 +86,7 @@ The popup opens on your last destination (or its suggestion) and scrolls it into
 | `Enter` | Select as destination |
 | `+` or `n` | Create a new child under selected node |
 | `L` | Reselect the last/suggested destination |
+| `E` | [Pick the parent in the editor](#pick-in-editor) instead |
 | `Escape` | Close popup |
 
 ### Creating Children Inline

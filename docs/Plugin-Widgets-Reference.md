@@ -473,7 +473,7 @@ Lets you manually override the next review date, adjust priority and choose the 
 ### 6.2. Parent Selector
 **Access:** Highlight text in a PDF or web page → click the puzzle piece icon → "Create Incremental Rem"
 
-A hierarchical tree selector that lets you choose where to place a new extract. Supports keyboard navigation (arrow keys, Enter to select), inline child creation via the `+` button, and automatic priority inheritance from the chosen parent. Expanded branches show **H1–H6 badges** and can list headings first or filter down to headings only; `L` reselects the last/suggested destination.
+A hierarchical tree selector that lets you choose where to place a new extract. Supports keyboard navigation (arrow keys, Enter to select), inline child creation via the `+` button, and automatic priority inheritance from the chosen parent. Expanded branches show **H1–H6 badges** and can list headings first or filter down to headings only; `L` reselects the last/suggested destination. `E` (**📍 Pick in editor**) closes the list and opens a small floating card instead, so you can [pick the parent in the editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) and confirm with `Opt+Shift+Enter`. The popup's height follows your screen size.
 
 ![Creat Inc Rem parent selection](assets/uploaded/9cbcdd80-b782-4dcc-b033-cda82fc91be8.gif)
 

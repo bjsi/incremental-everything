@@ -2,6 +2,18 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.156 - October 15th, 2026
+
+### ✨ New
+
+**Create Incremental Rem**: Added **📍 Pick in editor** (`E`) to the Select Parent popup: the list closes, you put the cursor in the destination Rem in the editor and press `Opt+Shift+Enter`. A Rem outside the IncRem you are reviewing asks you to confirm first.
+
+📖 [Picking the parent in the editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)
+
+### 🐛 Fixed
+
+**Select Parent popup**: Fixed the horizontal and vertical scrollbars; the popup now sizes itself to your screen.
+
 ## v1.0.155 - October 15th, 2026
 
 ### 🐛 Fixed
