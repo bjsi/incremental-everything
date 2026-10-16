@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.158 - October 16th, 2026
+
+### ✨ New
+
+**Priority Bridge**: Other plugins can now ask what priority a new flashcard would inherit at a given place and set card priorities, through a small messaging bridge. An importer, for example, can show you each card's inherited priority before importing and let you choose a different one; Incremental RemNote applies it as a manual priority, recorded as **Import** in the card's history.
+
+📖 [Priority Bridge for Other Plugins](Priority-Bridge-for-Other-Plugins.md)
+
 ## v1.0.157 - October 15th, 2026
 
 ### ✨ Improved
