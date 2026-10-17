@@ -69,6 +69,8 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | :--- | :--- | :--- | :--- |
 | `Shift` + `F8` | [Bulletize Inline Selected Text](Utilities-Text-and-Lists.md#bulletize-inline-selected-text) | Toggles a `• ` prefix on each line of a multi-line selection **within a single rem**. Restores bullets that a PDF highlight flattened into soft-wrapped text; a collapsed cursor bulletizes the whole rem. *(Uses `Shift+F8` because `Opt+Shift+8` types `°` on macOS and `Ctrl+Opt+Shift+8` is RemNote's blue-highlight shortcut.)* | Editor Only |
 | `Ctrl` + `Shift` + `F8` | [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl) | Rebuilds a list that a PDF highlight flattened onto one line: a line break + `• ` before each detected item (`1 2 3`, `a) b)`, `( )` blanks, `•`/`-`), still in the focused rem. Press again to switch to a blank line between items with no bullets. `Ctrl` on macOS too. | Editor Only |
+| `Ctrl` + `Shift` + `T` | [True/False: Mark as True](Utilities-True-or-False-Cards.md#mark-as-true-or-false) | Turns the statement into a [True or False card](Utilities-True-or-False-Cards.md) answered ✅, keeping whatever the back already holds. Works on a multi-Rem selection, and on the card on screen while you practise. | Editor and Queue |
+| `Ctrl` + `Shift` + `F` | [True/False: Mark as False](Utilities-True-or-False-Cards.md#mark-as-true-or-false) | The same, answered ❌; on a card marked true it flips the verdict. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
 | `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open) | Floating picker that finds Rems RemNote's `[[` search can't surface (all-common-word names). Enter/click inserts a reference at the cursor (cloze-aware, accent-insensitive); Ctrl/Cmd+Enter inserts it as a pin (no text); Opt/Alt+Enter inserts the Rem's text then a pin ("Text with Pin", preserving formatting/images); Shift+Enter/Shift+click opens the Rem in a new pane; Ctrl/Cmd+Shift+Enter appends a pin at the end of the Rem while keeping the selected text (linking a card to its source). | Editor Only |
 | `Shift` + `F3` | [Text Case Converter](Utilities-Text-and-Lists.md#text-case-converter) | Cycles the selection through **Title Case** → **UPPERCASE** → **lowercase**, auto-detecting the current case. Rich-text safe; also works on multi-rem selections. | Editor Only |
 | `Alt` + `Shift` + `M` | [Convert Extracted Markup to Rich Text](Plugin-Commands-Reference.md#convert-extracted-markup-to-rich-text) | Turns literal `\[…\]`, `$…$`, `**bold**`, `*italic*` and `--` left by PDF highlight extraction into real formulas, formatting and dashes, in the focused Rem and all its descendants. | Editor Only |
@@ -120,6 +122,7 @@ Function keys carry the utilities whose natural letter combination was already t
 | `Ctrl` + `F7` | [Set Read Point (Bookmark)](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) | Editor and Queue |
 | `Ctrl` + `Shift` + `F7` | [View Read Points (History)](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) | Editor and Queue |
 | `Ctrl` + `Shift` + `F1` | [Copy Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Editor |
+| `Ctrl` + `Shift` + `F8` | [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl) | Editor |
 
 ### Shift + key
 
@@ -151,11 +154,14 @@ Function keys carry the utilities whose natural letter combination was already t
 
 | Shortcut | Command | Context |
 | :--- | :--- | :--- |
+| `Ctrl` + `Shift` + `F` | [True/False: Mark as False](Utilities-True-or-False-Cards.md#mark-as-true-or-false) | Editor and Queue |
 | `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Editor and Queue |
 | `Ctrl` + `Shift` + `I` | [Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities) | Editor |
 | `Ctrl` + `Shift` + `J` | [Execute Repetition / Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor) | Editor and Queue |
+| `Ctrl` + `Shift` + `T` | [True/False: Mark as True](Utilities-True-or-False-Cards.md#mark-as-true-or-false) | Editor and Queue |
 | `Ctrl` + `Shift` + `F1` | [Copy Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Editor |
 | `Ctrl` + `Shift` + `F7` | [View Read Points (History)](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) | Editor and Queue |
+| `Ctrl` + `Shift` + `F8` | [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl) | Editor |
 
 ### Alt (Opt) + Shift + key
 
@@ -258,6 +264,7 @@ On Windows and Linux, RemNote's `Cmd` shortcuts use `Ctrl`, so these plugin shor
 
 | Shortcut | Plugin command | RemNote command (Windows / Linux) |
 | :--- | :--- | :--- |
+| `Ctrl` + `Shift` + `F` | [True/False: Mark as False](Utilities-True-or-False-Cards.md#mark-as-true-or-false) | Filter Document |
 | `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Hide Parents & Siblings From Document |
 | `Ctrl` + `Alt` + `P` | [Quick Set Priority](Prioritization-&-Sorting.md#light-priority-popup) | Add All Properties |
 | `Ctrl` + `Alt` + `↑` / `↓` | [Quick Increase / Decrease Priority Number](Prioritization-&-Sorting.md#quick-priority-shortcuts) | Increase / Decrease Video Playback Speed on Learning Page |

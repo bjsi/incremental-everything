@@ -244,10 +244,10 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
 Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). All of them act on the focused Rem, a multi-Rem selection, or the current queue card.
 
-- **True/False: Mark as True** — `quick: tft`
+- **True/False: Mark as True** (`Ctrl+Shift+T`) — `quick: tft`
   Tags the Rem `TFT` and makes sure its back says ✅, keeping whatever the back already holds. A Rem with no back becomes a forward-only card.
 
-- **True/False: Mark as False** — `quick: tff`
+- **True/False: Mark as False** (`Ctrl+Shift+F`) — `quick: tff`
   The same with the `TFF` tag and ❌. Running it on a card marked true flips the verdict, swapping only the mark.
 
 - **True/False: Convert Pasted Tags** — `quick: tfc`

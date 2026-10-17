@@ -120,7 +120,7 @@ The same shortcuts are listed **twice**:
 | Search Descendants in Editor | `Cmd + Shift + C` | `Ctrl + Shift + C` |  |
 | Go to Parent | `Cmd + \\` | `Ctrl + \\` |  |
 | Find Text in Document | `Cmd + F` | `Ctrl + F` |  |
-| Filter Document | `Cmd + Shift + F` | `Ctrl + Shift + F` |  |
+| Filter Document | `Cmd + Shift + F` | `Ctrl + Shift + F` | ⚠️ Same keys as *True/False: Mark as False* (Windows) |
 
 ### Editor Scope Showing / Hiding
 
@@ -546,7 +546,7 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 | `Cmd + Shift + C` / `Ctrl + Shift + C` | Copy as Image/Plain Text | — | may clash |
 | `Cmd + Shift + C` / `Ctrl + Shift + C` | Search Descendants in Editor | Editor Navigation |  |
 | `Cmd + Shift + E` / `Ctrl + Shift + E` | Copy Bullet as Portal | Copying References |  |
-| `Cmd + Shift + F` / `Ctrl + Shift + F` | Filter Document | Editor Navigation |  |
+| `Cmd + Shift + F` / `Ctrl + Shift + F` | Filter Document | Editor Navigation | ⚠️ Same keys as *True/False: Mark as False* (Windows) |
 | `Cmd + Shift + G` / `Ctrl + Shift + G` | Toggle Practice Forward | Bullet-Level Editing |  |
 | `Cmd + Shift + H` / `Ctrl + Shift + H` | Hide Parents & Siblings From Document | Editor Scope Showing / Hiding | ⚠️ Same keys as *Open Repetition History* (Windows) |
 | `Cmd + Shift + K` / `Ctrl + Shift + K` | Strikethrough Text | Text-Level Editing |  |
@@ -585,9 +585,11 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 
 | Keys | Command | Where | Notes |
 | :--- | :--- | :--- | :--- |
+| `Ctrl + Shift + F` | [True/False: Mark as False](Keyboard-Shortcuts.md) | **Incremental RemNote** | ⚠️ Same keys as *Filter Document* (Windows) |
 | `Ctrl + Shift + H` | [Open Repetition History](Keyboard-Shortcuts.md) | **Incremental RemNote** | ⚠️ Same keys as *Hide Parents & Siblings From Document* (Windows) |
 | `Ctrl + Shift + I` | [Toggle Ignore Tag](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Ctrl + Shift + J` | [Review in Editor (Execute Repetition)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
+| `Ctrl + Shift + T` | [True/False: Mark as True](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Ctrl + Shift + F1` | [Copy Rem Sources](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Ctrl + Shift + F7` | [View Read Points (History)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Ctrl + Shift + F8` | [Inlinize Detected List](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |

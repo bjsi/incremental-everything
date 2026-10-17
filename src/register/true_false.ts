@@ -364,6 +364,7 @@ export async function registerTrueFalseCommands(plugin: ReactRNPlugin) {
     id: `${TRUE_FALSE_TRUE_POWERUP_CODE}Cmd`,
     name: 'True/False: Mark as True',
     description: 'Turn the selected statement(s) into True/False cards answered ✅, keeping whatever the back already holds.',
+    keyboardShortcut: 'ctrl+shift+t',
     quickCode: 'tft',
     action: async () => runMarkCommand(plugin, 'true'),
   });
@@ -372,6 +373,7 @@ export async function registerTrueFalseCommands(plugin: ReactRNPlugin) {
     id: `${TRUE_FALSE_FALSE_POWERUP_CODE}Cmd`,
     name: 'True/False: Mark as False',
     description: 'Turn the selected statement(s) into True/False cards answered ❌, keeping whatever the back already holds.',
+    keyboardShortcut: 'ctrl+shift+f',
     quickCode: 'tff',
     action: async () => runMarkCommand(plugin, 'false'),
   });

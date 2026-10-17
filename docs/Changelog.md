@@ -10,6 +10,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl)
 
+**True or False Cards**: Mark as True and Mark as False are now on `Ctrl+Shift+T` and `Ctrl+Shift+F`, in the editor and the queue.
+
+📖 [Mark as True / Mark as False](Utilities-True-or-False-Cards.md#mark-as-true-or-false)
+
 ### 🐛 Fixed
 
 **Inlinize Detected List**: Fixed lists not being detected when a spaced dash follows the marker (`I - Um…`, `1 - Um…`).
