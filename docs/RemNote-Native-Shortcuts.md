@@ -590,6 +590,7 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 | `Ctrl + Shift + J` | [Review in Editor (Execute Repetition)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Ctrl + Shift + F1` | [Copy Rem Sources](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Ctrl + Shift + F7` | [View Read Points (History)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
+| `Ctrl + Shift + F8` | [Inlinize Detected List](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 
 ### Opt/Alt + Shift + key
 

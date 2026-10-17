@@ -158,20 +158,20 @@ circunstâncias, o número de pessoal qualificado… 2 Deixar claro em que situa
 "chamar o Comandante ao passadiço". 3 O Oficial de quarto… 11 Garantir que…
 ```
 
-There are no line breaks to bulletize — the only structure is in the **markers**: **enumerators** (`1`, `2`, `3`… / `a)` `b)` / `i.` `ii.` / `.1` `.2` `.3`), **depth/compound numbers** (`1.1`, `1.2`… or mixed `1.a`, `1.b`…), or **inline bullet/dash glyphs** (`•`, `-`, `*`) that a highlight ran together onto one line. These commands detect that structure and rebuild the list, first inline (for review) and then as proper child rems, with a full undo.
+There are no line breaks to bulletize — the only structure is in the **markers**: **enumerators** (`1`, `2`, `3`… / `a)` `b)` / `i.` `ii.` / `.1` `.2` `.3`), **depth/compound numbers** (`1.1`, `1.2`… or mixed `1.a`, `1.b`…), **fill-in blanks** (`( )` in true/false and matching exercises), or **inline bullet/dash glyphs** (`•`, `-`, `*`) that a highlight ran together onto one line. These commands detect that structure and rebuild the list, first inline (for review) and then as proper child rems, with a full undo.
 
 Unlike Bulletize, all three act on the **focused rem** — just click into the rem, no text selection required.
 
 ### The workflow
 
 1. Highlight the list in the PDF and **Create IncRem** from it (one rem, flattened).
-2. Run **`Inlinize Detected List`** — the numbers become soft-wrapped `• ` lines in the same rem. **Review the split**; if it's wrong, `Ctrl+Z` and you're back to the original.
+2. Run **`Inlinize Detected List`** (`Ctrl+Shift+F8`) — the numbers become soft-wrapped `• ` lines in the same rem. **Review the split**; if it's wrong, `Ctrl+Z` and you're back to the original. Press it again if you'd rather have a blank line between items and no bullets.
 3. Run **`Break Inline List Into Children`** — the caput/title stays on the parent, each item becomes a child rem.
 4. If the break went wrong, run **`Restore List Rem`** to undo it exactly.
 
 ### Inlinize Detected List (`inl`)
 
-Detects the list and inserts a line break + `• ` before each item, so the flattened text becomes soft-wrapped bulleted lines:
+Press **`Ctrl+Shift+F8`** (the same keys on macOS, Windows and Linux) or type the quick code `inl`. It detects the list and inserts a line break + `• ` before each item, so the flattened text becomes soft-wrapped bulleted lines:
 
 ```
 As seguintes medidas podem contribuir para evitá-las:
@@ -183,19 +183,34 @@ As seguintes medidas podem contribuir para evitá-las:
 
 - **Enumerated lists keep their number:** `1 Aumentar` → `• 1 Aumentar`.
 - **Sub-paragraph markers keep their leading dot:** the `.1` `.2` `.3` style used by IMO/UN and other legal drafting is read as one marker, so the break lands **before the dot** (`• .1 Deep unrestricted water…`) instead of stranding a lone `.` at the end of the previous item. A number glued to a word (`footnote.1`) is not a marker.
+- **Fill-in blanks keep their marker:** `( ) A Lei se aplica…` → `• ( ) A Lei se aplica…`, so the blank is still there to fill.
 - **Bullet/dash lists have their marker normalized:** an existing `•`, `-` or `*` is **replaced** by a single `• ` (so `- calado` and `* item` both become `• …`) — no duplicate bullet is added.
 
 The text before the first marker becomes the **caput** (title line); the whitespace before each marker is collapsed into the `• ` prefix. This stays a **single rem** and is fully `Ctrl+Z`-able — it's the review checkpoint before the destructive step. If no list is detected, a toast says so and nothing changes.
 
+#### Press again for a blank line between items
+
+On a list that is already split, the command switches the layout instead of detecting again: the bullets go away and a **blank line** separates the items. Press once more to bring the bullets back; each press switches between the two.
+
+```
+Marque V (Verdadeiro) ou F (Falso) - Lei nº 9.432/1997:
+
+( ) A Lei nº 9.432/1997 se aplica a embarcações de pesca de bandeira brasileira.
+
+( ) No afretamento a casco nu, o afretador tem direito de designar o comandante e a tripulação.
+```
+
+Formatting on the items is kept both ways, and [Break Inline List Into Children](#break-inline-list-into-children-brl) works on either layout. To get back the original single line, use `Ctrl+Z`.
+
 ### Break Inline List Into Children (`brl`)
 
-Splits the inline-bulletized rem on its `\n` lines: the **first line (caput) stays on the parent**, and each `• ` line becomes a **child rem** (order preserved). The `• ` prefix is stripped from each child.
+Splits the inline-bulletized rem on its `\n` lines: the **first line (caput) stays on the parent**, and each item line becomes a **child rem** (order preserved). The `• ` prefix is stripped from each child, and the blank lines of the spaced layout are skipped.
 
 - **Keeps the PDF-highlight pin on the caput.** A list rem made from a PDF highlight carries a **pin** back to that highlight — which sits at the end of the text and would otherwise ride along with the *last* item. The break detects that pin (any reference whose target rem is a **PDF Highlight** — the `#pdfextract` tag is also accepted but **not** required) and **moves it to the end of the caput/parent**, so every child stays clean and the source link stays on the title. This covers both the **Create IncRem** highlight-toolbar flow *and* directly pasting a highlight into your notes (text + pin), where no `#pdfextract` tag is present.
 - **Images and other pins survive too.** A highlight that ends with a **figure** (soft line break + image) gets that image split into its own **child rem, appended as the last item**; any other **trailing references** (e.g. a pin to a regular rem) join the caput alongside the highlight pin. Mid-text images stay attached to the line/item they end, and an image sitting alone on its own line becomes its own item rather than being dropped.
 - **Snapshot first.** Before mutating, it saves the original front text **and the IDs of the children it creates** to synced storage, keyed by the rem — so [Restore List Rem](#restore-list-rem-rlr) can reverse it exactly.
 - **Won't touch flashcards.** If the rem has **back text** (i.e. it's a flashcard), the command refuses with a toast rather than risk scrambling the card.
-- **Prerequisite.** Run [Inlinize Detected List](#inlinize-detected-list-inl) first — if there are no `• ` item lines, a toast tells you.
+- **Prerequisite.** Run [Inlinize Detected List](#inlinize-detected-list-inl) first — if there are no item lines, a toast tells you.
 
 ### Restore List Rem (`rlr`)
 
@@ -203,7 +218,7 @@ Reads the snapshot saved by the break, **deletes exactly the children it created
 
 ### How detection works
 
-Detection runs two paths and takes whichever finds the longer list (enumerated wins ties).
+Detection tries each kind of list below and takes whichever finds the most items (on a tie, enumerated wins, then fill-in blanks, then bullets).
 
 **Enumerated lists — an ascending chain.** The core problem is disambiguation: a lone `2` in prose (*"reduzir para 2 nós"*) is **not** a marker, but `1 … 2 … 3` in order almost certainly is. So it doesn't split on every number:
 
@@ -214,6 +229,8 @@ Detection runs two paths and takes whichever finds the longer list (enumerated w
 Supported enumerator styles: **decimal** (`1`, `1.`, `1-`, `1)`), **lettered** (`a)`, `b.`) and **roman** (`i.`, `ii.`). Bare decimals like `1 Aumentar` work with no delimiter; **letters and roman numerals require a delimiter** (`.`, `)`, `-`) because bare `a`/`i`/`o`/`v` collide with common words.
 
 **Depth / compound markers — a fixed prefix with an ascending tail.** Dotted markers where a constant prefix identifies the group and the **last component ascends** are detected too: `1.1`, `1.2`, `1.3…` (numeric tail) and mixed `1.a`, `1.b`, `1.c…` (letter tail), as well as sub-lists under any prefix (`3.1`, `3.2…`). The full label is kept (`1.1 Falha…` → `• 1.1 Falha…`). Because bare `1.1`/`5.2` also read as version numbers or ratios in prose, a compound list is only recognized when the **first item opens after a clause boundary** (`:`, `;`, `.`, or the start) — so *"atualize para 2.1 e depois 2.2"* is left alone. Items become **flat siblings** (see limitations); the compound path does not (yet) build a nested outline from `1`, `1.1`, `1.2`, `2`, `2.1…`.
+
+**Fill-in blanks — empty parentheses.** An empty `( )` before each item, as in true/false and matching exercises, is a marker when it is preceded by a space or punctuation and followed by a space + a letter. Padding inside is fine (`(  )`, `(__)`), and at least two are needed, so a single empty `( )` in a sentence is left alone.
 
 **Bullet/dash lists — a consistent standalone marker.** When there's no enumeration, it looks for one repeated marker glyph (`•`, `▪`, `◦`, `*`, `-`, `–`, `—`) that stands alone — preceded by a separator and followed by a space + a letter (so `bem-vindo`, `10-20` and `*bold*` are rejected). At least two such markers are needed.
 
@@ -229,4 +246,5 @@ Supported enumerator styles: **decimal** (`1`, `1.`, `1-`, `1)`), **lettered** (
 - **Compound markers produce flat siblings, not a nested outline.** `1.1`, `1.2`, `1.3` all become siblings under the caput; a full multi-level hierarchy (`1` → `1.1`/`1.2` → `2` → `2.1`…) isn't nested, and only one prefix group is captured per run.
 - **Dash lists need a clause boundary before the first item** (`:`, `;`, `.`, or start). A dash list buried mid-sentence with no such cue is skipped, to avoid mistaking parenthetical dashes for a list. Glyph bullets (`•`, `*`) have no such restriction.
 - **The last item runs to the end of the text.** If prose follows the final list item in the same highlight, it stays attached to that item — there's no reliable signal for where the list ends.
-- **No default keyboard shortcut** is bound (quick codes `inl` / `brl` / `rlr` only), to avoid clashing with existing bindings. You can add your own in RemNote's settings.
+- **Filled-in blanks aren't markers.** Once answered (`(V)`, `(F)`, `(C)`, `(E)`), the parentheses aren't empty and aren't detected; inlinize the list before filling it.
+- **Only Inlinize has a default keyboard shortcut** (`Ctrl+Shift+F8`). Break and Restore run by quick code (`brl` / `rlr`), to avoid clashing with existing bindings. You can add your own in RemNote's settings.

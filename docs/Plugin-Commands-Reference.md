@@ -297,13 +297,14 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 
   📖 See [Utilities → Bulletize Inline Selected Text](Utilities-Text-and-Lists.md#bulletize-inline-selected-text) for full behavior and examples.
 
-- **Inlinize Detected List** — `quick: inl`
-  Detects a list flattened onto one line by a PDF highlight (`… evitá-las: 1 Aumentar… 2 Deixar… 3 O Oficial…`, or bullets run together like `… reconhecidas: • alvos…; • ocorrem…`) and inserts a line break + `• ` before each item, turning it into soft-wrapped bulleted lines **in the same rem**. Enumerated items keep their number; existing `•`/`-`/`*` markers are normalized to `• `. Acts on the **focused rem** (no selection needed) and is `Ctrl+Z`-able — the review checkpoint before breaking to children.
+- **Inlinize Detected List** (`Ctrl+Shift+F8`) — `quick: inl`
+  Detects a list flattened onto one line by a PDF highlight (`… evitá-las: 1 Aumentar… 2 Deixar… 3 O Oficial…`, or bullets run together like `… reconhecidas: • alvos…; • ocorrem…`) and inserts a line break + `• ` before each item, turning it into soft-wrapped bulleted lines **in the same rem**. Enumerated items and fill-in blanks keep their marker; existing `•`/`-`/`*` markers are normalized to `• `. Acts on the **focused rem** (no selection needed) and is `Ctrl+Z`-able — the review checkpoint before breaking to children.
 
-  - **Detection:** enumerated lists follow an **ascending chain** (accepts only the next expected value at a word boundary, preferring markers after sentence punctuation), so stray numbers in prose aren't mistaken for markers. Supports decimal (`1`, `1.`, `1)`), lettered (`a)`, `b.`) and roman (`i.`, `ii.`) enumerators, **depth/compound markers** (`1.1`, `1.2`… and mixed `1.a`, `1.b`…, kept as flat siblings), plus **bullet/dash lists** (`•`, `-`, `*`) — a marker must stand alone, and dash/compound lists need a clause boundary (`:`, `;`, `.`) before the first item to rule out parenthetical dashes and inline version numbers.
+  - **Press again:** on a list that is already split, it switches to a **blank line between items with no bullets**, and back on the next press.
+  - **Detection:** enumerated lists follow an **ascending chain** (accepts only the next expected value at a word boundary, preferring markers after sentence punctuation), so stray numbers in prose aren't mistaken for markers. Supports decimal (`1`, `1.`, `1)`), lettered (`a)`, `b.`) and roman (`i.`, `ii.`) enumerators, **depth/compound markers** (`1.1`, `1.2`… and mixed `1.a`, `1.b`…, kept as flat siblings), **fill-in blanks** (`( )`, two or more), plus **bullet/dash lists** (`•`, `-`, `*`) — a marker must stand alone, and dash/compound lists need a clause boundary (`:`, `;`, `.`) before the first item to rule out parenthetical dashes and inline version numbers.
 
 - **Break Inline List Into Children** — `quick: brl`
-  Splits an inline-bulletized list rem into child rems: the caput/title stays on the parent, each `• ` line becomes a child (order preserved, `• ` prefix stripped).
+  Splits an inline-bulletized list rem into child rems: the caput/title stays on the parent, each item line becomes a child (order preserved, `• ` prefix stripped, blank lines skipped).
 
   - **PDF-highlight pin follows the caput:** if the rem has a pin to a PDF highlight (toolbar-created *or* pasted as text + pin; the `#pdfextract` tag is optional), it's moved to the end of the caput instead of the last item.
   - **Images & other pins survive:** a trailing image becomes its own **last child item**; other trailing references join the caput; a mid-list image stays with its item.

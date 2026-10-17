@@ -12,6 +12,8 @@
 //
 //   1. Inlinize — insert "\n• " before each detected marker, still ONE rem, so
 //      the user can eyeball the (heuristic) split and Ctrl+Z if it's wrong.
+//      Running it again cycles the layout: blank line between items, no "• "
+//      bullet; then back to bullets, and so on.
 //   2. Break to children — turn each "• " line into a child rem, caput/title
 //      staying on the parent. Destructive across rems, so a snapshot of the
 //      original front text + created child ids is stored first, restorable via
@@ -35,7 +37,7 @@ import { partitionSourcePins } from './source_pins';
 // Detection (pure, string-only — unit-testable without the SDK)
 // ---------------------------------------------------------------------------
 
-export type ListKind = 'decimal' | 'lettered' | 'roman' | 'compound' | 'bullet';
+export type ListKind = 'decimal' | 'lettered' | 'roman' | 'compound' | 'blank' | 'bullet';
 
 export interface DetectedList {
   kind: ListKind;
@@ -293,8 +295,21 @@ const detectBulletList = (S: string): number[] | null => {
   return null;
 };
 
+// Fill-in blanks — "( ) A Lei… ( ) No afretamento…" (true/false and matching
+// exercises). The empty parentheses (optionally padded with spaces or "_") are
+// the marker; they are kept in the item, since the blank is meant to be filled.
+const detectBlankList = (S: string): number[] | null => {
+  const offs: number[] = [];
+  const re = /\([\s_]*\)(?=\s+\p{L})/gu;
+  for (let m = re.exec(S); m; m = re.exec(S)) {
+    if (isSep(S[m.index - 1])) offs.push(m.index);
+  }
+  return offs.length >= 2 ? offs : null;
+};
+
 // Detect a flattened list — either an ascending ENUMERATED chain (decimal /
-// lettered / roman) or an already-delimited BULLET/dash list. Returns the
+// lettered / roman), a run of fill-in "( )" blanks, or an already-delimited
+// BULLET/dash list. Returns the
 // candidate with the most items (enumerated wins ties), or null when nothing
 // forms a list of >= 2 items. Enumerated chains must start at 1 / a / i — a
 // highlight beginning mid-list is out of scope (and much riskier to detect).
@@ -319,6 +334,11 @@ export const detectInlineList = (S: string): DetectedList | null => {
       titleEnd: compound[0].pos,
       markerOffsets: compound.map((m) => m.pos),
     });
+  }
+
+  const blankOffs = detectBlankList(S);
+  if (blankOffs) {
+    candidates.push({ kind: 'blank', titleEnd: blankOffs[0], markerOffsets: blankOffs });
   }
 
   const bulletOffs = detectBulletList(S);
@@ -496,6 +516,77 @@ export const inlinizeListInText = (
   return spliceRichText(richText, inserts, dropChars);
 };
 
+// The command cycles an already-inlinized rem between two layouts:
+//   bullets — "Caput\n• item\n• item"
+//   spaced  — "Caput\n\nitem\n\nitem" (blank line between items, no bullet)
+// Both are recognized from the text alone, and only with >= 2 items, so a
+// plain two-paragraph rem still goes through list detection.
+
+// Plain-char offsets of the "• " that opens each item line, when the text ends
+// in a run of >= 2 bullet lines (empty lines allowed); null otherwise.
+const bulletedItemOffsets = (S: string): number[] | null => {
+  const offs: number[] = [];
+  let lineStart = 0;
+  for (const line of S.split('\n')) {
+    if (line.startsWith(BULLET_PREFIX)) offs.push(lineStart);
+    else if (offs.length > 0 && line.trim()) return null;
+    lineStart += line.length + 1;
+  }
+  return offs.length >= 2 ? offs : null;
+};
+
+// Plain-char offsets where each item starts, when the text is a caput followed
+// by single-line items separated by blank lines; null otherwise. The first
+// part is an item rather than a caput when a list marker opens the text.
+const spacedItemOffsets = (S: string): number[] | null => {
+  const parts = S.split('\n\n');
+  if (parts.slice(1).some((p) => !p.trim() || p.includes('\n'))) return null;
+  const offs: number[] = [];
+  let partStart = 0;
+  parts.forEach((p, i) => {
+    if (i > 0) offs.push(partStart);
+    partStart += p.length + 2;
+  });
+  if (detectInlineList(S)?.titleEnd === 0) offs.unshift(0);
+  return offs.length >= 2 ? offs : null;
+};
+
+// Switch an inlinized list to the other layout, or null if the text is in
+// neither layout (i.e. not inlinized yet).
+export const cycleInlineListLayout = (
+  richText: RichTextInterface
+): RichTextInterface | null => {
+  const S = rtPlainStr(richText);
+  const inserts = new Map<number, string>();
+  const dropChars = new Set<number>();
+
+  const bulleted = bulletedItemOffsets(S);
+  if (bulleted) {
+    // "\n• item" -> "\n\nitem"; a leading "• " (no caput) just goes away.
+    for (const off of bulleted) {
+      for (let k = 0; k < BULLET_PREFIX.length; k++) dropChars.add(off + k);
+      if (off > 0) inserts.set(off, '\n');
+    }
+    return spliceRichText(richText, inserts, dropChars);
+  }
+
+  const spaced = spacedItemOffsets(S);
+  if (spaced) {
+    // "\n\nitem" -> "\n• item"; an item opening the text gets a bare "• ".
+    for (const off of spaced) {
+      if (off === 0) {
+        inserts.set(0, BULLET_PREFIX);
+      } else {
+        dropChars.add(off - 1);
+        inserts.set(off - 1, BULLET_PREFIX);
+      }
+    }
+    return spliceRichText(richText, inserts, dropChars);
+  }
+
+  return null;
+};
+
 export const inlinizeListSelection = async (
   plugin: ReactRNPlugin
 ): Promise<void> => {
@@ -504,10 +595,11 @@ export const inlinizeListSelection = async (
     await plugin.app.toast('Place your cursor in the rem holding the list.');
     return;
   }
-  const updated = inlinizeListInText(rem.text || []);
+  const text = rem.text || [];
+  const updated = cycleInlineListLayout(text) ?? inlinizeListInText(text);
   if (!updated) {
     await plugin.app.toast(
-      'No list detected (1, 2, 3… / a) b) / i. ii. / • - *).'
+      'No list detected (1, 2, 3… / a) b) / i. ii. / ( ) / • - *).'
     );
     return;
   }

@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.159 - October 17th, 2026
+
+### ✨ Improved
+
+**Inlinize Detected List**: Now on `Ctrl+Shift+F8`; press it again to switch between bulleted items and items separated by a blank line, and fill-in blanks `( )` now count as list markers.
+
+📖 [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl)
+
 ## v1.0.158 - October 16th, 2026
 
 ### ✨ New

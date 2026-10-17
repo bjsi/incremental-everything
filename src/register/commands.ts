@@ -1580,11 +1580,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   //
   // Two-step, reviewable flow for turning a flattened PDF-highlight list into a
   // proper outline: (1) inlinize inserts "\n• " before each detected enumerator
-  // so you can eyeball the split; (2) break-to-children turns each "• " line
-  // into a child rem after snapshotting the original for restore.
+  // so you can eyeball the split (run again to toggle blank-line spacing without
+  // bullets); (2) break-to-children turns each item line into a child rem after
+  // snapshotting the original for restore.
   plugin.app.registerCommand({
     id: 'inlinize-detected-list',
     name: 'Inlinize Detected List',
+    keyboardShortcut: 'ctrl+shift+F8',
     quickCode: 'inl',
     action: async () => {
       await inlinizeListSelection(plugin);

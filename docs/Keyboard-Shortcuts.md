@@ -68,12 +68,13 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
 | `Shift` + `F8` | [Bulletize Inline Selected Text](Utilities-Text-and-Lists.md#bulletize-inline-selected-text) | Toggles a `• ` prefix on each line of a multi-line selection **within a single rem**. Restores bullets that a PDF highlight flattened into soft-wrapped text; a collapsed cursor bulletizes the whole rem. *(Uses `Shift+F8` because `Opt+Shift+8` types `°` on macOS and `Ctrl+Opt+Shift+8` is RemNote's blue-highlight shortcut.)* | Editor Only |
+| `Ctrl` + `Shift` + `F8` | [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl) | Rebuilds a list that a PDF highlight flattened onto one line: a line break + `• ` before each detected item (`1 2 3`, `a) b)`, `( )` blanks, `•`/`-`), still in the focused rem. Press again to switch to a blank line between items with no bullets. `Ctrl` on macOS too. | Editor Only |
 | `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open) | Floating picker that finds Rems RemNote's `[[` search can't surface (all-common-word names). Enter/click inserts a reference at the cursor (cloze-aware, accent-insensitive); Ctrl/Cmd+Enter inserts it as a pin (no text); Opt/Alt+Enter inserts the Rem's text then a pin ("Text with Pin", preserving formatting/images); Shift+Enter/Shift+click opens the Rem in a new pane; Ctrl/Cmd+Shift+Enter appends a pin at the end of the Rem while keeping the selected text (linking a card to its source). | Editor Only |
 | `Shift` + `F3` | [Text Case Converter](Utilities-Text-and-Lists.md#text-case-converter) | Cycles the selection through **Title Case** → **UPPERCASE** → **lowercase**, auto-detecting the current case. Rich-text safe; also works on multi-rem selections. | Editor Only |
 | `Alt` + `Shift` + `M` | [Convert Extracted Markup to Rich Text](Plugin-Commands-Reference.md#convert-extracted-markup-to-rich-text) | Turns literal `\[…\]`, `$…$`, `**bold**`, `*italic*` and `--` left by PDF highlight extraction into real formulas, formatting and dashes, in the focused Rem and all its descendants. | Editor Only |
 | `Alt` + `Shift` + `G` | [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size) | Sizes the images of the card or Rem (and three levels below) that were never sized in RemNote, so they stop showing cropped in the queue. Each press steps through **Fit** → **Large** → **Medium** → **Original**. | Editor and Queue |
 
-> **No default shortcut (run by quick code or from the Omnibar).** The list-from-PDF-highlight commands ship **unbound** to avoid conflicts — invoke them by quick code: **`inl`** ([Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl)), **`brl`** ([Break Inline List Into Children](Utilities-Text-and-Lists.md#break-inline-list-into-children-brl)), and **`rlr`** ([Restore List Rem](Utilities-Text-and-Lists.md#restore-list-rem-rlr)). They act on the **focused rem** (no selection needed). Assign your own bindings in RemNote's keyboard-shortcut settings if you use them often.
+> **No default shortcut (run by quick code or from the Omnibar).** The other two list-from-PDF-highlight commands ship **unbound** to avoid conflicts — invoke them by quick code: **`brl`** ([Break Inline List Into Children](Utilities-Text-and-Lists.md#break-inline-list-into-children-brl)) and **`rlr`** ([Restore List Rem](Utilities-Text-and-Lists.md#restore-list-rem-rlr)). Like Inlinize, they act on the **focused rem** (no selection needed). Assign your own bindings in RemNote's keyboard-shortcut settings if you use them often.
 
 ### Sources & Reading
 
@@ -195,7 +196,6 @@ These commands ship **without** a shortcut, so nothing collides with your own bi
 | :--- | :--- |
 | Batch Priority Change (IncRems & Flashcards) | — (Command Palette / Document Menu) |
 | [Transfer Incremental Data to Parent Rem](Create-Incremental-Rem-from-PDF-Highlights.md#transfer-to-parent) | `ttp` |
-| [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl) | `inl` |
 | [Break Inline List Into Children](Utilities-Text-and-Lists.md#break-inline-list-into-children-brl) | `brl` |
 | [Restore List Rem](Utilities-Text-and-Lists.md#restore-list-rem-rlr) | `rlr` |
 | Open Sorting Criteria | `sort` |
