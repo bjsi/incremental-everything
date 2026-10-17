@@ -86,6 +86,13 @@ interface MarkerMatch {
   itemStart: number; // where the item text begins (past the token + delimiter)
 }
 
+// Delimiter after a marker token: glued (". ) - –", as in "1." "a)" "I-") or a
+// spaced dash ("I - Um", "a – texto", common in exam statements).
+const DELIM = String.raw`(?:[.\-)–]|\s+[\-–—])`;
+const DECIMAL_TAIL = new RegExp(String.raw`^${DELIM}?\s+(\p{L})`, 'u');
+const LETTERED_MARKER = new RegExp(String.raw`^([a-z])${DELIM}\s+(\p{L})`, 'iu');
+const ROMAN_MARKER = new RegExp(String.raw`^([ivxlcdm]+)${DELIM}\s+(\p{L})`, 'iu');
+
 // Try to read a marker of `kind` starting exactly at `pos`. Returns null if the
 // characters there aren't a valid, boundary-delimited marker of that kind.
 const matchMarkerAt = (
@@ -113,15 +120,16 @@ const matchMarkerAt = (
     const tokenEnd = pos + dotLead + m[1].length;
     // A decimal marker may carry no delimiter at all (sample: "1 Aumentar"), so
     // require token + optional delimiter + whitespace + a letter (item start).
-    const dm = /^([.\-)–]?)\s+(\p{L})/u.exec(S.slice(tokenEnd));
+    const dm = DECIMAL_TAIL.exec(S.slice(tokenEnd));
     if (!dm) return null;
     return { pos, value: parseInt(m[1], 10), itemStart: tokenEnd + dm[0].length - 1 };
   }
 
-  // Letters and roman numerals collide with real words, so a delimiter (". ) -")
+  // Letters and roman numerals collide with real words, so a delimiter (". ) -",
+  // or a spaced " - ")
   // is REQUIRED; the ascending chain then filters the rest.
   if (kind === 'lettered') {
-    const m = /^([a-z])([.\-)–])\s+(\p{L})/iu.exec(rest);
+    const m = LETTERED_MARKER.exec(rest);
     if (!m) return null;
     return {
       pos,
@@ -131,7 +139,7 @@ const matchMarkerAt = (
   }
 
   // roman
-  const m = /^([ivxlcdm]+)([.\-)–])\s+(\p{L})/iu.exec(rest);
+  const m = ROMAN_MARKER.exec(rest);
   if (!m) return null;
   const value = romanToInt(m[1]);
   if (value == null) return null;
@@ -211,7 +219,7 @@ const parseCompoundAt = (S: string, pos: number): CompoundMarker | null => {
   }
 
   if (comps.length < 2) return null;
-  const tail = /^([.\-)–]?)\s+(\p{L})/u.exec(S.slice(i));
+  const tail = DECIMAL_TAIL.exec(S.slice(i));
   if (!tail) return null;
 
   const last = comps[comps.length - 1];

@@ -33,6 +33,30 @@ describe('fill-in blank markers', () => {
   });
 });
 
+describe('spaced dash delimiter', () => {
+  it('detects roman numerals followed by " - "', () => {
+    const S =
+      '01-Analise as afirmativas sobre os travessões (spreaders) para bordas livres de até 9 m: ' +
+      'I - Um travessão de 2,00 m de comprimento está em conformidade. ' +
+      'II - O 5º degrau a partir de baixo deve ser um spreader step. ' +
+      'III - Deve haver no máximo 9 degraus entre um travessão e o seguinte. ' +
+      'IV - Um travessão de 1,70 m de comprimento está em conformidade. ' +
+      'Assinale a sequência correta (V para verdadeira, F para falsa):';
+    assert.equal(detectInlineList(S)?.kind, 'roman');
+    assert.equal(
+      plain(inlinizeListInText([S]))?.split('\n').slice(0, 3).join('\n'),
+      '01-Analise as afirmativas sobre os travessões (spreaders) para bordas livres de até 9 m:\n' +
+        '• I - Um travessão de 2,00 m de comprimento está em conformidade.\n' +
+        '• II - O 5º degrau a partir de baixo deve ser um spreader step.'
+    );
+  });
+
+  it('detects numbers and letters followed by " - " or " – "', () => {
+    assert.equal(detectInlineList('Itens: 1 - Um. 2 - Dois. 3 - Três.')?.markerOffsets.length, 3);
+    assert.equal(detectInlineList('Itens: a – Um. b – Dois.')?.kind, 'lettered');
+  });
+});
+
 describe('cycleInlineListLayout', () => {
   it('goes bullets -> spaced -> bullets with a caput', () => {
     const bullets = 'Caput:\n• 1 Um\n• 2 Dois';

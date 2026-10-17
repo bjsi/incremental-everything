@@ -10,6 +10,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl)
 
+### 🐛 Fixed
+
+**Inlinize Detected List**: Fixed lists not being detected when a spaced dash follows the marker (`I - Um…`, `1 - Um…`).
+
 ## v1.0.158 - October 16th, 2026
 
 ### ✨ New
