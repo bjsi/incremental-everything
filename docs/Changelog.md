@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.161 - October 21st, 2026
+
+### ✨ Improved
+
+**Execute Repetition**: Start Timer now continues from the Review time you typed instead of starting from zero, as *Review in Editor* already does from the queue.
+
+📖 [Execute Repetition](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command)
+
 ## v1.0.159 - October 17th, 2026
 
 ### ✨ Improved

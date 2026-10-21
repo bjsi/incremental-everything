@@ -490,11 +490,16 @@ const EditorReviewInput: React.FC<{
       }
 
       // Store timer info in session (writing rem-id mounts the timer widget).
-      // The start is back-dated by any time the user carried over from the queue
-      // turn they just left — those minutes were spent reading THIS rem in the
-      // previewer, so the timer picks up where that reading stopped.
+      // The start is back-dated by the time already spent on THIS rem: the
+      // minutes typed in Review time, plus any carried over from the queue turn
+      // they just left (spent reading it in the previewer). The timer picks up
+      // where that reading stopped, like Review in Editor from the queue.
+      const typedReviewMs = Math.max(0, parseFloat(reviewTimeMinutes) || 0) * 60 * 1000;
       await plugin.storage.setSession('editor-review-timer-rem-id', remId);
-      await plugin.storage.setSession('editor-review-timer-start', Date.now() - carryToTargetMsRef.current);
+      await plugin.storage.setSession(
+        'editor-review-timer-start',
+        Date.now() - carryToTargetMsRef.current - typedReviewMs
+      );
       // Start this rem's clock from zero (plus any carry-over back-dated
       // above). Without this, a timer taken over from another rem hands its
       // accumulated segment — and any pause — to the new review.
@@ -541,7 +546,7 @@ const EditorReviewInput: React.FC<{
 
       await plugin.widget.closePopup();
     },
-    [days, plugin, remId, priority, remName, note, activeReviewKind, readActiveReview]
+    [days, reviewTimeMinutes, plugin, remId, priority, remName, note, activeReviewKind, readActiveReview]
   );
 
   // ─── Leaving the Queue Turn ─────────────────────────────────────────────
@@ -1078,7 +1083,7 @@ const EditorReviewInput: React.FC<{
               step="0.5"
               value={reviewTimeMinutes}
               onChange={(e) => setReviewTimeMinutes(e.target.value)}
-              placeholder="Optional — leave empty if using timer"
+              placeholder="Optional — time already spent"
               className="w-full px-3 py-1.5 rounded text-sm"
               style={{
                 border: '1px solid var(--rn-clr-border-primary)',
@@ -1087,7 +1092,7 @@ const EditorReviewInput: React.FC<{
               }}
             />
             <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-              Leave empty if you'll use the timer below
+              Start Timer continues from this time
             </div>
           </div>
 
