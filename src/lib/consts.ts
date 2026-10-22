@@ -544,8 +544,8 @@ export const pendingIntervalBatchSaveKey = 'pendingIntervalBatchSave';
 // in the index widget also means the writes survive popup teardown and can be wrapped
 // in the plugin_operation_active / incRemBatchActive suppression flags.
 export const pendingIncRemCreateTailKey = 'pendingIncRemCreateTail';
-// IncRem review jobs (queue Next/Dismiss, Ctrl+D, Execute Repetition, Editor Review
-// Timer): the surface appends one here and moves on at once; tracker.ts drains them in
+// IncRem review jobs (queue Next/Dismiss, Ctrl+D, Reschedule, Execute Repetition, Editor
+// Review Timer): the surface appends one here and moves on at once; tracker.ts drains them in
 // the persistent index widget. A queue, not a slot, so reviews in quick succession
 // cannot overwrite each other. See lib/incremental_rem/review_jobs.ts.
 export const pendingReviewJobQueueKey = 'pendingReviewJobQueue';

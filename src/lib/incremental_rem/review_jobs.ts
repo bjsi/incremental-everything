@@ -1,7 +1,8 @@
 // lib/incremental_rem/review_jobs.ts
 //
 // Writing the outcome of an IncRem review — from the queue (Next, Cmd+→, the
-// Today/Tomorrow drag, Dismiss, Ctrl+D), the Execute Repetition popup
+// Today/Tomorrow drag, Dismiss, Ctrl+D), Reschedule (Ctrl+J, queue or editor),
+// the Execute Repetition popup
 // (Ctrl+Shift+J) and the Editor Review Timer (End Review, Next Review,
 // Dismiss).
 //
@@ -52,6 +53,8 @@ import { stampNoteAndContext, consumePendingReviewNote, buildRepContext } from '
 import { recordIncRemRep } from '../queue_session';
 import { transferToDismissed } from '../dismissed';
 import { handleCardPriorityInheritance } from '../card_priority/card_priority_inheritance';
+import { applySchedulerChoice } from '../scheduler_choice';
+import { SchedulerChoice } from '../scheduler_core';
 import { pendingReviewJobQueueKey, incremReviewStartTimeKey, powerupCode } from '../consts';
 
 interface ReviewJobBase {
@@ -124,7 +127,21 @@ export interface DismissJob extends ReviewJobBase {
   host?: ReviewHost;
 }
 
-export type ReviewJob = EditorReviewJob | QueueNextJob | ManualOffsetJob | DismissJob;
+/** Reschedule (button or Ctrl+J): a chosen interval and priority, not a review. */
+export interface RescheduleJob extends ReviewJobBase {
+  kind: 'reschedule';
+  intervalDays: number;
+  newPriority: number;
+  /** 'queue' records a rescheduledInQueue entry with the turn's duration. */
+  context: 'queue' | 'editor';
+  /** Queue only; null when the queue recorded no start time for this item. */
+  reviewTimeSeconds: number | null;
+  note?: string;
+  /** Only set when the user changed the scheduler in the popup. */
+  schedulerChoice?: SchedulerChoice;
+}
+
+export type ReviewJob = EditorReviewJob | QueueNextJob | ManualOffsetJob | DismissJob | RescheduleJob;
 
 /** IncRem cache changes collected over a drain: an entry to upsert, or null to remove. */
 export type IncRemCacheChanges = Map<string, IncrementalRem | null>;
@@ -329,6 +346,44 @@ export async function runReviewJob(
       await rem.removePowerup(powerupCode);
       cache.set(remId, null);
       return {};
+    }
+
+    case 'reschedule': {
+      const priorityChanged = job.newPriority !== incRem.priority || incRem.prioritySource !== 'slot';
+      if (priorityChanged) {
+        // recordHistory: false — the reschedule entry below carries this priority.
+        await setIncRemPriority(plugin, rem, job.newPriority, { recordHistory: false });
+      }
+      if (job.schedulerChoice) {
+        await applySchedulerChoice(plugin, rem, job.schedulerChoice);
+      }
+
+      const nextRepDate = job.confirmedAt + job.intervalDays * 1000 * 60 * 60 * 24;
+      const scheduledDate = incRem.nextRepDate;
+      const daysDifference = (job.confirmedAt - scheduledDate) / (1000 * 60 * 60 * 24);
+
+      const rescheduleEntry: IncrementalRep = {
+        date: job.confirmedAt,
+        scheduled: scheduledDate,
+        interval: job.intervalDays,
+        wasEarly: daysDifference < 0,
+        daysEarlyOrLate: Math.round(daysDifference * 10) / 10,
+        // An editor reschedule does not imply the item was read.
+        reviewTimeSeconds: job.context === 'queue' ? job.reviewTimeSeconds ?? undefined : undefined,
+        priority: job.newPriority, // the NEW priority set during reschedule
+        eventType: job.context === 'queue' ? 'rescheduledInQueue' : 'rescheduledInEditor',
+      };
+
+      // Attach the user's reason (if typed) + a reading-state snapshot to the entry.
+      await stampNoteAndContext(plugin, rem, rescheduleEntry, job.note);
+
+      const history = [...(incRem.history || []), rescheduleEntry];
+      await updateSRSDataForRem(plugin, remId, nextRepDate, history, rem);
+      cache.set(remId, reviewedEntry(incRem, nextRepDate, history, priorityChanged ? job.newPriority : undefined));
+
+      // The cascade only matters when a priority changed; it used to run on
+      // every reschedule, costing seconds of background work to update nothing.
+      return priorityChanged ? { cascadeRemId: remId } : {};
     }
 
     case 'new':

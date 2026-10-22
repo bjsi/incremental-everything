@@ -624,8 +624,8 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   });
 
   // IncRem review job watcher (lib/incremental_rem/review_jobs.ts): queue Next /
-  // Today-Tomorrow drag / Dismiss, Ctrl+D, Cmd+→, Execute Repetition and the Editor
-  // Review Timer all append a job and move on at once; the writes run here, suppressed.
+  // Today-Tomorrow drag / Dismiss, Ctrl+D, Cmd+→, Reschedule (Ctrl+J), Execute Repetition
+  // and the Editor Review Timer all append a job and move on at once; the writes run here, suppressed.
   // Drained in a loop so a job appended while another is running is not left
   // behind; each round patches the IncRem cache once for all its jobs. The id set
   // guards against a job read twice (an append racing the clear writes the old
