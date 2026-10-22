@@ -145,6 +145,10 @@ This is a non-clickable hint that appears **only for certain card types** (like 
 
 ![A PDF highlight in the queue: the reader on top, then the answer buttons bar and the priority info bar below it](assets/answer-buttons-new-design.png){ width="1000" }
 
+### Saved in the background { #saved-in-the-background }
+
+**Next**, **Reschedule**, **Dismiss** and the swipe gesture move you to the next item immediately; the review is written a moment later in the background (schedule, history entry, note, reading time). Your next item is never held up waiting for those writes, and an item you just finished is not shown again in the same session even if its new date has not landed yet. If something cannot be saved (for example, the Rem was deleted in the meantime), a dialog tells you.
+
 
 
 ___

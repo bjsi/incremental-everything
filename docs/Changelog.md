@@ -2,6 +2,24 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.164 - October 22nd, 2026
+
+### ⚡ Improved
+
+**Queue**: Next, Reschedule (`Ctrl+J`), Dismiss (`Ctrl+D`), `Cmd+→` and the Today/Tomorrow swipe now move to the next item instantly and save the review in the background.
+
+📖 [Saved in the background](Reviewing-Items-in-the-Queue.md#saved-in-the-background)
+
+**Editor Review Timer**: End Review, Next and Dismiss now move on instantly, and dismissing several selected Rems with `Ctrl+D` in the editor is much faster.
+
+📖 [The Workflow](Reviewing-Items-in-the-Editor.md#the-workflow)
+
+### 🐛 Fixed
+
+**Editor Review Timer**: Fixed Next carrying a pause, and its paused time, over to the next item.
+
+**Next Item in Queue** (`Cmd+→`): Fixed it hiding your last reading bookmark from the Scroll button on PDF items.
+
 ## v1.0.163 - October 22nd, 2026
 
 ### 🐛 Fixed
