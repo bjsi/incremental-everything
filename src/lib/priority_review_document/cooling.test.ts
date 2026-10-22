@@ -564,9 +564,35 @@ describe('image occlusion Rems are exempt', () => {
     assert.equal(isImageOcclusionText(['front'], [occlusion]), true);
   });
 
-  it('ignores plain images, empty box lists and text', () => {
+  // Shape of Rem ZswQg9WNnK6Mw1IVs (Oct 2026): the drawing editor's boxes, `blocks` left empty.
+  const drawn = {
+    i: 'i',
+    url: '%LOCAL_FILE%y.png',
+    blocks: [],
+    drawingData: {
+      items: [
+        { type: 'shape', _id: 'a', shape: 'rect', x: 437, y: 109, width: 66, height: 15, occlusionCard: { cId: '9564296351421686' } },
+        { type: 'squiggle', _id: 'b', points: [], occlusionCard: { cId: '8604403876402816' } },
+      ],
+      itemRemIds: [],
+    },
+    testInSequenceOrder: 'random',
+    practiceInOrder: false,
+    clozeOrder: [],
+  };
+
+  it('detects boxes drawn in the drawing editor, with an empty blocks list', () => {
+    assert.equal(isImageOcclusionText([drawn, { i: 'q', content: false, pin: true, _id: 'DN6RBj8gigLrM100B' }]), true);
+    assert.equal(isImageOcclusionText(['front'], [drawn]), true);
+  });
+
+  it('ignores plain images, empty box lists, drawings without occlusions and text', () => {
     assert.equal(isImageOcclusionText(['caption', { i: 'i', url: 'x.png' }]), false);
     assert.equal(isImageOcclusionText([{ ...occlusion, blocks: [] }]), false);
+    assert.equal(
+      isImageOcclusionText([{ ...drawn, drawingData: { items: [{ type: 'shape', _id: 'c', shape: 'rect' }] } }]),
+      false
+    );
     assert.equal(isImageOcclusionText(['text', { i: 'q', _id: 'x' }], undefined), false);
   });
 });

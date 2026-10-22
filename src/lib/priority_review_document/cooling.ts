@@ -266,19 +266,26 @@ export function isRecentlyCreatedUnseen(card: CardLike, now: number, days: numbe
  * nothing (RemNote's own bury skips those siblings too). That setting is the
  * Rem field `hato`, which the plugin API does not expose, so the Rem is
  * exempted whichever way it is set.
+ *
+ * The boxes come in two formats: the older `blocks` list, and the drawing
+ * editor's, where `blocks` is empty and each occluding shape in
+ * `drawingData.items` (a rectangle or freehand tape) carries an `occlusionCard`.
+ * RemNote looks a card up with a flat find over those items, so groups need no
+ * walk.
  */
 export function isImageOcclusionText(...texts: unknown[]): boolean {
-  return texts.some(
-    (text) =>
-      Array.isArray(text) &&
-      text.some(
-        (el) =>
-          !!el &&
-          typeof el === 'object' &&
-          (el as { i?: unknown }).i === 'i' &&
-          Array.isArray((el as { blocks?: unknown }).blocks) &&
-          (el as { blocks: unknown[] }).blocks.length > 0
-      )
+  return texts.some((text) => Array.isArray(text) && text.some(isOcclusionImage));
+}
+
+function isOcclusionImage(el: unknown): boolean {
+  if (!el || typeof el !== 'object') return false;
+  const image = el as { i?: unknown; blocks?: unknown; drawingData?: { items?: unknown } };
+  if (image.i !== 'i') return false;
+  if (Array.isArray(image.blocks) && image.blocks.length > 0) return true;
+  const items = image.drawingData?.items;
+  return (
+    Array.isArray(items) &&
+    items.some((item) => !!item && typeof item === 'object' && !!(item as { occlusionCard?: unknown }).occlusionCard)
   );
 }
 

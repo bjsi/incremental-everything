@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.163 - October 22nd, 2026
+
+### 🐛 Fixed
+
+**Cooling**: Fixed Image Occlusions made in RemNote's newer drawing editor being cooled; they are now exempt like every other Image Occlusion.
+
+📖 [Image Occlusion is never cooled](Priority-Review-Document.md#image-occlusion-is-never-cooled)
+
 ## v1.0.162 - October 22nd, 2026
 
 ### ⚡ Improved
