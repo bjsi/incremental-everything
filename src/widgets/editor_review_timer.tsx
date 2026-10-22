@@ -4,9 +4,15 @@ import {
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
-import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { getNextSpacingDateForRem } from '../lib/scheduler';
+import {
+  enqueueEditorReview,
+  editorReviewNextRepDate,
+  newEditorReviewJobId,
+  EditorReviewJob,
+} from '../lib/incremental_rem/editor_review_job';
 import { powerupCode, prioritySlotCode, currentSubQueueIdKey, remnoteEnvironmentId, pageRangeWidgetId } from '../lib/consts';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
@@ -22,9 +28,6 @@ import { startIncRemEngagement, endIncRemEngagement, forceSaveSession } from '..
 import {
   setPendingReviewNote,
   getPendingReviewNote,
-  consumePendingReviewNote,
-  buildRepContext,
-  stampNoteAndContext,
   MAX_NOTE_LENGTH,
 } from '../lib/history_notes';
 import { clearEditorReviewTimerHeights, reportEditorReviewTimerHeight } from '../lib/editor_review_timer_sticky';
@@ -388,123 +391,62 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
   };
 
+  // The reading host and page as the timer shows them right now — what the
+  // repetition's reading time is logged against.
+  const currentHost = (): EditorReviewJob['host'] =>
+    hostRemId ? { remId: hostRemId, page: hostKind === 'pdf' ? pdfControls.currentPage : null } : undefined;
+
   const handleEndReview = async (navigateBack: boolean = true) => {
     if (!timerData) return;
 
-    const rem = await plugin.rem.findOne(timerData.remId);
-    if (!rem) {
-      await plugin.app.toast('Error: Rem not found');
-      return;
-    }
+    // The writes run in the tracker (lib/incremental_rem/editor_review_job.ts),
+    // so the bar goes away now instead of after them; a failure there opens a
+    // dialog. Everything the job needs is captured here, before the session
+    // keys it would otherwise read are cleared below.
+    const reviewTimeSeconds = Math.round(elapsedMs / 1000);
+    const fromQueue = timerData.origin === 'queue';
+    // If the user chose "Keep Current Date" in the regression dialog before
+    // starting the timer, the override is in session storage.
+    const dateOverride = fromQueue
+      ? undefined
+      : await plugin.storage.getSession<number>('editor-review-timer-date-override');
+    const job: EditorReviewJob = {
+      id: newEditorReviewJobId(timerData.remId),
+      remId: timerData.remId,
+      // A queue handoff already wrote the repetition; End Review fills in its time.
+      kind: fromQueue ? 'amendLast' : 'new',
+      intervalDays: timerData.interval || 0,
+      overrideNextRepDate: dateOverride,
+      newPriority: timerData.priority ?? undefined,
+      reviewTimeSeconds,
+      host: currentHost(),
+      recordRep: false,
+      remName: reviewName,
+      confirmedAt: Date.now(),
+    };
+    await enqueueEditorReview(plugin, job);
 
-    const incRem = await getIncrementalRemFromRem(plugin, rem);
-    if (!incRem) {
-      await plugin.app.toast('Error: Not an Incremental Rem');
-      return;
-    }
-
-    // Suppress GlobalRemChanged
-    await plugin.storage.setSession('plugin_operation_active', true);
-
-    try {
-      // Update priority if changed
-      if (timerData.priority !== undefined && timerData.priority !== null) {
-        // recordHistory: false — the rep entry written below carries this priority.
-        await setIncRemPriority(plugin, rem, timerData.priority, { recordHistory: false });
-      }
-
-      // Calculate review time in seconds
-      const reviewTimeSeconds = Math.round(elapsedMs / 1000);
-
-      // Synchronize time spent reading directly to the PDF reading history tracker
-      // Record reading time against the host (PDF or HTML). Pages only apply
-      // to PDFs — pass null for HTML so the entry is page-less.
-      if (hostRemId) {
-        const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
-        // Carry a session bookmark forward so this reading-time entry does not
-        // bury it and make the Scroll button appear stale.
-        const carryHighlightId = await resolveSessionBookmarkCarry(plugin, timerData.remId, hostRemId, pageArg);
-        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds, carryHighlightId);
-      }
-
-      if (timerData.origin === 'queue') {
-        // Mode 1: Started from queue "Review in Editor". Repetition was already created.
-        // We just update the reviewTimeSeconds of the last history entry.
-        const updatedHistory = [...(incRem.history || [])];
-        if (updatedHistory.length > 0) {
-          const lastEntry = updatedHistory[updatedHistory.length - 1];
-          lastEntry.reviewTimeSeconds = reviewTimeSeconds;
-
-          // Attach a note typed during this editor session to the same entry the
-          // handoff wrote (appending to any note already stamped at handoff), and
-          // refresh the reading-state snapshot to end-of-session values.
-          const sessionNote = await consumePendingReviewNote(plugin, timerData.remId);
-          if (sessionNote && sessionNote !== lastEntry.notes) {
-            lastEntry.notes = lastEntry.notes ? `${lastEntry.notes}\n${sessionNote}` : sessionNote;
-          }
-          const ctx = await buildRepContext(plugin, rem);
-          if (ctx) lastEntry.context = ctx;
-        }
-
-        await updateSRSDataForRem(plugin, timerData.remId, incRem.nextRepDate, updatedHistory);
-        await addToIncrementalHistory(plugin, timerData.remId);
-        await plugin.app.toast(`✓ ${reviewName}: Repetition updated (${timeDisplay})`);
-      } else {
-        // Mode 2: Started from Editor command. We need to create the repetition right now.
-        // If the user chose "Keep Current Date" in the regression dialog before starting
-        // the timer, the override will be set in session storage. Use it instead of computing.
-        const dateOverride = await plugin.storage.getSession<number>('editor-review-timer-date-override');
-        const newNextRepDate = dateOverride ?? (Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24);
-
-        // Calculate early/late status
-        const scheduledDate = incRem.nextRepDate;
-        const actualDate = Date.now();
-        const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-        const wasEarly = daysDifference < 0;
-        const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-
-        const repEntry: IncrementalRep = {
-          date: actualDate,
-          scheduled: scheduledDate,
-          interval: timerData.interval || 0,
-          wasEarly: wasEarly,
-          daysEarlyOrLate: daysEarlyOrLate,
-          reviewTimeSeconds: reviewTimeSeconds,
-          priority: incRem.priority, // Record priority at time of rep
-          eventType: 'executeRepetition' as const,
-        };
-
-        // Attach the parked note (typed here or in the review popup) + a
-        // reading-state snapshot to the entry this session just created.
-        await stampNoteAndContext(plugin, rem, repEntry);
-
-        const newHistory: IncrementalRep[] = [...(incRem.history || []), repEntry];
-
-        await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
-        await addToIncrementalHistory(plugin, timerData.remId);
-        const dateStr = dayjs(newNextRepDate).format('MMMM D, YYYY');
-        await plugin.app.toast(`✓ ${reviewName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
-      }
-
-      const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-      if (updatedIncRem) {
-        await updateIncrementalRemCache(plugin, updatedIncRem);
-      }
-    } finally {
-      await plugin.storage.setSession('plugin_operation_active', false);
-    }
+    void plugin.app.toast(
+      fromQueue
+        ? `✓ ${reviewName}: Repetition updated (${timeDisplay})`
+        : `✓ ${reviewName}: Repetition stored (${timeDisplay}), next review: ${dayjs(editorReviewNextRepDate(job)).format('MMMM D, YYYY')}`
+    );
 
     // Clear timer data FIRST (to prevent navigation from interrupting cleanup)
-    await plugin.storage.setSession('editor-review-timer-rem-id', undefined);
-    await plugin.storage.setSession('editor-review-timer-start', undefined);
-    await plugin.storage.setSession('editor-review-timer-interval', undefined);
-    await plugin.storage.setSession('editor-review-timer-priority', undefined);
-    await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
-    await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
-    await plugin.storage.setSession('editor-review-timer-origin', undefined);
-    await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
-    await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
-    await plugin.storage.setSession('editor-review-timer-date-override', undefined);
+    await Promise.all(
+      [
+        'editor-review-timer-rem-id',
+        'editor-review-timer-start',
+        'editor-review-timer-interval',
+        'editor-review-timer-priority',
+        'editor-review-timer-rem-name',
+        'editor-review-timer-from-queue',
+        'editor-review-timer-origin',
+        'editor-review-timer-paused-at',
+        'editor-review-timer-accumulated-ms',
+        'editor-review-timer-date-override',
+      ].map((key) => plugin.storage.setSession(key, undefined))
+    );
 
     // Explicitly end the active session when Ending Review
     await forceSaveSession(plugin);
@@ -541,77 +483,21 @@ function EditorReviewTimer() {
   const handleNextReview = async () => {
     if (!timerData || timerData.queueList.length === 0) return;
 
-    // 1. First, save the repetition for the CURRENT item (matching handleEndReview Mode 2 logic)
-    const currentRem = await plugin.rem.findOne(timerData.remId);
-    if (!currentRem) {
-      await plugin.app.toast('Error: Current Rem not found');
-      return;
-    }
-
-    const currentIncRem = await getIncrementalRemFromRem(plugin, currentRem);
-    if (!currentIncRem) {
-      await plugin.app.toast('Error: Not an Incremental Rem');
-      return;
-    }
-
-    // Suppress GlobalRemChanged
-    await plugin.storage.setSession('plugin_operation_active', true);
-
-    try {
-      // Update priority if changed
-      if (timerData.priority !== undefined && timerData.priority !== null) {
-        // recordHistory: false — the rep entry written below carries this priority.
-        await setIncRemPriority(plugin, currentRem, timerData.priority, { recordHistory: false });
-      }
-
-      // Calculate review time and sync PDF page
-      const reviewTimeSeconds = Math.round(elapsedMs / 1000);
-      // Record reading time against the host (PDF or HTML). Pages only apply
-      // to PDFs — pass null for HTML so the entry is page-less.
-      if (hostRemId) {
-        const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
-        // Carry a session bookmark forward so this reading-time entry does not
-        // bury it and make the Scroll button appear stale.
-        const carryHighlightId = await resolveSessionBookmarkCarry(plugin, timerData.remId, hostRemId, pageArg);
-        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds, carryHighlightId);
-      }
-
-      // Always create a new repetition, just like Mode 2
-      const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
-      const scheduledDate = currentIncRem.nextRepDate;
-      const actualDate = Date.now();
-      const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-      const wasEarly = daysDifference < 0;
-      const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-
-      const repEntry: IncrementalRep = {
-        date: actualDate,
-        scheduled: scheduledDate,
-        interval: timerData.interval || 0,
-        wasEarly: wasEarly,
-        daysEarlyOrLate: daysEarlyOrLate,
-        reviewTimeSeconds: reviewTimeSeconds,
-        priority: currentIncRem.priority,
-        eventType: 'executeRepetition' as const,
-      };
-
-      // Attach the parked note + reading-state snapshot to this item's entry
-      // before moving on to the next queue item.
-      await stampNoteAndContext(plugin, currentRem, repEntry);
-
-      const newHistory: IncrementalRep[] = [...(currentIncRem.history || []), repEntry];
-
-      await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
-      await addToIncrementalHistory(plugin, timerData.remId);
-
-      // Update cache
-      const updatedIncRem = await getIncrementalRemFromRem(plugin, currentRem);
-      if (updatedIncRem) {
-        await updateIncrementalRemCache(plugin, updatedIncRem);
-      }
-    } finally {
-      await plugin.storage.setSession('plugin_operation_active', false);
-    }
+    // 1. Save the repetition for the CURRENT item — a new one, as End Review
+    // does for a review started in the editor. Handed to the tracker like End
+    // Review, so moving on does not wait for the writes.
+    await enqueueEditorReview(plugin, {
+      id: newEditorReviewJobId(timerData.remId),
+      remId: timerData.remId,
+      kind: 'new',
+      intervalDays: timerData.interval || 0,
+      newPriority: timerData.priority ?? undefined,
+      reviewTimeSeconds: Math.round(elapsedMs / 1000),
+      host: currentHost(),
+      recordRep: false,
+      remName: reviewName,
+      confirmedAt: Date.now(),
+    });
 
     // 2. Setup next item in queue
     const nextRemId = timerData.queueList[0];

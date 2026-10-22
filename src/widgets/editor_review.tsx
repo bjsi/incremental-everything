@@ -17,7 +17,7 @@ import { openRemInNewPane } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import { setPendingReviewNote, MAX_NOTE_LENGTH } from '../lib/history_notes';
-import { enqueueEditorReview, editorReviewNextRepDate, EditorReviewJob } from '../lib/incremental_rem/editor_review_job';
+import { enqueueEditorReview, editorReviewNextRepDate, newEditorReviewJobId, EditorReviewJob } from '../lib/incremental_rem/editor_review_job';
 import { PrioritySlider, PriorityBadge } from '../components';
 import {
   deductFromQueueIncRemClock,
@@ -321,13 +321,15 @@ const EditorReviewInput: React.FC<{
         // The writes run in the tracker (lib/incremental_rem/editor_review_job.ts) so the popup
         // closes now instead of after them; a failure there opens a dialog.
         const job: EditorReviewJob = {
-          id: `${remId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: newEditorReviewJobId(remId),
           remId,
+          kind: 'new',
           intervalDays: numDays,
           newPriority: priority,
-          reviewTimeMinutes: numMinutes,
+          reviewTimeSeconds: Math.round(numMinutes * 60),
           overrideNextRepDate: dateOverride,
           note,
+          recordRep: true,
           remName,
           confirmedAt: Date.now(),
         };

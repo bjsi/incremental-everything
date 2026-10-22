@@ -623,8 +623,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     }
   });
 
-  // Editor review watcher (Ctrl+Shift+J popup → Confirm Review).
-  // The popup appends a job and closes at once; the writes run here, suppressed.
+  // Editor review watcher: Ctrl+Shift+J → Confirm Review, and the Editor Review
+  // Timer's End Review / Next Review. They append a job and move on at once; the
+  // writes run here, suppressed.
   // Drained in a loop so a job appended while another is running is not left
   // behind. The id set guards against a job read twice (an append racing the
   // clear writes the old entries back along with the new one).
