@@ -109,6 +109,32 @@ export async function updateIncrementalRemCache(
 }
 
 /**
+ * Applies several cache changes with one read and one write — an IncRem to
+ * upsert, or `null` to remove it. For a caller that changes many rems at once
+ * (the tracker's review jobs), where one updateIncrementalRemCache per rem
+ * would move the whole cache across the bridge every time.
+ */
+export async function applyIncRemCacheChanges(
+  plugin: RNPlugin,
+  changes: Map<string, IncrementalRem | null>
+): Promise<void> {
+  if (changes.size === 0) return;
+  const allRems: IncrementalRem[] =
+    (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+  const upserts = [...changes.values()].filter((r): r is IncrementalRem => r !== null);
+  await writeIncRemCaches(
+    plugin,
+    allRems.filter((r) => !changes.has(r.remId)).concat(upserts)
+  );
+  if (knownIncRemIdsPopulated) {
+    for (const [remId, entry] of changes) {
+      if (entry) knownIncRemIds.add(remId);
+      else knownIncRemIds.delete(remId);
+    }
+  }
+}
+
+/**
  * Removes an incremental rem from the session cache.
  *
  * Use this when a rem is no longer incremental (powerup removed) or deleted.

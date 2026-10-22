@@ -76,17 +76,18 @@ import { CardPriorityInfo, expandCardInfosToCards, isPerCardDue } from '../lib/c
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { initIncrementalRem } from './powerups';
-import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
-import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { IncrementalRep } from '../lib/incremental_rem/types';
-import { safeRemTextToString, getIncrementalReadingPosition, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
+import { getIncrementalRemFromRem, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
+import {
+  queueNextRepetition,
+  captureQueueReviewSeconds,
+  enqueueReviewJob,
+  enqueueReviewJobs,
+  newReviewJobId,
+} from '../lib/incremental_rem/review_jobs';
+import { safeRemTextToString, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
 import { getHoveredReference } from './events';
 import { practicePriorityQueue, findPriorityQueueDoc, isQueueOpen } from '../lib/priority_review_document/queue_doc';
 import { flashcardHistorySpec, clearHistoryShard } from '../lib/history_shards';
-import { transferToDismissed } from '../lib/dismissed';
-import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
-import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
-import dayjs from 'dayjs';
 import {
   getOperatingSystem,
   getPlatform,
@@ -3045,7 +3046,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const isQueue = url && url.includes('/flashcards');
 
       let rem;
-      let incRemInfo;
 
       if (isQueue) {
         // Queue context: an explicit selection (previewer, sidebar, …) wins over
@@ -3070,76 +3070,45 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
-        incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-        if (!incRemInfo) {
-          await plugin.app.toast('Could not retrieve Incremental Rem information.');
-          return;
-        }
-
         // Was the queue actually reviewing THIS rem as an IncRem when Ctrl+D was
         // pressed? Only then did a review happen that deserves a 'rep' entry.
         // Dismissing a rem opened in the previewer (or selected anywhere else)
         // during a flashcard turn is a pure lifecycle change, exactly like the
         // editor branch below.
-        const isActiveIncRemTurn = target.isActiveIncRemTurn;
-
-        // Replicate the Dismiss button logic from answer_buttons.tsx
-        // 1. Handle card priority inheritance
-        await handleCardPriorityInheritance(plugin, rem, incRemInfo);
-
-        // 2/3. Record the review that is ending — ONLY on a real IncRem turn.
+        //
         // `incremReviewStartTimeKey` is stamped when the queue injects an IncRem
         // and is never cleared afterwards, so on any other turn it still points
-        // at an earlier item; using it here fabricated a rep whose duration was
-        // the time since some unrelated IncRem was shown.
-        const updatedHistory = [...(incRemInfo.history || [])];
+        // at an earlier item; reading it there would fabricate a rep whose
+        // duration was the time since some unrelated IncRem was shown.
+        const isActiveIncRemTurn = target.isActiveIncRemTurn;
+        const reviewTimeSeconds = isActiveIncRemTurn ? (await captureQueueReviewSeconds(plugin)) ?? 0 : 0;
 
-        if (isActiveIncRemTurn) {
-          const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-          const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
+        // Same as the Dismiss button: card priority, the move to Dismissed and
+        // the powerup removal run in the tracker (lib/incremental_rem/review_jobs.ts).
+        await enqueueReviewJob(plugin, {
+          id: newReviewJobId(rem._id),
+          kind: 'dismiss',
+          remId: rem._id,
+          rep: isActiveIncRemTurn ? { reviewTimeSeconds } : undefined,
+          cardPriorityInheritance: true,
+          confirmedAt: Date.now(),
+        });
 
-          const currentRep: IncrementalRep = {
-            date: Date.now(),
-            scheduled: incRemInfo.nextRepDate,
-            reviewTimeSeconds: reviewTimeSeconds,
-            eventType: 'rep',
-            priority: incRemInfo.priority,
-          };
-
-          updatedHistory.push(currentRep);
-        }
-
-        // 4. Transfer history to dismissed powerup
-        await transferToDismissed(plugin, rem, updatedHistory);
-
-        // 4b. Record the dismissal in the Incremental History widget
-        await addToIncrementalHistory(plugin, rem._id, { dismissed: true });
-
-        // 5. Remove from session cache
-        await removeIncrementalRemCache(plugin, rem._id);
-
-        // 6. Remove incremental powerup AND conditionally advance queue simultaneously.
-        // removePowerup destroys the widget sandbox on the next microtask,
-        // so both IPC messages must be sent in the same tick if targeting queue.
         // Only a real IncRem turn is advanced: on a flashcard turn the card on
         // screen is a different item that is still due, so dropping it would
         // silently eat a scheduled review.
         if (isActiveIncRemTurn) {
           // Like "Next", dismissing the queue card means we've left the rem —
-          // restore the dashboard. Flag BEFORE the destructive call (consumed by
-          // the persistent QueueLoadCard listener once the next card loads).
+          // restore the dashboard. Flag BEFORE advancing (consumed by the
+          // persistent QueueLoadCard listener once the next card loads).
           await requestQueueDashboardRefocus(plugin, 'dismiss-command');
-          await Promise.allSettled([
-            rem.removePowerup(powerupCode),
-            plugin.queue.removeCurrentCardFromQueue(true),
-          ]);
+          await plugin.queue.removeCurrentCardFromQueue(true);
         } else {
-          await rem.removePowerup(powerupCode);
           // No queue advance here, so nothing on screen changes — confirm which
-          // rem was actually dismissed.
+          // rem was dismissed.
           const name = await safeRemTextToString(plugin, rem.text);
           const short = name.length > 40 ? name.slice(0, 40) + '…' : name;
-          await plugin.app.toast(
+          void plugin.app.toast(
             short ? `Incremental Rem dismissed: "${short}"` : 'Incremental Rem dismissed.'
           );
         }
@@ -3179,22 +3148,23 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
-        for (const r of remsToDissmiss) {
-          incRemInfo = await getIncrementalRemFromRem(plugin, r);
-          if (incRemInfo) {
-            // Transfer existing history to dismissed (no new rep entry needed)
-            await transferToDismissed(plugin, r, incRemInfo.history || []);
-          }
-          // Log a standalone dismissal in the Incremental History widget
-          await addDismissalToIncrementalHistory(plugin, r._id);
-          // Remove from session cache
-          await removeIncrementalRemCache(plugin, r._id);
-          // Remove incremental powerup
-          await r.removePowerup(powerupCode);
-        }
+        // No review is ending here, so no rep entry: the history moves to
+        // Dismissed as it is. One job per rem, drained by the tracker with a
+        // single cache write for the whole selection.
+        const confirmedAt = Date.now();
+        await enqueueReviewJobs(
+          plugin,
+          remsToDissmiss.map((r) => ({
+            id: newReviewJobId(r._id),
+            kind: 'dismiss' as const,
+            remId: r._id,
+            cardPriorityInheritance: false,
+            confirmedAt,
+          }))
+        );
 
         const count = remsToDissmiss.length;
-        await plugin.app.toast(
+        void plugin.app.toast(
           count === 1
             ? 'Incremental Rem dismissed.'
             : `${count} Incremental Rems dismissed.`
@@ -3244,26 +3214,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-      if (!incRemInfo) {
-        await plugin.app.toast('Could not retrieve Incremental Rem information.');
-        return;
-      }
-
-      // Handle PDF page history (same as handleNextClick in answer_buttons.tsx)
+      // Same as the Next button: the writes (reading time, schedule, history)
+      // run in the tracker and the queue advances at once.
       const remType = await plugin.storage.getSession<string | null>(currentIncrementalRemTypeKey);
-      if (remType === 'pdf') {
-        const pdfRem = await getActivePdfForIncRem(plugin, rem);
-        if (pdfRem) {
-          const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRem._id);
-          if (currentPage) {
-            await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
-          }
-        }
-      }
-
-      // Advance the queue (updates SRS data + removes current card)
-      await handleNextRepetitionClick(plugin, incRemInfo);
+      await queueNextRepetition(plugin, rem._id, { syncPdfPage: remType === 'pdf' });
     },
   });
 

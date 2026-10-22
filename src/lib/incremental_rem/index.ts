@@ -22,7 +22,7 @@ import { readRawPdfState, writeRawPdfState } from '../pdf_state';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { getInitialIntervalForRem } from '../scheduler_choice';
 import { IncrementalRem, IncrementalRep, UNREADABLE_PRIORITY_FALLBACK } from './types';
-import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
+import { tryParseJson, getDailyDocReferenceForDate } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { stampNoteAndContext } from '../history_notes';
 import { updateIncrementalRemCache } from './cache';
@@ -264,7 +264,14 @@ async function appendIncRemPriorityChange(
 export async function updateReviewRemData(
   plugin: RNPlugin,
   incRem: IncrementalRem | undefined,
-  overrideOptions?: ReviewOverrideOptions
+  overrideOptions?: ReviewOverrideOptions,
+  /**
+   * Values read at the moment of the click, for a caller that runs later (the
+   * tracker's review jobs): by then the queue has moved on, so the review start
+   * key belongs to the next item and the lookback state may have changed.
+   * `reviewTimeSeconds: null` means no start time was recorded.
+   */
+  captured?: { reviewTimeSeconds: number | null; inLookbackMode: boolean }
 ) {
   if (!incRem) {
     console.log("❌ [reviewRem] No incRem provided!");
@@ -272,15 +279,19 @@ export async function updateReviewRemData(
   }
 
   // 1. Calculate review time
-  const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-  const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : undefined;
+  let reviewTimeSeconds: number | undefined;
+  if (captured) {
+    reviewTimeSeconds = captured.reviewTimeSeconds ?? undefined;
+  } else {
+    const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+    reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : undefined;
+  }
 
-  // DEBUG LOGS
-  console.log(`🔍 [reviewRem] ID: ${incRem.remId}`);
-  console.log(`🔍 [reviewRem] Start Time: ${startTime}`);
-  console.log(`🔍 [reviewRem] Calculated Duration: ${reviewTimeSeconds}`);
+  console.log(`🔍 [reviewRem] ID: ${incRem.remId}, duration: ${reviewTimeSeconds}`);
 
-  const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+  const inLookbackMode = captured
+    ? captured.inLookbackMode
+    : !!(await plugin.queue.inLookbackMode());
   const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
   if (!nextSpacing) {
     return null;
@@ -342,95 +353,6 @@ export async function requestQueueDashboardRefocus(plugin: RNPlugin, source: str
     });
   } catch (e) {
     console.warn(`[QDASH] failed to set refocus flag from "${source}":`, e);
-  }
-}
-
-export async function handleNextRepetitionClick(
-  plugin: RNPlugin,
-  incRem: IncrementalRem | undefined
-) {
-  if (!incRem) return;
-
-  try {
-    await plugin.storage.setSession('plugin_operation_active', true);
-
-    // 1. Capture the exact new data calculated by the review
-    const reviewResult = await updateReviewRemData(plugin, incRem);
-
-    if (reviewResult) {
-      // 2. Manually patch the object using the new data
-      const updatedIncRem: IncrementalRem = {
-        ...incRem,
-        nextRepDate: reviewResult.newNextRepDate,
-        history: reviewResult.newHistory,
-      };
-
-      // 3. Update the cache with guaranteed fresh data
-      await updateIncrementalRemCache(plugin as any, updatedIncRem);
-    }
-
-    // Keep the sleep to be safe
-    await sleep(150);
-
-    // Flag the refocus BEFORE advancing — removeCurrentCardFromQueue tears down
-    // this widget sandbox, so the actual refocus is done by the persistent
-    // QueueLoadCard listener in register/events.ts.
-    await requestQueueDashboardRefocus(plugin, 'handleNextRepetitionClick');
-    await plugin.queue.removeCurrentCardFromQueue();
-  } finally {
-    await plugin.storage.setSession('plugin_operation_active', false);
-  }
-}
-
-/**
- * Same as handleNextRepetitionClick but allows forcing the next repetition
- * to a specific day offset (e.g., Today or Tomorrow) for the drag gesture UX.
- */
-export async function handleNextRepetitionManualOffset(
-  plugin: RNPlugin,
-  incRem: IncrementalRem | undefined,
-  offsetDays: number
-) {
-  if (!incRem) {
-    console.log('[handleNextRepetitionManualOffset] No incRem provided');
-    return;
-  }
-
-  try {
-    await plugin.storage.setSession('plugin_operation_active', true);
-
-    const targetDay = dayjs().startOf('day').add(Math.max(offsetDays, 0), 'day').valueOf();
-
-    const manualEntry: IncrementalRep = {
-      date: Date.now(),
-      scheduled: targetDay,
-      interval: Math.max(offsetDays, 0),
-      // A "carry on today / tomorrow" gesture, not a new rhythm for the item.
-      keepsInterval: true,
-    };
-    // Same note/context stamping as the regular review funnel.
-    const remForStamp = await plugin.rem.findOne(incRem.remId);
-    if (remForStamp) {
-      await stampNoteAndContext(plugin, remForStamp, manualEntry);
-    }
-
-    const newHistory = [...(incRem.history || []), manualEntry];
-
-    await updateSRSDataForRem(plugin, incRem.remId, targetDay, newHistory);
-
-    // MANUALLY CONSTRUCT THE UPDATED OBJECT
-    const updatedIncRem: IncrementalRem = {
-      ...incRem,
-      nextRepDate: targetDay,
-      history: newHistory,
-    };
-
-    await updateIncrementalRemCache(plugin as any, updatedIncRem);
-
-    await requestQueueDashboardRefocus(plugin, 'handleNextRepetitionManualOffset');
-    await plugin.queue.removeCurrentCardFromQueue();
-  } finally {
-    await plugin.storage.setSession('plugin_operation_active', false);
   }
 }
 

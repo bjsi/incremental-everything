@@ -17,7 +17,7 @@ import { openRemInNewPane } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import { setPendingReviewNote, MAX_NOTE_LENGTH } from '../lib/history_notes';
-import { enqueueEditorReview, editorReviewNextRepDate, newEditorReviewJobId, EditorReviewJob } from '../lib/incremental_rem/editor_review_job';
+import { enqueueReviewJob, editorReviewNextRepDate, newReviewJobId, EditorReviewJob } from '../lib/incremental_rem/review_jobs';
 import { PrioritySlider, PriorityBadge } from '../components';
 import {
   deductFromQueueIncRemClock,
@@ -318,10 +318,10 @@ const EditorReviewInput: React.FC<{
       const numMinutes = parseFloat(reviewTimeMinutes) || 0;
 
       if (!isNaN(numDays)) {
-        // The writes run in the tracker (lib/incremental_rem/editor_review_job.ts) so the popup
+        // The writes run in the tracker (lib/incremental_rem/review_jobs.ts) so the popup
         // closes now instead of after them; a failure there opens a dialog.
         const job: EditorReviewJob = {
-          id: newEditorReviewJobId(remId),
+          id: newReviewJobId(remId),
           remId,
           kind: 'new',
           intervalDays: numDays,
@@ -333,7 +333,7 @@ const EditorReviewInput: React.FC<{
           remName,
           confirmedAt: Date.now(),
         };
-        await enqueueEditorReview(plugin, job);
+        await enqueueReviewJob(plugin, job);
 
         // Another review is running on a different rem: these minutes were
         // spent HERE, inside its clock, so they must come off that clock

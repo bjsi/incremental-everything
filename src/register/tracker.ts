@@ -1,7 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
-import { loadIncrementalRemCache, writeIncRemCaches } from '../lib/incremental_rem/cache';
+import { loadIncrementalRemCache, writeIncRemCaches, applyIncRemCacheChanges } from '../lib/incremental_rem/cache';
 import { PriorityChangeEvent } from '../lib/priority_history';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingEditorReviewQueueKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -11,7 +11,7 @@ import { withQueueMutex } from '../lib/mutex';
 // bundled into widget entries without issue, so bundling it here is safe and acyclic.
 import { runIncRemCreateTail, IncRemCreateTailJob } from '../lib/highlightActions';
 import { shouldUseLightMode } from '../lib/mobileUtils';
-import { runEditorReview, EditorReviewJob } from '../lib/incremental_rem/editor_review_job';
+import { runReviewJob, ReviewJob, IncRemCacheChanges } from '../lib/incremental_rem/review_jobs';
 import { showMessageDialog } from '../lib/message_dialog';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
@@ -623,46 +623,56 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     }
   });
 
-  // Editor review watcher: Ctrl+Shift+J → Confirm Review, and the Editor Review
-  // Timer's End Review / Next Review. They append a job and move on at once; the
-  // writes run here, suppressed.
+  // IncRem review job watcher (lib/incremental_rem/review_jobs.ts): queue Next /
+  // Today-Tomorrow drag / Dismiss, Ctrl+D, Cmd+→, Execute Repetition and the Editor
+  // Review Timer all append a job and move on at once; the writes run here, suppressed.
   // Drained in a loop so a job appended while another is running is not left
-  // behind. The id set guards against a job read twice (an append racing the
-  // clear writes the old entries back along with the new one).
-  let editorReviewRunning = false;
-  const doneEditorReviewIds = new Set<string>();
+  // behind; each round patches the IncRem cache once for all its jobs. The id set
+  // guards against a job read twice (an append racing the clear writes the old
+  // entries back along with the new one).
+  let reviewJobsRunning = false;
+  const doneReviewJobIds = new Set<string>();
   plugin.track(async (rp) => {
-    const queued = await rp.storage.getSession<EditorReviewJob[]>(pendingEditorReviewQueueKey);
-    if (!queued || queued.length === 0 || editorReviewRunning) return;
+    const queued = await rp.storage.getSession<ReviewJob[]>(pendingReviewJobQueueKey);
+    if (!queued || queued.length === 0 || reviewJobsRunning) return;
 
-    editorReviewRunning = true;
+    reviewJobsRunning = true;
     incRemBatchActive = true;
     await plugin.storage.setSession('plugin_operation_active', true);
     const cascadeRemIds: string[] = [];
     try {
       while (true) {
-        const current =
-          (await plugin.storage.getSession<EditorReviewJob[]>(pendingEditorReviewQueueKey)) || [];
+        const current = (await plugin.storage.getSession<ReviewJob[]>(pendingReviewJobQueueKey)) || [];
         if (current.length === 0) break;
-        await plugin.storage.setSession(pendingEditorReviewQueueKey, null);
-        const jobs = current.filter((j) => !doneEditorReviewIds.has(j.id));
+        await plugin.storage.setSession(pendingReviewJobQueueKey, null);
+        const jobs = current.filter((j) => !doneReviewJobIds.has(j.id));
 
+        const cacheChanges: IncRemCacheChanges = new Map();
         for (const job of jobs) {
-          doneEditorReviewIds.add(job.id);
-          console.log('[Tracker] editorReview picked up for remId:', job.remId);
+          doneReviewJobIds.add(job.id);
+          console.log(`[Tracker] reviewJob ${job.kind} picked up for remId:`, job.remId);
           try {
-            const { priorityChanged } = await runEditorReview(plugin, job);
-            if (priorityChanged) cascadeRemIds.push(job.remId);
-            console.log('[Tracker] editorReview complete for remId:', job.remId);
+            const { cascadeRemId } = await runReviewJob(plugin, job, cacheChanges);
+            if (cascadeRemId) cascadeRemIds.push(cascadeRemId);
+            console.log(`[Tracker] reviewJob ${job.kind} complete for remId:`, job.remId);
           } catch (err) {
-            console.error('[Tracker] editorReview failed:', err);
+            console.error(`[Tracker] reviewJob ${job.kind} failed:`, err);
+            const isDismissal = job.kind === 'dismiss';
             await showMessageDialog(plugin, {
-              title: 'Repetition not saved',
-              message: `The review of "${job.remName || job.remId}" could not be recorded.`,
+              title: isDismissal ? 'Dismissal not saved' : 'Repetition not saved',
+              message: isDismissal
+                ? `"${job.remName || job.remId}" could not be dismissed.`
+                : `The review of "${job.remName || job.remId}" could not be recorded.`,
               detail: err instanceof Error ? err.message : String(err),
               tone: 'error',
             });
           }
+        }
+
+        try {
+          await applyIncRemCacheChanges(plugin, cacheChanges);
+        } catch (err) {
+          console.error('[Tracker] reviewJob cache patch failed:', err);
         }
       }
 
@@ -673,7 +683,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         await plugin.storage.setSession('pendingInheritanceCascade', cascadeRemIds);
       }
     } finally {
-      editorReviewRunning = false;
+      reviewJobsRunning = false;
       incRemBatchActive = false;
       await plugin.storage.setSession('plugin_operation_active', false);
     }

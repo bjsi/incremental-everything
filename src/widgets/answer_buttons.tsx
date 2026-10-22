@@ -9,8 +9,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useMemo, useRef, useState, useLayoutEffect, useEffect } from 'react';
 import * as _ from 'remeda';
-import dayjs from 'dayjs';
-import { IncrementalRep, repCountsForScheduling } from '../lib/incremental_rem/types';
+import { repCountsForScheduling } from '../lib/incremental_rem/types';
 import { NextRepTime } from '../components/NextRepTime';
 import { DraggableButton } from '../components/buttons/DraggableButton';
 import { Button } from '../components/buttons/Button';
@@ -18,7 +17,6 @@ import { getButtonStyles } from '../components/buttons/styles';
 import { RescheduleIcon, DismissIcon, PriorityIcon, ReviewInEditorIcon, NewTabIcon, LocateIcon, BookmarkIcon } from '../components/buttons/ActionIcons';
 import {
   allIncrementalRemKey,
-  powerupCode,
   activeHighlightIdKey,
   currentIncrementalRemTypeKey,
   displayPriorityShieldId,
@@ -27,26 +25,28 @@ import {
   remnoteEnvironmentId,
   queueSessionCacheKey,
   priorityCalcScopeRemIdsKey,
-  incremReviewStartTimeKey,
 } from '../lib/consts';
-import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetitionManualOffset, updateReviewRemData, requestQueueDashboardRefocus } from '../lib/incremental_rem';
-import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { getIncrementalRemFromRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
+import {
+  queueNextRepetition,
+  queueManualOffset,
+  captureQueueReviewSeconds,
+  enqueueReviewJob,
+  newReviewJobId,
+} from '../lib/incremental_rem/review_jobs';
 import { openRemInBrowserTab } from '../lib/remHelpers';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, calculateWeightedShield, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
-import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, addPageToHistory, getPageHistory, getIncrementalReadingPosition, getDescendantsToDepth, resolveSessionBookmarkCarry } from '../lib/pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, getPageHistory, getDescendantsToDepth } from '../lib/pdfUtils';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
-import { transferToDismissed } from '../lib/dismissed';
 import { setPendingReviewNote, getPendingReviewNote, MAX_NOTE_LENGTH } from '../lib/history_notes';
-import { addToIncrementalHistory } from '../lib/history_utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
-import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import { getIESetting, useIESetting } from '../lib/settings';
 
 export function AnswerButtons() {
@@ -343,33 +343,14 @@ export function AnswerButtons() {
 
   const { ctx, rem, incRemInfo, sessionCache } = coreData;
 
+  // Next and the Today/Tomorrow drag hand their writes to the tracker
+  // (lib/incremental_rem/review_jobs.ts) and advance the queue at once.
   const handleNextClick = async () => {
-    if (remType === 'pdf') {
-      const pdfRem = await getActivePdfForIncRem(plugin, rem);
-      if (pdfRem) {
-        const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRem._id);
-
-        if (currentPage) {
-          // Carry a session bookmark forward so this reading-time entry does
-          // not bury it and make the Scroll button appear stale.
-          const carryHighlightId = await resolveSessionBookmarkCarry(plugin, rem._id, pdfRem._id, currentPage);
-          // Compute review duration here (addPageToHistory no longer auto-
-          // computes — bookmark/UI callers must not record durations).
-          const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-          const reviewTimeSeconds = startTime
-            ? Math.round((Date.now() - startTime) / 1000)
-            : undefined;
-          await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage, reviewTimeSeconds, carryHighlightId);
-        }
-      }
-    }
-
-    await handleNextRepetitionClick(plugin, incRemInfo);
+    await queueNextRepetition(plugin, rem._id, { syncPdfPage: remType === 'pdf' });
   };
 
   const runManualNext = async (mode: 'today' | 'tomorrow') => {
-    const offset = mode === 'tomorrow' ? 1 : 0;
-    await handleNextRepetitionManualOffset(plugin, incRemInfo, offset);
+    await queueManualOffset(plugin, rem._id, mode === 'tomorrow' ? 1 : 0);
   };
 
   const priorityColor = percentiles.kb ? percentileToHslColor(percentiles.kb) : '#6b7280';
@@ -514,47 +495,23 @@ export function AnswerButtons() {
         <Button
           variant="danger"
           onClick={async () => {
-            await handleCardPriorityInheritance(plugin, rem, incRemInfo);
-
-            //Calculate review time and add current history entry
-            const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-            const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
-
-            const currentRep: IncrementalRep = {
-              date: Date.now(),
-              scheduled: incRemInfo.nextRepDate,
-              reviewTimeSeconds: reviewTimeSeconds,
-              eventType: 'rep',
-              priority: incRemInfo.priority,
-            };
-
-            const updatedHistory = [...(incRemInfo.history || []), currentRep];
-
-            // Save updated history to dismissed powerup BEFORE removing incremental
-            await transferToDismissed(plugin, rem, updatedHistory);
-
-            // Reflect the dismissal in the Incremental History widget
-            await addToIncrementalHistory(plugin, rem._id, { dismissed: true });
-
-            // Remove from session cache
-            await removeIncrementalRemCache(plugin, rem._id);
+            // Card priority, the move to Dismissed and the powerup removal run in
+            // the tracker (lib/incremental_rem/review_jobs.ts); the queue moves on now.
+            const reviewTimeSeconds = (await captureQueueReviewSeconds(plugin)) ?? 0;
+            await enqueueReviewJob(plugin, {
+              id: newReviewJobId(rem._id),
+              kind: 'dismiss',
+              remId: rem._id,
+              rep: { reviewTimeSeconds },
+              cardPriorityInheritance: true,
+              confirmedAt: Date.now(),
+            });
 
             // Like "Next", leaving the rem should restore the queue dashboard.
-            // Set the flag BEFORE the destructive call below (the persistent
-            // QueueLoadCard listener consumes it once the next card loads).
+            // Set the flag BEFORE advancing (the persistent QueueLoadCard
+            // listener consumes it once the next card loads).
             await requestQueueDashboardRefocus(plugin, 'dismiss-button');
-
-            // CRITICAL: Both removePowerup and removeCurrentCardFromQueue must be
-            // fired simultaneously. removePowerup destroys the widget sandbox
-            // shortly after resolving, so any subsequent await never completes.
-            // By initiating both calls at once, both IPC messages reach RemNote
-            // before either can trigger sandbox destruction.
-            console.log('[Dismiss] Firing removePowerup + removeCurrentCardFromQueue simultaneously for rem:', rem._id);
-            await Promise.allSettled([
-              rem.removePowerup(powerupCode),
-              plugin.queue.removeCurrentCardFromQueue(true),
-            ]);
-            console.log('[Dismiss] Both operations settled');
+            await plugin.queue.removeCurrentCardFromQueue(true);
           }}
           style={compactButtonStyle}
           title="Dismiss (Ctrl+D): Permanently finish item by removing its Incremental power-up"
