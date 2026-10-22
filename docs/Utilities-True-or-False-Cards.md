@@ -28,7 +28,7 @@ It works in both the Compact and the Beautiful queue, in light and dark mode.
 
 ## Mark as True (`tft`) / Mark as False (`tff`) { #mark-as-true-or-false }
 
-Run **True/False: Mark as True** or **True/False: Mark as False** from the Omnibar or the `/` menu. They act on the focused Rem, on every Rem of a multi-Rem selection, or on the current card while you practise.
+Press **`Ctrl+Shift+T`** (Mark as True) or **`Ctrl+Shift+F`** (Mark as False), or run **True/False: Mark as True** / **True/False: Mark as False** from the Omnibar or the `/` menu. `Ctrl` is the Control key on macOS too; on Windows, `Ctrl+Shift+F` is also RemNote's Filter Document, see [Windows Notes](Keyboard-Shortcuts.md#windows-notes). They act on the focused Rem, on every Rem of a multi-Rem selection, or on the current card while you practise.
 
 Each command does two things:
 

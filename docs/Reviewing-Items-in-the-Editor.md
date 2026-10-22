@@ -27,8 +27,8 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
    ![Execute Repetition popup](assets/review-in-editor.png){ width="500" }
 
 4. Choose from the available options:
-   - **Manual time entry**: Enter the time you spent (in seconds) and click Submit.
-   - **Timer mode**: Start a timer, review the content, then stop and submit.
+   - **Manual time entry**: Enter the time you spent (in minutes) in **Review time** and click **Confirm Review**.
+   - **Timer mode**: Click **⏱️ Start Timer**, review the content, then stop and submit. If you already typed a **Review time**, the timer starts from it instead of from zero, just like *Review in Editor* in the queue carries your reading time forward.
    - **📝 Note** (optional): an observation stored on this repetition's history entry — shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view). If you choose **Start Timer**, the note is handed to the timer and saved when the session ends (you can still extend it there).
 
 ### Key Behavior
@@ -38,6 +38,7 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
 - **Multi-PDF support**: If the Inc Rem has **more than one PDF source**, a PDF dropdown appears just above the Page Controls. Selecting a different PDF pins it as active for this Inc Rem (★ marks the `#preferthispdf` one) — Start Timer will then open and scroll to that PDF, and any subsequent reading-time writes target it. See the [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) section for the resolution chain.
 - **Records review time**: The time you enter is saved in the repetition history.
 - **Schedules next review**: Uses the same [scheduler](IncRem-Scheduler.md) as the queue's "Next" button.
+- **Closes instantly**: **Confirm Review** closes the popup right away and the repetition is saved in the background a moment later. If it can't be saved (for example, the Rem was deleted meanwhile), a dialog tells you. If you changed the priority, the inherited priorities of the flashcards below the Rem are updated too.
 - **Indicator in history**: Shows with a ⌨️ indicator in the Repetition History widget.
 - **Ahead-of-Schedule Warning Banner**: If you review an Incremental Rem before its scheduled due date, an amber warning banner will appear at the top of the popup informing you how many days early you are:
 

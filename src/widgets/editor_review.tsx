@@ -6,21 +6,18 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getNextSpacingDateForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, pageRangeWidgetId } from '../lib/consts';
-import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
-import { safeRemTextToString, getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, getIncrementalReadingPosition, addPageToHistory, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
-import { addToIncrementalHistory } from '../lib/history_utils';
+import { safeRemTextToString, getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
 import { determineIncRemType } from '../lib/incRemHelpers';
 import { openRemInNewPane } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
-import { recordIncRemRep } from '../lib/queue_session';
-import { setPendingReviewNote, stampNoteAndContext, MAX_NOTE_LENGTH } from '../lib/history_notes';
+import { setPendingReviewNote, MAX_NOTE_LENGTH } from '../lib/history_notes';
+import { enqueueEditorReview, editorReviewNextRepDate, EditorReviewJob } from '../lib/incremental_rem/editor_review_job';
 import { PrioritySlider, PriorityBadge } from '../components';
 import {
   deductFromQueueIncRemClock,
@@ -35,83 +32,6 @@ import {
   editorReviewTimerAccumulatedMsKey,
   editorReviewTimerPausedAtKey,
 } from '../lib/consts';
-
-// ─── Core Review Handler ────────────────────────────────────────────────────
-
-async function handleEditorReview(
-  plugin: RNPlugin,
-  remId: string,
-  intervalDays: number,
-  newPriority: number,
-  reviewTimeMinutes: number,
-  /** When set, the handler writes this timestamp as nextRepDate instead of the computed one. */
-  overrideNextRepDate?: number,
-  /** Optional user note stored on this repetition's history entry. */
-  note?: string
-) {
-  const rem = await plugin.rem.findOne(remId);
-  if (!rem) return null;
-
-  const incRem = await getIncrementalRemFromRem(plugin, rem);
-  if (!incRem) return null;
-
-  // recordHistory: false — the rep entry appended below carries this priority.
-  await setIncRemPriority(plugin, rem, newPriority, { recordHistory: false });
-
-  const computedNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
-  const newNextRepDate = overrideNextRepDate ?? computedNextRepDate;
-
-  // The interval stored in history must reflect the EFFECTIVE interval used
-  // for the next rep date, not the algorithm-calculated one. When the user
-  // chooses "Keep Current Date" or "Custom Interval", overrideNextRepDate
-  // differs from the computed value.
-  const effectiveIntervalDays = overrideNextRepDate
-    ? Math.round(((overrideNextRepDate - Date.now()) / (1000 * 60 * 60 * 24)) * 10) / 10
-    : intervalDays;
-
-  // Calculate early/late status
-  const scheduledDate = incRem.nextRepDate;
-  const actualDate = Date.now();
-  const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-  const wasEarly = daysDifference < 0;
-  const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-
-  // Convert minutes to seconds
-  const reviewTimeSeconds = Math.round(reviewTimeMinutes * 60);
-
-  // Synchronize time spent reading directly to the PDF reading history tracker
-  const pdfRem = await getActivePdfForIncRem(plugin, rem);
-  if (pdfRem && reviewTimeSeconds > 0) {
-    const activePage = await getIncrementalReadingPosition(plugin, remId, pdfRem._id);
-    await addPageToHistory(plugin, remId, pdfRem._id, activePage || 1, reviewTimeSeconds);
-  }
-
-  const repEntry: IncrementalRep = {
-    date: actualDate,
-    scheduled: scheduledDate,
-    interval: effectiveIntervalDays,
-    wasEarly: wasEarly,
-    daysEarlyOrLate: daysEarlyOrLate,
-    reviewTimeSeconds: reviewTimeSeconds,
-    priority: incRem.priority, // Record priority at time of rep
-    eventType: 'executeRepetition' as const,
-  };
-
-  // Attach the user's note (if typed) + a reading-state snapshot to the entry.
-  await stampNoteAndContext(plugin, rem, repEntry, note);
-
-  const newHistory: IncrementalRep[] = [...(incRem.history || []), repEntry];
-
-  await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
-  await addToIncrementalHistory(plugin, remId);
-
-  const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-  if (updatedIncRem) {
-    await updateIncrementalRemCache(plugin, updatedIncRem);
-  }
-
-  return { rem, newNextRepDate };
-}
 
 // ─── Confirmation Dialog Types ──────────────────────────────────────────────
 
@@ -398,28 +318,39 @@ const EditorReviewInput: React.FC<{
       const numMinutes = parseFloat(reviewTimeMinutes) || 0;
 
       if (!isNaN(numDays)) {
-        const result = await handleEditorReview(plugin, remId, numDays, priority, numMinutes, dateOverride, note);
-        if (result) {
-          await recordIncRemRep(plugin, remId, Math.round(numMinutes * 60 * 1000));
+        // The writes run in the tracker (lib/incremental_rem/editor_review_job.ts) so the popup
+        // closes now instead of after them; a failure there opens a dialog.
+        const job: EditorReviewJob = {
+          id: `${remId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          remId,
+          intervalDays: numDays,
+          newPriority: priority,
+          reviewTimeMinutes: numMinutes,
+          overrideNextRepDate: dateOverride,
+          note,
+          remName,
+          confirmedAt: Date.now(),
+        };
+        await enqueueEditorReview(plugin, job);
 
-          // Another review is running on a different rem: these minutes were
-          // spent HERE, inside its clock, so they must come off that clock
-          // instead of being counted twice. That review itself continues.
-          let deducted = 0;
-          if (activeReviewKind && numMinutes > 0) {
-            deducted =
-              activeReviewKind === 'queue'
-                ? await deductFromQueueIncRemClock(plugin, numMinutes * 60)
-                : await deductFromEditorTimerClock(plugin, numMinutes * 60);
-          }
-
-          const dateStr = dayjs(result.newNextRepDate).format('MMMM D, YYYY');
-          await plugin.app.toast(
-            `✓ ${remName}: Repetition stored, next review: ${dateStr}` +
-            (deducted > 0 ? ` · ${formatSpan(deducted)} deducted from ${activeReview?.name ?? 'the running review'}` : '')
-          );
-          await plugin.widget.closePopup();
+        // Another review is running on a different rem: these minutes were
+        // spent HERE, inside its clock, so they must come off that clock
+        // instead of being counted twice. That review itself continues.
+        // Kept here (a few small session keys) because the toast reports it.
+        let deducted = 0;
+        if (activeReviewKind && numMinutes > 0) {
+          deducted =
+            activeReviewKind === 'queue'
+              ? await deductFromQueueIncRemClock(plugin, numMinutes * 60)
+              : await deductFromEditorTimerClock(plugin, numMinutes * 60);
         }
+
+        const dateStr = dayjs(editorReviewNextRepDate(job)).format('MMMM D, YYYY');
+        void plugin.app.toast(
+          `✓ ${remName}: Repetition stored, next review: ${dateStr}` +
+          (deducted > 0 ? ` · ${formatSpan(deducted)} deducted from ${activeReview?.name ?? 'the running review'}` : '')
+        );
+        await plugin.widget.closePopup();
       }
     },
     [days, reviewTimeMinutes, plugin, remId, priority, remName, note, activeReviewKind, activeReview]
@@ -490,11 +421,16 @@ const EditorReviewInput: React.FC<{
       }
 
       // Store timer info in session (writing rem-id mounts the timer widget).
-      // The start is back-dated by any time the user carried over from the queue
-      // turn they just left — those minutes were spent reading THIS rem in the
-      // previewer, so the timer picks up where that reading stopped.
+      // The start is back-dated by the time already spent on THIS rem: the
+      // minutes typed in Review time, plus any carried over from the queue turn
+      // they just left (spent reading it in the previewer). The timer picks up
+      // where that reading stopped, like Review in Editor from the queue.
+      const typedReviewMs = Math.max(0, parseFloat(reviewTimeMinutes) || 0) * 60 * 1000;
       await plugin.storage.setSession('editor-review-timer-rem-id', remId);
-      await plugin.storage.setSession('editor-review-timer-start', Date.now() - carryToTargetMsRef.current);
+      await plugin.storage.setSession(
+        'editor-review-timer-start',
+        Date.now() - carryToTargetMsRef.current - typedReviewMs
+      );
       // Start this rem's clock from zero (plus any carry-over back-dated
       // above). Without this, a timer taken over from another rem hands its
       // accumulated segment — and any pause — to the new review.
@@ -541,7 +477,7 @@ const EditorReviewInput: React.FC<{
 
       await plugin.widget.closePopup();
     },
-    [days, plugin, remId, priority, remName, note, activeReviewKind, readActiveReview]
+    [days, reviewTimeMinutes, plugin, remId, priority, remName, note, activeReviewKind, readActiveReview]
   );
 
   // ─── Leaving the Queue Turn ─────────────────────────────────────────────
@@ -1078,7 +1014,7 @@ const EditorReviewInput: React.FC<{
               step="0.5"
               value={reviewTimeMinutes}
               onChange={(e) => setReviewTimeMinutes(e.target.value)}
-              placeholder="Optional — leave empty if using timer"
+              placeholder="Optional — time already spent"
               className="w-full px-3 py-1.5 rounded text-sm"
               style={{
                 border: '1px solid var(--rn-clr-border-primary)',
@@ -1087,7 +1023,7 @@ const EditorReviewInput: React.FC<{
               }}
             />
             <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-              Leave empty if you'll use the timer below
+              Start Timer continues from this time
             </div>
           </div>
 

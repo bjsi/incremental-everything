@@ -2,6 +2,74 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.163 - October 22nd, 2026
+
+### 🐛 Fixed
+
+**Cooling**: Fixed Image Occlusions made in RemNote's newer drawing editor being cooled; they are now exempt like every other Image Occlusion.
+
+📖 [Image Occlusion is never cooled](Priority-Review-Document.md#image-occlusion-is-never-cooled)
+
+## v1.0.162 - October 22nd, 2026
+
+### ⚡ Improved
+
+**Execute Repetition**: Confirm Review now closes the popup instantly and saves the repetition in the background; a priority changed there now also updates the inherited priorities of the flashcards below it.
+
+📖 [Execute Repetition](Reviewing-Items-in-the-Editor.md#key-behavior)
+
+### 🐛 Fixed
+
+**Repetition History**: Fixed slow reviews sometimes adding false ✏️ Manual Date Reset entries.
+
+## v1.0.161 - October 21st, 2026
+
+### ✨ Improved
+
+**Execute Repetition**: Start Timer now continues from the Review time you typed instead of starting from zero, as *Review in Editor* already does from the queue.
+
+📖 [Execute Repetition](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command)
+
+## v1.0.159 - October 17th, 2026
+
+### ✨ Improved
+
+**Inlinize Detected List**: Now on `Ctrl+Shift+F8`; press it again to switch between bulleted items and items separated by a blank line, and fill-in blanks `( )` now count as list markers.
+
+📖 [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl)
+
+**True or False Cards**: Mark as True and Mark as False are now on `Ctrl+Shift+T` and `Ctrl+Shift+F`, in the editor and the queue.
+
+📖 [Mark as True / Mark as False](Utilities-True-or-False-Cards.md#mark-as-true-or-false)
+
+### 🐛 Fixed
+
+**Inlinize Detected List**: Fixed lists not being detected when a spaced dash follows the marker (`I - Um…`, `1 - Um…`).
+
+## v1.0.158 - October 16th, 2026
+
+### ✨ New
+
+**Priority Bridge**: Other plugins can now ask what priority a new flashcard would inherit at a given place and set card priorities, through a small messaging bridge. An importer, for example, can show you each card's inherited priority before importing and let you choose a different one; Incremental RemNote applies it as a manual priority, recorded as **Import** in the card's history.
+
+📖 [Priority Bridge for Other Plugins](Priority-Bridge-for-Other-Plugins.md)
+
+## v1.0.157 - October 15th, 2026
+
+### ✨ Improved
+
+**Answer Buttons**: Redesigned the bar so it fits on one line: every button after Next is now a compact icon button, and Scroll to Highlight / Scroll to Bookmark became **To Highlight** / **To Bookmark**, next to the other reader actions.
+
+![A PDF highlight in the queue with the redesigned answer buttons bar](assets/answer-buttons-new-design.png){ width="1000" }
+
+📖 [The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
+
+### 🐛 Fixed
+
+**Queue**: Fixed documents with due Incremental Rems but no due flashcards opening on "You've finished practicing for now"; the first Incremental Rem now appears after a brief flash of that screen.
+
+**Queue**: Fixed a blank band between the PDF reader and the answer buttons in the Beautiful queue, and removed the empty space below the buttons.
+
 ## v1.0.156 - October 15th, 2026
 
 ### ✨ New

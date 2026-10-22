@@ -309,7 +309,7 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     id: 'inlinize-break-lists',
     category: 'utilities',
     title: 'Rescue a flattened list',
-    body: 'A highlight that ate its line breaks: “inl” rebuilds the items, “brl” splits them out.',
+    body: 'A highlight that ate its line breaks: Ctrl+Shift+F8 (“inl”) rebuilds the items, “brl” splits them out.',
     docsPath: 'Utilities-Text-and-Lists/#inlinize-break-lists-from-pdf-highlights',
   },
     {

@@ -15,6 +15,7 @@ import { NextRepTime } from '../components/NextRepTime';
 import { DraggableButton } from '../components/buttons/DraggableButton';
 import { Button } from '../components/buttons/Button';
 import { getButtonStyles } from '../components/buttons/styles';
+import { RescheduleIcon, DismissIcon, PriorityIcon, ReviewInEditorIcon, NewTabIcon, LocateIcon, BookmarkIcon } from '../components/buttons/ActionIcons';
 import {
   allIncrementalRemKey,
   powerupCode,
@@ -409,6 +410,21 @@ export function AnswerButtons() {
     margin: '0 6px',
   };
 
+  // Icon + one-word label stacked: the secondary actions stay narrow so the
+  // button row fits on one line beside the conditional buttons.
+  const compactButtonStyle: React.CSSProperties = {
+    minWidth: '58px',
+    padding: '6px 8px',
+    gap: '4px',
+  };
+
+  const compactLabelStyle: React.CSSProperties = {
+    fontSize: '10.5px',
+    fontWeight: 500,
+    lineHeight: '1.1',
+    whiteSpace: 'nowrap',
+  };
+
   const priorityBadgeStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -488,10 +504,11 @@ export function AnswerButtons() {
           onClick={async () => {
             await plugin.widget.openPopup('reschedule', { remId: ctx.remId });
           }}
+          style={compactButtonStyle}
           title="Reschedule (Ctrl+J): Manually set custom interval and adjust priority"
         >
-          <div style={buttonStyles.label}>Reschedule</div>
-          <div style={buttonStyles.sublabel}>Set interval</div>
+          <RescheduleIcon size={15} />
+          <div style={compactLabelStyle}>Reschedule</div>
         </Button>
 
         <Button
@@ -539,9 +556,11 @@ export function AnswerButtons() {
             ]);
             console.log('[Dismiss] Both operations settled');
           }}
+          style={compactButtonStyle}
           title="Dismiss (Ctrl+D): Permanently finish item by removing its Incremental power-up"
         >
-          <div style={buttonStyles.label}>Dismiss</div>
+          <DismissIcon size={15} />
+          <div style={{ ...compactLabelStyle, fontWeight: 600 }}>Dismiss</div>
         </Button>
 
         {/* Divider */}
@@ -552,28 +571,102 @@ export function AnswerButtons() {
           onClick={async () => {
             await plugin.widget.openPopup('priority', { remId: ctx.remId });
           }}
+          style={compactButtonStyle}
           title="Change Priority (Ctrl+P / Ctrl+Alt+P): Adjust item's priority on the fly"
         >
-          <div style={buttonStyles.label}>Change</div>
-          <div style={buttonStyles.label}>Priority</div>
+          <PriorityIcon size={15} />
+          <div style={compactLabelStyle}>Priority</div>
         </Button>
 
         <Button
           onClick={() => handleReviewInEditorRem(plugin, rem, remType)}
+          style={compactButtonStyle}
           title="Review in Editor (Ctrl+Shift+J): Reschedule item, open in editor, and start Editor Review Timer"
         >
-          <div style={buttonStyles.label}>Review</div>
-          <div style={buttonStyles.label}>in Editor</div>
+          <ReviewInEditorIcon size={15} />
+          <div style={compactLabelStyle}>In Editor</div>
         </Button>
 
         <Button
           onClick={() => openRemInBrowserTab(plugin, rem._id)}
-          style={{ minWidth: '100px' }}
+          style={compactButtonStyle}
           title="Open Editor in New Tab: Instantly open the full source document in a new browser tab"
         >
-          <div style={buttonStyles.label}>Open Editor</div>
-          <div style={buttonStyles.sublabel}>New Tab</div>
+          <NewTabIcon size={15} />
+          <div style={compactLabelStyle}>New Tab</div>
         </Button>
+
+        {/* Scroll to Highlight / Bookmark: compact, beside the other reader actions. */}
+        {activeHighlightId && (
+          <>
+            <Button
+              onClick={async () => {
+                const highlightRem = await plugin.rem.findOne(activeHighlightId);
+                await highlightRem?.scrollToReaderHighlight();
+              }}
+              style={{
+                ...compactButtonStyle,
+                backgroundColor: 'var(--rn-clr-yellow, #fbbf24)',
+                color: 'var(--rn-clr-content-primary)',
+                border: '2px solid var(--rn-clr-yellow, #f59e0b)',
+                animation: 'highlightPulse 2s ease-in-out 3',
+              }}
+              title="Scroll to Highlight: Instantly snap view back to highlight's position"
+            >
+              <LocateIcon size={15} />
+              <div style={{ ...compactLabelStyle, fontWeight: 600 }}>To Highlight</div>
+            </Button>
+            <style>{`
+              @keyframes highlightPulse {
+                0%, 100% {
+                  transform: translateY(0) scale(1);
+                  box-shadow: 0 2px 4px rgba(251, 191, 36, 0.3);
+                }
+                50% {
+                  transform: translateY(-2px) scale(1.05);
+                  box-shadow: 0 6px 12px rgba(251, 191, 36, 0.5);
+                }
+              }
+            `}</style>
+          </>
+        )}
+
+        {/* Scroll to Bookmark: visible for both pdf and pdf-highlight types */}
+        {bookmarkHighlightId && (
+          <Button
+            onClick={async () => {
+              const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+              await bookmarkRem?.scrollToReaderHighlight();
+            }}
+            style={{
+              ...compactButtonStyle,
+              position: 'relative',
+              color: 'var(--rn-clr-blue, #3b82f6)',
+              border: '2px solid var(--rn-clr-blue, #3b82f6)',
+            }}
+            title={
+              'Scroll to Bookmark: Jump to your last saved reading position in the document' +
+              (readerBookmarkIsLatest ? ' (saved more recently than the read point)' : '')
+            }
+          >
+            <BookmarkIcon size={15} />
+            <div style={{ ...compactLabelStyle, fontWeight: 600 }}>To Bookmark</div>
+            {/* "Latest" marker: saved more recently than the read point. */}
+            {readerBookmarkIsLatest && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: 'currentColor',
+                }}
+              />
+            )}
+          </Button>
+        )}
 
         {/* Review-note toggle — compact icon (styled like the ℹ️ help icon).
             Tinted while the input is open or a note is pending. */}
@@ -604,64 +697,6 @@ export function AnswerButtons() {
         >
           📝
         </span>
-
-        {activeHighlightId && (
-          <>
-            <div style={dividerStyle} />
-            <Button
-              onClick={async () => {
-                const highlightRem = await plugin.rem.findOne(activeHighlightId);
-                await highlightRem?.scrollToReaderHighlight();
-              }}
-              style={{
-                backgroundColor: 'var(--rn-clr-yellow, #fbbf24)',
-                color: 'var(--rn-clr-content-primary)',
-                border: '2px solid var(--rn-clr-yellow, #f59e0b)',
-                animation: 'highlightPulse 2s ease-in-out 3',
-                fontWeight: 600,
-              }}
-              title="Scroll to Highlight: Instantly snap view back to highlight's position"
-            >
-              <div style={buttonStyles.label}>Scroll to</div>
-              <div style={buttonStyles.sublabel}>Highlight</div>
-            </Button>
-            <style>{`
-              @keyframes highlightPulse {
-                0%, 100% {
-                  transform: translateY(0) scale(1);
-                  box-shadow: 0 2px 4px rgba(251, 191, 36, 0.3);
-                }
-                50% {
-                  transform: translateY(-2px) scale(1.05);
-                  box-shadow: 0 6px 12px rgba(251, 191, 36, 0.5);
-                }
-              }
-            `}</style>
-          </>
-        )}
-
-        {/* Scroll to Bookmark: visible for both pdf and pdf-highlight types */}
-        {bookmarkHighlightId && (
-          <>
-            <div style={dividerStyle} />
-            <Button
-              onClick={async () => {
-                const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
-                await bookmarkRem?.scrollToReaderHighlight();
-              }}
-              style={{
-                backgroundColor: 'var(--rn-clr-background-secondary)',
-                color: 'var(--rn-clr-blue, #3b82f6)',
-                border: '2px solid var(--rn-clr-blue, #3b82f6)',
-                fontWeight: 600,
-              }}
-              title="Scroll to Bookmark: Jump to your last saved reading position in the document"
-            >
-              <div style={buttonStyles.label}>🔖 Scroll{readerBookmarkIsLatest ? ' • latest' : ''}</div>
-              <div style={buttonStyles.sublabel}>to Bookmark</div>
-            </Button>
-          </>
-        )}
 
         {/* Read point (hybrid cards): a read point is set on a descendant rem.
             The in-queue reader can't jump there without leaving the queue, so a

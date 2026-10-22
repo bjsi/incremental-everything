@@ -193,6 +193,16 @@ let rebuildRequested: PrefetchQueueInfo | null = null;
  */
 let generation = 0;
 let refillTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * True once primeQueuePrefetch has run for the current session, i.e. once the
+ * buffer is built against the session's real document scope. Before that, a
+ * build triggered from GetNextCard selects from the whole KB (see
+ * buildQueuePrefetch), which is fine for a turn the user may never notice but
+ * not for the empty-queue rescue, which must only ever show an in-scope IncRem.
+ */
+let primed = false;
+/** The sub-queue the session was primed for, so a wait from another session never matches. */
+let primedSubQueueId: string | undefined;
 
 const makeBuildKey = (info: PrefetchQueueInfo) => `${info.mode}|${info.subQueueId ?? ''}`;
 
@@ -207,6 +217,7 @@ export function resetQueuePrefetch() {
   }
   rebuildRequested = null;
   generation++;
+  primed = false;
   state = emptyState(state);
 }
 
@@ -233,6 +244,35 @@ export function readDueCount(): number {
 
 export function isPrefetchReadyFor(info: PrefetchQueueInfo): boolean {
   return state.ready && state.buildKey === makeBuildKey(info);
+}
+
+/** True when there is something left to serve, deferred spoilers included. */
+export function hasPrefetchedCandidate(info: PrefetchQueueInfo): boolean {
+  if (!isPrefetchReadyFor(info)) return false;
+  const unseen = (list: SlimIncRem[]) => list.some((c) => !state.seen.has(c.remId));
+  return unseen(state.buffer) || unseen(state.deferredBuffer);
+}
+
+/**
+ * Resolves true once the session is primed and the buffer is built for `info`,
+ * false on timeout. Polls module memory only — no bridge traffic. When the
+ * primed buffer was built for another mode (QueueEnter primes 'normal'), it
+ * requests the build for the real one.
+ */
+export async function waitForPrimedPrefetch(
+  plugin: ReactRNPlugin,
+  info: PrefetchQueueInfo,
+  timeoutMs: number
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (primed && primedSubQueueId === info.subQueueId) {
+      if (isPrefetchReadyFor(info)) return true;
+      if (!buildInFlight) void buildQueuePrefetch(plugin, info);
+    }
+    if (Date.now() >= deadline) return false;
+    await new Promise((r) => setTimeout(r, 50));
+  }
 }
 
 /**
@@ -745,15 +785,24 @@ export function scheduleQueuePrefetchRefill(plugin: ReactRNPlugin, info: Prefetc
 /**
  * Primes state at queue entry, before the first GetNextCard call arrives.
  *
- * Called at the end of the QueueEnter handler, by which point the document scope
- * and the session caches it depends on are resolved. The queue mode is not part
+ * Called from the QueueEnter handler as soon as the document scope is in session
+ * storage — the build reads nothing else that QueueEnter computes, so it does not
+ * wait for the priority and shield calculations that follow. The queue mode is not part
  * of the QueueEnter payload, so this primes for 'normal'; if the session turns
  * out to be practice-all or in-order, the first GetNextCard sees the build-key
  * mismatch and triggers a rebuild for the real mode.
  */
 export async function primeQueuePrefetch(plugin: ReactRNPlugin, subQueueId: string | undefined) {
   resetQueuePrefetch();
+  const primedGeneration = generation;
   await buildQueuePrefetch(plugin, { mode: 'normal', subQueueId });
+  // Marked even when the build was queued behind one in flight rather than run:
+  // the scope is in session storage by now, so every build from here on is
+  // scoped. waitForPrimedPrefetch still waits for `ready` before trusting it.
+  if (primedGeneration === generation) {
+    primed = true;
+    primedSubQueueId = subQueueId;
+  }
 }
 
 /**

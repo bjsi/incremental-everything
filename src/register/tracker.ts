@@ -1,7 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache, writeIncRemCaches } from '../lib/incremental_rem/cache';
 import { PriorityChangeEvent } from '../lib/priority_history';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingEditorReviewQueueKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -11,6 +11,8 @@ import { withQueueMutex } from '../lib/mutex';
 // bundled into widget entries without issue, so bundling it here is safe and acyclic.
 import { runIncRemCreateTail, IncRemCreateTailJob } from '../lib/highlightActions';
 import { shouldUseLightMode } from '../lib/mobileUtils';
+import { runEditorReview, EditorReviewJob } from '../lib/incremental_rem/editor_review_job';
+import { showMessageDialog } from '../lib/message_dialog';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
 // IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
@@ -616,6 +618,61 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       console.error('[Tracker] incRemCreateTail failed:', err);
     } finally {
       incRemCreateTailRunning = false;
+      incRemBatchActive = false;
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }
+  });
+
+  // Editor review watcher (Ctrl+Shift+J popup → Confirm Review).
+  // The popup appends a job and closes at once; the writes run here, suppressed.
+  // Drained in a loop so a job appended while another is running is not left
+  // behind. The id set guards against a job read twice (an append racing the
+  // clear writes the old entries back along with the new one).
+  let editorReviewRunning = false;
+  const doneEditorReviewIds = new Set<string>();
+  plugin.track(async (rp) => {
+    const queued = await rp.storage.getSession<EditorReviewJob[]>(pendingEditorReviewQueueKey);
+    if (!queued || queued.length === 0 || editorReviewRunning) return;
+
+    editorReviewRunning = true;
+    incRemBatchActive = true;
+    await plugin.storage.setSession('plugin_operation_active', true);
+    const cascadeRemIds: string[] = [];
+    try {
+      while (true) {
+        const current =
+          (await plugin.storage.getSession<EditorReviewJob[]>(pendingEditorReviewQueueKey)) || [];
+        if (current.length === 0) break;
+        await plugin.storage.setSession(pendingEditorReviewQueueKey, null);
+        const jobs = current.filter((j) => !doneEditorReviewIds.has(j.id));
+
+        for (const job of jobs) {
+          doneEditorReviewIds.add(job.id);
+          console.log('[Tracker] editorReview picked up for remId:', job.remId);
+          try {
+            const { priorityChanged } = await runEditorReview(plugin, job);
+            if (priorityChanged) cascadeRemIds.push(job.remId);
+            console.log('[Tracker] editorReview complete for remId:', job.remId);
+          } catch (err) {
+            console.error('[Tracker] editorReview failed:', err);
+            await showMessageDialog(plugin, {
+              title: 'Repetition not saved',
+              message: `The review of "${job.remName || job.remId}" could not be recorded.`,
+              detail: err instanceof Error ? err.message : String(err),
+              tone: 'error',
+            });
+          }
+        }
+      }
+
+      // Same follow-up the priority popup schedules when an IncRem priority
+      // changes: inherited card priorities below it are recomputed. Set BEFORE
+      // the flags clear so the cascade watcher picks it up under suppression.
+      if (cascadeRemIds.length > 0) {
+        await plugin.storage.setSession('pendingInheritanceCascade', cascadeRemIds);
+      }
+    } finally {
+      editorReviewRunning = false;
       incRemBatchActive = false;
       await plugin.storage.setSession('plugin_operation_active', false);
     }

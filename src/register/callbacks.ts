@@ -29,6 +29,7 @@ import {
   scheduleQueuePrefetchRefill,
   takePrefetchedCandidate,
 } from '../lib/queue_prefetch';
+import { GetNextCardProbe, rescueEmptyQueueStart, resetEmptyQueueRescue } from '../lib/queue_empty_start';
 
 
 // Registered once globally — safe because all selectors are highly specific to the
@@ -62,6 +63,12 @@ const QUEUE_LAYOUT_FIX_CSS = `
     flex-grow: 1 !important;
     min-height: 0;
   }
+  /* The layout's own filler (an empty "grow" div after the card, added by RemNote
+     in Oct 2026) would take half of the free space beside the stage above,
+     leaving a blank band between the reader and the answer buttons. */
+  .queue-beautiful-box:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .beautiful-queue-card-free-space {
+    flex-grow: 0 !important;
+  }
   /* RemNote sizes both the trailing spacer and the bottom fade mask as
      gradient (56px) + controls height + solid padding (24px), so scrolling text
      fades out behind the answer buttons. Our card fills the box and never scrolls
@@ -86,6 +93,14 @@ const QUEUE_LAYOUT_FIX_CSS = `
      answer_buttons widget is present — the widget provides its own internal spacing. */
   .spaced-repetition__bottom:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=answer_buttons&"]) {
     padding-top: 0 !important;
+  }
+  /* Same for the bottom: the bar's sm:pb-8 (32px) sat on top of the widget's own
+     12px bottom padding, a blank band under the info bar. Desktop widths only — on
+     phones the default pb-6 also clears the home indicator. */
+  @media (min-width: 640px) {
+    .spaced-repetition__bottom:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=answer_buttons&"]) {
+      padding-bottom: 4px !important;
+    }
   }
 `;
 
@@ -118,6 +133,7 @@ export const resetSessionItemCounter = () => {
   // runs on both queue enter and queue exit, so nothing from a finished session
   // can leak into the next one.
   resetQueuePrefetch();
+  resetEmptyQueueRescue();
 };
 
 /**
@@ -208,6 +224,11 @@ type Decision = {
 
 let callSeq = 0;
 let lastDecision: Decision | null = null;
+
+const emptyQueueProbe: GetNextCardProbe = {
+  seq: () => callSeq,
+  answeredWithIncRem: () => !!lastDecision?.remId,
+};
 
 /**
  * Confirms (or refutes) that the item returned by the PREVIOUS GetNextCard call
@@ -387,6 +408,13 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         clearStaleIncRemSignals();
         scheduleQueuePrefetchRefill(plugin, prefetchInfo);
         return finish(null, gates.reason ?? 'blocked');
+      }
+
+      // No flashcards left: RemNote may be showing its end screen with our answer
+      // parked for a pop that never comes — always so when a queue opens with
+      // only IncRems due. See lib/queue_empty_start. Never awaited.
+      if (queueInfo.numCardsRemaining === 0) {
+        rescueEmptyQueueStart(plugin, prefetchInfo, emptyQueueProbe);
       }
 
       const cardsPerRem = readCardsPerRem();
