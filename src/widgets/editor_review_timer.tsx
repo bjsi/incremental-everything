@@ -525,6 +525,10 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-priority', nextIncRemInfo?.priority ?? 10);
     await plugin.storage.setSession('editor-review-timer-rem-name', nextRemName || 'Unnamed Rem');
     await plugin.storage.setSession('editor-review-timer-queue-list', newQueueList);
+    // Reset pause state for the next item, as Dismiss does — otherwise a pause
+    // taken on this item would carry its time (or the paused state) over.
+    await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
+    await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
 
     await plugin.app.toast(`✓ Saved: ${reviewName}. Starting: ${nextRemName}`);
 
