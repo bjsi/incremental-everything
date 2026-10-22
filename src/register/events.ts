@@ -1200,9 +1200,25 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
             // Get the CURRENT nextRepDate from the rem itself
             const currentIncRem = await getIncrementalRemFromRem(plugin, rem);
 
-            if (currentIncRem && dayjs(currentIncRem.nextRepDate).startOf('day').valueOf() !== oldNextRepDate) {
+            const currentDay = currentIncRem
+              ? dayjs(currentIncRem.nextRepDate).startOf('day').valueOf()
+              : undefined;
+            if (currentIncRem && currentDay !== oldNextRepDate) {
+              // Every plugin write of the date (updateSRSDataForRem) stamps the
+              // same date as nextRepMs on the newest history entry; editing the
+              // date chip by hand changes only the reference. So a stamp on the
+              // current day means the plugin moved it. Unlike the session flag
+              // below, this does not depend on a 3s timer outlasting the
+              // debounce — under load the debounce ran after the flag had
+              // cleared and logged the plugin's own write as a manual reset.
+              const history = currentIncRem.history || [];
+              const lastStamp = history[history.length - 1]?.nextRepMs;
+              const pluginWroteThisDate =
+                typeof lastStamp === 'number' && dayjs(lastStamp).startOf('day').valueOf() === currentDay;
+
               // Check if this change was made by the plugin using a session flag
-              const pluginIsUpdating = await plugin.storage.getSession<boolean>('plugin_updating_srs_data');
+              const pluginIsUpdating =
+                pluginWroteThisDate || (await plugin.storage.getSession<boolean>('plugin_updating_srs_data'));
 
               if (!pluginIsUpdating) {
                 // Date was changed manually! Add manualDateReset event
@@ -1359,6 +1375,12 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         }
 
       }, REM_CHANGE_DEBOUNCE_MS);
+      // Cleared again here, not only at the top: two events for the same rem
+      // can both pass the top clear before either sets its timer (the
+      // pre-capture above awaits in between), leaving two timers and a
+      // duplicated detection. The later event's timer is the one that stays.
+      const racingTimer = remChangeDebounceTimers.get(data.remId);
+      if (racingTimer) clearTimeout(racingTimer);
       remChangeDebounceTimers.set(data.remId, debounceTimer);
     }
   );

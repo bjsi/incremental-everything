@@ -544,6 +544,11 @@ export const pendingIntervalBatchSaveKey = 'pendingIntervalBatchSave';
 // in the index widget also means the writes survive popup teardown and can be wrapped
 // in the plugin_operation_active / incRemBatchActive suppression flags.
 export const pendingIncRemCreateTailKey = 'pendingIncRemCreateTail';
+// Editor review jobs (Ctrl+Shift+J popup → Confirm Review): the popup appends one here
+// and closes at once; tracker.ts drains them in the persistent index widget. A queue,
+// not a slot, so two reviews confirmed in quick succession cannot overwrite each other.
+// See lib/incremental_rem/editor_review_job.ts.
+export const pendingEditorReviewQueueKey = 'pendingEditorReviewQueue';
 // Rem ids that were made Incremental moments ago and whose priority popup is about
 // to open (extract-with-priority, Toggle Incremental, the PDF/HTML/video highlight
 // "Create IncRem" flows). The popup reads this list once on mount, clears it, and

@@ -2,6 +2,18 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.162 - October 22nd, 2026
+
+### ⚡ Improved
+
+**Execute Repetition**: Confirm Review now closes the popup instantly and saves the repetition in the background; a priority changed there now also updates the inherited priorities of the flashcards below it.
+
+📖 [Execute Repetition](Reviewing-Items-in-the-Editor.md#key-behavior)
+
+### 🐛 Fixed
+
+**Repetition History**: Fixed slow reviews sometimes adding false ✏️ Manual Date Reset entries.
+
 ## v1.0.161 - October 21st, 2026
 
 ### ✨ Improved

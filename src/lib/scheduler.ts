@@ -1,4 +1,4 @@
-import { RNPlugin } from '@remnote/plugin-sdk';
+import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { nextRepDateSlotCode, powerupCode, repHistorySlotCode } from './consts';
 import { IncrementalRep } from './incremental_rem';
 import { repCountsForScheduling } from './incremental_rem/types';
@@ -204,9 +204,11 @@ export async function updateSRSDataForRem(
   plugin: RNPlugin,
   remId: string,
   newNextRepDate: number,
-  newHistory: IncrementalRep[]
+  newHistory: IncrementalRep[],
+  /** The rem, when the caller already holds it — saves a findOne. */
+  remInHand?: PluginRem
 ) {
-  const rem = await plugin.rem.findOne(remId);
+  const rem = remInHand ?? (await plugin.rem.findOne(remId));
   console.log('updating srs data for rem', remId, newNextRepDate, newHistory);
   console.log('next rep due in ', dayjs(newNextRepDate).fromNow());
   const date = new Date(newNextRepDate);
