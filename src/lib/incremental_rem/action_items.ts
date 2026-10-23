@@ -116,6 +116,12 @@ export const remToActionItemType = async (
   } else if (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
     return { rem, type: 'pdf' };
   } else if (await rem.hasPowerup('vi')) {
+    // A RemNote video Rem: its URL is the Video powerup's URL slot. With a
+    // YouTube URL the plugin's player can show it as well as RemNote's.
+    const url = await rem.getPowerupProperty('vi', 'u');
+    if (url && ['youtube', 'youtu.be'].some((x) => url.includes(x))) {
+      return { rem, type: 'youtube', url, nativeAvailable: true };
+    }
     return { rem, type: 'video' };
   } else if (
     (await rem.hasPowerup(BuiltInPowerupCodes.Link)) &&

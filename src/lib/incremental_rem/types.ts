@@ -15,7 +15,13 @@ export type ActionItemType =
 
 export type PDFActionItem = { type: 'pdf'; rem: PluginRem };
 export type HTMLActionItem = { type: 'html'; rem: PluginRem };
-export type YoutubeActionItem = { type: 'youtube'; rem: PluginRem; url: string };
+export type YoutubeActionItem = {
+  type: 'youtube';
+  rem: PluginRem;
+  url: string;
+  /** A RemNote video Rem (Upload File › YouTube URL): RemNote's own player can show it too. */
+  nativeAvailable?: boolean;
+};
 export type VideoActionItem = { type: 'video'; rem: PluginRem };
 export type RemActionItem = { type: 'rem'; rem: PluginRem };
 export type PDFHighlightActionItem = { type: 'pdf-highlight'; rem: PluginRem; extract: PluginRem };

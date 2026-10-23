@@ -1,9 +1,8 @@
-import { DocumentViewer, usePlugin } from '@remnote/plugin-sdk';
+import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 
 // Notes on the left, the video on the right, with a draggable divider between
-// them. Both sides are host-drawn layers over the plugin iframe (a
-// DocumentViewer each), so the divider gets its own strip between them: a
+// them. Both sides are usually host-drawn layers over the plugin iframe, so the divider gets its own strip between them: a
 // handle overlapping either side would sit under the host layer and never see
 // the mouse. Pointer capture keeps the drag going when the pointer crosses
 // onto a side.
@@ -16,15 +15,15 @@ const KEY_STEP = 0.05;
 const clampRatio = (r: number) => Math.min(MAX_RATIO, Math.max(MIN_RATIO, r));
 
 interface VideoNotesSplitProps {
-  /** The document shown on the left. */
-  notesDocId: string;
+  /** What the left side shows: usually a DocumentViewer of the IncRem. */
+  notes: React.ReactNode;
   notesOpen: boolean;
   /** The video side. */
   children: React.ReactNode;
 }
 
 export const VideoNotesSplit: React.FC<VideoNotesSplitProps> = ({
-  notesDocId,
+  notes,
   notesOpen,
   children,
 }) => {
@@ -86,8 +85,8 @@ export const VideoNotesSplit: React.FC<VideoNotesSplitProps> = ({
     >
       {notesOpen && (
         <>
-          <div style={{ width: `${ratio * 100}%`, height: '100%', flexShrink: 0 }}>
-            <DocumentViewer width={'100%'} height={'100%'} documentId={notesDocId} />
+          <div style={{ width: `${ratio * 100}%`, height: '100%', flexShrink: 0, overflow: 'auto' }}>
+            {notes}
           </div>
           <div
             role="separator"

@@ -1,4 +1,4 @@
-import { usePlugin, useRunAsync } from '@remnote/plugin-sdk';
+import { DocumentViewer, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
 import { YoutubeHighlightActionItem } from '../lib/incremental_rem/types';
 import { extractVideoId } from '../lib/youtube_transcript';
@@ -111,7 +111,10 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                     </span>
                 )}
             </div>
-            <VideoNotesSplit notesDocId={extract._id} notesOpen={notesOpen}>
+            <VideoNotesSplit
+                notes={<DocumentViewer width={'100%'} height={'100%'} documentId={extract._id} />}
+                notesOpen={notesOpen}
+            >
                 {!videoId ? (
                     <div className="p-4">Not a YouTube video URL: {url}</div>
                 ) : savedRate !== undefined ? (

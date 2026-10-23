@@ -12,7 +12,7 @@
 const PROXY_URL = 'http://localhost:3456';
 
 const RE_YOUTUBE =
-    /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i;
+    /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i;
 
 export interface TranscriptSegment {
     text: string;

@@ -1,4 +1,4 @@
-import { usePlugin, useRunAsync } from '@remnote/plugin-sdk';
+import { DocumentViewer, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
 import { YoutubeActionItem } from '../lib/incremental_rem';
 import { initIncrementalRem } from '../lib/incremental_rem';
@@ -14,9 +14,13 @@ import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PAUSED, YT_PLAYING } fro
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
 import { VideoSnapshotButtons } from './VideoSnapshotButtons';
+import { ExtractViewer } from './ExtractViewer';
+import { setNativeVideoPosition, setPluginVideoPosition } from '../lib/video_position';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
+  /** Shown for RemNote video Rems: switches the card to RemNote's player. */
+  onSwitchPlayer?: () => void;
 }
 
 /** Format seconds to MM:SS */
@@ -190,6 +194,31 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
     }
   };
 
+  // Leaving for RemNote's player: save where this one is, and put it in
+  // RemNote's "Resume watching at…". Before the player has played from the
+  // saved start, the time it reports can't be trusted.
+  const switchToNative = async () => {
+    send({ command: 'pause' });
+    const at = armed.current ? latestPosition.current ?? info.currentTime : undefined;
+    const seconds = at ?? saved?.position ?? 0;
+    try {
+      await setPluginVideoPosition(plugin, props.actionItem.url, seconds);
+      lastSaved.current = { at: Date.now(), position: seconds };
+      await setNativeVideoPosition(props.actionItem.rem, seconds);
+    } catch (e) {
+      console.error('[VideoViewer] Could not hand the position over:', e);
+    }
+    props.onSwitchPlayer?.();
+  };
+
+  // A RemNote video Rem shown as a document is RemNote's video page, player
+  // and all, so its notes are shown as an outline instead.
+  const notes = props.actionItem.nativeAvailable ? (
+    <ExtractViewer rem={props.actionItem.rem} plugin={plugin as any} />
+  ) : (
+    <DocumentViewer width={'100%'} height={'100%'} documentId={props.actionItem.rem._id} />
+  );
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="top-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
@@ -214,6 +243,23 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
             }}
           >
             {saved.position > 0 ? `⏮ Resumed at ${formatTime(saved.position)}` : '⏮ From the start'}
+          </button>
+        )}
+
+        {props.onSwitchPlayer && (
+          <button
+            onClick={switchToNative}
+            title="Watch in RemNote's player: transcript, Highlight Moment, AI Tutor and Summary. It offers to resume where you are now."
+            style={{
+              cursor: 'pointer',
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: '1px solid #d1d5db',
+              backgroundColor: '#f3f4f6',
+              fontSize: 12,
+            }}
+          >
+            🎬 RemNote player
           </button>
         )}
 
@@ -294,7 +340,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
           </span>
         )}
       </div>
-      <VideoNotesSplit notesDocId={props.actionItem.rem._id} notesOpen={notesOpen}>
+      <VideoNotesSplit notes={notes} notesOpen={notesOpen}>
         {!videoId ? (
           <div className="p-4">Not a YouTube video URL: {props.actionItem.url}</div>
         ) : saved ? (

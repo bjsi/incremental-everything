@@ -61,6 +61,8 @@ import {
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
   IsolatedQueueMode,
+  defaultVideoPlayerId,
+  DefaultVideoPlayer,
   autoFocusQueueDashboardId,
   hideCardPriorityTagSettingId,
   showLeftBorderForIncRemsSettingId,
@@ -150,6 +152,7 @@ export interface IESettings {
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
+  [defaultVideoPlayerId]: DefaultVideoPlayer;
   [autoFocusQueueDashboardId]: boolean;
 
   // Editor indicators
@@ -239,6 +242,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
+  [defaultVideoPlayerId]: 'plugin',
   [autoFocusQueueDashboardId]: false,
 
   [hideCardPriorityTagSettingId]: true,
@@ -806,6 +810,22 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'rems', label: 'Regular Rems' },
       { value: 'both', label: 'Both' },
       { value: 'none', label: 'None' },
+    ],
+  },
+  [defaultVideoPlayerId]: {
+    kind: 'dropdown',
+    group: 'queue',
+    helpPath: 'Incremental-Video/',
+    title: 'Default Player for RemNote Videos',
+    description:
+      'Which player a video added through RemNote\'s Upload File › YouTube URL opens in, in the ' +
+      'queue. The plugin\'s player resumes where you stopped and has speed, extracts and ' +
+      'screenshots; RemNote\'s has its transcript, Highlight Moment, AI Tutor and Summary. A ' +
+      'button on the card switches between them. Videos saved with the RemNote Clipper always use ' +
+      'the plugin\'s player.',
+    options: [
+      { value: 'plugin', label: "The plugin's player" },
+      { value: 'remnote', label: "RemNote's player" },
     ],
   },
   [autoFocusQueueDashboardId]: {

@@ -32,7 +32,7 @@ Every YouTube IncRem can be watched in either of two players, with a switch butt
   - [ ] segment auto-pause, after the probe fix (it fired on the pre-seek position); the published page; web
   - [x] ~~PaneHeader on the video page~~: not rendered there, only on editor panes
   - [x] a floating bar stays on screen and clickable over the video page, and shows `ip.l` ticking with the right position (desktop, 2026-10-23)
-- [ ] **1. Plugin player rebuilt on the bridge.** Code written, awaiting the in-app test. ReactPlayer is gone from `Video.tsx` and `VideoExtractViewer.tsx`; both use `components/PluginYouTubePlayer.tsx` (`useYouTubeBridge` + `PluginYouTubePlayerFrame`).
+- [x] **1. Plugin player rebuilt on the bridge.** Tested in the app 2026-10-23, plus a resizable notes divider, resume-time chip, player controls (±30 s, play/pause, speed) and 📸 / 📸✨ screenshots through the helper. ReactPlayer is gone from `Video.tsx` and `VideoExtractViewer.tsx`; both use `components/PluginYouTubePlayer.tsx` (`useYouTubeBridge` + `PluginYouTubePlayerFrame`).
   - **Decided: one reusable player Rem per KB** (`lib/video_player_rem.ts`): a document "▶️ Incremental RemNote video player" with one `ew` child, ids in synced storage `video-player-rem_<kbId>`, re-created if deleted. The URL is rewritten per video; an unchanged URL is left alone.
   - The embed is sized to the viewer (16:9, WIDTH + HEIGHT slots, debounced). The title and padding overheads are guesses to tune in the app.
   - On the first answer from each page load: seek to the start (the page may be left over from an earlier card), apply the saved speed, play.
@@ -41,6 +41,11 @@ Every YouTube IncRem can be watched in either of two players, with a switch butt
   - Still to check: rewriting the URL reloads the iframe; the sizing overheads; the web app.
   - The player page lives in `docs/player/` (served by the docs site); changes to it ship when the docs deploy, not with the plugin.
 - [ ] **2. `vi` Rems resolve with their URL.** `action_items.ts` returns `{ type: 'youtube', url: vi.u, nativeAvailable: true }` instead of the URL-less `'video'` type. Add the queue switch (plugin player ⇄ RemNote player), defaulting from a new setting.
+  - Code written 2026-10-23, awaiting the in-app test. A `vi` Rem whose URL isn't YouTube still resolves as `'video'` (RemNote's player only).
+  - Setting **Default Player for RemNote Videos** (`default-video-player`, Queue Display group, default: the plugin's player). The card's switch overrides it for that card only.
+  - The switch is a button in each player's own top bar (🎬 RemNote player / ▶️ Plugin player), not a floating overlay: RemNote paints the embeds above anything the plugin floats over them.
+  - Position hand-over (`lib/video_position.ts`): the plugin's position is written to `ip.l` before RemNote's page opens, but only if the Rem already has `ip`, because the plugin doesn't add RemNote's built-in powerups. While RemNote's player plays, `ip.l` is copied back (non-zero changes ≥ 2 s), and once more when switching back.
+  - In the plugin player, a `vi` Rem's notes pane shows the read-only outline (`ExtractViewer`), because a DocumentViewer of a `vi` Rem is RemNote's whole video page, player included.
 - [ ] **3. Review in Editor for the RemNote player.** Open the video page and start the editor review timer as today. A floating bar carries Next / Dismiss / position / extract controls while the IncRem under review is open in RemNote's player. Mirror the position into `ip.l` on entry and read it back at Next.
 - [ ] **4. Extracts from the RemNote player.** Start / End from `ip.l` (with nudges), same `videoExtract` powerup as today. An extract opens in the plugin player by default; in the RemNote player it pre-sets `ip.l` = start and shows "extract ends at X / reached ✓".
 - [ ] **5. Docs.** `docs/Incremental-Video.md` (the "two ways to watch" section changes completely) and the changelog, once approved.
