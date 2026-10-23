@@ -360,9 +360,14 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('video_debug', WidgetLocation.Popup, {
     dimensions: {
-      width: '500px',
+      width: '560px',
       height: 'auto',
     },
+  });
+
+  // Renders nothing unless switched on from the video_debug popup.
+  plugin.app.registerWidget('video_pane_probe', WidgetLocation.PaneHeader, {
+    dimensions: { height: 'auto', width: 'auto' },
   });
 
   plugin.app.registerWidget('editor_review', WidgetLocation.Popup, {

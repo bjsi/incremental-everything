@@ -627,6 +627,10 @@ export const videoExtractUrlSlotCode = 'videoUrl';
 export const videoExtractStartSlotCode = 'startTime';
 export const videoExtractEndSlotCode = 'endTime';
 
+// Debug Video Detection probes (session only)
+export const videoPaneProbeSessionKey = 'video-pane-probe-on';
+export const videoProbeRemsSessionKey = 'video-probe-rems';
+
 // IncRem Notes Sidebar (right sidebar widget)
 // Stable rem id published by ExtractViewer while a Rem-type IncRem is shown in
 // the queue, so the notes sidebar can edit it without depending on

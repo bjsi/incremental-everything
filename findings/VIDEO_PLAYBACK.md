@@ -42,6 +42,8 @@ Not yet verified inside RemNote:
 - that a `<RemViewer>`/`<DocumentViewer>` of an `ew` Rem renders the iframe in the queue;
 - the desktop app. Its host origin is `app://js`, and YouTube may refuse an embed with no usable referrer (Error 153). That is why RemNote serves its own wrapper (see below), and why a self-hosted wrapper on an https origin (e.g. the docs site) is the fallback.
 
+**An origin-locked player can't be driven.** The IFrame API always passes `origin=` (the embedding page's origin). A copy of RemNote's wrapper (IFrame API, `origin=https://backend.remnote.com`, nested one frame deep) neither answered the handshake nor obeyed a blind `seekTo(600)` sent to every frame: it stayed at 10 s. So the plugin can't seek or pause RemNote's own video player. Only a raw `/embed/` URL without `origin=` answers.
+
 RemNote's wrapper, `https://backend.remnote.com/embed/youtube/<id>?start=&controls=`, messages of type `remnote-youtube-embed`, accepts commands only from `window.parent` and posts only to `window.parent`. A plugin cannot use it.
 
 ## RemNote's own video Rems (Create › Upload File › YouTube URL)
@@ -65,6 +67,10 @@ Read from `remnote.db` (Rem `eVTm6KiURagOtwomR`) and the bundle:
 - The player has internal `seekTo` and time-range auto-pause triggers (AI sections). None of them are reachable from a plugin.
 - The video learning suite is YouTube-only: `getOrCreateVideoRemFromURL` accepts only YouTube URL shapes, and usage is metered (`YOUTUBE_ANNOTATION`).
 - The transcript cues are not stored in `remnote.db`.
+
+## Where a plugin widget can sit on the video page
+
+The video page's pane toolbar (the "Notes · AI Learning Tools · ⋯" row; the toolbar component's `isReaderViewer` branch) renders `WidgetLocation.PaneHeader` widgets, with context `{ paneId }`. Map the pane to its Rem with `plugin.window.getOpenPaneRemId(paneId)` (not reactive). `DocumentAboveToolbar` (the editor review timer) only appears once **Notes** opens the document beside the video. Read from the bundle; visibility still to be confirmed with the `video_pane_probe` widget.
 
 ## Local video files
 
