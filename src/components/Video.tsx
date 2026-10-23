@@ -1,6 +1,5 @@
-import { DocumentViewer, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
+import { usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
-import { Resizable } from 're-resizable';
 import { YoutubeActionItem } from '../lib/incremental_rem';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { showPriorityPopupForRem } from '../lib/highlightActions';
@@ -12,13 +11,11 @@ import {
 } from '../lib/consts';
 import { getTranscriptForRange, extractVideoId } from '../lib/youtube_transcript';
 import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PAUSED, YT_PLAYING } from './PluginYouTubePlayer';
+import { VideoNotesSplit } from './VideoNotesSplit';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
 }
-
-const getBoundedWidth = (width: number, minWidth: number, maxWidth: number) =>
-  Math.min(Math.max(width, minWidth), maxWidth);
 
 /** Format seconds to MM:SS */
 const formatTime = (seconds: number): string => {
@@ -34,14 +31,7 @@ type ExtractState =
 
 export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
   const plugin = usePlugin();
-  const [width, setWidthInner] = React.useState<number>();
-
-  const startWidth = React.useRef<number>();
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  const setWidth = (width: number, minWidth: number, maxWidth: number) => {
-    setWidthInner(getBoundedWidth(width, minWidth, maxWidth));
-  };
+  const [notesOpen, setNotesOpen] = React.useState(true);
 
   const videoId = extractVideoId(props.actionItem.url);
   const playbackRateStorageKey = `${props.actionItem.url}-playbackRate`;
@@ -210,17 +200,29 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="top-bar" style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-        <button
-          onClick={() => {
-            if (width === 0) {
-              setWidthInner(containerRef.current!.clientWidth / 2);
-            } else {
-              setWidthInner(0);
-            }
-          }}
-        >
+        <button onClick={() => setNotesOpen((open) => !open)} title="Show or hide the notes">
           📝
         </button>
+
+        {saved && (
+          <button
+            onClick={() => {
+              send({ command: 'seekTo', seconds: saved.position });
+              send({ command: 'play' });
+            }}
+            title="Where the last session stopped. Click to go back there."
+            style={{
+              cursor: 'pointer',
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: '1px solid #d1d5db',
+              backgroundColor: '#f3f4f6',
+              fontSize: 12,
+            }}
+          >
+            {saved.position > 0 ? `⏮ Resumed at ${formatTime(saved.position)}` : '⏮ From the start'}
+          </button>
+        )}
 
         {/* Video Extract controls */}
         {extractState.phase === 'idle' && (
@@ -294,51 +296,13 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
           </span>
         )}
       </div>
-      <div ref={containerRef} className="flex video-container w-[100%]" style={{ flex: 1, minHeight: 0 }}>
-        {width !== 0 && (
-          <Resizable
-            minWidth="30%"
-            maxWidth="70%"
-            enable={{ right: true }}
-            size={{ width: width || `50%`, height: '100%' }}
-            handleClasses={{ right: '!w-[15px] !right-[-15px] z-[3]' }}
-            onResizeStart={() => {
-              startWidth.current = width;
-            }}
-            onResize={(___, __, _, delta) => {
-              const containerRefCurrent = containerRef.current;
-
-              if (!startWidth.current || !containerRefCurrent) return;
-              const newWidth = startWidth.current + delta.width;
-
-              setWidth(
-                newWidth || containerRefCurrent.clientWidth * 0.5,
-                containerRefCurrent.clientWidth * 0.3,
-                containerRefCurrent.clientWidth * 0.7
-              );
-            }}
-            onResizeStop={(___, __, _, delta) => {
-              const containerRefCurrent = containerRef.current;
-
-              if (!startWidth.current || !containerRefCurrent) return;
-              const newWidth = startWidth.current + delta.width;
-
-              setWidth(
-                newWidth || containerRefCurrent.clientWidth * 0.5,
-                containerRefCurrent.clientWidth * 0.3,
-                containerRefCurrent.clientWidth * 0.7
-              );
-            }}
-          >
-            <DocumentViewer width={'100%'} height={'100%'} documentId={props.actionItem.rem._id} />
-          </Resizable>
-        )}
+      <VideoNotesSplit notesDocId={props.actionItem.rem._id} notesOpen={notesOpen}>
         {!videoId ? (
           <div className="p-4">Not a YouTube video URL: {props.actionItem.url}</div>
         ) : saved ? (
           <PluginYouTubePlayerFrame videoId={videoId} start={saved.position} />
         ) : null}
-      </div>
+      </VideoNotesSplit>
     </div>
   );
 };
