@@ -68,7 +68,7 @@ Read from `remnote.db` (Rem `eVTm6KiURagOtwomR`) and the bundle:
 | | RemVideoId `p` | reference to the `vi` Rem |
 
 - `vi` and `ip` are not in the SDK enum, so the SDK passes the slot code through unchanged: `rem.getPowerupProperty('vi','u')` and `('ip','l')`. The host's `getPowerupProperty` handler does no slot validation. `setPowerupProperty` checks only that the slot is registered (`ip.l` is). **Verified in the app (2026-10-23):** both reads work, `ip.l` follows playback live, and a plugin write to `ip.l` sticks and becomes the "Resume watching at…" time.
-- **Open question:** a probe label showed `ip.l` = 0 right after the video page loaded, when it had been 342.7 s before. Possibly the player's first progress event (time 0) is stored after `onReady` has already read the resume time, so leaving without resuming would lose the position. To confirm with the floating probe. If true, the plugin must keep its own position and never trust `ip.l` read after the page opens.
+- **`ip.l` is reset when the video page opens (very likely).** It read 342.7 s; after the page was reopened it read 0, with no plugin write in between (2026-10-23). Earlier a probe label had also shown 0 right after the page loaded. Possibly the player's first progress event (time 0) is stored after `onReady` has already read the resume time, so leaving without resuming would lose the position. So the plugin must keep its own position, and trust `ip.l` only as the live position while RemNote's player is open.
 - **Who writes `ip.l`:** the learning-page video controller, `storeLastWatchedTime = _.throttle(…, 3000)` on every progress tick, so the stored position lags by up to 3 s while playing.
 - **Who reads it:** `onReady` sets `lastWatchedSecond` from it, and the page shows a **"Resume watching at {{timestamp}}"** button. It does **not** auto-seek; the user has to click. `onPlay` clears the button.
 - The player has internal `seekTo` and time-range auto-pause triggers (AI sections). None of them are reachable from a plugin.
@@ -80,7 +80,7 @@ Read from `remnote.db` (Rem `eVTm6KiURagOtwomR`) and the bundle:
 - **`PaneHeader` does not render on the video page** (verified in the app 2026-10-23). The video pane's "Notes · AI Learning Tools · ⋯" header isn't the toolbar that hosts it; a probe label showed only in the editor pane opened by **Notes**. (The bundle's `isReaderViewer` branch that renders `PaneHeader` is some other reader.) `PaneHeader` context is `{ paneId }`; `plugin.window.getOpenPaneRemId(paneId)` maps it to a Rem (not reactive).
 - `DocumentAboveToolbar` (the editor review timer) also appears only once **Notes** opens the document beside the video.
 - **`RightSidebar`** plugin widgets are reachable on the video page (the sidebar there has Learn Video / AI Tutor / Summary / Highlights / Plugins tabs plus plugin icons).
-- **`FloatingWidget`** (`openFloatingWidget(name, {bottom, right}, undefined, false)`) is drawn above every page. Whether it stays put and clickable over the video page is being checked with the `video_floating_probe` widget.
+- **`FloatingWidget`** (`openFloatingWidget(name, {bottom, right}, undefined, false)`) is drawn above every page. Verified in the desktop app (2026-10-23): it stays bottom-right over the video page, is clickable, and its tracker shows `ip.l` ticking with the right position.
 - `TopBar` was not tried: as soon as any widget is registered there, RemNote changes its own top-right chrome (`hasTopWidgets`).
 
 ## Local video files

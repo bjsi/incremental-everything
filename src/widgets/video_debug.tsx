@@ -163,7 +163,10 @@ function VideoDebug() {
   const [player, setPlayer] = useState<YouTubeEmbedInfo>({});
   const [events, setEvents] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
-  const [segment, setSegment] = useState<{ end: number } | null>(null);
+  // `entered` stays false until the player reports a time inside the segment:
+  // the last time known when the seek is sent is still the old position, often
+  // already past `end`.
+  const [segment, setSegment] = useState<{ start: number; end: number; entered: boolean } | null>(null);
   const conn = useRef<YouTubeEmbedConnection | null>(null);
   // The published page by default; a local copy (python3 -m http.server 8766
   // --directory docs) tests changes before the docs site is deployed.
@@ -202,7 +205,13 @@ function VideoDebug() {
 
   // End-of-segment control: the bridge's answer to "play from A until B".
   useEffect(() => {
-    if (segment && player.currentTime !== undefined && player.currentTime >= segment.end) {
+    const t = player.currentTime;
+    if (!segment || t === undefined) return;
+    if (!segment.entered) {
+      if (t >= segment.start - 1 && t < segment.end) setSegment({ ...segment, entered: true });
+      return;
+    }
+    if (t >= segment.end) {
       conn.current?.send({ command: 'pause' });
       setSegment(null);
     }
@@ -227,7 +236,7 @@ function VideoDebug() {
   const playSegment = (start: number, length: number) => {
     conn.current?.send({ command: 'seekTo', seconds: start });
     conn.current?.send({ command: 'play' });
-    setSegment({ end: start + length });
+    setSegment({ start, end: start + length, entered: false });
   };
 
   // --- 4. Floating probe ---

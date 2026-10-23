@@ -25,13 +25,14 @@ Every YouTube IncRem can be watched in either of two players, with a switch butt
 - [ ] **0. Probes.** "Debug Video Detection" (`video_debug.tsx`) and the `video_floating_probe` floating widget answer:
   - [x] `vi.u` and `ip.l` read through the plugin (section 1); `ip.l` ticks live while RemNote's player plays
   - [x] a plugin write to `ip.l` sticks and shows up as "Resume watching at…" (section 2)
-  - [ ] does opening the video page reset `ip.l` to 0 before the user resumes? (floating probe)
+  - [x] does opening the video page reset `ip.l` to 0 before the user resumes? **Very likely yes.** It read 342.7 s, and after the page was reopened it read 0 with no plugin write in between. So the plugin keeps its own position and treats `ip.l` only as the live position while RemNote's player is open
   - [x] the `ew` Rem renders a player inside a `DocumentViewer` fake embed, on web and desktop
   - [x] ~~youtube.com URL~~: swapped for RemNote's locked player. ~~raw nocookie URL~~: connects, but Error 153 on desktop
-  - [ ] with the player page (local copy first, then published), the bridge connects, seeks, pauses and auto-pauses a segment, on web and desktop (section 3). Confirm desktop needs no first click on the video
+  - [x] with the player page (local copy), the bridge connects, plays, pauses, seeks, sets speed and mutes in the **desktop app** (2026-10-23)
+  - [ ] segment auto-pause, after the probe fix (it fired on the pre-seek position); the published page; web
   - [x] ~~PaneHeader on the video page~~: not rendered there, only on editor panes
-  - [ ] a floating bar stays on screen and clickable over the video page, video only and with Notes (section 4)
-- [ ] **1. Plugin player rebuilt on the bridge.** Replace ReactPlayer for YouTube in `Video.tsx` and `VideoExtractViewer.tsx`. Open question: one reusable plugin-owned player Rem whose URL is rewritten per item, or one per video? (A reused Rem keeps the KB clean; check that rewriting the URL re-creates the iframe.) The player page lives in `docs/player/` (served by the docs site); changes to it ship when the docs deploy, not with the plugin.
+  - [x] a floating bar stays on screen and clickable over the video page, and shows `ip.l` ticking with the right position (desktop, 2026-10-23)
+- [ ] **1. Plugin player rebuilt on the bridge.** Replace ReactPlayer for YouTube in `Video.tsx` and `VideoExtractViewer.tsx`. Open question: one reusable plugin-owned player Rem whose URL is rewritten per item, or one per video? (A reused Rem keeps the KB clean; check that rewriting the URL re-creates the iframe.) The player page lives in `docs/player/` (served by the docs site); changes to it ship when the docs deploy, not with the plugin. Extract end: arm the auto-pause only once the player reports a time inside the segment, because right after a seek the last known time is still the old one.
 - [ ] **2. `vi` Rems resolve with their URL.** `action_items.ts` returns `{ type: 'youtube', url: vi.u, nativeAvailable: true }` instead of the URL-less `'video'` type. Add the queue switch (plugin player ⇄ RemNote player), defaulting from a new setting.
 - [ ] **3. Review in Editor for the RemNote player.** Open the video page and start the editor review timer as today. A floating bar carries Next / Dismiss / position / extract controls while the IncRem under review is open in RemNote's player. Mirror the position into `ip.l` on entry and read it back at Next.
 - [ ] **4. Extracts from the RemNote player.** Start / End from `ip.l` (with nudges), same `videoExtract` powerup as today. An extract opens in the plugin player by default; in the RemNote player it pre-sets `ip.l` = start and shows "extract ends at X / reached ✓".
