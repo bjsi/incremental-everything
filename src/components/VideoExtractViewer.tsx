@@ -1,9 +1,9 @@
-import { DocumentViewer, usePlugin } from '@remnote/plugin-sdk';
+import { DocumentViewer, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
-import ReactPlayer from 'react-player/youtube';
 import { Resizable } from 're-resizable';
-import { useSyncedStorageState } from '@remnote/plugin-sdk';
 import { YoutubeHighlightActionItem } from '../lib/incremental_rem/types';
+import { extractVideoId } from '../lib/youtube_transcript';
+import { PluginYouTubePlayerFrame, useYouTubeBridge } from './PluginYouTubePlayer';
 
 interface VideoExtractViewerProps {
     actionItem: YoutubeHighlightActionItem;
@@ -31,38 +31,43 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
         setWidthInner(getBoundedWidth(w, minW, maxW));
     };
 
-    const [playing, setPlaying] = React.useState(true);
-
+    const videoId = extractVideoId(url);
     const playbackRateStorageKey = `${url}-playbackRate`;
-    const [playbackRate, setPlaybackRate] = useSyncedStorageState<number>(
-        playbackRateStorageKey,
-        1.0
+    const savedRate = useRunAsync(
+        async () => (await plugin.storage.getSynced<number>(playbackRateStorageKey)) ?? 1,
+        [playbackRateStorageKey]
     );
 
-    const player = React.useRef<ReactPlayer>(null);
-    const didInitialSeek = React.useRef(false);
+    const { info, connected, send } = useYouTubeBridge(savedRate !== undefined ? videoId : null, {
+        start: startTime,
+        playbackRate: savedRate,
+    });
 
-    // Seek to startTime on mount
     React.useEffect(() => {
-        if (player.current && !didInitialSeek.current) {
-            didInitialSeek.current = true;
-            player.current.seekTo(startTime, 'seconds');
+        if (info.playbackRate && savedRate !== undefined && info.playbackRate !== savedRate) {
+            plugin.storage.setSynced(playbackRateStorageKey, info.playbackRate);
         }
-    }, [player?.current, startTime]);
+    }, [info.playbackRate]);
 
-    // Pause when reaching endTime
-    const handleProgress = (state: { playedSeconds: number }) => {
-        if (state.playedSeconds >= endTime) {
-            setPlaying(false);
+    // Pause at endTime. The auto-pause arms only once the player reports a time
+    // inside the segment: until the start seek lands, the time it reports is
+    // the old position, often already past the end.
+    const [armed, setArmed] = React.useState<'waiting' | 'inside' | 'done'>('waiting');
+    React.useEffect(() => {
+        const t = info.currentTime;
+        if (t === undefined) return;
+        if (armed === 'waiting' && t >= startTime - 1 && t < endTime) setArmed('inside');
+        if (armed === 'inside' && t >= endTime) {
+            send({ command: 'pause' });
+            setArmed('done');
         }
-    };
+    }, [info.currentTime, armed]);
 
     // Allow replaying the segment
     const handleReplay = () => {
-        if (player.current) {
-            player.current.seekTo(startTime, 'seconds');
-            setPlaying(true);
-        }
+        send({ command: 'seekTo', seconds: startTime });
+        send({ command: 'play' });
+        setArmed('waiting');
     };
 
     return (
@@ -109,6 +114,18 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                 >
                     🔄 Replay
                 </button>
+
+                {armed === 'done' && (
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>✓ end of extract reached</span>
+                )}
+                {videoId && !connected && (
+                    <span
+                        style={{ fontSize: 12, color: '#6b7280' }}
+                        title="Waiting for the player. In a browser, click play on the video once."
+                    >
+                        ⏳ connecting to the player…
+                    </span>
+                )}
             </div>
             <div ref={containerRef} className="flex video-container w-[100%]" style={{ flex: 1, minHeight: 0 }}>
                 {width !== 0 && (
@@ -145,19 +162,11 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                         <DocumentViewer width={'100%'} height={'100%'} documentId={extract._id} />
                     </Resizable>
                 )}
-                <ReactPlayer
-                    controls
-                    playing={playing}
-                    playbackRate={playbackRate}
-                    ref={player}
-                    url={url}
-                    width="100%"
-                    height="100%"
-                    onProgress={handleProgress}
-                    onPlaybackRateChange={(speed: any) => {
-                        setPlaybackRate(parseFloat(speed));
-                    }}
-                />
+                {!videoId ? (
+                    <div className="p-4">Not a YouTube video URL: {url}</div>
+                ) : savedRate !== undefined ? (
+                    <PluginYouTubePlayerFrame videoId={videoId} start={startTime} />
+                ) : null}
             </div>
         </div>
     );

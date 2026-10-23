@@ -1,8 +1,6 @@
-import { DocumentViewer, usePlugin } from '@remnote/plugin-sdk';
+import { DocumentViewer, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
-import ReactPlayer from 'react-player/youtube';
 import { Resizable } from 're-resizable';
-import { useSyncedStorageState } from '@remnote/plugin-sdk';
 import { YoutubeActionItem } from '../lib/incremental_rem';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { showPriorityPopupForRem } from '../lib/highlightActions';
@@ -13,6 +11,7 @@ import {
   videoExtractEndSlotCode,
 } from '../lib/consts';
 import { getTranscriptForRange, extractVideoId } from '../lib/youtube_transcript';
+import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PLAYING } from './PluginYouTubePlayer';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
@@ -44,25 +43,64 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
     setWidthInner(getBoundedWidth(width, minWidth, maxWidth));
   };
 
-  const [playing, setPlaying] = React.useState(true);
-
+  const videoId = extractVideoId(props.actionItem.url);
   const playbackRateStorageKey = `${props.actionItem.url}-playbackRate`;
   const positionStorageKey = `${props.actionItem.url}-position`;
-  const [position, setPosition] = useSyncedStorageState<number>(positionStorageKey, 0);
-  const [playbackRate, setPlaybackRate] = useSyncedStorageState<number>(
-    playbackRateStorageKey,
-    1.0
+
+  // Both are read once, before the player opens: the position is where it
+  // starts, and the speed is applied when the page first answers.
+  const saved = useRunAsync(async () => {
+    const [position, playbackRate] = await Promise.all([
+      plugin.storage.getSynced<number>(positionStorageKey),
+      plugin.storage.getSynced<number>(playbackRateStorageKey),
+    ]);
+    return { position: position ?? 0, playbackRate: playbackRate ?? 1 };
+  }, [positionStorageKey]);
+
+  const { info, connected, send } = useYouTubeBridge(saved ? videoId : null, {
+    start: saved?.position,
+    playbackRate: saved?.playbackRate,
+  });
+  const position = info.currentTime ?? saved?.position ?? 0;
+
+  // The position is a synced write: save it every few seconds while playing,
+  // at once on pause, and when the card closes. Nothing is saved until the
+  // video has played from where it should start: before the start seek lands,
+  // the page reports 0, or the position an earlier card left it at.
+  const lastSaved = React.useRef({ at: 0, position: -1 });
+  const latestPosition = React.useRef<number | undefined>();
+  const armed = React.useRef(false);
+  React.useEffect(() => {
+    const t = info.currentTime;
+    if (t === undefined) return;
+    if (!armed.current && info.playerState === YT_PLAYING && Math.abs(t - (saved?.position ?? 0)) <= 5) {
+      armed.current = true;
+    }
+    if (!armed.current || t === lastSaved.current.position) return;
+    latestPosition.current = t;
+    const now = Date.now();
+    if (info.playerState !== YT_PLAYING || now - lastSaved.current.at > 5000) {
+      lastSaved.current = { at: now, position: t };
+      plugin.storage.setSynced(positionStorageKey, t);
+    }
+  }, [info.currentTime, info.playerState]);
+  React.useEffect(
+    () => () => {
+      if (latestPosition.current !== undefined && latestPosition.current !== lastSaved.current.position)
+        plugin.storage.setSynced(positionStorageKey, latestPosition.current);
+    },
+    [positionStorageKey]
   );
 
-  const player = React.useRef<ReactPlayer>(null);
-
-  const didInitialSeek = React.useRef(false);
+  const savedRate = React.useRef<number | undefined>();
   React.useEffect(() => {
-    if (player.current && position && !didInitialSeek.current) {
-      didInitialSeek.current = true;
-      player.current.seekTo(position, 'seconds');
+    if (!info.playbackRate || !saved) return;
+    if (savedRate.current === undefined) savedRate.current = saved.playbackRate;
+    if (info.playbackRate !== savedRate.current) {
+      savedRate.current = info.playbackRate;
+      plugin.storage.setSynced(playbackRateStorageKey, info.playbackRate);
     }
-  }, [player?.current, position]);
+  }, [info.playbackRate]);
 
   // --- Video Extract state ---
   const [extractState, setExtractState] = React.useState<ExtractState>({ phase: 'idle' });
@@ -78,7 +116,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
 
   const handleSetEnd = async () => {
     if (extractState.phase !== 'capturing') return;
-    setPlaying(false); // Pause video so user can set priority freely
+    send({ command: 'pause' }); // Pause video so user can set priority freely
     const { startTime } = extractState;
     const endTime = position || 0;
 
@@ -118,7 +156,6 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
 
       // Fetch transcript and add segments as children Rems
       try {
-        const videoId = extractVideoId(props.actionItem.url);
         console.log('[VideoViewer] Attempting transcript fetch for videoId:', videoId, 'range:', startTime, '-', endTime);
         if (videoId) {
           const segments = await getTranscriptForRange(videoId, startTime, endTime);
@@ -245,6 +282,15 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
         {extractState.phase === 'creating' && (
           <span style={{ fontSize: 12, color: '#6b7280' }}>Creating extract...</span>
         )}
+
+        {videoId && !connected && (
+          <span
+            style={{ fontSize: 12, color: '#6b7280' }}
+            title="Waiting for the player. In a browser, click play on the video once."
+          >
+            ⏳ connecting to the player…
+          </span>
+        )}
       </div>
       <div ref={containerRef} className="flex video-container w-[100%]" style={{ flex: 1, minHeight: 0 }}>
         {width !== 0 && (
@@ -285,21 +331,11 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
             <DocumentViewer width={'100%'} height={'100%'} documentId={props.actionItem.rem._id} />
           </Resizable>
         )}
-        <ReactPlayer
-          controls
-          playing={playing}
-          playbackRate={playbackRate}
-          ref={player}
-          url={props.actionItem.url}
-          width="100%"
-          height="100%"
-          onProgress={(state) => {
-            setPosition(state.playedSeconds);
-          }}
-          onPlaybackRateChange={(speed: any) => {
-            setPlaybackRate(parseFloat(speed));
-          }}
-        />
+        {!videoId ? (
+          <div className="p-4">Not a YouTube video URL: {props.actionItem.url}</div>
+        ) : saved ? (
+          <PluginYouTubePlayerFrame videoId={videoId} start={saved.position} />
+        ) : null}
       </div>
     </div>
   );
