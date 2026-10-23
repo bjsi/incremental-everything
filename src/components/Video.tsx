@@ -12,6 +12,7 @@ import {
 import { getTranscriptForRange, extractVideoId } from '../lib/youtube_transcript';
 import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PAUSED, YT_PLAYING } from './PluginYouTubePlayer';
 import { VideoNotesSplit } from './VideoNotesSplit';
+import { PlayerControls } from './PlayerControls';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
@@ -190,7 +191,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div className="top-bar" style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+      <div className="top-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
         <button onClick={() => setNotesOpen((open) => !open)} title="Show or hide the notes">
           📝
         </button>
@@ -214,6 +215,8 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
             {saved.position > 0 ? `⏮ Resumed at ${formatTime(saved.position)}` : '⏮ From the start'}
           </button>
         )}
+
+        {videoId && <PlayerControls info={info} connected={connected} send={send} />}
 
         {/* Video Extract controls */}
         {extractState.phase === 'idle' && (

@@ -4,6 +4,7 @@ import { YoutubeHighlightActionItem } from '../lib/incremental_rem/types';
 import { extractVideoId } from '../lib/youtube_transcript';
 import { PluginYouTubePlayerFrame, useYouTubeBridge } from './PluginYouTubePlayer';
 import { VideoNotesSplit } from './VideoNotesSplit';
+import { PlayerControls } from './PlayerControls';
 
 interface VideoExtractViewerProps {
     actionItem: YoutubeHighlightActionItem;
@@ -57,7 +58,7 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
 
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div className="top-bar" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+            <div className="top-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
                 <button onClick={() => setNotesOpen((open) => !open)} title="Show or hide the notes">
                     📝
                 </button>
@@ -91,6 +92,8 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                 >
                     🔄 Replay
                 </button>
+
+                {videoId && <PlayerControls info={info} connected={connected} send={send} />}
 
                 {armed === 'done' && (
                     <span style={{ fontSize: 12, color: '#6b7280' }}>✓ end of extract reached</span>
