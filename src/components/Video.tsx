@@ -50,6 +50,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
   const { info, connected, send } = useYouTubeBridge(saved ? videoId : null, {
     start: saved?.position,
     playbackRate: saved?.playbackRate,
+    onRateChange: (rate) => plugin.storage.setSynced(playbackRateStorageKey, rate),
   });
   const position = info.currentTime ?? saved?.position ?? 0;
 
@@ -83,16 +84,6 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
     },
     [positionStorageKey]
   );
-
-  const savedRate = React.useRef<number | undefined>();
-  React.useEffect(() => {
-    if (!info.playbackRate || !saved) return;
-    if (savedRate.current === undefined) savedRate.current = saved.playbackRate;
-    if (info.playbackRate !== savedRate.current) {
-      savedRate.current = info.playbackRate;
-      plugin.storage.setSynced(playbackRateStorageKey, info.playbackRate);
-    }
-  }, [info.playbackRate]);
 
   // --- Video Extract state ---
   const [extractState, setExtractState] = React.useState<ExtractState>({ phase: 'idle' });

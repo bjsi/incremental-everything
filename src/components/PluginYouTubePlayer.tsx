@@ -46,10 +46,13 @@ const MEMORY_TTL_MS = 10 * 60 * 1000;
  * may also be one left over from an earlier card on the same video, so its
  * URL's start time can't be relied on. A page answers 'hello' only until its
  * player is ready, so a 'hello' after that means the page was reloaded.
+ *
+ * `onRateChange` hears only speed changes the user makes: a page reports 1×
+ * (or whatever an earlier card left) until the greeting's speed lands.
  */
 export function useYouTubeBridge(
   videoId: string | null,
-  opts: { start?: number; playbackRate?: number } = {}
+  opts: { start?: number; playbackRate?: number; onRateChange?: (rate: number) => void } = {}
 ): YouTubeBridge {
   const [info, setInfo] = React.useState<YouTubeEmbedInfo>({});
   const [connected, setConnected] = React.useState(false);
@@ -68,6 +71,11 @@ export function useYouTubeBridge(
     // the position it had before the seek landed.
     let target: number | undefined;
     let settled = false;
+    // The same for the speed: what the greeting asked for, and whether the
+    // player has reported it yet. YouTube applies a new speed asynchronously.
+    let rate = 1;
+    let rateLanded = false;
+    let greetedAt = 0;
     console.log(LOG, 'connect', key);
 
     const greet = (next: YouTubeEmbedInfo) => {
@@ -76,7 +84,9 @@ export function useYouTubeBridge(
         remembered && Date.now() - remembered.at < MEMORY_TTL_MS ? remembered : undefined;
       target = prev?.time ?? optsRef.current.start ?? 0;
       settled = false;
-      const rate = prev?.rate ?? optsRef.current.playbackRate ?? 1;
+      rate = prev?.rate ?? optsRef.current.playbackRate ?? 1;
+      rateLanded = next.playbackRate === rate;
+      greetedAt = Date.now();
       console.log(LOG, reloaded ? 'page reloaded, restoring' : 'greeting', key, {
         target,
         rate,
@@ -108,10 +118,19 @@ export function useYouTubeBridge(
           next.currentTime !== undefined &&
           (next.playerState === YT_PLAYING || next.playerState === YT_PAUSED);
         if (known && !settled && Math.abs(next.currentTime! - (target ?? 0)) <= 3) settled = true;
+        if (next.playbackRate !== undefined) {
+          if (!rateLanded && (next.playbackRate === rate || Date.now() - greetedAt > 5000)) {
+            rateLanded = true;
+          } else if (rateLanded && next.playbackRate !== rate) {
+            console.log(LOG, 'speed changed', key, rate, '→', next.playbackRate);
+            rate = next.playbackRate;
+            optsRef.current.onRateChange?.(rate);
+          }
+        }
         if (known && settled) {
           memory.set(key, {
             time: next.currentTime!,
-            rate: next.playbackRate ?? memory.get(key)?.rate ?? 1,
+            rate,
             playing: next.playerState === YT_PLAYING,
             at: Date.now(),
           });

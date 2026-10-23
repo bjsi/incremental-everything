@@ -31,13 +31,8 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
     const { info, connected, send } = useYouTubeBridge(savedRate !== undefined ? videoId : null, {
         start: startTime,
         playbackRate: savedRate,
+        onRateChange: (rate) => plugin.storage.setSynced(playbackRateStorageKey, rate),
     });
-
-    React.useEffect(() => {
-        if (info.playbackRate && savedRate !== undefined && info.playbackRate !== savedRate) {
-            plugin.storage.setSynced(playbackRateStorageKey, info.playbackRate);
-        }
-    }, [info.playbackRate]);
 
     // Pause at endTime. The auto-pause arms only once the player reports a time
     // inside the segment: until the start seek lands, the time it reports is
