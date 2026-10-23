@@ -33,14 +33,20 @@ The Embed Website powerup (`ew`, slots URL `u`, WIDTH `w`, HEIGHT `h`; the SDK k
 
 as long as the URL is a valid https URL, is not RemNote's own origin, and is **not on `remnoteplugins.com`**. RemNote deliberately keeps plugin-CDN pages out of same-origin frames. The bridge lets plugins `addPowerup` a built-in code and `setPowerupProperty` any registered slot.
 
+**Not every URL gets that iframe** (1.28.56, verified in the app 2026-10-23). The component branches on the URL: Vimeo → a Vimeo player; Google Drive → a Drive preview; **`youtube.com` / `youtu.be`** (hostname check `Eg`, after stripping `www.`/`m.`) → **RemNote's own YouTube component**, i.e. the origin-locked `backend.remnote.com` wrapper. Only everything else gets the plain same-origin iframe. A probe `ew` Rem with a `youtube.com/embed/…?enablejsapi=1` URL played fine, on desktop too, but the bridge got no message at all. **Use `https://www.youtube-nocookie.com/embed/<id>?enablejsapi=1`**: it isn't matched, so it gets the plain iframe, and a raw nocookie embed answers the bridge (Chrome: seek to 200 s, pause at 205 s).
+
 **Tested (Chrome, simulated layout):** a frame with the plugin's sandbox finds a sibling frame through `window.top.frames` (cross-origin `WindowProxy` indexing and `postMessage` are allowed) and drives:
 
-1. **A raw `https://www.youtube.com/embed/<id>?enablejsapi=1` frame**, using YouTube's own widget protocol: post `{"event":"listening","id":1,"channel":"widget"}` to every frame, and YouTube answers `event.source` with `infoDelivery` (`currentTime`, `playerState`, …). `{"event":"command","func":"seekTo","args":[200,true]}` and `pauseVideo` worked: it seeked to 200 s and paused at 205 s. Ignore your own echo, because `window.top.frames` includes the plugin frame.
+1. **A raw `https://www.youtube.com/embed/<id>?enablejsapi=1` frame** (and the same with `www.youtube-nocookie.com`), using YouTube's own widget protocol: post `{"event":"listening","id":1,"channel":"widget"}` to every frame, and YouTube answers `event.source` with `infoDelivery` (`currentTime`, `playerState`, …). `{"event":"command","func":"seekTo","args":[200,true]}` and `pauseVideo` worked: it seeked to 200 s and paused at 205 s. Ignore your own echo, because `window.top.frames` includes the plugin frame.
 2. **A hosted wrapper page** with its own message protocol, which also worked (seek to 100 s, pause at 105.4 s).
 
-Not yet verified inside RemNote:
-- that a `<RemViewer>`/`<DocumentViewer>` of an `ew` Rem renders the iframe in the queue;
-- the desktop app. Its host origin is `app://js`, and YouTube may refuse an embed with no usable referrer (Error 153). That is why RemNote serves its own wrapper (see below), and why a self-hosted wrapper on an https origin (e.g. the docs site) is the fallback.
+Inside RemNote: a `<DocumentViewer>` (in a popup) of a document holding an `ew` Rem does render the embed, on web and desktop.
+
+**Desktop: a raw embed gets Error 153** (verified in the app 2026-10-23). The nocookie `ew` iframe connected to the bridge (`initialDelivery`, `onReady`), then reported `onError(153)` ("Video player configuration error"). YouTube needs a Referer, and `app://js` pages send none. Reproduced in Chrome with `referrerpolicy="no-referrer"`.
+
+**Fix: our own https player page** (`docs/player/youtube.html`, published at `https://hugomarins.github.io/incremental-remnote/player/youtube.html`). It mirrors RemNote's wrapper: IFrame API with the nocookie host. It relays `{type:'ie-youtube-player', command}` from any frame and posts state to every frame that said hello. YouTube sees the page's own origin as referrer. In Chrome, loaded with no referrer from its parent, it played, and the sandboxed frame's seek, pause and progress (every 250 ms) all worked. Embed Website accepts `http:` too, so `http://localhost:<port>/player/youtube.html` works for local testing.
+
+**Autoplay (browser).** RemNote's `ew` iframe has no `allow="autoplay"`. Without it, a `play` command that arrives by message, with no click in that frame, is refused (it buffers, then goes back to unstarted). Muted play is allowed, but `unMute` without a click pauses it. Seek and pause are always allowed. Once the user has clicked the video once, `play` commands work. Electron's default autoplay policy needs no user gesture, so the desktop app shouldn't need that first click (to confirm).
 
 **An origin-locked player can't be driven.** The IFrame API always passes `origin=` (the embedding page's origin). A copy of RemNote's wrapper (IFrame API, `origin=https://backend.remnote.com`, nested one frame deep) neither answered the handshake nor obeyed a blind `seekTo(600)` sent to every frame: it stayed at 10 s. So the plugin can't seek or pause RemNote's own video player. Only a raw `/embed/` URL without `origin=` answers.
 
@@ -61,7 +67,8 @@ Read from `remnote.db` (Rem `eVTm6KiURagOtwomR`) and the bundle:
 | VideoHighlight `vh` | Data `d` | `{"startCueIndex","endCueIndex","text"}`: **transcript cue indexes, not seconds** |
 | | RemVideoId `p` | reference to the `vi` Rem |
 
-- `vi` and `ip` are not in the SDK enum, so the SDK passes the slot code through unchanged: `rem.getPowerupProperty('vi','u')` and `('ip','l')`. The host's `getPowerupProperty` handler does no slot validation. `setPowerupProperty` checks only that the slot is registered (`ip.l` is), so a plugin write is accepted. Writes were not tested live.
+- `vi` and `ip` are not in the SDK enum, so the SDK passes the slot code through unchanged: `rem.getPowerupProperty('vi','u')` and `('ip','l')`. The host's `getPowerupProperty` handler does no slot validation. `setPowerupProperty` checks only that the slot is registered (`ip.l` is). **Verified in the app (2026-10-23):** both reads work, `ip.l` follows playback live, and a plugin write to `ip.l` sticks and becomes the "Resume watching at…" time.
+- **Open question:** a probe label showed `ip.l` = 0 right after the video page loaded, when it had been 342.7 s before. Possibly the player's first progress event (time 0) is stored after `onReady` has already read the resume time, so leaving without resuming would lose the position. To confirm with the floating probe. If true, the plugin must keep its own position and never trust `ip.l` read after the page opens.
 - **Who writes `ip.l`:** the learning-page video controller, `storeLastWatchedTime = _.throttle(…, 3000)` on every progress tick, so the stored position lags by up to 3 s while playing.
 - **Who reads it:** `onReady` sets `lastWatchedSecond` from it, and the page shows a **"Resume watching at {{timestamp}}"** button. It does **not** auto-seek; the user has to click. `onPlay` clears the button.
 - The player has internal `seekTo` and time-range auto-pause triggers (AI sections). None of them are reachable from a plugin.
@@ -70,7 +77,11 @@ Read from `remnote.db` (Rem `eVTm6KiURagOtwomR`) and the bundle:
 
 ## Where a plugin widget can sit on the video page
 
-The video page's pane toolbar (the "Notes · AI Learning Tools · ⋯" row; the toolbar component's `isReaderViewer` branch) renders `WidgetLocation.PaneHeader` widgets, with context `{ paneId }`. Map the pane to its Rem with `plugin.window.getOpenPaneRemId(paneId)` (not reactive). `DocumentAboveToolbar` (the editor review timer) only appears once **Notes** opens the document beside the video. Read from the bundle; visibility still to be confirmed with the `video_pane_probe` widget.
+- **`PaneHeader` does not render on the video page** (verified in the app 2026-10-23). The video pane's "Notes · AI Learning Tools · ⋯" header isn't the toolbar that hosts it; a probe label showed only in the editor pane opened by **Notes**. (The bundle's `isReaderViewer` branch that renders `PaneHeader` is some other reader.) `PaneHeader` context is `{ paneId }`; `plugin.window.getOpenPaneRemId(paneId)` maps it to a Rem (not reactive).
+- `DocumentAboveToolbar` (the editor review timer) also appears only once **Notes** opens the document beside the video.
+- **`RightSidebar`** plugin widgets are reachable on the video page (the sidebar there has Learn Video / AI Tutor / Summary / Highlights / Plugins tabs plus plugin icons).
+- **`FloatingWidget`** (`openFloatingWidget(name, {bottom, right}, undefined, false)`) is drawn above every page. Whether it stays put and clickable over the video page is being checked with the `video_floating_probe` widget.
+- `TopBar` was not tried: as soon as any widget is registered there, RemNote changes its own top-right chrome (`hasTopWidgets`).
 
 ## Local video files
 

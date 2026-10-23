@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="robots" content="noindex" />
+  <title>Incremental RemNote — video player</title>
+  <style>
+    html, body, #player { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+    iframe { width: 100%; height: 100%; border: 0; }
+    #msg { color: #ccc; font: 14px system-ui, sans-serif; padding: 16px; }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+  <script>
+    // YouTube player page for the Incremental RemNote plugin.
+    //
+    // The plugin shows this page through RemNote's Embed Website powerup and
+    // drives it with postMessage. It exists because the plugin's own sandboxed
+    // iframe can't run a YouTube player, and in the desktop app (app://js) an
+    // embed placed straight into Embed Website gets YouTube Error 153: no
+    // Referer. Served from an https origin, this page gives YouTube one.
+    // See findings/VIDEO_PLAYBACK.md in the plugin repository.
+    //
+    // URL: youtube.html?v=<11-char id>[&start=<s>][&end=<s>][&autoplay=1]
+    // In:  { type: 'ie-youtube-player', command: 'hello' | 'play' | 'pause' |
+    //        'seekTo' (seconds) | 'setPlaybackRate' (playbackRate) | 'mute' |
+    //        'unMute' }
+    // Out: { type: 'ie-youtube-player', event: 'ready' | 'progress' | 'state' |
+    //        'error', videoId, currentTime, duration, playerState,
+    //        playbackRate, muted, errorCode } — sent to every frame that said hello.
+    // It controls nothing but this video, so it accepts commands from any frame.
+    const TYPE = 'ie-youtube-player';
+    const params = new URLSearchParams(location.search);
+    const videoId = params.get('v') || '';
+    const num = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
+    };
+    const controllers = new Set();
+    let player = null;
+    let ready = false;
+    let progressTimer = null;
+    const pending = [];
+
+    function snapshot() {
+      if (!player || !ready) return {};
+      return {
+        currentTime: player.getCurrentTime(),
+        duration: player.getDuration(),
+        playerState: player.getPlayerState(),
+        playbackRate: player.getPlaybackRate(),
+        muted: player.isMuted(),
+      };
+    }
+
+    function post(event, extra) {
+      const message = { type: TYPE, event, videoId, ...snapshot(), ...(extra || {}) };
+      controllers.forEach((target) => {
+        try { target.postMessage(message, '*'); } catch (e) { controllers.delete(target); }
+      });
+    }
+
+    function setProgress(on) {
+      if (on && progressTimer === null) progressTimer = setInterval(() => post('progress'), 250);
+      if (!on && progressTimer !== null) { clearInterval(progressTimer); progressTimer = null; }
+    }
+
+    function run(data) {
+      if (!ready) { pending.push(data); return; }
+      if (data.command === 'play') player.playVideo();
+      else if (data.command === 'pause') player.pauseVideo();
+      else if (data.command === 'seekTo') player.seekTo(Number(data.seconds) || 0, true);
+      else if (data.command === 'setPlaybackRate') player.setPlaybackRate(Number(data.playbackRate) || 1);
+      else if (data.command === 'mute') player.mute();
+      else if (data.command === 'unMute') player.unMute();
+      post('state');
+    }
+
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || data.type !== TYPE || typeof data.command !== 'string' || !event.source) return;
+      controllers.add(event.source);
+      if (data.command === 'hello') post(ready ? 'ready' : 'hello');
+      else run(data);
+    });
+
+    if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+      document.body.innerHTML = '<div id="msg">No valid video id in the address (?v=…).</div>';
+    } else {
+      window.onYouTubeIframeAPIReady = function () {
+        const playerVars = { enablejsapi: 1, playsinline: 1, rel: 0 };
+        if (num(params.get('start')) !== undefined) playerVars.start = num(params.get('start'));
+        if (num(params.get('end')) !== undefined) playerVars.end = num(params.get('end'));
+        if (params.get('autoplay') === '1') playerVars.autoplay = 1;
+        player = new YT.Player('player', {
+          host: 'https://www.youtube-nocookie.com',
+          videoId,
+          playerVars,
+          events: {
+            onReady: () => {
+              ready = true;
+              post('ready');
+              while (pending.length) run(pending.shift());
+            },
+            onStateChange: (e) => {
+              setProgress(e.data === YT.PlayerState.PLAYING);
+              post('state');
+            },
+            onPlaybackRateChange: () => post('state'),
+            onError: (e) => post('error', { errorCode: e.data }),
+          },
+        });
+      };
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    }
+  </script>
+</body>
+</html>

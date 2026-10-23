@@ -13,23 +13,27 @@ Every YouTube IncRem can be watched in either of two players, with a switch butt
 
 | Decision | Why |
 |---|---|
-| The plugin player is a YouTube embed rendered **by RemNote** in an Embed Website (`ew`) Rem, driven through YouTube's postMessage protocol (`lib/youtube_embed_bridge.ts`). ReactPlayer stays only for non-YouTube URLs. | No YouTube player can boot inside the plugin's sandboxed iframe any more. The host's `ew` iframe has `allow-same-origin`. |
+| The plugin player is **our own https player page** (`docs/player/youtube.html`, nocookie IFrame API inside) rendered **by RemNote** in an Embed Website (`ew`) Rem, driven through YouTube's postMessage protocol (`lib/youtube_embed_bridge.ts`). ReactPlayer stays only for non-YouTube URLs. | No YouTube player can boot inside the plugin's sandboxed iframe any more. The host's `ew` iframe has `allow-same-origin`. A youtube.com URL would be swapped for RemNote's own locked player, and a raw nocookie embed gets Error 153 (no referrer) in the desktop app. |
 | The embed URL never carries `origin=`. | An origin-locked player ignores frames from other origins. |
 | The RemNote player is offered only for Rems that already have the Video powerup (`vi`), i.e. made via Upload File. Clipper Rems get the plugin player only. | Adding `vi` from the plugin would bypass RemNote's metered YouTube limit (`YOUTUBE_ANNOTATION`). Not ours to do. |
 | One position per video, owned by the plugin, mirrored into `ip.l` before RemNote's player opens and read back from `ip.l` after it closes. | RemNote's player only *offers* "Resume watching at…" from `ip.l`. It never seeks by itself, and it overwrites `ip.l` while it plays. |
-| RemNote-player controls (Next, Dismiss, position, Extract start / end / create) live in a **PaneHeader** widget, pending probe 4. Fallbacks, in order: RightSidebar widget, FloatingWidget. | On the video page the editor review timer (`DocumentAboveToolbar`) only shows once **Notes** is pressed. The video page's toolbar (`isReaderViewer`) does host `PaneHeader` widgets. |
+| RemNote-player controls (Next, Dismiss, position, Extract start / end / create) live in a **FloatingWidget** bar, pending probe 4. Fallback: a RightSidebar widget. | On the video page the editor review timer (`DocumentAboveToolbar`) only shows once **Notes** is pressed, and `PaneHeader` widgets don't show there at all (tested). |
 | Extract times taken in the RemNote player come from `ip.l`, with −5 s / +5 s nudges. | `ip.l` lags by up to 3 s while playing. |
 
 ## Phases
 
-- [ ] **0. Probes.** "Debug Video Detection" (`video_debug.tsx`) and the `video_pane_probe` PaneHeader widget answer:
-  - [ ] `vi.u` and `ip.l` read through the plugin (section 1); `ip.l` ticks live while RemNote's player plays
-  - [ ] a plugin write to `ip.l` sticks and shows up as "Resume watching at…" (section 2)
-  - [ ] the `ew` Rem renders a YouTube player inside a `DocumentViewer` fake embed, and the bridge connects, seeks, pauses and auto-pauses a segment (section 3). **Web and desktop**: desktop may hit YouTube Error 153 (app://js host, no referrer)
-  - [ ] the PaneHeader label is visible on the video page, with and without Notes, and ticks while playing (section 4)
-- [ ] **1. Plugin player rebuilt on the bridge.** Replace ReactPlayer for YouTube in `Video.tsx` and `VideoExtractViewer.tsx`. Open question: one reusable plugin-owned player Rem whose URL is rewritten per item, or one per video? (A reused Rem keeps the KB clean; check that rewriting the URL re-creates the iframe.) If desktop hits Error 153, fall back to a wrapper page on an https origin we control (not `remnoteplugins.com`; `ew` refuses it).
+- [ ] **0. Probes.** "Debug Video Detection" (`video_debug.tsx`) and the `video_floating_probe` floating widget answer:
+  - [x] `vi.u` and `ip.l` read through the plugin (section 1); `ip.l` ticks live while RemNote's player plays
+  - [x] a plugin write to `ip.l` sticks and shows up as "Resume watching at…" (section 2)
+  - [ ] does opening the video page reset `ip.l` to 0 before the user resumes? (floating probe)
+  - [x] the `ew` Rem renders a player inside a `DocumentViewer` fake embed, on web and desktop
+  - [x] ~~youtube.com URL~~: swapped for RemNote's locked player. ~~raw nocookie URL~~: connects, but Error 153 on desktop
+  - [ ] with the player page (local copy first, then published), the bridge connects, seeks, pauses and auto-pauses a segment, on web and desktop (section 3). Confirm desktop needs no first click on the video
+  - [x] ~~PaneHeader on the video page~~: not rendered there, only on editor panes
+  - [ ] a floating bar stays on screen and clickable over the video page, video only and with Notes (section 4)
+- [ ] **1. Plugin player rebuilt on the bridge.** Replace ReactPlayer for YouTube in `Video.tsx` and `VideoExtractViewer.tsx`. Open question: one reusable plugin-owned player Rem whose URL is rewritten per item, or one per video? (A reused Rem keeps the KB clean; check that rewriting the URL re-creates the iframe.) The player page lives in `docs/player/` (served by the docs site); changes to it ship when the docs deploy, not with the plugin.
 - [ ] **2. `vi` Rems resolve with their URL.** `action_items.ts` returns `{ type: 'youtube', url: vi.u, nativeAvailable: true }` instead of the URL-less `'video'` type. Add the queue switch (plugin player ⇄ RemNote player), defaulting from a new setting.
-- [ ] **3. Review in Editor for the RemNote player.** Open the video page and start the editor review timer as today. The PaneHeader widget carries Next / Dismiss / position / extract controls whenever its pane shows the IncRem under review. Mirror the position into `ip.l` on entry and read it back at Next.
+- [ ] **3. Review in Editor for the RemNote player.** Open the video page and start the editor review timer as today. A floating bar carries Next / Dismiss / position / extract controls while the IncRem under review is open in RemNote's player. Mirror the position into `ip.l` on entry and read it back at Next.
 - [ ] **4. Extracts from the RemNote player.** Start / End from `ip.l` (with nudges), same `videoExtract` powerup as today. An extract opens in the plugin player by default; in the RemNote player it pre-sets `ip.l` = start and shows "extract ends at X / reached ✓".
 - [ ] **5. Docs.** `docs/Incremental-Video.md` (the "two ways to watch" section changes completely) and the changelog, once approved.
 

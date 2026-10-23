@@ -1,15 +1,22 @@
-// Drives a YouTube embed that RemNote itself renders, from inside the plugin.
+// Drives a YouTube player that RemNote itself renders, from inside the plugin.
 //
 // A YouTube player can't run in the plugin's own iframe: RemNote sandboxes it
 // without allow-same-origin, nested frames inherit that, and YouTube's embed
 // script dies reading `window.caches` (findings/VIDEO_PLAYBACK.md). RemNote's
 // Embed Website powerup, though, is rendered by the host with allow-same-origin.
-// A raw /embed/ URL there answers YouTube's widget postMessage protocol from any
-// frame, so we find it through window.top.frames and talk to it from here.
 //
-// Never put `origin=` in the embed URL: an origin-locked player ignores both
-// the handshake and commands from other frames (verified against a copy of
-// RemNote's own wrapper, which is why RemNote's player can't be driven).
+// What goes into Embed Website is our own player page (docs/player/youtube.html,
+// published with the docs site), not a YouTube URL:
+// - a youtube.com / youtu.be URL is swapped for RemNote's own YouTube player,
+//   which is locked to its origin and ignores every other frame;
+// - a raw youtube-nocookie.com embed works in the browser, but in the desktop
+//   app (app://js) it gets YouTube Error 153: no Referer. Our https page gives
+//   YouTube a referrer and relays commands and state over postMessage.
+// We find that page through window.top.frames and talk to it from here.
+
+export const YOUTUBE_PLAYER_PAGE_URL = 'https://hugomarins.github.io/incremental-remnote/player/youtube.html';
+
+const MESSAGE_TYPE = 'ie-youtube-player';
 
 export interface YouTubeEmbedInfo {
   currentTime?: number;
@@ -17,27 +24,35 @@ export interface YouTubeEmbedInfo {
   /** -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued */
   playerState?: number;
   playbackRate?: number;
+  muted?: boolean;
+  /** YouTube error code, e.g. 153 (no referrer), 101/150 (embedding disabled). */
+  errorCode?: number;
 }
 
+export type YouTubePlayerCommand =
+  | { command: 'play' }
+  | { command: 'pause' }
+  | { command: 'mute' }
+  | { command: 'unMute' }
+  | { command: 'seekTo'; seconds: number }
+  | { command: 'setPlaybackRate'; playbackRate: number };
+
 export interface YouTubeEmbedConnection {
-  /** Calls a YouTube player method, e.g. send('seekTo', [120, true]). */
-  send: (func: string, args?: unknown[]) => void;
+  send: (command: YouTubePlayerCommand) => void;
   isConnected: () => boolean;
   close: () => void;
 }
 
-export function buildBridgeableEmbedUrl(
+export function buildPlayerPageUrl(
   videoId: string,
-  opts: { start?: number; end?: number; autoplay?: boolean } = {}
+  opts: { start?: number; end?: number; autoplay?: boolean; pageUrl?: string } = {}
 ): string {
-  const params = new URLSearchParams({ enablejsapi: '1', playsinline: '1', rel: '0' });
+  const params = new URLSearchParams({ v: videoId });
   if (opts.start) params.set('start', `${Math.floor(opts.start)}`);
   if (opts.end) params.set('end', `${Math.ceil(opts.end)}`);
   if (opts.autoplay) params.set('autoplay', '1');
-  return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params.toString()}`;
+  return `${opts.pageUrl ?? YOUTUBE_PLAYER_PAGE_URL}?${params.toString()}`;
 }
-
-const WIDGET_CHANNEL = { id: 1, channel: 'widget' };
 
 function collectFrames(root: Window, depth: number, out: Window[]) {
   if (depth > 3) return;
@@ -60,29 +75,16 @@ function collectFrames(root: Window, depth: number, out: Window[]) {
   }
 }
 
-const parseMessage = (data: unknown): any => {
-  if (typeof data !== 'string') return data;
-  try {
-    return JSON.parse(data);
-  } catch {
-    return null;
-  }
-};
-
-/** The video id a YouTube widget message reports, when it reports one. */
-const reportedVideoId = (info: any): string | undefined =>
-  info?.videoData?.video_id ?? info?.videoUrl?.match(/[?&]v=([^&]{11})/)?.[1];
-
 /**
- * Finds the embed playing `videoId` and streams its state to `onInfo`. Keeps
- * re-sending the handshake while nothing answers, which also covers the iframe
- * being re-created when RemNote re-renders it.
+ * Finds the player page showing `videoId` and streams its state to `onInfo`.
+ * Keeps saying hello while nothing answers, which also covers the iframe being
+ * re-created when RemNote re-renders it.
  */
 export function connectYouTubeEmbed(
   videoId: string,
   onInfo: (info: YouTubeEmbedInfo) => void,
-  /** Every message from the connected embed, for diagnostics. */
-  onRawMessage?: (event: string, info: unknown) => void
+  /** Every event from the connected page, for diagnostics. */
+  onEvent?: (event: string) => void
 ): YouTubeEmbedConnection {
   let target: Window | null = null;
   let lastReplyAt = 0;
@@ -91,58 +93,48 @@ export function connectYouTubeEmbed(
 
   const post = (frame: Window, payload: object) => {
     try {
-      frame.postMessage(JSON.stringify({ ...payload, ...WIDGET_CHANNEL }), '*');
+      frame.postMessage({ type: MESSAGE_TYPE, ...payload }, '*');
     } catch {
       // A frame can go away between enumeration and posting.
     }
   };
 
   const onMessage = (event: MessageEvent) => {
-    if (event.source === window) return;
-    const msg = parseMessage(event.data);
-    // Other frames (another instance of this plugin, say) send 'listening' too.
-    if (!msg || typeof msg.event !== 'string' || msg.event === 'listening') return;
-    const source = event.source as Window | null;
-    if (!source) return;
-    const info = msg.info && typeof msg.info === 'object' ? msg.info : {};
-    if (source !== target) {
-      // Not every message names its video; a different id is the only veto.
-      // Embeds without enablejsapi (RemNote's inline videos) never answer.
-      const id = reportedVideoId(info);
-      if (id && id !== videoId) return;
-      target = source;
-    }
+    const msg = event.data;
+    if (!msg || msg.type !== MESSAGE_TYPE || typeof msg.event !== 'string') return;
+    if (msg.videoId !== videoId || !event.source) return;
+    target = event.source as Window;
     lastReplyAt = Date.now();
-    onRawMessage?.(msg.event, msg.info);
-    const out: YouTubeEmbedInfo = {};
-    if (typeof info.currentTime === 'number') out.currentTime = info.currentTime;
-    if (typeof info.duration === 'number') out.duration = info.duration;
-    if (typeof info.playerState === 'number') out.playerState = info.playerState;
-    if (typeof info.playbackRate === 'number') out.playbackRate = info.playbackRate;
-    if (msg.event === 'onStateChange' && typeof msg.info === 'number') out.playerState = msg.info;
-    if (Object.keys(out).length) onInfo(out);
+    onEvent?.(msg.event);
+    const info: YouTubeEmbedInfo = {};
+    for (const key of ['currentTime', 'duration', 'playerState', 'playbackRate', 'errorCode'] as const) {
+      if (typeof msg[key] === 'number') info[key] = msg[key];
+    }
+    if (typeof msg.muted === 'boolean') info.muted = msg.muted;
+    onInfo(info);
   };
 
+  // The page reports progress every 250 ms only while playing, so silence is
+  // normal when paused. Re-handshake only when it has been quiet for a while,
+  // and say hello to the known page anyway so a paused player stays connected.
   const handshake = () => {
     if (closed) return;
-    const silent = Date.now() - lastReplyAt > 3000;
-    if (silent) {
-      target = null;
+    if (Date.now() - lastReplyAt > 3000) {
       const frames: Window[] = [];
       collectFrames(window.top ?? window, 0, frames);
-      frames.forEach((frame) => post(frame, { event: 'listening' }));
+      frames.forEach((frame) => post(frame, { command: 'hello' }));
     }
-    timer = setTimeout(handshake, silent ? 500 : 2000);
+    timer = setTimeout(handshake, target ? 2000 : 500);
   };
 
   window.addEventListener('message', onMessage);
   handshake();
 
   return {
-    send: (func, args = []) => {
-      if (target) post(target, { event: 'command', func, args });
+    send: (command) => {
+      if (target) post(target, command);
     },
-    isConnected: () => !!target && Date.now() - lastReplyAt < 3000,
+    isConnected: () => !!target && Date.now() - lastReplyAt < 5000,
     close: () => {
       closed = true;
       if (timer) clearTimeout(timer);

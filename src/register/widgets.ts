@@ -365,8 +365,8 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // Renders nothing unless switched on from the video_debug popup.
-  plugin.app.registerWidget('video_pane_probe', WidgetLocation.PaneHeader, {
+  // Opened from the video_debug popup only.
+  plugin.app.registerWidget('video_floating_probe', WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 'auto' },
   });
 

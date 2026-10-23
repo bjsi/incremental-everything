@@ -13,20 +13,26 @@ import {
 } from '@remnote/plugin-sdk';
 import { readNativeVideoInfo, writeLastWatchedTime } from '../lib/native_video';
 import {
-  buildBridgeableEmbedUrl,
+  buildPlayerPageUrl,
+  YOUTUBE_PLAYER_PAGE_URL,
   connectYouTubeEmbed,
   YouTubeEmbedConnection,
   YouTubeEmbedInfo,
 } from '../lib/youtube_embed_bridge';
 import { extractVideoId } from '../lib/youtube_transcript';
-import { videoPaneProbeSessionKey, videoProbeRemsSessionKey } from '../lib/consts';
+import {
+  videoFloatingProbeIdKey,
+  videoProbeOriginalLastWatchedKey,
+  videoProbeRemsSessionKey,
+} from '../lib/consts';
 
 // Probes for the Incremental Video redesign (findings/VIDEO_PLAYBACK.md). Each
 // section answers one question that can only be settled inside RemNote:
 //   1. can the plugin read RemNote's video slots (URL, last watched time)?
 //   2. does a plugin write to the last watched time reach RemNote's player?
 //   3. does an Embed Website Rem give the plugin a YouTube player it can drive?
-//   4. does a PaneHeader widget survive RemNote's video page?
+//   4. does a floating widget stay on screen over RemNote's video page? (A
+//      PaneHeader widget does not: it shows on editor panes only.)
 
 type UrlSource = 'vi.u' | 'Link URL' | 'source Link URL';
 
@@ -82,7 +88,12 @@ interface ProbeRems {
   videoId: string;
 }
 
-async function createProbePlayer(plugin: RNPlugin, videoId: string, start: number): Promise<ProbeRems | null> {
+async function createProbePlayer(
+  plugin: RNPlugin,
+  videoId: string,
+  start: number,
+  pageUrl: string
+): Promise<ProbeRems | null> {
   const doc = await plugin.rem.createRem();
   const embed = await plugin.rem.createRem();
   if (!doc || !embed) return null;
@@ -91,7 +102,7 @@ async function createProbePlayer(plugin: RNPlugin, videoId: string, start: numbe
   await embed.setParent(doc._id);
   await embed.addPowerup(BuiltInPowerupCodes.EmbedWebsite);
   await embed.setPowerupProperty(BuiltInPowerupCodes.EmbedWebsite, 'URL', [
-    buildBridgeableEmbedUrl(videoId, { start }),
+    buildPlayerPageUrl(videoId, { start, pageUrl }),
   ]);
   await embed.setPowerupProperty(BuiltInPowerupCodes.EmbedWebsite, 'WIDTH', ['460']);
   await embed.setPowerupProperty(BuiltInPowerupCodes.EmbedWebsite, 'HEIGHT', ['260']);
@@ -124,12 +135,20 @@ function VideoDebug() {
   // --- 2. ip.l write ---
   const [writeSeconds, setWriteSeconds] = useState('60');
   const [writeLog, setWriteLog] = useState<string>('');
-  const originalLastWatched = useRef<number | undefined | null>(null);
+  // Kept in session storage so Restore still works after the popup is closed to
+  // check RemNote's video page. Only the value before the first write is kept.
+  const [originals, setOriginals] = useSessionStorageState<Record<string, number | null>>(
+    videoProbeOriginalLastWatchedKey,
+    {}
+  );
+  const original = remId && remId in originals ? originals[remId] : undefined;
 
   const doWrite = async (seconds: number) => {
     const rem = remId ? await plugin.rem.findOne(remId) : undefined;
-    if (!rem) return;
-    if (originalLastWatched.current === null) originalLastWatched.current = data?.native.lastWatchedTime;
+    if (!rem || !remId) return;
+    if (!(remId in originals)) {
+      await setOriginals({ ...originals, [remId]: data?.native.lastWatchedTime ?? null });
+    }
     try {
       await writeLastWatchedTime(rem, seconds);
       const back = (await readNativeVideoInfo(rem)).lastWatchedTime;
@@ -146,6 +165,18 @@ function VideoDebug() {
   const [connected, setConnected] = useState(false);
   const [segment, setSegment] = useState<{ end: number } | null>(null);
   const conn = useRef<YouTubeEmbedConnection | null>(null);
+  // The published page by default; a local copy (python3 -m http.server 8766
+  // --directory docs) tests changes before the docs site is deployed.
+  const [pageUrl, setPageUrl] = useState(YOUTUBE_PLAYER_PAGE_URL);
+
+  const storedEmbedUrl = useTrackerPlugin(
+    async (rp) => {
+      if (!probe) return null;
+      const embed = await rp.rem.findOne(probe.embedId);
+      return embed ? await embed.getPowerupProperty(BuiltInPowerupCodes.EmbedWebsite, 'URL') : null;
+    },
+    [probe?.embedId]
+  );
 
   useEffect(() => {
     if (!probe) return;
@@ -153,12 +184,10 @@ function VideoDebug() {
     const c = connectYouTubeEmbed(
       probe.videoId,
       (info) => setPlayer((prev) => ({ ...prev, ...info })),
-      (event, info) => {
-        const shape =
-          info && typeof info === 'object' ? `${event}{${Object.keys(info).slice(0, 8).join(',')}}` : `${event}(${info})`;
+      (event) => {
         if (!seen.has(event)) {
           seen.add(event);
-          setEvents((prev) => [...prev, shape]);
+          setEvents((prev) => [...prev, event]);
         }
       }
     );
@@ -174,14 +203,14 @@ function VideoDebug() {
   // End-of-segment control: the bridge's answer to "play from A until B".
   useEffect(() => {
     if (segment && player.currentTime !== undefined && player.currentTime >= segment.end) {
-      conn.current?.send('pauseVideo');
+      conn.current?.send({ command: 'pause' });
       setSegment(null);
     }
   }, [player.currentTime, segment]);
 
   const createProbe = async () => {
     if (!videoId) return;
-    const created = await createProbePlayer(plugin as RNPlugin, videoId, data?.native.lastWatchedTime ?? 0);
+    const created = await createProbePlayer(plugin as RNPlugin, videoId, data?.native.lastWatchedTime ?? 0, pageUrl);
     if (!created) return void plugin.app.toast('Could not create the probe Rems');
     setEvents([]);
     setPlayer({});
@@ -196,13 +225,23 @@ function VideoDebug() {
   };
 
   const playSegment = (start: number, length: number) => {
-    conn.current?.send('seekTo', [start, true]);
-    conn.current?.send('playVideo');
+    conn.current?.send({ command: 'seekTo', seconds: start });
+    conn.current?.send({ command: 'play' });
     setSegment({ end: start + length });
   };
 
-  // --- 4. PaneHeader probe ---
-  const [paneProbe, setPaneProbe] = useSessionStorageState<boolean>(videoPaneProbeSessionKey, false);
+  // --- 4. Floating probe ---
+  const [floatingId, setFloatingId] = useSessionStorageState<string | null>(videoFloatingProbeIdKey, null);
+  const toggleFloating = async () => {
+    if (floatingId && (await plugin.window.isFloatingWidgetOpen(floatingId))) {
+      await plugin.window.closeFloatingWidget(floatingId);
+      await setFloatingId(null);
+      return;
+    }
+    // closeWhenClickOutside false: the probe must survive clicks on the video.
+    const id = await plugin.window.openFloatingWidget('video_floating_probe', { bottom: 90, right: 40 }, undefined, false);
+    await setFloatingId(id);
+  };
 
   if (!remId) return <div className="p-4">No Rem in context — focus a video Rem and run the command again.</div>;
   if (!data) return <div className="p-4">Loading…</div>;
@@ -253,10 +292,10 @@ function VideoDebug() {
           </button>
           <button
             style={btn}
-            disabled={originalLastWatched.current === null}
-            onClick={() => doWrite(originalLastWatched.current ?? 0)}
+            disabled={original === undefined || original === null}
+            onClick={() => original != null && doWrite(original)}
           >
-            Restore original ({fmt(originalLastWatched.current ?? undefined)})
+            Restore original ({fmt(original ?? undefined)})
           </button>
         </div>
         <div>{writeLog}</div>
@@ -269,12 +308,25 @@ function VideoDebug() {
         <strong>3 · Plugin-driven player (Embed Website + postMessage)</strong>
         {!probe ? (
           <div>
+            <div>
+              Player page:{' '}
+              <input
+                value={pageUrl}
+                onChange={(e) => setPageUrl(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
             <button style={btn} disabled={!videoId} onClick={createProbe}>
               Create probe player
             </button>
             <span style={{ opacity: 0.7 }}>
               creates a top-level document "🧪 Incremental Video probe" with an Embed Website child
             </span>
+            <div style={{ opacity: 0.7 }}>
+              Until the docs site is deployed with player/youtube.html, run{' '}
+              <code>python3 -m http.server 8766 --directory docs</code> in the repo and use
+              http://localhost:8766/player/youtube.html
+            </div>
           </div>
         ) : (
           <>
@@ -286,43 +338,62 @@ function VideoDebug() {
               {fmt(now)} · duration {fmt(player.duration)} · state{' '}
               {player.playerState !== undefined ? PLAYER_STATES[player.playerState] ?? player.playerState : '—'}
               {player.playbackRate ? ` · ${player.playbackRate}×` : ''}
+              {player.muted ? ' · muted' : ''}
+              {player.errorCode ? ` · ❌ YouTube error ${player.errorCode}` : ''}
             </div>
             <div>
-              <button style={btn} onClick={() => conn.current?.send('playVideo')}>
+              <button style={btn} onClick={() => conn.current?.send({ command: 'play' })}>
                 ▶ Play
               </button>
-              <button style={btn} onClick={() => conn.current?.send('pauseVideo')}>
+              <button style={btn} onClick={() => conn.current?.send({ command: 'pause' })}>
                 ⏸ Pause
               </button>
-              <button style={btn} onClick={() => conn.current?.send('seekTo', [(now ?? 0) + 30, true])}>
+              <button style={btn} onClick={() => conn.current?.send({ command: 'seekTo', seconds: (now ?? 0) + 30 })}>
                 +30 s
               </button>
               <button style={btn} onClick={() => playSegment(Math.max(0, (now ?? 0) - 10), 8)}>
                 Segment test: −10 s, play 8 s, auto-pause
               </button>
-              <button style={btn} onClick={() => conn.current?.send('setPlaybackRate', [1.5])}>
+              <button style={btn} onClick={() => conn.current?.send({ command: 'setPlaybackRate', playbackRate: 1.5 })}>
                 1.5×
+              </button>
+              <button
+                style={btn}
+                onClick={() => conn.current?.send({ command: player.muted ? 'unMute' : 'mute' })}
+              >
+                {player.muted ? 'Unmute' : 'Mute'}
               </button>
               <button style={btn} onClick={deleteProbe}>
                 🗑 Delete probe Rems
               </button>
             </div>
             {segment && <div>auto-pause armed at {fmt(segment.end)}</div>}
-            <div style={{ opacity: 0.7 }}>Message shapes seen: {events.join('  ') || '—'}</div>
+            <div style={{ opacity: 0.7 }}>Events seen: {events.join(' ') || '—'}</div>
+            <div style={{ opacity: 0.7, wordBreak: 'break-all' }}>
+              Embed URL: {storedEmbedUrl ?? '—'}
+              {storedEmbedUrl && !storedEmbedUrl.includes('/player/youtube.html')
+                ? ' ⚠️ made by an older probe — delete and recreate it'
+                : ''}
+            </div>
+            <div style={{ opacity: 0.7 }}>
+              In a browser, the first ▶ must be a click on the video itself (autoplay rule); the buttons work after
+              that. The desktop app should not need it.
+            </div>
           </>
         )}
       </div>
 
       <div style={section}>
-        <strong>4 · PaneHeader widget on RemNote's video page</strong>
+        <strong>4 · Floating controls over RemNote's video page</strong>
         <div>
-          <button style={btn} onClick={() => setPaneProbe(!paneProbe)}>
-            {paneProbe ? 'Hide' : 'Show'} pane-header probe
+          <button style={btn} onClick={toggleFloating}>
+            {floatingId ? 'Close' : 'Open'} floating probe
           </button>
         </div>
         <div style={{ opacity: 0.7 }}>
-          While on, every pane header shows a 🧪 label with the pane's Rem and its ip.l. Open the video in RemNote's
-          player (with and without Notes) and check the label is there and ticks while playing.
+          Opens a small bar in the bottom-right corner. Close this popup, then open the video in RemNote's player
+          (video only, then with Notes) and check: the bar stays, ip.l ticks while playing, and its test button
+          responds. Also watch ip.l right after the video page loads, before pressing play — does it drop to 0?
         </div>
       </div>
     </div>
