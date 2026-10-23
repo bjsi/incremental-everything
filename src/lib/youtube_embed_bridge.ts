@@ -14,7 +14,8 @@
 //   YouTube a referrer and relays commands and state over postMessage.
 // We find that page through window.top.frames and talk to it from here.
 
-export const YOUTUBE_PLAYER_PAGE_URL = 'https://hugomarins.github.io/incremental-remnote/player/youtube.html';
+export const YOUTUBE_PLAYER_PAGE_URL =
+  'https://hugomarins.github.io/incremental-remnote/player/youtube.html';
 
 const MESSAGE_TYPE = 'ie-youtube-player';
 
@@ -27,6 +28,8 @@ export interface YouTubeEmbedInfo {
   muted?: boolean;
   /** YouTube error code, e.g. 153 (no referrer), 101/150 (embedding disabled). */
   errorCode?: number;
+  /** New on every load of the player page: a change means it was reloaded. */
+  instance?: string;
 }
 
 export type YouTubePlayerCommand =
@@ -107,10 +110,17 @@ export function connectYouTubeEmbed(
     lastReplyAt = Date.now();
     onEvent?.(msg.event);
     const info: YouTubeEmbedInfo = {};
-    for (const key of ['currentTime', 'duration', 'playerState', 'playbackRate', 'errorCode'] as const) {
+    for (const key of [
+      'currentTime',
+      'duration',
+      'playerState',
+      'playbackRate',
+      'errorCode',
+    ] as const) {
       if (typeof msg[key] === 'number') info[key] = msg[key];
     }
     if (typeof msg.muted === 'boolean') info.muted = msg.muted;
+    if (typeof msg.instance === 'string') info.instance = msg.instance;
     onInfo(info);
   };
 

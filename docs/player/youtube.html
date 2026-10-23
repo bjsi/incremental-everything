@@ -28,13 +28,19 @@
     // In:  { type: 'ie-youtube-player', command: 'hello' | 'play' | 'pause' |
     //        'seekTo' (seconds) | 'setPlaybackRate' (playbackRate) | 'mute' |
     //        'unMute' }
-    // Out: { type: 'ie-youtube-player', event: 'ready' | 'progress' | 'state' |
-    //        'error', videoId, currentTime, duration, playerState,
-    //        playbackRate, muted, errorCode } — sent to every frame that said hello.
+    // Out: { type: 'ie-youtube-player', event: 'loaded' | 'hello' | 'ready' |
+    //        'progress' | 'state' | 'error', videoId, instance, currentTime,
+    //        duration, playerState, playbackRate, muted, errorCode } — sent to
+    //        every frame that said hello. 'loaded' goes once, on load, to every
+    //        frame in the window: RemNote can re-create the iframe (the plugin
+    //        has seen it on hover), and the plugin must restore its position
+    //        before this fresh page plays from its URL's start time. `instance`
+    //        is new on every load, so a reload is visible in any message.
     // It controls nothing but this video, so it accepts commands from any frame.
     const TYPE = 'ie-youtube-player';
     const params = new URLSearchParams(location.search);
     const videoId = params.get('v') || '';
+    const instance = Math.random().toString(36).slice(2, 10);
     const num = (value) => {
       const n = Number(value);
       return Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
@@ -57,7 +63,7 @@
     }
 
     function post(event, extra) {
-      const message = { type: TYPE, event, videoId, ...snapshot(), ...(extra || {}) };
+      const message = { type: TYPE, event, videoId, instance, ...snapshot(), ...(extra || {}) };
       controllers.forEach((target) => {
         try { target.postMessage(message, '*'); } catch (e) { controllers.delete(target); }
       });
@@ -117,6 +123,26 @@
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
       document.head.appendChild(tag);
+      announce();
+    }
+
+    // Tells every frame in the window that this page has (re)loaded. Frames
+    // that aren't the plugin ignore the message type.
+    function announce() {
+      const message = { type: TYPE, event: 'loaded', videoId, instance };
+      const visit = (win, depth) => {
+        if (depth > 3) return;
+        let count = 0;
+        try { count = win.frames.length; } catch (e) { return; }
+        for (let i = 0; i < count; i++) {
+          let frame;
+          try { frame = win.frames[i]; } catch (e) { continue; }
+          if (!frame || frame === window) continue;
+          try { frame.postMessage(message, '*'); } catch (e) {}
+          visit(frame, depth + 1);
+        }
+      };
+      try { visit(window.top, 0); } catch (e) {}
     }
   </script>
 </body>

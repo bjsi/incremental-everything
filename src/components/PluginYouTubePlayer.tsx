@@ -13,8 +13,11 @@ import { getPlayerRem, PlayerRemIds, setPlayerSize, setPlayerUrl } from '../lib/
 // (lib/video_player_rem.ts), shown through a DocumentViewer and driven over
 // postMessage (lib/youtube_embed_bridge.ts).
 
-/** 1 = playing in YouTube's player states. */
+/** YouTube player states: 1 playing, 2 paused. */
 export const YT_PLAYING = 1;
+export const YT_PAUSED = 2;
+
+const LOG = '[VideoPlayer]';
 
 export interface YouTubeBridge {
   info: YouTubeEmbedInfo;
@@ -22,12 +25,27 @@ export interface YouTubeBridge {
   send: (command: YouTubePlayerCommand) => void;
 }
 
+// Where each video last was, kept outside React so it survives the player page
+// being reloaded and this component being remounted: RemNote can re-create the
+// embed's iframe (seen when the mouse first moves over it in the queue), and a
+// fresh page would start over from its URL's start time at 1×. Keyed by video
+// and start, so another card on the same video still starts where it should.
+interface PlayerMemory {
+  time: number;
+  rate: number;
+  playing: boolean;
+  at: number;
+}
+const memory = new Map<string, PlayerMemory>();
+const MEMORY_TTL_MS = 10 * 60 * 1000;
+
 /**
  * Connects to the player page showing `videoId`. On the first answer from each
- * page load it seeks to `start`, sets the speed and plays: the page may be one
- * left over from an earlier card that showed the same video, so its URL's start
- * time can't be relied on. A page answers 'hello' only until its player is
- * ready, so a 'hello' after that means the page was reloaded.
+ * page load it seeks, sets the speed and plays (or stays paused): to where this
+ * card's player last was if the page was reloaded, else to `start`. The page
+ * may also be one left over from an earlier card on the same video, so its
+ * URL's start time can't be relied on. A page answers 'hello' only until its
+ * player is ready, so a 'hello' after that means the page was reloaded.
  */
 export function useYouTubeBridge(
   videoId: string | null,
@@ -41,25 +59,67 @@ export function useYouTubeBridge(
 
   React.useEffect(() => {
     if (!videoId) return;
+    const key = `${videoId}@${Math.floor(optsRef.current.start ?? 0)}`;
     let greeted = false;
     let reloaded = false;
+    let instance: string | undefined;
+    // Where the last greeting sent the player; nothing is remembered until the
+    // player reports being there, so a left-over or reloaded page can't record
+    // the position it had before the seek landed.
+    let target: number | undefined;
+    let settled = false;
+    console.log(LOG, 'connect', key);
+
+    const greet = (next: YouTubeEmbedInfo) => {
+      const remembered = memory.get(key);
+      const prev =
+        remembered && Date.now() - remembered.at < MEMORY_TTL_MS ? remembered : undefined;
+      target = prev?.time ?? optsRef.current.start ?? 0;
+      settled = false;
+      const rate = prev?.rate ?? optsRef.current.playbackRate ?? 1;
+      console.log(LOG, reloaded ? 'page reloaded, restoring' : 'greeting', key, {
+        target,
+        rate,
+        prev,
+      });
+      // A fresh page starts at its URL's start time; an old one could be anywhere.
+      if (next.currentTime === undefined ? target > 0 : Math.abs(next.currentTime - target) > 2) {
+        c.send({ command: 'seekTo', seconds: target! });
+      }
+      if (rate !== 1) c.send({ command: 'setPlaybackRate', playbackRate: rate });
+      c.send({ command: prev && !prev.playing ? 'pause' : 'play' });
+    };
+
     const c = connectYouTubeEmbed(
       videoId,
       (next) => {
+        if (next.instance) {
+          if (instance && next.instance !== instance) reloaded = true;
+          instance = next.instance;
+        }
         if (!greeted || reloaded) {
+          greet(next);
           greeted = true;
           reloaded = false;
-          const { start = 0, playbackRate } = optsRef.current;
-          // A fresh page starts at its URL's start time; an old one could be anywhere.
-          if (next.currentTime === undefined ? start > 0 : Math.abs(next.currentTime - start) > 2) {
-            c.send({ command: 'seekTo', seconds: start });
-          }
-          if (playbackRate && playbackRate !== 1)
-            c.send({ command: 'setPlaybackRate', playbackRate });
-          c.send({ command: 'play' });
+        }
+        // Only a playing or paused player says where the video is: a page
+        // that has just loaded reports its URL's start time until the seek lands.
+        const known =
+          next.currentTime !== undefined &&
+          (next.playerState === YT_PLAYING || next.playerState === YT_PAUSED);
+        if (known && !settled && Math.abs(next.currentTime! - (target ?? 0)) <= 3) settled = true;
+        if (known && settled) {
+          memory.set(key, {
+            time: next.currentTime!,
+            rate: next.playbackRate ?? memory.get(key)?.rate ?? 1,
+            playing: next.playerState === YT_PLAYING,
+            at: Date.now(),
+          });
         }
         setInfo((prev) => ({ ...prev, ...next }));
       },
+      // Pages from before `instance` existed: a 'hello' after the first greeting
+      // also means a reload, though only while the new player is still loading.
       (event) => {
         if (event === 'hello' && greeted) reloaded = true;
       }
@@ -67,6 +127,7 @@ export function useYouTubeBridge(
     conn.current = c;
     const t = setInterval(() => setConnected(c.isConnected()), 500);
     return () => {
+      console.log(LOG, 'disconnect', key);
       clearInterval(t);
       c.send({ command: 'pause' });
       c.close();
@@ -113,6 +174,7 @@ export const PluginYouTubePlayerFrame: React.FC<{ videoId: string; start?: numbe
 
   React.useEffect(() => {
     let cancelled = false;
+    console.log(LOG, 'frame mount', videoId);
     (async () => {
       try {
         const found = await getPlayerRem(plugin);
@@ -123,11 +185,12 @@ export const PluginYouTubePlayerFrame: React.FC<{ videoId: string; start?: numbe
         );
         if (!cancelled) setIds(found);
       } catch (e) {
-        console.error('[PluginYouTubePlayer]', e);
+        console.error(LOG, e);
         if (!cancelled) setError(String(e));
       }
     })();
     return () => {
+      console.log(LOG, 'frame unmount', videoId);
       cancelled = true;
     };
   }, [videoId]);
@@ -148,6 +211,7 @@ export const PluginYouTubePlayerFrame: React.FC<{ videoId: string; start?: numbe
       )
         return;
       lastSize.current = size;
+      console.log(LOG, 'resize embed', size);
       setPlayerSize(plugin, ids.embedId, size.width, size.height);
     };
     const observer = new ResizeObserver(() => {

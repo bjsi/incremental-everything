@@ -11,7 +11,7 @@ import {
   videoExtractEndSlotCode,
 } from '../lib/consts';
 import { getTranscriptForRange, extractVideoId } from '../lib/youtube_transcript';
-import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PLAYING } from './PluginYouTubePlayer';
+import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PAUSED, YT_PLAYING } from './PluginYouTubePlayer';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
@@ -72,7 +72,9 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
   const armed = React.useRef(false);
   React.useEffect(() => {
     const t = info.currentTime;
-    if (t === undefined) return;
+    // Only a playing or paused player says where the video is: a page that
+    // has just (re)loaded reports its URL's start time until the seek lands.
+    if (t === undefined || (info.playerState !== YT_PLAYING && info.playerState !== YT_PAUSED)) return;
     if (!armed.current && info.playerState === YT_PLAYING && Math.abs(t - (saved?.position ?? 0)) <= 5) {
       armed.current = true;
     }
