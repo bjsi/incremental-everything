@@ -54,6 +54,8 @@ Inside RemNote: a `<DocumentViewer>` (in a popup) of a document holding an `ew` 
 
 RemNote's wrapper, `https://backend.remnote.com/embed/youtube/<id>?start=&controls=`, messages of type `remnote-youtube-embed`, accepts commands only from `window.parent` and posts only to `window.parent`. A plugin cannot use it.
 
+**Screenshots of the player can't be taken inside RemNote** (1.28.57, 2026-10-23). A canvas can't read the frame: the video sits in YouTube's cross-origin frame, and its media comes from googlevideo without CORS. Screen capture is out too. No RemNote iframe `allow` list includes `display-capture`, and the desktop app's `app.asar` has no `setDisplayMediaRequestHandler` or `desktopCapturer`, so Electron rejects `getDisplayMedia`. The local helper does it instead (`/video-frame` in `scripts/ai_ocr_helper.py`). `yt-dlp -g` gives a stream URL, which is cached for an hour, and `ffmpeg -ss <t> -i <url> -frames:v 1` grabs the exact frame. That takes about 6 s cold and 1.5 s with the cached URL, at the video's own resolution, with no player controls in it.
+
 ## RemNote's own video Rems (Create › Upload File › YouTube URL)
 
 Read from `remnote.db` (Rem `eVTm6KiURagOtwomR`) and the bundle:

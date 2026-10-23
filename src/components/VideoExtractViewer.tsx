@@ -5,6 +5,7 @@ import { extractVideoId } from '../lib/youtube_transcript';
 import { PluginYouTubePlayerFrame, useYouTubeBridge } from './PluginYouTubePlayer';
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
+import { VideoSnapshotButtons } from './VideoSnapshotButtons';
 
 interface VideoExtractViewerProps {
     actionItem: YoutubeHighlightActionItem;
@@ -94,6 +95,9 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                 </button>
 
                 {videoId && <PlayerControls info={info} connected={connected} send={send} />}
+                {videoId && (
+                    <VideoSnapshotButtons videoId={videoId} time={info.currentTime} parentId={extract._id} />
+                )}
 
                 {armed === 'done' && (
                     <span style={{ fontSize: 12, color: '#6b7280' }}>✓ end of extract reached</span>

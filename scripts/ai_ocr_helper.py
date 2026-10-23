@@ -11,9 +11,14 @@ write back as rich text.
 It also locates quotes in a PDF (`/locate`), so the plugin can pin a passage's
 source highlight without the user selecting it.
 
+For YouTube videos it grabs the exact frame at a given time (`/video-frame`,
+with yt-dlp and ffmpeg: the plugin's player can't be captured from inside
+RemNote) and transcribes a grabbed frame into an outline (`/video-transcribe`).
+
     python3 scripts/ai_ocr_helper.py          # listens on 127.0.0.1:3457
 
-Requires PyMuPDF (`pip install pymupdf`) and a logged-in `claude` CLI.
+Requires PyMuPDF (`pip install pymupdf`) and a logged-in `claude` CLI; video
+frames also need `brew install yt-dlp ffmpeg`.
 
 Environment:
     IR_AI_PORT      port (default 3457)
@@ -23,9 +28,11 @@ Environment:
 
 Files live in ~/.incremental-remnote/ai-ocr/:
     prompt.md       the transcription instructions — edit freely, re-read per request
+    video-prompt.md the same for video frames
     requests.log    one JSON line per request (includes the raw highlight Data)
     crops/          the last image sent for each highlight
     pdf-cache/      downloaded PDFs
+    video-frames/   grabbed video frames
 """
 import base64
 import difflib
@@ -56,6 +63,8 @@ PDF_CACHE = HOME / 'pdf-cache'
 CROPS = HOME / 'crops'
 LOG = HOME / 'requests.log'
 PROMPT_FILE = HOME / 'prompt.md'
+VIDEO_PROMPT_FILE = HOME / 'video-prompt.md'
+VIDEO_FRAMES = HOME / 'video-frames'
 
 DPI = 220
 # PDF points of margin around the highlight box. Vertical is larger: a line's
@@ -87,6 +96,35 @@ If part of the image is illegible, transcribe what you can and mark the gap inli
 """
 
 
+DEFAULT_VIDEO_PROMPT = r"""Extract the text shown in a frame of a video: a lecture slide, a document or screen being shown, a whiteboard, a diagram. Do not acknowledge the request, do not comment, and do not ask questions: output the outline described below and nothing else.
+
+The output becomes a RemNote outline, one rem per line:
+- Start every line with "- ".
+- Nest a line under the one it belongs to by indenting it two spaces per level: a slide's title at the top level, its bullets one level down, their sub-bullets one more. Follow the structure the frame shows; do not invent hierarchy.
+- One line per paragraph or list item; never break a line inside a sentence.
+- Keep the frame's own numbering and lettering (1., a), …) as part of the line's text.
+- Tables: a line naming the table, then one nested line per row, cells separated by " | ".
+- Diagrams and charts: transcribe their labels; when the labels alone would not make sense, add one line in *italics* saying what the figure shows.
+
+Leave out what is not content: logos, watermarks, the video player's controls, subtitles burnt into the picture.
+
+Formulae, in KaTeX:
+- inline: $x$
+- a formula set on its own line in the frame: its own outline line, written $$x$$
+- numbered equations use \tag with the number shown, and are always written as $$...$$
+- words inside formulae are enclosed in \text{}.
+
+Emphasis, since the reader skims these rems later:
+- Put the key terms and concepts in **bold**, even when the frame does not emphasise them: one to three per line at most, each a word or a short phrase, never a whole sentence.
+- Keep the frame's own emphasis: italics as *italic*, bold as **bold**.
+- Never put ** or * inside a formula's $...$.
+
+Use no other markup: no headings, no code, no links.
+
+If part of the frame is illegible, transcribe what you can and mark the gap as [illegible]. If the frame shows no text at all, output exactly: [no text]
+"""
+
+
 def log(entry):
     with open(LOG, 'a') as f:
         f.write(json.dumps(entry, ensure_ascii=False) + '\n')
@@ -96,6 +134,20 @@ def prompt():
     if not PROMPT_FILE.exists():
         PROMPT_FILE.write_text(DEFAULT_PROMPT)
     return PROMPT_FILE.read_text()
+
+
+def video_prompt():
+    if not VIDEO_PROMPT_FILE.exists():
+        VIDEO_PROMPT_FILE.write_text(DEFAULT_VIDEO_PROMPT)
+    return VIDEO_PROMPT_FILE.read_text()
+
+
+def find_tool(name):
+    # launchd and GUI launches carry a minimal PATH, so check Homebrew's spots too.
+    for candidate in [shutil.which(name), f'/opt/homebrew/bin/{name}', f'/usr/local/bin/{name}']:
+        if candidate and Path(candidate).exists():
+            return str(candidate)
+    return None
 
 
 def find_claude():
@@ -249,6 +301,13 @@ def transcribe(images, raw_text, extend=None):
     else:
         instruction = 'Transcribe the image.'
     content.append({'type': 'text', 'text': instruction})
+    markup, model = run_claude(content, prompt())
+    return bullets_to_markers(markup), model
+
+
+def run_claude(content, system_prompt):
+    """One `claude -p` turn on `content` (message content blocks); returns the
+    reply text and the model that answered."""
     message = json.dumps({'type': 'user', 'message': {'role': 'user', 'content': content}})
 
     claude = find_claude()
@@ -259,7 +318,7 @@ def transcribe(images, raw_text, extend=None):
     # settings files (and so hooks) and session persistence.
     cmd = [claude, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
            '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence',
-           '--model', MODEL, '--system-prompt', prompt()]
+           '--model', MODEL, '--system-prompt', system_prompt]
     proc = subprocess.run(cmd, input=message + '\n', capture_output=True, text=True, timeout=240, cwd=HOME)
     model = None  # the model the CLI actually resolved the alias to, reported in its init event
     for line in proc.stdout.splitlines():
@@ -272,7 +331,7 @@ def transcribe(images, raw_text, extend=None):
         if event.get('type') == 'result':
             if event.get('is_error'):
                 raise RuntimeError(event.get('result') or 'claude reported an error')
-            return bullets_to_markers(event.get('result', '').strip()), model
+            return event.get('result', '').strip(), model
     raise RuntimeError(f'claude exited {proc.returncode}: {proc.stderr.strip()[-400:]}')
 
 
@@ -495,7 +554,81 @@ def handle_match(req, entry):
     return {'results': results}
 
 
-ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match}
+# ---------------------------------------------------------------------------
+# /video-frame, /video-transcribe — YouTube frames
+# ---------------------------------------------------------------------------
+
+VIDEO_ID = re.compile(r'^[A-Za-z0-9_-]{11}$')
+FRAME_ID = re.compile(r'^[A-Za-z0-9_-]{11}-\d+\.jpg$')
+# The best stream up to 1080p, H.264 first: every ffmpeg build decodes it.
+VIDEO_FORMAT = 'bv*[height<=1080][vcodec^=avc1]/bv*[height<=1080]/b[height<=1080]/b'
+STREAM_TTL = 3600     # googlevideo URLs last ~6 h; refetch well before that
+_streams = {}         # video id -> (fetched at, stream URL)
+
+
+def stream_url(video_id, fresh=False):
+    cached = _streams.get(video_id)
+    if cached and not fresh and time.time() - cached[0] < STREAM_TTL:
+        return cached[1]
+    ytdlp = find_tool('yt-dlp')
+    if not ytdlp:
+        raise RuntimeError('yt-dlp not found (brew install yt-dlp)')
+    proc = subprocess.run([ytdlp, '-g', '--no-playlist', '--no-warnings', '-f', VIDEO_FORMAT,
+                           f'https://www.youtube.com/watch?v={video_id}'],
+                          capture_output=True, text=True, timeout=90)
+    url = next((line for line in proc.stdout.splitlines() if line.startswith('http')), None)
+    if not url:
+        raise RuntimeError(f'yt-dlp found no stream: {proc.stderr.strip()[-400:]}')
+    _streams[video_id] = (time.time(), url)
+    return url
+
+
+def grab_frame(video_id, seconds):
+    """The frame at `seconds`, as a JPEG file. Seeking before -i jumps to the
+    keyframe and decodes forward from there, so the frame is exact."""
+    ffmpeg = find_tool('ffmpeg')
+    if not ffmpeg:
+        raise RuntimeError('ffmpeg not found (brew install ffmpeg)')
+    path = VIDEO_FRAMES / f'{video_id}-{int(round(seconds * 1000))}.jpg'
+    if path.exists():
+        return path
+    for fresh in (False, True):  # a cached stream URL may have expired
+        cmd = [ffmpeg, '-hide_banner', '-loglevel', 'error', '-ss', f'{seconds:.3f}',
+               '-i', stream_url(video_id, fresh), '-frames:v', '1', '-q:v', '2', '-y', str(path)]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        if proc.returncode == 0 and path.exists() and path.stat().st_size:
+            return path
+    raise RuntimeError(f'ffmpeg could not grab the frame: {proc.stderr.strip()[-400:]}')
+
+
+def handle_video_frame(req, entry):
+    video_id = req.get('videoId') or ''
+    seconds = req.get('seconds')
+    if not VIDEO_ID.match(video_id) or not isinstance(seconds, (int, float)) or seconds < 0:
+        raise RuntimeError('need a YouTube videoId and seconds >= 0')
+    entry.update(videoId=video_id, seconds=seconds)
+    path = grab_frame(video_id, float(seconds))
+    return {'frameId': path.name, 'mime': 'image/jpeg',
+            'image': base64.b64encode(path.read_bytes()).decode()}
+
+
+def handle_video_transcribe(req, entry):
+    frame_id = req.get('frameId') or ''
+    if not FRAME_ID.match(frame_id) or not (VIDEO_FRAMES / frame_id).exists():
+        raise RuntimeError('unknown frame; grab it with /video-frame first')
+    entry['frameId'] = frame_id
+    content = [
+        {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/jpeg',
+                                     'data': base64.b64encode((VIDEO_FRAMES / frame_id).read_bytes()).decode()}},
+        {'type': 'text', 'text': 'Transcribe this video frame.'},
+    ]
+    markup, model = run_claude(content, video_prompt())
+    entry.update(model=model, markup=markup)
+    return {'markup': markup}
+
+
+ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match,
+          '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -517,7 +650,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == '/':
-            return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL})
+            return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL,
+                                        'ytDlp': find_tool('yt-dlp'), 'ffmpeg': find_tool('ffmpeg')})
         self.send_json(404, {'ok': False, 'error': 'POST /ocr or /locate'})
 
     def do_POST(self):
@@ -553,9 +687,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    for d in (HOME, PDF_CACHE, CROPS):
+    for d in (HOME, PDF_CACHE, CROPS, VIDEO_FRAMES):
         d.mkdir(parents=True, exist_ok=True)
     prompt()
+    video_prompt()
     print(f'AI OCR helper on http://127.0.0.1:{PORT}  (claude: {find_claude()}, model: {MODEL})', flush=True)
     print(f'Prompt: {PROMPT_FILE}', flush=True)
     ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()

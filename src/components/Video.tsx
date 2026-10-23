@@ -13,6 +13,7 @@ import { getTranscriptForRange, extractVideoId } from '../lib/youtube_transcript
 import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PAUSED, YT_PLAYING } from './PluginYouTubePlayer';
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
+import { VideoSnapshotButtons } from './VideoSnapshotButtons';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
@@ -217,6 +218,9 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
         )}
 
         {videoId && <PlayerControls info={info} connected={connected} send={send} />}
+        {videoId && (
+          <VideoSnapshotButtons videoId={videoId} time={info.currentTime} parentId={props.actionItem.rem._id} />
+        )}
 
         {/* Video Extract controls */}
         {extractState.phase === 'idle' && (
