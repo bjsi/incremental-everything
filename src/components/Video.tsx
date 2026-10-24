@@ -1,4 +1,4 @@
-import { DocumentViewer, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
+import { DocumentViewer, RemHierarchyEditorTree, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
 import { YoutubeActionItem } from '../lib/incremental_rem';
 import { initIncrementalRem } from '../lib/incremental_rem';
@@ -14,7 +14,6 @@ import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PAUSED, YT_PLAYING } fro
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
 import { VideoSnapshotButtons } from './VideoSnapshotButtons';
-import { ExtractViewer } from './ExtractViewer';
 import { setNativeVideoPosition, setPluginVideoPosition } from '../lib/video_position';
 
 interface VideoViewerProps {
@@ -212,9 +211,14 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
   };
 
   // A RemNote video Rem shown as a document is RemNote's video page, player
-  // and all, so its notes are shown as an outline instead.
+  // and all: the host's document view opens a "learning source" (a Rem with the
+  // Video, Uploaded File or Link powerup) as its source unless told not to, and
+  // the plugin's DocumentViewer can't tell it. The editable tree is the
+  // document's body without that switch: the Rem and its children.
   const notes = props.actionItem.nativeAvailable ? (
-    <ExtractViewer rem={props.actionItem.rem} plugin={plugin as any} />
+    <div style={{ padding: '12px 16px' }}>
+      <RemHierarchyEditorTree remId={props.actionItem.rem._id} width="100%" height="auto" />
+    </div>
   ) : (
     <DocumentViewer width={'100%'} height={'100%'} documentId={props.actionItem.rem._id} />
   );

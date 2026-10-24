@@ -79,6 +79,10 @@ Read from `remnote.db` (Rem `eVTm6KiURagOtwomR`) and the bundle:
 - The video learning suite is YouTube-only: `getOrCreateVideoRemFromURL` accepts only YouTube URL shapes, and usage is metered (`YOUTUBE_ANNOTATION`).
 - The transcript cues are not stored in `remnote.db`.
 
+## A plugin can't show a video Rem as a plain document
+
+Checked in the 1.28.57 bundle on 2026-10-23. The host's `Document` component opens a Rem as its "learning source" (the video page with player, outline, transcript, AI) when `!props.dontShowLearningSource && document.isLearningSourceFile()`. `isLearningSourceFile()` is true for a Rem with any of these powerups: UploadedFile, Video (`vi`), Link, AudioRecording, SavedSharedArticleStudy or SavedSharedLearningOutline. The plugin's `DocumentViewer` fake embed passes only `knowledgeBaseId, mosaicId, scrollRef, focusId, readOnly, toggleReadOnly, allowToggleReadOnly, shouldTakeGlobalFocus` plus `documentId`. So it always shows a `vi` Rem as RemNote's video page. The plain document view, with **Re-Open Video** in the pills, comes from a pane that sets `dontShowLearningSource`, which a plugin can't reach. `RemHierarchyEditorTree` renders the Rem and its children as an editable tree without that switch. It is the closest a plugin can get.
+
 ## Where a plugin widget can sit on the video page
 
 - **`PaneHeader` does not render on the video page** (verified in the app 2026-10-23). The video pane's "Notes · AI Learning Tools · ⋯" header isn't the toolbar that hosts it; a probe label showed only in the editor pane opened by **Notes**. (The bundle's `isReaderViewer` branch that renders `PaneHeader` is some other reader.) `PaneHeader` context is `{ paneId }`; `plugin.window.getOpenPaneRemId(paneId)` maps it to a Rem (not reactive).
