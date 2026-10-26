@@ -17,6 +17,7 @@ import { formatVideoTime } from '../lib/video_snapshot';
 import { nativeVideoUrl } from '../lib/video_position';
 import { useNativeVideoMirror } from '../components/useNativeVideoMirror';
 import { NativeExtractButtons } from '../components/NativeExtractButtons';
+import { VideoTranscriptButton } from '../components/VideoTranscriptButton';
 
 // The Editor Review Timer's controls over RemNote's video page, where the timer
 // bar itself can't show. Opened and closed by lib/video_review_bar.ts.
@@ -119,6 +120,7 @@ function VideoReviewBar() {
       </span>
 
       {video?.url && <NativeExtractButtons parentId={timer.remId} url={video.url} position={position} />}
+      {video?.url && <VideoTranscriptButton target={{ parentId: timer.remId, url: video.url }} />}
 
       <button
         style={btn(isPaused ? '#f59e0b' : '#6b7280')}

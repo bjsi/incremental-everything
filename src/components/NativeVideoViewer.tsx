@@ -9,6 +9,7 @@ import {
 import { formatVideoTime } from '../lib/video_snapshot';
 import { useNativeVideoMirror } from './useNativeVideoMirror';
 import { NativeExtractButtons } from './NativeExtractButtons';
+import { VideoTranscriptButton } from './VideoTranscriptButton';
 
 interface NativeVideoViewerProps {
   actionItem: {
@@ -26,6 +27,8 @@ interface NativeVideoViewerProps {
    * instead of the video's position, which is left alone.
    */
   segment?: { start: number; end: number };
+  /** The extract's Rem, when `segment` is shown: 📜 puts the range's transcript under it. */
+  extractId?: string;
 }
 
 const barButton: React.CSSProperties = {
@@ -43,7 +46,13 @@ const LOG = '[NativeVideo]';
  * RemNote's own video page for a video Rem: a DocumentViewer of the Rem shows
  * its player, transcript, Highlight Moment, AI Tutor and Summary.
  */
-export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({ actionItem, url, onSwitchPlayer, segment }) => {
+export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({
+  actionItem,
+  url,
+  onSwitchPlayer,
+  segment,
+  extractId,
+}) => {
   const plugin = usePlugin();
   const remId = actionItem.rem._id;
   // Without a URL there is nothing to keep in step: show the page at once.
@@ -129,9 +138,15 @@ export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({ actionItem
                   ? '✓ end of extract reached'
                   : `ends at ${formatVideoTime(segment.end)} · now ${position !== undefined ? formatVideoTime(position) : '—'}`}
               </span>
+              {url && extractId && <VideoTranscriptButton target={{ parentId: extractId, url, range: segment }} />}
             </>
           ) : (
-            url && <NativeExtractButtons parentId={remId} url={url} position={position} />
+            url && (
+              <>
+                <NativeExtractButtons parentId={remId} url={url} position={position} />
+                <VideoTranscriptButton target={{ parentId: remId, url }} />
+              </>
+            )
           )}
         </div>
       )}

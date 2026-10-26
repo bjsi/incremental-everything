@@ -1,15 +1,14 @@
 /**
- * YouTube Transcript Utility
+ * YouTube transcripts, fetched by the local helper (scripts/ai_ocr_helper.py,
+ * `/video-transcript`): yt-dlp lists the caption tracks and the helper returns
+ * the lines of the video's own-language track, cached per video.
  *
- * Fetches captions via a Cloudflare Worker that handles everything:
- * - Innertube API (ANDROID client) to get caption track info
- * - Fetches and parses captions server-side (json3/srv1 formats)
- * - Returns clean segments to the client
- *
- * Deploy your own worker: see /yt-transcript-proxy/
+ * The earlier local proxy (yt-local-proxy.js, Innertube ANDROID client) stopped
+ * working when YouTube began refusing that request. See
+ * findings/VIDEO_PLAYBACK.md, "Transcripts".
  */
 
-const PROXY_URL = 'http://localhost:3456';
+import { callVideoHelper } from './video_snapshot';
 
 const RE_YOUTUBE =
     /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i;
@@ -25,67 +24,26 @@ export function extractVideoId(videoIdOrUrl: string): string | null {
     return videoIdOrUrl.match(RE_YOUTUBE)?.[1] ?? null;
 }
 
-/**
- * Fetch the full transcript for a YouTube video.
- * The Worker handles all the heavy lifting (Innertube API + caption parsing).
- */
-export async function fetchTranscript(
-    videoIdOrUrl: string,
-    lang?: string
-): Promise<TranscriptSegment[]> {
+export interface Transcript {
+    language: string;
+    /** 'manual': captions the uploader made; 'auto': YouTube's speech recognition. */
+    kind: 'manual' | 'auto';
+    segments: TranscriptSegment[];
+}
+
+/** The whole transcript of a YouTube video. Throws with a message for the user. */
+export async function fetchTranscript(videoIdOrUrl: string): Promise<Transcript> {
     const videoId = extractVideoId(videoIdOrUrl);
-    if (!videoId) throw new Error(`Could not extract video ID from: ${videoIdOrUrl}`);
-
-    console.log('[YT-Transcript] Fetching transcript for:', videoId);
-
-    const params = new URLSearchParams({ v: videoId });
-    if (lang) params.set('lang', lang);
-
-    const url = `${PROXY_URL}/transcript?${params}`;
-    console.log('[YT-Transcript] Calling Worker:', url);
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.error) {
-        console.warn('[YT-Transcript] Worker error:', data);
-        throw new Error(`[YT-Transcript] ${data.error}: ${data.message}`);
-    }
-
-    if (!data.ok || !Array.isArray(data.segments)) {
-        console.warn('[YT-Transcript] Unexpected response:', data);
-        throw new Error('[YT-Transcript] Unexpected Worker response');
-    }
-
-    console.log('[YT-Transcript] Got', data.segments.length, 'segments for:',
-        data.language, `(${data.kind})`,
-        '| Available:', data.availableTracks?.map((t: any) => t.lang).join(', '));
-
-    return data.segments;
-}
-
-/** Fetch transcript segments overlapping a time range. */
-export async function getTranscriptForRange(
-    videoIdOrUrl: string,
-    startTime: number,
-    endTime: number,
-    lang?: string
-): Promise<TranscriptSegment[]> {
-    const all = await fetchTranscript(videoIdOrUrl, lang);
-    const filtered = all.filter((s: TranscriptSegment) =>
-        (s.offset + s.duration) > startTime && s.offset < endTime
+    if (!videoId) throw new Error(`Not a YouTube video: ${videoIdOrUrl}`);
+    const transcript = await callVideoHelper<Transcript & { cached: boolean }>('/video-transcript', { videoId });
+    console.log(
+        `[YT-Transcript] ${videoId}: ${transcript.segments.length} lines, ${transcript.language} (${transcript.kind})` +
+            (transcript.cached ? ', cached' : '')
     );
-    console.log(`[YT-Transcript] Filtered ${filtered.length}/${all.length} for [${startTime.toFixed(1)}-${endTime.toFixed(1)}]`);
-    return filtered;
+    return transcript;
 }
 
-/** Get transcript text for a range as a joined string. */
-export async function getTranscriptTextForRange(
-    videoIdOrUrl: string,
-    startTime: number,
-    endTime: number,
-    lang?: string
-): Promise<string> {
-    const segs = await getTranscriptForRange(videoIdOrUrl, startTime, endTime, lang);
-    return segs.map(s => s.text).join(' ');
+/** The lines overlapping a time range, in seconds. */
+export function segmentsInRange(segments: TranscriptSegment[], startTime: number, endTime: number) {
+    return segments.filter((s) => s.offset + s.duration > startTime && s.offset < endTime);
 }

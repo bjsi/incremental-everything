@@ -7,6 +7,7 @@ import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PAUSED, YT_PLAYING } fro
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
 import { VideoSnapshotButtons } from './VideoSnapshotButtons';
+import { VideoTranscriptButton } from './VideoTranscriptButton';
 import { setNativeVideoPosition, setPluginVideoPosition } from '../lib/video_position';
 import { safeRemTextToString } from '../lib/pdfUtils';
 
@@ -221,6 +222,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
         {videoId && (
           <VideoSnapshotButtons videoId={videoId} time={info.currentTime} parentId={props.actionItem.rem._id} />
         )}
+        {videoId && <VideoTranscriptButton target={{ parentId: props.actionItem.rem._id, url: props.actionItem.url }} />}
 
         {/* Video Extract controls */}
         {extractState.phase === 'idle' && (

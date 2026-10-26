@@ -7,13 +7,49 @@ import {
   videoExtractStartSlotCode,
   videoExtractEndSlotCode,
 } from './consts';
-import { getTranscriptForRange, extractVideoId } from './youtube_transcript';
-import { formatVideoTime } from './video_snapshot';
+import { addVideoTranscript } from './video_transcript';
+import { showMessageDialog } from './message_dialog';
+import { checkVideoHelper, formatVideoTime } from './video_snapshot';
+
+/**
+ * The extract's range of the transcript, as child Rems, when the helper can
+ * fetch it; without the helper this is skipped (📜 in the players says what's
+ * missing). Returns false when a fetch failed, after a dialog saying so: a
+ * second toast right after "Created video extract" would go unseen.
+ */
+async function addExtractTranscript(
+  plugin: RNPlugin,
+  extractId: RemId,
+  url: string,
+  start: number,
+  end: number
+): Promise<boolean> {
+  if (!(await checkVideoHelper()).transcripts) {
+    console.log('[VideoExtract] No transcript: the helper is not running or has no transcript support.');
+    return true;
+  }
+  try {
+    const { blocks } = await addVideoTranscript(plugin, { parentId: extractId, url, range: { start, end } });
+    await plugin.app.toast(`📝 Added transcript (${blocks} block${blocks > 1 ? 's' : ''})`);
+    return true;
+  } catch (e) {
+    console.warn('[VideoExtract] Could not fetch transcript:', e);
+    await showMessageDialog(plugin, {
+      title: 'Extract created without its transcript',
+      message: e instanceof Error ? e.message : String(e),
+      detail:
+        "Try again later with 📜 in the extract's player or the Add Video Transcript command (avt). " +
+        "Set the extract's priority with Set Priority (⌥P).",
+      tone: 'error',
+    });
+    return false;
+  }
+}
 
 /**
  * Creates a Video Extract: an Incremental child of the video Rem with the
  * VideoExtract powerup (URL, start, end), followed by the range's transcript
- * as child Rems when YouTube has one, then the priority popup. The same for
+ * as child Rems when the video has captions, then the priority popup. The same for
  * extracts taken in the plugin's player and in RemNote's.
  */
 export async function createVideoExtract(
@@ -47,45 +83,9 @@ export async function createVideoExtract(
 
     await plugin.app.toast(`✅ Created video extract [${range}]`);
 
-    // Fetch transcript and add segments as children Rems
-    const videoId = extractVideoId(url);
-    try {
-      console.log('[VideoExtract] Attempting transcript fetch for videoId:', videoId, 'range:', startTime, '-', endTime);
-      if (videoId) {
-        const segments = await getTranscriptForRange(videoId, startTime, endTime);
-        if (segments.length > 0) {
-          // Consolidate segments into larger chunks (~300 chars each)
-          const MAX_CHUNK_CHARS = 300;
-          const chunks: string[] = [];
-          let current = '';
-
-          for (const seg of segments) {
-            const candidate = current ? `${current} ${seg.text}` : seg.text;
-            if (current && candidate.length > MAX_CHUNK_CHARS) {
-              chunks.push(current);
-              current = seg.text;
-            } else {
-              current = candidate;
-            }
-          }
-          if (current) chunks.push(current);
-
-          for (const chunk of chunks) {
-            const childRem = await plugin.rem.createRem();
-            if (childRem) {
-              await childRem.setText([chunk]);
-              await childRem.setParent(newRem._id);
-            }
-          }
-          await plugin.app.toast(`📝 Added transcript (${chunks.length} block${chunks.length > 1 ? 's' : ''})`);
-        } else {
-          await plugin.app.toast('ℹ️ No transcript segments found for this range');
-        }
-      }
-    } catch (transcriptErr) {
-      console.warn('[VideoExtract] Could not fetch transcript:', transcriptErr);
-      await plugin.app.toast('⚠️ Transcript unavailable (see console for details)');
-    }
+    // A failed transcript says so in a dialog, which takes the place of the
+    // priority popup (one popup at a time).
+    if (!(await addExtractTranscript(plugin, newRem._id, url, startTime, endTime))) return;
 
     // Show priority popup
     setTimeout(async () => {

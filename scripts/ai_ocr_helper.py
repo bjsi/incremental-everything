@@ -14,6 +14,8 @@ source highlight without the user selecting it.
 For YouTube videos it grabs the exact frame at a given time (`/video-frame`,
 with yt-dlp and ffmpeg: the plugin's player can't be captured from inside
 RemNote) and transcribes a grabbed frame into an outline (`/video-transcribe`).
+It also fetches a video's captions (`/video-transcript`, with yt-dlp), which
+the plugin turns into transcript Rems for a whole video or an extract.
 
     python3 scripts/ai_ocr_helper.py          # listens on 127.0.0.1:3457
 
@@ -65,6 +67,7 @@ LOG = HOME / 'requests.log'
 PROMPT_FILE = HOME / 'prompt.md'
 VIDEO_PROMPT_FILE = HOME / 'video-prompt.md'
 VIDEO_FRAMES = HOME / 'video-frames'
+VIDEO_TRANSCRIPTS = HOME / 'video-transcripts'
 
 DPI = 220
 # PDF points of margin around the highlight box. Vertical is larger: a line's
@@ -627,8 +630,97 @@ def handle_video_transcribe(req, entry):
     return {'markup': markup}
 
 
+# ---------------------------------------------------------------------------
+# /video-transcript — a YouTube video's captions
+# ---------------------------------------------------------------------------
+#
+# YouTube refuses the old Innertube ANDROID request the plugin's first proxy
+# (yt-local-proxy.js) made, with 400 FAILED_PRECONDITION. yt-dlp keeps up with
+# YouTube's changes, so it lists the caption tracks here. See
+# findings/VIDEO_PLAYBACK.md, "Transcripts".
+
+TRANSCRIPT_TTL = 30 * 24 * 3600   # captions rarely change; refetch now and then
+
+
+def caption_track(info):
+    """The track to use: hand-made captions in the video's language, else
+    YouTube's automatic captions of the spoken language (`<lang>-orig`), else
+    any hand-made track. Never an automatic translation: YouTube answers those
+    with 429 Too Many Requests."""
+    def json3(formats):
+        return next((f.get('url') for f in formats or [] if f.get('ext') == 'json3'), None)
+
+    def base(code):
+        return code.split('-')[0].lower()
+
+    language = info.get('language') or ''
+    manual = {code: fmts for code, fmts in (info.get('subtitles') or {}).items() if code != 'live_chat'}
+    auto = info.get('automatic_captions') or {}
+    if language:
+        for code, fmts in manual.items():
+            if base(code) == base(language) and json3(fmts):
+                return code, 'manual', json3(fmts)
+    for code, fmts in auto.items():
+        if code.endswith('-orig') and json3(fmts):
+            return code[:-len('-orig')], 'auto', json3(fmts)
+    for code, fmts in manual.items():
+        if json3(fmts):
+            return code, 'manual', json3(fmts)
+    return None
+
+
+def parse_json3(body):
+    """Caption lines as {offset, duration, text}, in seconds."""
+    segments = []
+    for event in json.loads(body).get('events') or []:
+        text = ''.join(seg.get('utf8', '') for seg in event.get('segs') or []).replace('\n', ' ').strip()
+        if text:
+            segments.append({'offset': event.get('tStartMs', 0) / 1000,
+                             'duration': event.get('dDurationMs', 0) / 1000,
+                             'text': text})
+    return segments
+
+
+def video_transcript(video_id, refresh=False):
+    path = VIDEO_TRANSCRIPTS / f'{video_id}.json'
+    if path.exists() and not refresh and time.time() - path.stat().st_mtime < TRANSCRIPT_TTL:
+        return {**json.loads(path.read_text()), 'cached': True}
+    ytdlp = find_tool('yt-dlp')
+    if not ytdlp:
+        raise RuntimeError('yt-dlp not found (brew install yt-dlp)')
+    proc = subprocess.run([ytdlp, '-J', '--skip-download', '--no-playlist', '--no-warnings',
+                           f'https://www.youtube.com/watch?v={video_id}'],
+                          capture_output=True, text=True, timeout=120)
+    if proc.returncode != 0:
+        raise RuntimeError(f'yt-dlp could not read the video: {proc.stderr.strip()[-400:]}')
+    track = caption_track(json.loads(proc.stdout))
+    if not track:
+        raise RuntimeError('this video has no captions in its own language')
+    language, kind, url = track
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=60, context=ssl_context()) as resp:
+        segments = parse_json3(resp.read())
+    if not segments:
+        raise RuntimeError(f'the {language} captions came back empty')
+    result = {'videoId': video_id, 'language': language, 'kind': kind, 'segments': segments}
+    path.write_text(json.dumps(result))
+    return {**result, 'cached': False}
+
+
+def handle_video_transcript(req, entry):
+    video_id = req.get('videoId') or ''
+    if not VIDEO_ID.match(video_id):
+        raise RuntimeError('need a YouTube videoId')
+    result = video_transcript(video_id, refresh=bool(req.get('refresh')))
+    # The segments themselves would swamp the request log.
+    entry.update(videoId=video_id, language=result['language'], kind=result['kind'],
+                 segments=len(result['segments']), cached=result['cached'])
+    return result
+
+
 ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match,
-          '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe}
+          '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
+          '/video-transcript': handle_video_transcript}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -651,7 +743,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
             return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL,
-                                        'ytDlp': find_tool('yt-dlp'), 'ffmpeg': find_tool('ffmpeg')})
+                                        'ytDlp': find_tool('yt-dlp'), 'ffmpeg': find_tool('ffmpeg'),
+                                        'transcripts': True})
         self.send_json(404, {'ok': False, 'error': 'POST /ocr or /locate'})
 
     def do_POST(self):
@@ -687,7 +780,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    for d in (HOME, PDF_CACHE, CROPS, VIDEO_FRAMES):
+    for d in (HOME, PDF_CACHE, CROPS, VIDEO_FRAMES, VIDEO_TRANSCRIPTS):
         d.mkdir(parents=True, exist_ok=True)
     prompt()
     video_prompt()

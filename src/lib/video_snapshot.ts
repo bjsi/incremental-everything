@@ -21,9 +21,11 @@ export interface VideoHelperStatus {
   frames: boolean;
   /** It can transcribe: the claude CLI was found. */
   ai: boolean;
+  /** It can fetch a video's captions: a version with /video-transcript, and yt-dlp found. */
+  transcripts: boolean;
 }
 
-export const HELPER_DOWN: VideoHelperStatus = { reachable: false, frames: false, ai: false };
+export const HELPER_DOWN: VideoHelperStatus = { reachable: false, frames: false, ai: false, transcripts: false };
 
 export async function checkVideoHelper(): Promise<VideoHelperStatus> {
   const controller = new AbortController();
@@ -31,7 +33,12 @@ export async function checkVideoHelper(): Promise<VideoHelperStatus> {
   try {
     const res = await fetch(`${AI_OCR_HELPER_URL}/`, { signal: controller.signal });
     const body = await res.json();
-    return { reachable: true, frames: !!(body?.ytDlp && body?.ffmpeg), ai: !!body?.claude };
+    return {
+      reachable: true,
+      frames: !!(body?.ytDlp && body?.ffmpeg),
+      ai: !!body?.claude,
+      transcripts: !!(body?.ytDlp && body?.transcripts),
+    };
   } catch {
     return HELPER_DOWN;
   } finally {
@@ -39,7 +46,8 @@ export async function checkVideoHelper(): Promise<VideoHelperStatus> {
   }
 }
 
-async function callHelper<T>(route: string, payload: object): Promise<T> {
+/** POSTs to the helper; throws with a message for the user when it fails or isn't running. */
+export async function callVideoHelper<T>(route: string, payload: object): Promise<T> {
   let body: any;
   try {
     const res = await fetch(`${AI_OCR_HELPER_URL}${route}`, {
@@ -119,7 +127,7 @@ export async function saveVideoSnapshot(
 ): Promise<{ heading: RemId; lines: number }> {
   const { videoId, seconds, parentId, transcribe, onProgress } = opts;
   onProgress?.('grabbing');
-  const frame = await callHelper<{ frameId: string; mime: string; image: string }>('/video-frame', {
+  const frame = await callVideoHelper<{ frameId: string; mime: string; image: string }>('/video-frame', {
     videoId,
     seconds,
   });
@@ -136,7 +144,7 @@ export async function saveVideoSnapshot(
   if (!transcribe) return { heading: heading._id, lines: 0 };
 
   onProgress?.('transcribing');
-  const { markup } = await callHelper<{ markup: string }>('/video-transcribe', {
+  const { markup } = await callVideoHelper<{ markup: string }>('/video-transcribe', {
     frameId: frame.frameId,
   });
   if (markup.trim() === '[no text]') return { heading: heading._id, lines: 0 };

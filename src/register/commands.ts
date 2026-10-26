@@ -15,6 +15,7 @@ import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote } from '../lib/pdf_source_pins';
 import { localizeMediaInRems } from '../lib/localize_media';
 import { showMessageDialog } from '../lib/message_dialog';
+import { addVideoTranscript, describeTranscript, transcriptTargetForRem, TranscriptTarget } from '../lib/video_transcript';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import { isHintNode } from '../lib/richTextSanitize';
 import {
@@ -2233,6 +2234,60 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         scopeRemId: scope?._id ?? null,
         scopeName,
       });
+    },
+  });
+
+  // The transcript of a whole YouTube video or a Video Extract, from the
+  // video's captions (lib/video_transcript.ts): the queue item, else the
+  // focused Rem, else the Rem under an Editor Review (RemNote's video page has
+  // no focused Rem), else a Rem open in a pane. A note under a video or an
+  // extract counts as that video or extract.
+  plugin.app.registerCommand({
+    id: 'add-video-transcript',
+    name: 'Add Video Transcript',
+    description: "Add the transcript of a YouTube video, or of a Video Extract's range, from the video's captions",
+    quickCode: 'avt',
+    action: async () => {
+      const candidates: string[] = [];
+      if ((await plugin.window.getURL()).includes('/flashcards')) {
+        const queueTarget = (await resolveQueueCommandTarget(plugin)).remId;
+        if (queueTarget) candidates.push(queueTarget);
+      } else {
+        const focused = await plugin.focus.getFocusedRem();
+        if (focused) candidates.push(focused._id);
+        const reviewed = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
+        if (reviewed) candidates.push(reviewed);
+        candidates.push(...(await plugin.window.getOpenPaneRemIds()));
+      }
+
+      let target: TranscriptTarget | null = null;
+      for (const id of candidates) {
+        const rem = await plugin.rem.findOne(id);
+        target = rem ? await transcriptTargetForRem(plugin, rem) : null;
+        if (target) break;
+      }
+      if (!target) {
+        await showMessageDialog(plugin, {
+          title: 'No video here',
+          message: 'Add Video Transcript works on a YouTube video or a Video Extract, or a note inside one.',
+          detail: 'Focus the video or extract (or a note under it), or run the command on it in the queue.',
+          tone: 'info',
+        });
+        return;
+      }
+
+      await plugin.app.toast(target.range ? '📜 Fetching the extract\'s transcript…' : '📜 Fetching the transcript…');
+      try {
+        const { blocks, transcript } = await addVideoTranscript(plugin, target);
+        await plugin.app.toast(`✓ 📜 Added ${blocks} block${blocks > 1 ? 's' : ''} (${describeTranscript(transcript)})`);
+      } catch (e) {
+        console.error('[VideoTranscript]', e);
+        await showMessageDialog(plugin, {
+          title: 'Transcript failed',
+          message: e instanceof Error ? e.message : String(e),
+          tone: 'error',
+        });
+      }
     },
   });
 

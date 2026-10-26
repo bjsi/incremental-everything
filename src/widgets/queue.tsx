@@ -402,6 +402,7 @@ export function QueueComponent() {
               actionItem={remAndType}
               url={remAndType.url}
               segment={{ start: remAndType.startTime, end: remAndType.endTime }}
+              extractId={remAndType.extract._id}
               onSwitchPlayer={() => setVideoPlayer('plugin')}
             />
           ) : (

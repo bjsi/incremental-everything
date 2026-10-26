@@ -16,7 +16,7 @@ import {
 const POLL_MS = 10_000;
 const DONE_MS = 4_000;
 
-const START_HELPER = `Start it with: python3 scripts/ai_ocr_helper.py (it listens on ${AI_OCR_HELPER_URL}).`;
+export const START_HELPER = `Start it with: python3 scripts/ai_ocr_helper.py (it listens on ${AI_OCR_HELPER_URL}).`;
 
 function unavailableReason(status: VideoHelperStatus, ai: boolean): string | null {
   if (!status.reachable)
@@ -42,7 +42,7 @@ const btn: React.CSSProperties = {
 };
 
 /** A greyed-out, struck-through icon whose tooltip explains why. */
-const Unavailable: React.FC<{ icon: string; reason: string }> = ({ icon, reason }) => (
+export const Unavailable: React.FC<{ icon: string; reason: string }> = ({ icon, reason }) => (
   <span
     title={reason}
     style={{
@@ -69,6 +69,25 @@ const Unavailable: React.FC<{ icon: string; reason: string }> = ({ icon, reason 
   </span>
 );
 
+/** What the helper can do now, polled; null until the first answer. The setter takes a fresh check. */
+export function useVideoHelperStatus() {
+  const [status, setStatus] = React.useState<VideoHelperStatus | null>(null);
+  React.useEffect(() => {
+    let alive = true;
+    const poll = async () => {
+      const next = await checkVideoHelper();
+      if (alive) setStatus(next);
+    };
+    poll();
+    const timer = setInterval(poll, POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+  return [status, setStatus] as const;
+}
+
 type Stage = 'grabbing' | 'saving' | 'transcribing';
 const STAGE_TEXT: Record<Stage, string> = {
   grabbing: '📸 grabbing the frame…',
@@ -90,7 +109,7 @@ export const VideoSnapshotButtons: React.FC<VideoSnapshotButtonsProps> = ({
   parentId,
 }) => {
   const plugin = usePlugin() as RNPlugin;
-  const [status, setStatus] = React.useState<VideoHelperStatus | null>(null);
+  const [status, setStatus] = useVideoHelperStatus();
   const [stage, setStageState] = React.useState<Stage | null>(null);
   // The stage a failure happened in, for its message.
   const stageRef = React.useRef<Stage | null>(null);
@@ -99,20 +118,6 @@ export const VideoSnapshotButtons: React.FC<VideoSnapshotButtonsProps> = ({
     setStageState(next);
   };
   const [done, setDone] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    let alive = true;
-    const poll = async () => {
-      const next = await checkVideoHelper();
-      if (alive) setStatus(next);
-    };
-    poll();
-    const timer = setInterval(poll, POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, []);
 
   React.useEffect(() => {
     if (!done) return;
