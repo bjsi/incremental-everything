@@ -76,7 +76,7 @@ Every YouTube IncRem can be watched in either of two players, with a switch butt
 
 ## 6. Local videos (desktop)
 
-Started 2026-10-26. RemNote has no interface for local videos, so this is entirely the plugin's: a `<video>` element in the plugin frame (full control, no bridge), fed by the helper over loopback. The first library: `/Volumes/PortableSSD`, four course folders, ~426 MP4 (H.264, some HEVC), 40 min – 2.5 h each, mostly flat folders.
+Started 2026-10-26. RemNote has no interface for local videos, so this is entirely the plugin's: a `<video>` element in the plugin frame (full control, no bridge), fed by the helper over loopback. The first library: `/Volumes/PortableSSD`, four course folders, ~426 MP4 (H.264, some HEVC; HEVC verified to play in RemNote's `<video>` on 2026-10-26), 40 min – 2.5 h each, mostly flat folders.
 
 | Decision | Why |
 |---|---|

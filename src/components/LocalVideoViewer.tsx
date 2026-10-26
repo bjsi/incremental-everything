@@ -39,14 +39,17 @@ type Problem =
   | { kind: 'file' }
   | { kind: 'format'; code: number };
 
-export const LocalVideoViewer: React.FC<{ actionItem: LocalVideoActionItem | LocalVideoHighlightActionItem }> = ({
-  actionItem,
-}) => {
+export const LocalVideoViewer: React.FC<{
+  actionItem: LocalVideoActionItem | LocalVideoHighlightActionItem;
+}> = ({ actionItem }) => {
   const plugin = usePlugin();
   const { file, url } = actionItem;
   const segment =
-    actionItem.type === 'local-video-highlight' ? { start: actionItem.startTime, end: actionItem.endTime } : undefined;
-  const notesRemId = actionItem.type === 'local-video-highlight' ? actionItem.extract._id : actionItem.rem._id;
+    actionItem.type === 'local-video-highlight'
+      ? { start: actionItem.startTime, end: actionItem.endTime }
+      : undefined;
+  const notesRemId =
+    actionItem.type === 'local-video-highlight' ? actionItem.extract._id : actionItem.rem._id;
   const [notesOpen, setNotesOpen] = React.useState(true);
   // Bumped after a library is re-pointed, to load the file again.
   const [reload, setReload] = React.useState(0);
@@ -115,8 +118,8 @@ export const LocalVideoViewer: React.FC<{ actionItem: LocalVideoActionItem | Loc
       case 'library':
         return p.library ? (
           <>
-            The folder of the video library “{file.library}” isn't available: {p.library.root}. Connect the disk it
-            is on, or, if the folder has moved,{' '}
+            The folder of the video library “{file.library}” isn't available: {p.library.root}.
+            Connect the disk it is on, or, if the folder has moved,{' '}
             <button style={barButton} onClick={relink}>
               📁 show where it is now
             </button>
@@ -135,7 +138,13 @@ export const LocalVideoViewer: React.FC<{ actionItem: LocalVideoActionItem | Loc
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div
         className="top-bar"
-        style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', flexShrink: 0 }}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '4px',
+          alignItems: 'center',
+          flexShrink: 0,
+        }}
       >
         <button onClick={() => setNotesOpen((open) => !open)} title="Show or hide the notes">
           📝
@@ -177,7 +186,9 @@ export const LocalVideoViewer: React.FC<{ actionItem: LocalVideoActionItem | Loc
                 send({ command: 'play' });
               }}
             >
-              {saved.position > 0 ? `⏮ Resumed at ${formatVideoTime(saved.position)}` : '⏮ From the start'}
+              {saved.position > 0
+                ? `⏮ Resumed at ${formatVideoTime(saved.position)}`
+                : '⏮ From the start'}
             </button>
           )
         )}
@@ -193,28 +204,33 @@ export const LocalVideoViewer: React.FC<{ actionItem: LocalVideoActionItem | Loc
             url={url}
           />
         )}
-        {armed === 'done' && <span style={{ fontSize: 12, color: '#6b7280' }}>✓ end of extract reached</span>}
+        {armed === 'done' && (
+          <span style={{ fontSize: 12, color: '#6b7280' }}>✓ end of extract reached</span>
+        )}
       </div>
       <VideoNotesSplit
         notes={<DocumentViewer width={'100%'} height={'100%'} documentId={notesRemId} />}
         notesOpen={notesOpen}
       >
-        {problem ? (
-          <div className="p-4" style={{ fontSize: 13, lineHeight: 1.5 }}>
-            {problemText(problem)}
-          </div>
-        ) : (
-          src && (
-            <video
-              key={src}
-              ref={videoRef}
-              src={src}
-              controls
-              preload="metadata"
-              style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
-            />
-          )
-        )}
+        {/* The video side takes what the notes leave; width 100% alone would be the whole split. */}
+        <div style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>
+          {problem ? (
+            <div className="p-4" style={{ fontSize: 13, lineHeight: 1.5 }}>
+              {problemText(problem)}
+            </div>
+          ) : (
+            src && (
+              <video
+                key={src}
+                ref={videoRef}
+                src={src}
+                controls
+                preload="metadata"
+                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+              />
+            )
+          )}
+        </div>
       </VideoNotesSplit>
     </div>
   );
