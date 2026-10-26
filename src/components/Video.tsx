@@ -1,4 +1,4 @@
-import { DocumentViewer, RemHierarchyEditorTree, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
+import { DocumentViewer, RemHierarchyEditorTree, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import { YoutubeActionItem } from '../lib/incremental_rem';
 import { initIncrementalRem } from '../lib/incremental_rem';
@@ -15,6 +15,7 @@ import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
 import { VideoSnapshotButtons } from './VideoSnapshotButtons';
 import { setNativeVideoPosition, setPluginVideoPosition } from '../lib/video_position';
+import { safeRemTextToString } from '../lib/pdfUtils';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
@@ -214,9 +215,32 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
   // and all: the host's document view opens a "learning source" (a Rem with the
   // Video, Uploaded File or Link powerup) as its source unless told not to, and
   // the plugin's DocumentViewer can't tell it. The editable tree is the
-  // document's body without that switch: the Rem and its children.
+  // document's body without that switch: the Rem's children. The tree leaves
+  // out the Rem itself, so its name is drawn here as the document title.
+  const remId = props.actionItem.rem._id;
+  const title = useTrackerPlugin(
+    async (rp) => {
+      if (!props.actionItem.nativeAvailable) return undefined;
+      const rem = await rp.rem.findOne(remId);
+      return rem ? safeRemTextToString(rp, rem.text) : undefined;
+    },
+    [remId, props.actionItem.nativeAvailable]
+  );
   const notes = props.actionItem.nativeAvailable ? (
     <div style={{ padding: '12px 16px' }}>
+      {title && (
+        <h1
+          style={{
+            margin: '0 0 12px 22px',
+            fontSize: 26,
+            fontWeight: 700,
+            lineHeight: 1.25,
+            color: 'var(--rn-clr-content-primary)',
+          }}
+        >
+          {title}
+        </h1>
+      )}
       <RemHierarchyEditorTree remId={props.actionItem.rem._id} width="100%" height="auto" />
     </div>
   ) : (
