@@ -95,7 +95,7 @@ export async function nativeVideoUrl(rem: PluginRem): Promise<string | undefined
  * shows the parent's video page beside it, whose "Resume watching at…" is the
  * parent's `ip.l`.
  */
-async function nativeVideoOfExtract(
+export async function nativeVideoOfExtract(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<{ video: PluginRem; url: string; segment: { start: number; end: number } } | undefined> {

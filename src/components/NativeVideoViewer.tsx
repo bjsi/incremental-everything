@@ -4,12 +4,11 @@ import {
   getExtractResume,
   getNativeVideoPosition,
   getPluginVideoPosition,
-  setExtractPosition,
   setNativeVideoPosition,
   setPluginVideoPosition,
 } from '../lib/video_position';
 import { formatVideoTime } from '../lib/video_snapshot';
-import { useNativeVideoMirror } from './useNativeVideoMirror';
+import { useNativeExtractProgress, useNativeVideoMirror } from './useNativeVideoMirror';
 import { NativeExtractButtons } from './NativeExtractButtons';
 import { VideoTranscriptButton } from './VideoTranscriptButton';
 
@@ -63,29 +62,8 @@ export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({
   // While RemNote's player plays, its position is copied back; not while an
   // extract plays, which isn't where the video was left.
   const { position, mirrored } = useNativeVideoMirror(remId, url, prepared && !segment);
-  // An extract's end counts as reached only once the player has reported a
-  // time inside it: until then ip.l may still hold where the video was before.
-  const [segmentState, setSegmentState] = React.useState<'waiting' | 'inside' | 'reached'>('waiting');
-  React.useEffect(() => {
-    if (!segment || !prepared || position === undefined) return;
-    if (segmentState === 'waiting' && position >= segment.start - 1 && position < segment.end) setSegmentState('inside');
-    if (segmentState === 'inside' && position >= segment.end) setSegmentState('reached');
-  }, [position, prepared, segmentState]);
-  const endReached = segmentState === 'reached';
-
-  // Where the extract got to, for its next review. Not before the extract's
-  // start: the page resets ip.l to 0 when it opens, after the resume time
-  // put there has already counted as inside.
-  const savedExtractPosition = React.useRef<number | undefined>();
-  React.useEffect(() => {
-    if (!segment || !extractId || segmentState === 'waiting' || position === undefined) return;
-    if (position < segment.start) return;
-    if (savedExtractPosition.current !== undefined && Math.abs(position - savedExtractPosition.current) < 2) return;
-    savedExtractPosition.current = position;
-    setExtractPosition(plugin, extractId, position).catch((e) =>
-      console.error(LOG, 'Could not save the extract position:', e)
-    );
-  }, [position, segmentState, extractId]);
+  // An extract: whether its end was reached, and where it got to for its next review.
+  const endReached = useNativeExtractProgress(extractId, segment, position, prepared) === 'reached';
 
   // Before the page opens, put the plugin's position (or the extract's start)
   // in "Resume watching at…".

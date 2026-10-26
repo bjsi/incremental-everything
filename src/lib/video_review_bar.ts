@@ -1,13 +1,15 @@
 import { AppEvents, ReactRNPlugin } from '@remnote/plugin-sdk';
 import { editorReviewTimerRemIdKey, editorReviewTimerStartKey, videoReviewBarIdKey } from './consts';
 import { isNativeVideoRem } from './native_video';
+import { nativeVideoOfExtract } from './video_position';
 
 /**
  * The Editor Review Timer can't be used on RemNote's video page: its widget
  * spot (above the document toolbar) only shows there once Notes is pressed. So
- * while a review runs on a RemNote video Rem whose page is open, its controls
- * come in a floating bar instead (widgets/video_review_bar.tsx). This decides
- * when that bar is open. It runs in the index widget, which lives all session.
+ * while a review runs on a RemNote video Rem whose page is open, or on an
+ * extract of one with that video's page open beside it, its controls come in
+ * a floating bar instead (widgets/video_review_bar.tsx). This decides when
+ * that bar is open. It runs in the index widget, which lives all session.
  */
 
 const BAR_POSITION = { bottom: 90, right: 40 };
@@ -18,8 +20,9 @@ async function barWanted(plugin: ReactRNPlugin): Promise<boolean> {
   const remId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
   if (!remId || !(await plugin.storage.getSession<number>(editorReviewTimerStartKey))) return false;
   const rem = await plugin.rem.findOne(remId);
-  if (!rem || !(await isNativeVideoRem(rem))) return false;
-  return (await plugin.window.getOpenPaneRemIds()).includes(remId);
+  if (!rem) return false;
+  const videoId = (await isNativeVideoRem(rem)) ? remId : (await nativeVideoOfExtract(plugin, rem))?.video._id;
+  return !!videoId && (await plugin.window.getOpenPaneRemIds()).includes(videoId);
 }
 
 async function syncBar(plugin: ReactRNPlugin) {

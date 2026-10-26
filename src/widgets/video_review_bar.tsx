@@ -14,13 +14,16 @@ import {
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { startIncRemEngagement, endIncRemEngagement } from '../lib/queue_session';
 import { formatVideoTime } from '../lib/video_snapshot';
-import { nativeVideoUrl } from '../lib/video_position';
-import { useNativeVideoMirror } from '../components/useNativeVideoMirror';
+import { nativeVideoOfExtract, nativeVideoUrl } from '../lib/video_position';
+import { useNativeExtractProgress, useNativeVideoMirror } from '../components/useNativeVideoMirror';
 import { NativeExtractButtons } from '../components/NativeExtractButtons';
 import { VideoTranscriptButton } from '../components/VideoTranscriptButton';
 
 // The Editor Review Timer's controls over RemNote's video page, where the timer
-// bar itself can't show. Opened and closed by lib/video_review_bar.ts.
+// bar itself can't show. Opened and closed by lib/video_review_bar.ts. For an
+// extract of the video: its range, whether the player got to its end, and its
+// position kept for its next review.
+
 
 const btn = (background: string): React.CSSProperties => ({
   padding: '5px 10px',
@@ -60,12 +63,19 @@ function VideoReviewBar() {
       if (!remId) return null;
       const rem = await rp.rem.findOne(remId);
       if (!rem) return null;
-      return { url: await nativeVideoUrl(rem), name: await safeRemTextToString(rp, rem.text) };
+      const name = await safeRemTextToString(rp, rem.text);
+      const url = await nativeVideoUrl(rem);
+      if (url) return { videoRemId: remId, url, name };
+      const of = await nativeVideoOfExtract(rp, rem);
+      return of ? { videoRemId: of.video._id, url: of.url, name, segment: of.segment } : { name };
     },
     [remId]
   );
-  // Keeps where RemNote's player is as the plugin's position, as it plays.
-  const { position } = useNativeVideoMirror(remId, video?.url, true);
+  const segment = video?.segment;
+  // Keeps where RemNote's player is as the plugin's position, as it plays; for
+  // an extract, as the extract's position instead.
+  const { position } = useNativeVideoMirror(video?.videoRemId, video?.url, !segment);
+  const endReached = useNativeExtractProgress(segment && remId, segment, position, !!segment) === 'reached';
 
   if (!timer || !timer.startTime) return null;
 
@@ -116,11 +126,23 @@ function VideoReviewBar() {
           >
             🎬 {position ? formatVideoTime(position) : '—'}
           </span>
+          {segment && (
+            <span
+              style={{ marginLeft: 8, color: endReached ? '#15803d' : '#7f1d1d', fontWeight: 600 }}
+              title="RemNote's player can't be stopped at the extract's end: watch for “reached”."
+            >
+              {endReached
+                ? '✓ end reached'
+                : `✂️ ${formatVideoTime(segment.start)} – ${formatVideoTime(segment.end)}`}
+            </span>
+          )}
         </span>
       </span>
 
-      {video?.url && <NativeExtractButtons parentId={timer.remId} url={video.url} position={position} />}
-      {video?.url && <VideoTranscriptButton target={{ parentId: timer.remId, url: video.url }} />}
+      {video?.url && !segment && (
+        <NativeExtractButtons parentId={timer.remId} url={video.url} position={position} />
+      )}
+      {video?.url && <VideoTranscriptButton target={{ parentId: timer.remId, url: video.url, range: segment }} />}
 
       <button
         style={btn(isPaused ? '#f59e0b' : '#6b7280')}
