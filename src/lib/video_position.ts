@@ -1,4 +1,9 @@
 import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
+import {
+  videoExtractEndSlotCode,
+  videoExtractPowerupCode,
+  videoExtractStartSlotCode,
+} from './consts';
 
 /**
  * Where a video was left, shared by the plugin's player and RemNote's.
@@ -86,15 +91,44 @@ export async function nativeVideoUrl(rem: PluginRem): Promise<string | undefined
 }
 
 /**
+ * A Video Extract whose parent is a RemNote video Rem: in the editor, RemNote
+ * shows the parent's video page beside it, whose "Resume watching at…" is the
+ * parent's `ip.l`.
+ */
+async function nativeVideoOfExtract(
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<{ video: PluginRem; url: string; segment: { start: number; end: number } } | undefined> {
+  if (!(await rem.hasPowerup(videoExtractPowerupCode)) || !rem.parent) return undefined;
+  const video = await plugin.rem.findOne(rem.parent);
+  const url = video ? await nativeVideoUrl(video) : undefined;
+  if (!video || !url) return undefined;
+  const [start, end] = await Promise.all([
+    rem.getPowerupProperty(videoExtractPowerupCode, videoExtractStartSlotCode),
+    rem.getPowerupProperty(videoExtractPowerupCode, videoExtractEndSlotCode),
+  ]);
+  if (start == null || end == null) return undefined;
+  return { video, url, segment: { start: Number(start), end: Number(end) } };
+}
+
+/**
  * Before a RemNote video Rem opens in RemNote's player: offer the plugin's
- * position there as "Resume watching at…". A no-op for any other Rem.
+ * position there as "Resume watching at…". For an extract of one, offer where
+ * the extract's last review stopped (or its start) on its video's page. A
+ * no-op for any other Rem.
  */
 export async function primeNativeVideoPosition(plugin: RNPlugin, rem: PluginRem) {
   try {
     const url = await nativeVideoUrl(rem);
-    if (!url) return;
-    const seconds = await getPluginVideoPosition(plugin, url);
-    if (seconds > 0) await setNativeVideoPosition(rem, seconds);
+    if (url) {
+      const seconds = await getPluginVideoPosition(plugin, url);
+      if (seconds > 0) await setNativeVideoPosition(rem, seconds);
+      return;
+    }
+    const of = await nativeVideoOfExtract(plugin, rem);
+    if (!of) return;
+    const { start } = await getExtractResume(plugin, rem._id, of.segment);
+    await setNativeVideoPosition(of.video, start);
   } catch (e) {
     console.error('[VideoPosition] Could not set the resume time:', e);
   }
@@ -102,15 +136,26 @@ export async function primeNativeVideoPosition(plugin: RNPlugin, rem: PluginRem)
 
 /**
  * After RemNote's player: keep where it got to as the plugin's position. Zero
- * is skipped, since the page resets `ip.l` when it opens. A no-op for any
+ * is skipped, since the page resets `ip.l` when it opens. For an extract of a
+ * video, where it got to is the extract's position (not before its start),
+ * and the video's page gets the video's own position back. A no-op for any
  * other Rem.
  */
 export async function pullNativeVideoPosition(plugin: RNPlugin, rem: PluginRem) {
   try {
     const url = await nativeVideoUrl(rem);
-    if (!url) return;
-    const seconds = await getNativeVideoPosition(rem);
-    if (seconds) await setPluginVideoPosition(plugin, url, seconds);
+    if (url) {
+      const seconds = await getNativeVideoPosition(rem);
+      if (seconds) await setPluginVideoPosition(plugin, url, seconds);
+      return;
+    }
+    const of = await nativeVideoOfExtract(plugin, rem);
+    if (!of) return;
+    const seconds = await getNativeVideoPosition(of.video);
+    if (seconds !== undefined && seconds >= of.segment.start)
+      await setExtractPosition(plugin, rem._id, seconds);
+    const videoPosition = await getPluginVideoPosition(plugin, of.url);
+    if (videoPosition > 0) await setNativeVideoPosition(of.video, videoPosition);
   } catch (e) {
     console.error('[VideoPosition] Could not save the position:', e);
   }
