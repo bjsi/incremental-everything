@@ -626,6 +626,12 @@ export const PRIORITY_GRAPH_DATA_KEY_PREFIX = 'priority_graph_data_';
 
 // Video Extract Powerup
 export const videoExtractPowerupCode = 'videoExtract';
+/**
+ * Session: `{ remId, at }`, the Rem whose notes the queue's local video player
+ * shows, refreshed while it's on screen. The editor player widget, which that
+ * notes pane hosts too, stays empty for it.
+ */
+export const localVideoQueueNotesKey = 'local-video-queue-notes';
 export const videoExtractUrlSlotCode = 'videoUrl';
 export const videoExtractStartSlotCode = 'startTime';
 export const videoExtractEndSlotCode = 'endTime';

@@ -9,6 +9,7 @@ import {
   VideoLibrary,
 } from '../lib/local_video';
 import { checkVideoHelper, formatVideoTime } from '../lib/video_snapshot';
+import { localVideoQueueNotesKey } from '../lib/consts';
 import { showMessageDialog } from '../lib/message_dialog';
 import { useHtmlVideo } from './useHtmlVideo';
 import { useSavedVideoSettings, useSaveVideoRate, useVideoPositionSaver } from './useVideoPosition';
@@ -33,6 +34,8 @@ const barButton: React.CSSProperties = {
   backgroundColor: '#f3f4f6',
   fontSize: 12,
 };
+
+export const QUEUE_NOTES_REFRESH_MS = 2000;
 
 /** Why the file can't play, found out once the <video> reports an error. */
 type Problem =
@@ -60,6 +63,20 @@ export const LocalVideoViewer: React.FC<{
   // Bumped after a library is re-pointed, to load the file again.
   const [reload, setReload] = React.useState(0);
   const [problem, setProblem] = React.useState<Problem | null>(null);
+
+  // The notes pane below hosts the editor player widget too; tell it to stay
+  // empty. Refreshed, so a frame torn down without cleanup lets it go.
+  React.useEffect(() => {
+    if (inEditor) return;
+    const announce = () =>
+      plugin.storage.setSession(localVideoQueueNotesKey, { remId: notesRemId, at: Date.now() });
+    announce();
+    const timer = setInterval(announce, QUEUE_NOTES_REFRESH_MS);
+    return () => {
+      clearInterval(timer);
+      plugin.storage.setSession(localVideoQueueNotesKey, null);
+    };
+  }, [notesRemId, inEditor]);
 
   const saved = useSavedVideoSettings(url);
   const saveRate = useSaveVideoRate(url);

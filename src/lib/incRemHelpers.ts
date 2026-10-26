@@ -62,15 +62,20 @@ export async function determineIncRemType(
   }
 }
 
+/** Opened as their own page: a note under a PDF, and local videos, whose player is under the page title. */
+const OPEN_AS_PAGE = new Set<ActionItemType>(['pdf-note', 'local-video', 'local-video-highlight']);
+
 /**
  * Opens an IncRem in the editor for a review: a note under a PDF as its own
- * page (not the PDF viewer), anything else as RemNote opens it. A RemNote video
- * Rem opens on RemNote's video page, which is first offered the plugin's
- * position to resume at.
+ * page (not the PDF viewer), a local video or its extract as its own page (a
+ * Rem that isn't a document would otherwise open inside its parent's, with no
+ * player), anything else as RemNote opens it. A RemNote video Rem opens on
+ * RemNote's video page, which is first offered the plugin's position to
+ * resume at.
  */
 export async function openIncRemForReview(plugin: RNPlugin, rem: PluginRem): Promise<void> {
   await primeNativeVideoPosition(plugin, rem);
-  if ((await determineIncRemType(plugin, rem)) === 'pdf-note') {
+  if (OPEN_AS_PAGE.has(await determineIncRemType(plugin, rem))) {
     await rem.openRemAsPage();
   } else {
     await plugin.window.openRem(rem);
