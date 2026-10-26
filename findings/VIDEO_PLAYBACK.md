@@ -91,6 +91,12 @@ Checked in the 1.28.57 bundle on 2026-10-23. The host's `Document` component ope
 - **`FloatingWidget`** (`openFloatingWidget(name, {bottom, right}, undefined, false)`) is drawn above every page. Verified in the desktop app (2026-10-23): it stays bottom-right over the video page, is clickable, and its tracker shows `ip.l` ticking with the right position.
 - `TopBar` was not tried: as soon as any widget is registered there, RemNote changes its own top-right chrome (`hasTopWidgets`).
 
+## Transcripts (checked 2026-10-26)
+
+- **The plugin's proxy is dead.** `yt-local-proxy.js` asks Innertube `youtubei/v1/player` with the ANDROID client 19.02.39. YouTube now answers `400 FAILED_PRECONDITION` ("Precondition check failed"). The reply has no `playabilityStatus`, so the proxy reports `playability_error: Video status: undefined`, which is what `/tmp/yt-transcript-proxy.log` shows. The plugin turns it into a "⚠️ Transcript unavailable" toast, raised right after "✅ Created video extract", so it is likely swallowed (see the memory note on plugin toasts).
+- **RemNote's player gets its transcript from RemNote's server.** The video page calls the RPC `getYoutubeTranscript({videoId})` (client `fetchTranscript` in bundle 21129, 3 retries). Errors handled there: `transcript_not_found`, `out_of_ai_credits`, `transcript_fetch_failed`. The server side runs it with the user's id and IP. The cues come back as `{start, end, text}`, indexed by position, and **aren't stored in the KB** (`vi.tu` stays unset). A Highlight Moment keeps its own text in `vh.d.text` with cue indexes, not seconds. A plugin can't call the RPC: it isn't in the SDK, and it is RemNote's private, metered API.
+- **yt-dlp still works (2026.10.21, with deno for YouTube's JS challenges).** `yt-dlp -J` lists the video's `language` and its `subtitles` / `automatic_captions`. The original-language ASR track is `<lang>-orig` (e.g. `pt-orig`). Its `json3` URL fetches fine directly (200, 2129 cues for `O_XN2pCKH-w`). **Translated auto tracks** (e.g. `en` on a Portuguese video) got `HTTP 429`, so ask for the original track.
+
 ## Local video files
 
 - RemNote has no interface for local video files and does not store them; the KB holds none. A plugin feature for local video would be entirely the plugin's own. (Even the local media RemNote does store, i.e. audio and images as `%LOCAL_FILE%`, reaches the host as **host-origin blob URLs** via `getAudioURLForCurrentDevice`, which a sandboxed plugin can't load.)
