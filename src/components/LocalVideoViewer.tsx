@@ -12,7 +12,13 @@ import { checkVideoHelper, formatVideoTime } from '../lib/video_snapshot';
 import { localVideoQueueNotesKey } from '../lib/consts';
 import { showMessageDialog } from '../lib/message_dialog';
 import { useHtmlVideo } from './useHtmlVideo';
-import { useSavedVideoSettings, useSaveVideoRate, useVideoPositionSaver } from './useVideoPosition';
+import {
+  useExtractResume,
+  useSavedVideoSettings,
+  useSaveVideoRate,
+  useVideoPositionSaver,
+} from './useVideoPosition';
+import { extractPositionKey, videoPositionKey } from '../lib/video_position';
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
 import { PluginExtractButtons } from './PluginExtractButtons';
@@ -80,8 +86,11 @@ export const LocalVideoViewer: React.FC<{
 
   const saved = useSavedVideoSettings(url);
   const saveRate = useSaveVideoRate(url);
-  const start = segment ? segment.start : saved?.position;
-  const src = saved ? `${localVideoMediaUrl(file)}${reload ? `?r=${reload}` : ''}` : null;
+  // An extract has its own position: where its last review stopped, or its start.
+  const extractResume = useExtractResume(segment && notesRemId, segment);
+  const start = segment ? extractResume?.start : saved?.position;
+  const ready = !!saved && (!segment || !!extractResume);
+  const src = ready ? `${localVideoMediaUrl(file)}${reload ? `?r=${reload}` : ''}` : null;
   const { info, connected, send, videoRef } = useHtmlVideo(src, {
     start,
     playbackRate: saved?.playbackRate,
@@ -89,8 +98,11 @@ export const LocalVideoViewer: React.FC<{
     onRateChange: saveRate,
   });
   const position = info.currentTime ?? start ?? 0;
-  // A whole video remembers where it was left; an extract always starts at its start.
-  useVideoPositionSaver(segment ? `${url}#extract` : url, segment ? {} : info, saved?.position);
+  useVideoPositionSaver(
+    segment ? extractPositionKey(notesRemId) : videoPositionKey(url),
+    info,
+    start
+  );
 
   // An extract pauses at its end, once the player has been inside it (before
   // the start seek lands, the time can be anywhere).
@@ -220,6 +232,18 @@ export const LocalVideoViewer: React.FC<{
             >
               🔄 Replay
             </button>
+            {extractResume?.resumed && (
+              <button
+                style={barButton}
+                title="Where the last review of this extract stopped. Click to go back there."
+                onClick={() => {
+                  send({ command: 'seekTo', seconds: extractResume.start });
+                  send({ command: 'play' });
+                }}
+              >
+                ⏮ Resumed at {formatVideoTime(extractResume.start)}
+              </button>
+            )}
           </>
         ) : (
           saved && (

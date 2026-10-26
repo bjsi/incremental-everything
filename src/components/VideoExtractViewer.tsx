@@ -7,6 +7,8 @@ import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
 import { VideoSnapshotButtons } from './VideoSnapshotButtons';
 import { VideoTranscriptButton } from './VideoTranscriptButton';
+import { useExtractResume, useVideoPositionSaver } from './useVideoPosition';
+import { extractPositionKey } from '../lib/video_position';
 
 interface VideoExtractViewerProps {
     actionItem: YoutubeHighlightActionItem;
@@ -33,11 +35,16 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
         [playbackRateStorageKey]
     );
 
-    const { info, connected, send } = useYouTubeBridge(savedRate !== undefined ? videoId : null, {
-        start: startTime,
+    // Where the last review of this extract stopped, or its start.
+    const resume = useExtractResume(extract._id, { start: startTime, end: endTime });
+    const ready = savedRate !== undefined && !!resume;
+
+    const { info, connected, send } = useYouTubeBridge(ready ? videoId : null, {
+        start: resume?.start ?? startTime,
         playbackRate: savedRate,
         onRateChange: (rate) => plugin.storage.setSynced(playbackRateStorageKey, rate),
     });
+    useVideoPositionSaver(extractPositionKey(extract._id), info, resume?.start);
 
     // Pause at endTime. The auto-pause arms only once the player reports a time
     // inside the segment: until the start seek lands, the time it reports is
@@ -97,6 +104,26 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                     🔄 Replay
                 </button>
 
+                {resume?.resumed && (
+                    <button
+                        onClick={() => {
+                            send({ command: 'seekTo', seconds: resume.start });
+                            send({ command: 'play' });
+                        }}
+                        title="Where the last review of this extract stopped. Click to go back there."
+                        style={{
+                            cursor: 'pointer',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            border: '1px solid #d1d5db',
+                            backgroundColor: '#f3f4f6',
+                            fontSize: 12,
+                        }}
+                    >
+                        ⏮ Resumed at {formatTime(resume.start)}
+                    </button>
+                )}
+
                 {props.onSwitchPlayer && (
                     <button
                         onClick={() => {
@@ -145,8 +172,8 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
             >
                 {!videoId ? (
                     <div className="p-4">Not a YouTube video URL: {url}</div>
-                ) : savedRate !== undefined ? (
-                    <PluginYouTubePlayerFrame videoId={videoId} start={startTime} />
+                ) : ready ? (
+                    <PluginYouTubePlayerFrame videoId={videoId} start={resume!.start} />
                 ) : null}
             </VideoNotesSplit>
         </div>

@@ -14,6 +14,39 @@ import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 
 export const videoPositionKey = (url: string) => `${url}-position`;
 
+/**
+ * Where a Video Extract was left, per extract: several extracts share a URL.
+ * The next review resumes there, unless the last one got to the extract's end
+ * (or its last seconds), which starts it from the beginning again.
+ */
+export const extractPositionKey = (extractId: string) => `extract:${extractId}-position`;
+
+/** Stopped this close to an extract's end, it counts as watched to the end. */
+const EXTRACT_END_SLACK_SECONDS = 5;
+
+export interface ExtractResume {
+  start: number;
+  /** Starts where the last review stopped, not at the extract's start. */
+  resumed: boolean;
+}
+
+export async function getExtractResume(
+  plugin: RNPlugin,
+  extractId: string,
+  segment: { start: number; end: number }
+): Promise<ExtractResume> {
+  const saved = await plugin.storage.getSynced<number>(extractPositionKey(extractId));
+  const resumed =
+    typeof saved === 'number' &&
+    saved > segment.start + 1 &&
+    saved < segment.end - EXTRACT_END_SLACK_SECONDS;
+  return { start: resumed ? saved : segment.start, resumed };
+}
+
+export async function setExtractPosition(plugin: RNPlugin, extractId: string, seconds: number) {
+  await plugin.storage.setSynced(extractPositionKey(extractId), seconds);
+}
+
 const IN_PROGRESS = 'ip';
 const LAST_WATCHED = 'l';
 

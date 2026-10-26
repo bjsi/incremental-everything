@@ -1,8 +1,10 @@
 import { DocumentViewer, PluginRem, usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import {
+  getExtractResume,
   getNativeVideoPosition,
   getPluginVideoPosition,
+  setExtractPosition,
   setNativeVideoPosition,
   setPluginVideoPosition,
 } from '../lib/video_position';
@@ -23,8 +25,9 @@ interface NativeVideoViewerProps {
   url?: string;
   onSwitchPlayer?: () => void;
   /**
-   * Shows a Video Extract of this video: RemNote's player is offered its start
-   * instead of the video's position, which is left alone.
+   * Shows a Video Extract of this video: RemNote's player is offered where the
+   * extract's last review stopped (or its start) instead of the video's
+   * position, which is left alone.
    */
   segment?: { start: number; end: number };
   /** The extract's Rem, when `segment` is shown: 📜 puts the range's transcript under it. */
@@ -70,6 +73,20 @@ export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({
   }, [position, prepared, segmentState]);
   const endReached = segmentState === 'reached';
 
+  // Where the extract got to, for its next review. Not before the extract's
+  // start: the page resets ip.l to 0 when it opens, after the resume time
+  // put there has already counted as inside.
+  const savedExtractPosition = React.useRef<number | undefined>();
+  React.useEffect(() => {
+    if (!segment || !extractId || segmentState === 'waiting' || position === undefined) return;
+    if (position < segment.start) return;
+    if (savedExtractPosition.current !== undefined && Math.abs(position - savedExtractPosition.current) < 2) return;
+    savedExtractPosition.current = position;
+    setExtractPosition(plugin, extractId, position).catch((e) =>
+      console.error(LOG, 'Could not save the extract position:', e)
+    );
+  }, [position, segmentState, extractId]);
+
   // Before the page opens, put the plugin's position (or the extract's start)
   // in "Resume watching at…".
   React.useEffect(() => {
@@ -77,7 +94,11 @@ export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({
     let cancelled = false;
     (async () => {
       try {
-        const seconds = segment ? segment.start : await getPluginVideoPosition(plugin, url);
+        const seconds = segment
+          ? extractId
+            ? (await getExtractResume(plugin, extractId, segment)).start
+            : segment.start
+          : await getPluginVideoPosition(plugin, url);
         if (seconds > 0) {
           await setNativeVideoPosition(actionItem.rem, seconds);
           mirrored.current = seconds;
@@ -129,7 +150,7 @@ export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({
             <>
               <span
                 style={{ padding: '2px 8px', borderRadius: 4, backgroundColor: '#fecaca', color: '#7f1d1d', fontWeight: 600 }}
-                title="RemNote's player is offered the start as “Resume watching at…”, once it has played this video before. It can't be stopped at the end: watch for “reached”."
+                title="RemNote's player is offered where the last review of this extract stopped (or its start) as “Resume watching at…”, once it has played this video before. It can't be stopped at the end: watch for “reached”."
               >
                 ✂️ {formatVideoTime(segment.start)} – {formatVideoTime(segment.end)}
               </span>

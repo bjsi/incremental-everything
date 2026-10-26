@@ -1,5 +1,6 @@
 import { RNPlugin, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { localVideoUrl, readLocalVideo } from './local_video_ref';
+import { extractPositionKey } from './video_position';
 import {
   powerupCode,
   dismissedPowerupCode,
@@ -713,6 +714,13 @@ async function buildCandidates(
     coverage: 'partial',
     note: 'Keyed by URL, not rem id — a URL that changed or whose rem was deleted leaves an unnameable orphan.',
     keys: Array.from(videoUrls).flatMap((url) => [`${url}-position`, `${url}-playbackRate`]),
+  });
+  families.push({
+    family: 'Video extract position',
+    pattern: 'extract:{remId}-position',
+    coverage: 'partial',
+    note: 'Where each Video Extract was left. A deleted extract leaves an orphan.',
+    keys: videoExtracts.map((r) => extractPositionKey(r._id)),
   });
 
   // 8. Review-graph keys named by the synced index. Their rems are usually gone

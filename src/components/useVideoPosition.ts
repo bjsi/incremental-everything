@@ -2,9 +2,11 @@ import { usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
 import { YouTubeEmbedInfo } from '../lib/youtube_embed_bridge';
 import { YT_PAUSED, YT_PLAYING } from './PluginYouTubePlayer';
+import { ExtractResume, getExtractResume } from '../lib/video_position';
 
 // Where a video was left and at what speed, per URL (synced storage), shared by
-// the plugin's YouTube player and its local video player.
+// the plugin's YouTube player and its local video player. An extract has its
+// own position (lib/video_position.ts, extractPositionKey).
 
 /** Read once, before the player opens: the position is where it starts, the speed is applied on load. */
 export function useSavedVideoSettings(url: string) {
@@ -16,6 +18,21 @@ export function useSavedVideoSettings(url: string) {
     ]);
     return { position: position ?? 0, playbackRate: playbackRate ?? 1 };
   }, [url]);
+}
+
+/**
+ * Where an extract's review starts: where the last one stopped, or its start.
+ * Null when there's no extract; undefined while it's read.
+ */
+export function useExtractResume(
+  extractId: string | undefined,
+  segment: { start: number; end: number } | undefined
+): ExtractResume | null | undefined {
+  const plugin = usePlugin();
+  return useRunAsync(
+    async () => (extractId && segment ? getExtractResume(plugin, extractId, segment) : null),
+    [extractId, segment?.start, segment?.end]
+  );
 }
 
 /** Saves a speed the user chose for the video. */
@@ -30,12 +47,14 @@ export function useSaveVideoRate(url: string) {
  * has played from where it should start: before the start seek lands, a player
  * reports 0, or the position an earlier card left it at.
  *
+ * `positionKey` is videoPositionKey(url), or extractPositionKey(id) for an
+ * extract.
+ *
  * Returns the refs a caller needs to hand the position over elsewhere:
  * `armed` (the reported time can be trusted), `latestPosition`, `lastSaved`.
  */
-export function useVideoPositionSaver(url: string, info: YouTubeEmbedInfo, startPosition: number | undefined) {
+export function useVideoPositionSaver(positionKey: string, info: YouTubeEmbedInfo, startPosition: number | undefined) {
   const plugin = usePlugin();
-  const positionKey = `${url}-position`;
   const lastSaved = React.useRef({ at: 0, position: -1 });
   const latestPosition = React.useRef<number | undefined>();
   const armed = React.useRef(false);

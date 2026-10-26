@@ -4,6 +4,7 @@ import { YoutubeActionItem } from '../lib/incremental_rem';
 import { extractVideoId } from '../lib/youtube_transcript';
 import { PluginYouTubePlayerFrame, useYouTubeBridge } from './PluginYouTubePlayer';
 import { PluginExtractButtons } from './PluginExtractButtons';
+import { videoPositionKey } from '../lib/video_position';
 import { useSavedVideoSettings, useSaveVideoRate, useVideoPositionSaver } from './useVideoPosition';
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
@@ -40,7 +41,11 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
     onRateChange: saveRate,
   });
   const position = info.currentTime ?? saved?.position ?? 0;
-  const { armed, latestPosition, lastSaved } = useVideoPositionSaver(props.actionItem.url, info, saved?.position);
+  const { armed, latestPosition, lastSaved } = useVideoPositionSaver(
+    videoPositionKey(props.actionItem.url),
+    info,
+    saved?.position
+  );
 
   // Leaving for RemNote's player: save where this one is, and put it in
   // RemNote's "Resume watching at…". Before the player has played from the
