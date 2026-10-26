@@ -1,15 +1,8 @@
 import { DocumentViewer, RemHierarchyEditorTree, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import { YoutubeActionItem } from '../lib/incremental_rem';
-import { initIncrementalRem } from '../lib/incremental_rem';
-import { showPriorityPopupForRem } from '../lib/highlightActions';
-import {
-  videoExtractPowerupCode,
-  videoExtractUrlSlotCode,
-  videoExtractStartSlotCode,
-  videoExtractEndSlotCode,
-} from '../lib/consts';
-import { getTranscriptForRange, extractVideoId } from '../lib/youtube_transcript';
+import { extractVideoId } from '../lib/youtube_transcript';
+import { createVideoExtract } from '../lib/video_extract';
 import { PluginYouTubePlayerFrame, useYouTubeBridge, YT_PAUSED, YT_PLAYING } from './PluginYouTubePlayer';
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
@@ -115,80 +108,13 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
     }
 
     setExtractState({ phase: 'creating' });
-
     try {
-      // Create a new child Rem under the video Rem
-      const newRem = await plugin.rem.createRem();
-      if (!newRem) {
-        await plugin.app.toast('Failed to create extract rem');
-        setExtractState({ phase: 'idle' });
-        return;
-      }
-
-      // Set the text to describe the extract
-      const label = `Video Extract [${formatTime(startTime)} – ${formatTime(endTime)}]`;
-      await newRem.setText([label]);
-      await newRem.setParent(props.actionItem.rem._id);
-
-      // Apply the VideoExtract powerup and set slots
-      await newRem.addPowerup(videoExtractPowerupCode);
-      await newRem.setPowerupProperty(videoExtractPowerupCode, videoExtractUrlSlotCode, [props.actionItem.url]);
-      await newRem.setPowerupProperty(videoExtractPowerupCode, videoExtractStartSlotCode, [startTime.toString()]);
-      await newRem.setPowerupProperty(videoExtractPowerupCode, videoExtractEndSlotCode, [endTime.toString()]);
-
-      // Make it incremental — pass explicitParentId so priority inheritance
-      // can walk ancestors correctly (the local `newRem` object's .parent is
-      // stale after setParent, same pattern as highlightActions.ts reload).
-      await initIncrementalRem(plugin as any, newRem, { explicitParentId: props.actionItem.rem._id });
-
-      await plugin.app.toast(`✅ Created video extract [${formatTime(startTime)} – ${formatTime(endTime)}]`);
-
-      // Fetch transcript and add segments as children Rems
-      try {
-        console.log('[VideoViewer] Attempting transcript fetch for videoId:', videoId, 'range:', startTime, '-', endTime);
-        if (videoId) {
-          const segments = await getTranscriptForRange(videoId, startTime, endTime);
-          if (segments.length > 0) {
-            // Consolidate segments into larger chunks (~300 chars each)
-            const MAX_CHUNK_CHARS = 300;
-            const chunks: string[] = [];
-            let current = '';
-
-            for (const seg of segments) {
-              const candidate = current ? `${current} ${seg.text}` : seg.text;
-              if (current && candidate.length > MAX_CHUNK_CHARS) {
-                chunks.push(current);
-                current = seg.text;
-              } else {
-                current = candidate;
-              }
-            }
-            if (current) chunks.push(current);
-
-            for (const chunk of chunks) {
-              const childRem = await plugin.rem.createRem();
-              if (childRem) {
-                await childRem.setText([chunk]);
-                await childRem.setParent(newRem._id);
-              }
-            }
-            await plugin.app.toast(`📝 Added transcript (${chunks.length} block${chunks.length > 1 ? 's' : ''})`);
-          } else {
-            await plugin.app.toast('ℹ️ No transcript segments found for this range');
-          }
-        }
-      } catch (transcriptErr) {
-        console.warn('[VideoViewer] Could not fetch transcript:', transcriptErr);
-        await plugin.app.toast('⚠️ Transcript unavailable (see console for details)');
-      }
-
-      // Show priority popup
-      setTimeout(async () => {
-        await showPriorityPopupForRem(plugin as any, newRem._id);
-      }, 300);
-    } catch (error) {
-      console.error('[VideoViewer] Error creating video extract:', error);
-      await plugin.app.toast('Error creating video extract');
+      await createVideoExtract(plugin, {
+        parentId: props.actionItem.rem._id,
+        url: props.actionItem.url,
+        startTime,
+        endTime,
+      });
     } finally {
       setExtractState({ phase: 'idle' });
     }

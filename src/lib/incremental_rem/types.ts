@@ -33,6 +33,8 @@ export type YoutubeHighlightActionItem = {
   url: string;
   startTime: number;    // seconds
   endTime: number;      // seconds
+  /** The parent is a RemNote video Rem, so RemNote's player can show the extract too. */
+  nativeAvailable?: boolean;
 };
 
 export type RemAndType =

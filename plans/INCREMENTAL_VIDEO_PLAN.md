@@ -46,14 +46,20 @@ Every YouTube IncRem can be watched in either of two players, with a switch butt
   - The switch is a button in each player's own top bar (🎬 RemNote player / ▶️ Plugin player), not a floating overlay: RemNote paints the embeds above anything the plugin floats over them.
   - Position hand-over (`lib/video_position.ts`): the plugin's position is written to `ip.l` before RemNote's page opens, but only if the Rem already has `ip`, because the plugin doesn't add RemNote's built-in powerups. While RemNote's player plays, `ip.l` is copied back (non-zero changes ≥ 2 s), and once more when switching back.
   - In the plugin player, a `vi` Rem's notes pane is an editable `RemHierarchyEditorTree` of its children under a title drawn by the plugin. A DocumentViewer of a `vi` Rem would be RemNote's whole video page, player included.
-- [ ] **3. Review in Editor for the RemNote player.** Open the video page and start the editor review timer as today. A floating bar carries Next / Dismiss / position / extract controls while the IncRem under review is open in RemNote's player. Mirror the position into `ip.l` on entry and read it back at Next.
-  - Code written 2026-10-26, awaiting the in-app test.
+- [x] **3. Review in Editor for the RemNote player.** Open the video page and start the editor review timer as today. A floating bar carries Next / Dismiss / position / extract controls while the IncRem under review is open in RemNote's player. Mirror the position into `ip.l` on entry and read it back at Next.
+  - Tested in the app 2026-10-26.
   - The timer's session and its End / Next / Dismiss / Pause moved to `lib/editor_review_session.ts`, shared by the timer bar and the new floating bar (`widgets/video_review_bar.tsx`).
   - `lib/video_review_bar.ts` (index widget) opens the bar while the timer's Rem is a `vi` Rem open in a pane, and closes it otherwise. It re-checks on timer session changes, URL changes and window-tree changes.
   - Position in: every path that opens an IncRem for a review goes through `openIncRemForReview` (`lib/incRemHelpers.ts`), which first writes the plugin's position into `ip.l`. Position out: the bar mirrors `ip.l` while it plays (`components/useNativeVideoMirror.ts`, shared with `NativeVideoViewer`), and End / Next / Dismiss copy it once more.
   - The bar reports engagement to Practiced Queues itself, since the timer bar isn't mounted on the video page. Known gap: if Notes is pressed and then closed, the timer bar's unmount ends the engagement while the bar is still up.
   - Extract controls come with phase 4.
 - [ ] **4. Extracts from the RemNote player.** Start / End from `ip.l` (with nudges), same `videoExtract` powerup as today. An extract opens in the plugin player by default; in the RemNote player it pre-sets `ip.l` = start and shows "extract ends at X / reached ✓".
+  - Code written 2026-10-26, awaiting the in-app test.
+  - Creation moved from `Video.tsx` to `lib/video_extract.ts` (`createVideoExtract`: powerup, transcript children, priority popup), shared by both players.
+  - `components/NativeExtractButtons.tsx`: ✂️ Extract → Start from `ip.l` (−5 / +5) → ■ Set End from `ip.l` → End (−5 / +5) → ✓ Create. Shown in `NativeVideoViewer`'s top bar (queue) and in the floating review bar (editor).
+  - Extracts of `vi` videos resolve with `nativeAvailable`; the queue offers 🎬 RemNote player / ▶️ Plugin player on them. The plugin's player is always the starting one for an extract, whatever the default setting, because only it stops at the end.
+  - In RemNote's player an extract shows the parent's video page with `ip.l` pre-set to the start (only if the Rem already has `ip`), a ✂️ start – end chip, and "ends at X · now Y", then "✓ end of extract reached". Its position isn't mirrored back: the whole video's position stays where it was.
+  - Not covered: Review in Editor on an extract opens the extract Rem itself, a plain document, not the video page.
 - [ ] **5. Docs.** `docs/Incremental-Video.md` (the "two ways to watch" section changes completely) and the changelog, once approved.
 
 ## Later: local videos (desktop)

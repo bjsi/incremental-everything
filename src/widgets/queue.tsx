@@ -395,7 +395,21 @@ export function QueueComponent() {
             <VideoViewer actionItem={remAndType} onSwitchPlayer={() => setVideoPlayer('remnote')} />
           )
         ) : remAndType.type === 'youtube-highlight' ? (
-          <VideoExtractViewer actionItem={remAndType} />
+          // An extract opens in the plugin's player, which stops at its end,
+          // whatever the default player for whole videos.
+          remAndType.nativeAvailable && videoPlayer === 'remnote' ? (
+            <NativeVideoViewer
+              actionItem={remAndType}
+              url={remAndType.url}
+              segment={{ start: remAndType.startTime, end: remAndType.endTime }}
+              onSwitchPlayer={() => setVideoPlayer('plugin')}
+            />
+          ) : (
+            <VideoExtractViewer
+              actionItem={remAndType}
+              onSwitchPlayer={remAndType.nativeAvailable ? () => setVideoPlayer('remnote') : undefined}
+            />
+          )
         ) : remAndType.type === 'video' ? (
           <NativeVideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' ? (

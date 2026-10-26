@@ -70,6 +70,7 @@ export const remToActionItemType = async (
           url: String(videoUrl),
           startTime: Number(startTime),
           endTime: Number(endTime),
+          nativeAvailable: !!parentRem && (await parentRem.hasPowerup('vi')),
         };
       }
     } catch (error) {

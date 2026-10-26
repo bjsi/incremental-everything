@@ -9,6 +9,8 @@ import { VideoSnapshotButtons } from './VideoSnapshotButtons';
 
 interface VideoExtractViewerProps {
     actionItem: YoutubeHighlightActionItem;
+    /** Shown for extracts of RemNote video Rems: switches the card to RemNote's player. */
+    onSwitchPlayer?: () => void;
 }
 
 /** Format seconds to MM:SS */
@@ -93,6 +95,26 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                 >
                     🔄 Replay
                 </button>
+
+                {props.onSwitchPlayer && (
+                    <button
+                        onClick={() => {
+                            send({ command: 'pause' });
+                            props.onSwitchPlayer?.();
+                        }}
+                        title="Watch the extract in RemNote's player: transcript, Highlight Moment, AI Tutor and Summary. It offers to resume at the extract's start, but can't stop at its end."
+                        style={{
+                            cursor: 'pointer',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            border: '1px solid #d1d5db',
+                            backgroundColor: '#f3f4f6',
+                            fontSize: 12,
+                        }}
+                    >
+                        🎬 RemNote player
+                    </button>
+                )}
 
                 {videoId && <PlayerControls info={info} connected={connected} send={send} />}
                 {videoId && (
