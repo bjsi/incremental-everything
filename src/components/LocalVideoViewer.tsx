@@ -21,7 +21,9 @@ import { VideoTranscriptButton } from './VideoTranscriptButton';
 // A video file on this computer, played in the plugin's own frame from the
 // local helper (lib/local_video.ts): resume, speed, extracts, screenshots and
 // transcripts from the audio, as for YouTube. An extract plays its range and
-// pauses at its end.
+// pauses at its end. In the queue the notes sit beside the video; in the
+// editor (widgets/local_video_editor.tsx) the document is the notes, so the
+// video comes alone, above it.
 
 const barButton: React.CSSProperties = {
   cursor: 'pointer',
@@ -41,7 +43,11 @@ type Problem =
 
 export const LocalVideoViewer: React.FC<{
   actionItem: LocalVideoActionItem | LocalVideoHighlightActionItem;
-}> = ({ actionItem }) => {
+  /** Under the document's title: no notes pane, the video at 16:9 of the width. */
+  inEditor?: boolean;
+  /** Start playing once loaded (default). */
+  autoplay?: boolean;
+}> = ({ actionItem, inEditor, autoplay = true }) => {
   const plugin = usePlugin();
   const { file, url } = actionItem;
   const segment =
@@ -62,6 +68,7 @@ export const LocalVideoViewer: React.FC<{
   const { info, connected, send, videoRef } = useHtmlVideo(src, {
     start,
     playbackRate: saved?.playbackRate,
+    autoplay,
     onRateChange: saveRate,
   });
   const position = info.currentTime ?? start ?? 0;
@@ -134,8 +141,27 @@ export const LocalVideoViewer: React.FC<{
     }
   };
 
+  const player = problem ? (
+    <div className="p-4" style={{ fontSize: 13, lineHeight: 1.5 }}>
+      {problemText(problem)}
+    </div>
+  ) : (
+    src && (
+      <video
+        key={src}
+        ref={videoRef}
+        src={src}
+        controls
+        preload="metadata"
+        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+      />
+    )
+  );
+
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{ height: inEditor ? undefined : '100%', display: 'flex', flexDirection: 'column' }}
+    >
       <div
         className="top-bar"
         style={{
@@ -146,9 +172,11 @@ export const LocalVideoViewer: React.FC<{
           flexShrink: 0,
         }}
       >
-        <button onClick={() => setNotesOpen((open) => !open)} title="Show or hide the notes">
-          📝
-        </button>
+        {!inEditor && (
+          <button onClick={() => setNotesOpen((open) => !open)} title="Show or hide the notes">
+            📝
+          </button>
+        )}
 
         {segment ? (
           <>
@@ -208,30 +236,19 @@ export const LocalVideoViewer: React.FC<{
           <span style={{ fontSize: 12, color: '#6b7280' }}>✓ end of extract reached</span>
         )}
       </div>
-      <VideoNotesSplit
-        notes={<DocumentViewer width={'100%'} height={'100%'} documentId={notesRemId} />}
-        notesOpen={notesOpen}
-      >
-        {/* The video side takes what the notes leave; width 100% alone would be the whole split. */}
-        <div style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>
-          {problem ? (
-            <div className="p-4" style={{ fontSize: 13, lineHeight: 1.5 }}>
-              {problemText(problem)}
-            </div>
-          ) : (
-            src && (
-              <video
-                key={src}
-                ref={videoRef}
-                src={src}
-                controls
-                preload="metadata"
-                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
-              />
-            )
-          )}
+      {inEditor ? (
+        <div style={{ width: '100%', aspectRatio: problem ? undefined : '16 / 9', marginTop: 4 }}>
+          {player}
         </div>
-      </VideoNotesSplit>
+      ) : (
+        <VideoNotesSplit
+          notes={<DocumentViewer width={'100%'} height={'100%'} documentId={notesRemId} />}
+          notesOpen={notesOpen}
+        >
+          {/* The video side takes what the notes leave; width 100% alone would be the whole split. */}
+          <div style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>{player}</div>
+        </VideoNotesSplit>
+      )}
     </div>
   );
 };

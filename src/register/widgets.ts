@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, localVideoPowerupCode, videoExtractPowerupCode } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
@@ -391,6 +391,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // Register incremental rem counter widget below document title
   plugin.app.registerWidget('inc_rem_counter', WidgetLocation.DocumentBelowTitle, {
     dimensions: { height: 'auto', width: '100%' },
+  });
+
+  // A local video's player in the editor, under the title of the video Rem
+  // and of its extracts (components/LocalVideoEditorPlayer).
+  plugin.app.registerWidget('local_video_editor', WidgetLocation.DocumentBelowTitle, {
+    dimensions: { height: 'auto', width: '100%' },
+    powerupFilter: localVideoPowerupCode,
+  });
+  plugin.app.registerWidget('local_video_extract_editor', WidgetLocation.DocumentBelowTitle, {
+    dimensions: { height: 'auto', width: '100%' },
+    powerupFilter: videoExtractPowerupCode,
   });
 
   // Register incremental rem list popup

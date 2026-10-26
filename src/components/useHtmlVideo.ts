@@ -13,12 +13,18 @@ const YT_BUFFERING = 3;
  * the element. The element is in the plugin's own frame, so commands act at
  * once and every event is the element's own.
  *
- * On load it seeks to `start`, applies `playbackRate` and plays. Like the
- * bridge, `onRateChange` hears only speed changes made afterwards.
+ * On load it seeks to `start`, applies `playbackRate` and plays, unless
+ * `autoplay` is false. Like the bridge, `onRateChange` hears only speed
+ * changes made afterwards.
  */
 export function useHtmlVideo(
   src: string | null,
-  opts: { start?: number; playbackRate?: number; onRateChange?: (rate: number) => void } = {}
+  opts: {
+    start?: number;
+    playbackRate?: number;
+    autoplay?: boolean;
+    onRateChange?: (rate: number) => void;
+  } = {}
 ) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const [info, setInfo] = React.useState<YouTubeEmbedInfo>({});
@@ -36,20 +42,26 @@ export function useHtmlVideo(
       setInfo({
         currentTime: v.currentTime,
         duration: Number.isFinite(v.duration) ? v.duration : undefined,
-        playerState: v.ended ? YT_ENDED : v.paused ? YT_PAUSED : v.readyState < 3 ? YT_BUFFERING : YT_PLAYING,
+        playerState: v.ended
+          ? YT_ENDED
+          : v.paused
+            ? YT_PAUSED
+            : v.readyState < 3
+              ? YT_BUFFERING
+              : YT_PLAYING,
         playbackRate: v.playbackRate,
         muted: v.muted,
         errorCode: v.error?.code,
       });
     const onLoaded = () => {
-      const { start, playbackRate } = optsRef.current;
+      const { start, playbackRate, autoplay = true } = optsRef.current;
       if (start && start > 0) v.currentTime = Math.min(start, Math.max(0, v.duration - 1));
       if (playbackRate && playbackRate !== 1) {
         ownRateChange = true;
         v.playbackRate = playbackRate;
       }
       setConnected(true);
-      v.play().catch(() => report()); // autoplay refused: stay paused
+      if (autoplay) v.play().catch(() => report()); // autoplay refused: stay paused
       report();
     };
     const onRate = () => {
@@ -57,7 +69,17 @@ export function useHtmlVideo(
       else optsRef.current.onRateChange?.(v.playbackRate);
       report();
     };
-    const events = ['timeupdate', 'play', 'playing', 'pause', 'seeked', 'waiting', 'ended', 'error', 'volumechange'];
+    const events = [
+      'timeupdate',
+      'play',
+      'playing',
+      'pause',
+      'seeked',
+      'waiting',
+      'ended',
+      'error',
+      'volumechange',
+    ];
     v.addEventListener('loadedmetadata', onLoaded);
     v.addEventListener('ratechange', onRate);
     events.forEach((e) => v.addEventListener(e, report));
