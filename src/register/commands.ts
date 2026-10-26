@@ -24,6 +24,7 @@ import {
   TranscriptTarget,
 } from '../lib/video_transcript';
 import { TranscriptSource } from '../lib/youtube_transcript';
+import { chooseLocalVideo, localVideoTitle, setLocalVideo } from '../lib/local_video';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import { isHintNode } from '../lib/richTextSanitize';
 import {
@@ -2330,6 +2331,65 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       'even when the video has captions',
     quickCode: 'avta',
     action: () => addTranscriptCommand('audio'),
+  });
+
+  // Local videos (lib/local_video.ts): the helper's macOS dialog picks a folder
+  // or a file, which it places in a video library.
+  const localVideoFailure = (e: unknown) =>
+    showMessageDialog(plugin, {
+      title: 'Local video',
+      message: e instanceof Error ? e.message : String(e),
+      tone: 'error',
+    });
+
+  plugin.app.registerCommand({
+    id: 'import-local-videos',
+    name: 'Import Local Videos',
+    description:
+      'Pick a folder of videos on this computer and import it as a document of Incremental Rems, one per video',
+    quickCode: 'ilv',
+    action: async () => {
+      try {
+        const focused = await plugin.focus.getFocusedRem();
+        await plugin.app.toast('📂 Choose the folder in the dialog…');
+        const picked = await chooseLocalVideo('folder', 'Choose a folder of videos to import');
+        if (!picked) return;
+        await plugin.widget.openPopup('local_video_import', {
+          ...picked,
+          parentId: focused?._id,
+          parentName: focused ? await safeRemTextToString(plugin, focused.text) : undefined,
+        });
+      } catch (e) {
+        await localVideoFailure(e);
+      }
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'link-local-video',
+    name: 'Link Local Video',
+    description: 'Pick a video file on this computer for the focused Rem, and make the Rem Incremental',
+    quickCode: 'llv',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('Focus the Rem the video belongs to first.');
+        return;
+      }
+      try {
+        await plugin.app.toast('🎞️ Choose the video in the dialog…');
+        const file = await chooseLocalVideo('file', 'Choose a video for this Rem');
+        if (!file) return;
+        await setLocalVideo(rem, file);
+        const name = localVideoTitle(file.path);
+        if (!rem.text?.length) await rem.setText([name]);
+        const wasIncremental = await rem.hasPowerup(powerupCode);
+        if (!wasIncremental) await initIncrementalRem(plugin, rem);
+        await plugin.app.toast(`🎞️ Linked “${name}”${wasIncremental ? '' : ', and made it Incremental'}`);
+      } catch (e) {
+        await localVideoFailure(e);
+      }
+    },
   });
 
   plugin.app.registerCommand({

@@ -74,6 +74,20 @@ Every YouTube IncRem can be watched in either of two players, with a switch butt
   - Plugin: 📜 and `avt` use `auto`; new command **Add Video Transcript from Audio** (`avta`) forces Whisper. Extract creation tidies in the background, behind the priority popup.
 - [ ] **5. Docs.** `docs/Incremental-Video.md` (the "two ways to watch" section changes completely) and the changelog, once approved.
 
-## Later: local videos (desktop)
+## 6. Local videos (desktop)
 
-RemNote has no interface for local videos, so this is entirely the plugin's. `<video>` works inside the sandbox with full control. Files would come from a loopback helper server (like `yt-local-proxy.js`) serving a folder with HTTP Range support, with the path stored on the Rem. A file picker works as a fallback, but it has to be re-picked each session.
+Started 2026-10-26. RemNote has no interface for local videos, so this is entirely the plugin's: a `<video>` element in the plugin frame (full control, no bridge), fed by the helper over loopback. The first library: `/Volumes/PortableSSD`, four course folders, ~426 MP4 (H.264, some HEVC), 40 min – 2.5 h each, mostly flat folders.
+
+| Decision | Why |
+|---|---|
+| **Libraries**: named root folders registered in the helper (`video-libraries.json`), chosen with the macOS folder dialog the helper opens (`osascript choose folder`). A Rem stores **library name + path relative to it**. | Several places (internal disk, external SSD) with no extra concept; a moved or remounted folder is fixed once by re-pointing its library, not per Rem. The plugin frame can't browse the disk or learn a picked file's path. |
+| The helper serves **only video files under registered libraries**, with HTTP Range, and never with `Access-Control-Allow-Origin` on media. | `<video>` needs no CORS; without it no website can read the files through the helper, and nothing outside the libraries is reachable. |
+| A `localVideo` powerup (slots `library`, `path`) marks the Rem. Its URL for the shared code is `local-video://<library>/<path>`: the position key, the extract powerup's `videoUrl`, transcripts. | One id scheme lets resume, speed, extracts, screenshots and transcripts work as for YouTube. |
+| `components/useHtmlVideo` gives a `<video>` the same `{ info, connected, send }` interface as the YouTube bridge. | `PlayerControls`, the resume chip, extract auto-pause and the snapshot / transcript buttons are reused as they are. |
+| Screenshots and transcripts read the **file** in the helper: ffmpeg frame grab, Whisper on the audio (no captions exist). | `transcribe_audio(path, …)` and `grab_frame` already take a local input. |
+
+- [x] **6a. Helper** (tested with curl 2026-10-26: scan, Range, `../` refused, frame and Whisper from the file; the dialogs need the in-app test): libraries (`GET /video-libraries`, `POST /video-choose` folder or file dialog → library + relative path, registering a new library when needed, `POST /video-library-relink`), `POST /video-scan` (videos under a folder, natural order, nested by subfolder), `GET /media/<library>/<path>` with Range; `/video-frame` and `/video-transcript` accept `file: {library, path}`.
+- [ ] **6b. Player** (code written 2026-10-26, awaiting the in-app test): `localVideo` powerup; action items `local-video` and `local-video-highlight` (an extract whose URL is `local-video://`); `LocalVideoViewer` (notes pane, resume, speed, extracts with auto-pause, 📸, 📜 from audio). Missing library or file: say so, with a relink button.
+- [ ] **6c. Getting videos in** (code written 2026-10-26, awaiting the in-app test; bulk: Rems created one at a time in order, then `initIncrementalRem` four at a time with `priority`, `nextRepDate`, no cache write, no creation history, then one cache reload): **Import Local Videos** (folder dialog → popup with the tree, where to put it, priority, and how to introduce them: all now, or one every N days in file order) and **Link Local Video** (file dialog → the focused Rem).
+- [ ] **6d. Editor review**: Review in Editor of a local video IncRem opens a plain document with no player. Candidate: a `DocumentBelowTitle` widget that plays the document's local video, but the queue's notes pane (a DocumentViewer of the same Rem) hosts that widget too, so it would need to tell the two apart. To decide after 6b.
+

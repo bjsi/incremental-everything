@@ -1,8 +1,10 @@
 import { RNPlugin, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { localVideoUrl, readLocalVideo } from './local_video_ref';
 import {
   powerupCode,
   dismissedPowerupCode,
   videoExtractPowerupCode,
+  localVideoPowerupCode,
   videoExtractUrlSlotCode,
   priorityShieldHistoryKey,
   documentPriorityShieldHistoryKey,
@@ -692,6 +694,15 @@ async function buildCandidates(
     try {
       const url = await r.getPowerupProperty(videoExtractPowerupCode, videoExtractUrlSlotCode);
       if (url) videoUrls.add(String(url));
+    } catch {
+      /* ignore */
+    }
+  }
+  // Local videos are keyed by their local-video:// URL.
+  for (const r of await taggedRems(plugin, localVideoPowerupCode)) {
+    try {
+      const file = await readLocalVideo(r);
+      if (file) videoUrls.add(localVideoUrl(file));
     } catch {
       /* ignore */
     }

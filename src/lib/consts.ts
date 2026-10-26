@@ -629,6 +629,11 @@ export const videoExtractPowerupCode = 'videoExtract';
 export const videoExtractUrlSlotCode = 'videoUrl';
 export const videoExtractStartSlotCode = 'startTime';
 export const videoExtractEndSlotCode = 'endTime';
+// A video file on this computer, played from the helper (lib/local_video.ts):
+// the library it is in and its path inside it.
+export const localVideoPowerupCode = 'localVideo';
+export const localVideoLibrarySlotCode = 'library';
+export const localVideoPathSlotCode = 'path';
 
 // Debug Video Detection probes (session only)
 export const videoProbeRemsSessionKey = 'video-probe-rems';

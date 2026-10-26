@@ -625,18 +625,21 @@ def stream_url(video_id, fresh=False):
     return url
 
 
-def grab_frame(video_id, seconds):
+def grab_frame(video_id, seconds, file=None):
     """The frame at `seconds`, as a JPEG file. Seeking before -i jumps to the
-    keyframe and decodes forward from there, so the frame is exact."""
+    keyframe and decodes forward from there, so the frame is exact. `file` is a
+    local video, which `video_id` (its local_key) then only names."""
     ffmpeg = find_tool('ffmpeg')
     if not ffmpeg:
         raise RuntimeError('ffmpeg not found (brew install ffmpeg)')
     path = VIDEO_FRAMES / f'{video_id}-{int(round(seconds * 1000))}.jpg'
     if path.exists():
         return path
-    for fresh in (False, True):  # a cached stream URL may have expired
+    # A cached stream URL may have expired, so a YouTube grab gets a second try.
+    inputs = [lambda: str(file)] if file else [lambda: stream_url(video_id), lambda: stream_url(video_id, True)]
+    for source in inputs:
         cmd = [ffmpeg, '-hide_banner', '-loglevel', 'error', '-ss', f'{seconds:.3f}',
-               '-i', stream_url(video_id, fresh), '-frames:v', '1', '-q:v', '2', '-y', str(path)]
+               '-i', source(), '-frames:v', '1', '-q:v', '2', '-y', str(path)]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
         if proc.returncode == 0 and path.exists() and path.stat().st_size:
             return path
@@ -644,12 +647,16 @@ def grab_frame(video_id, seconds):
 
 
 def handle_video_frame(req, entry):
-    video_id = req.get('videoId') or ''
+    """A YouTube video by `videoId`, or a local one by `file: {library, path}`."""
     seconds = req.get('seconds')
-    if not VIDEO_ID.match(video_id) or not isinstance(seconds, (int, float)) or seconds < 0:
-        raise RuntimeError('need a YouTube videoId and seconds >= 0')
-    entry.update(videoId=video_id, seconds=seconds)
-    path = grab_frame(video_id, float(seconds))
+    if not isinstance(seconds, (int, float)) or seconds < 0:
+        raise RuntimeError('need seconds >= 0')
+    file = local_video_file(req['file']) if req.get('file') else None
+    video_id = local_key(file) if file else req.get('videoId') or ''
+    if not VIDEO_ID.match(video_id):
+        raise RuntimeError('need a YouTube videoId or a local file')
+    entry.update(videoId=video_id, file=str(file) if file else None, seconds=seconds)
+    path = grab_frame(video_id, float(seconds), file)
     return {'frameId': path.name, 'mime': 'image/jpeg',
             'image': base64.b64encode(path.read_bytes()).decode()}
 
@@ -818,9 +825,10 @@ def transcribe_audio(path, start=None, end=None):
     return (data.get('result') or {}).get('language') or '', segments
 
 
-def audio_transcript(video_id, start=None, end=None, refresh=False):
+def audio_transcript(video_id, start=None, end=None, refresh=False, file=None):
     """The audio's transcript: the whole video's is cached, and a range is cut
-    from it when there is one; otherwise only the range is transcribed."""
+    from it when there is one; otherwise only the range is transcribed. `file`
+    is a local video, read as it is; `video_id` (its local_key) then names the cache."""
     path = VIDEO_TRANSCRIPTS / f'{video_id}.audio.json'
     whole = start is None and end is None
     if path.exists() and not refresh:
@@ -830,7 +838,7 @@ def audio_transcript(video_id, start=None, end=None, refresh=False):
                                   if s['offset'] + s['duration'] > (start or 0)
                                   and (end is None or s['offset'] < end)]
         return {**result, 'cached': True}
-    language, segments = transcribe_audio(video_audio(video_id), start, end)
+    language, segments = transcribe_audio(file or video_audio(video_id), start, end)
     if not segments:
         raise RuntimeError('Whisper heard no speech' + ('' if whole else ' in this range'))
     result = {'videoId': video_id, 'language': language, 'kind': 'whisper', 'segments': segments}
@@ -843,15 +851,22 @@ def handle_video_transcript(req, entry):
     """source: 'captions' (the default), 'audio' (Whisper), or 'auto' (captions,
     else Whisper when it is set up). start / end (seconds) limit what Whisper
     transcribes; captions always come whole, cached, for the plugin to cut."""
-    video_id = req.get('videoId') or ''
-    if not VIDEO_ID.match(video_id):
-        raise RuntimeError('need a YouTube videoId')
-    source = req.get('source') or 'captions'
     start, end = req.get('start'), req.get('end')
     for value in (start, end):
         if value is not None and (not isinstance(value, (int, float)) or value < 0):
             raise RuntimeError('start and end are seconds >= 0')
     refresh = bool(req.get('refresh'))
+    source = req.get('source') or 'captions'
+    if req.get('file'):
+        # A local video has no captions: always its audio.
+        file = local_video_file(req['file'])
+        result = audio_transcript(local_key(file), start, end, refresh, file)
+        entry.update(file=str(file), language=result['language'], segments=len(result['segments']),
+                     cached=result['cached'])
+        return result
+    video_id = req.get('videoId') or ''
+    if not VIDEO_ID.match(video_id):
+        raise RuntimeError('need a YouTube videoId or a local file')
     if source == 'audio':
         result = audio_transcript(video_id, start, end, refresh)
     else:
@@ -902,9 +917,195 @@ def handle_transcript_tidy(req, entry):
     return {'blocks': tidied}
 
 
+# ---------------------------------------------------------------------------
+# Local videos: libraries, the macOS file dialogs, scanning, serving
+# ---------------------------------------------------------------------------
+#
+# A library is a named folder the user picked in a dialog. A Rem stores its
+# video as library name + path relative to the library, so a folder that moves
+# (an external disk mounted elsewhere) is fixed once, by re-pointing the
+# library. Only video files inside libraries are ever served or read.
+
+VIDEO_LIBRARIES_FILE = HOME / 'video-libraries.json'
+VIDEO_TYPES = {'.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm'}
+LIBRARY_LOCK = threading.Lock()
+DIALOG_LOCK = threading.Lock()  # one file dialog at a time
+
+
+def load_libraries():
+    try:
+        return json.loads(VIDEO_LIBRARIES_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def save_libraries(libraries):
+    VIDEO_LIBRARIES_FILE.write_text(json.dumps(libraries, indent=2, ensure_ascii=False))
+
+
+def is_video(path):
+    return path.suffix.lower() in VIDEO_TYPES and not path.name.startswith('.')
+
+
+def library_for(path):
+    """(library name, path relative to it) for a picked file or folder: the
+    innermost library holding it, else a new library at the folder itself (or
+    the file's folder), named after it."""
+    path = path.resolve()
+    with LIBRARY_LOCK:
+        libraries = load_libraries()
+        holders = [(name, Path(root)) for name, root in libraries.items()
+                   if path == Path(root) or Path(root) in path.parents]
+        if holders:
+            name, root = max(holders, key=lambda h: len(str(h[1])))
+            return name, '' if path == root else path.relative_to(root).as_posix()
+        root = path if path.is_dir() else path.parent
+        name, n = root.name or 'Videos', 2
+        while name in libraries:
+            name, n = f'{root.name} {n}', n + 1
+        libraries[name] = str(root)
+        save_libraries(libraries)
+        return name, '' if path == root else path.relative_to(root).as_posix()
+
+
+def library_root(name):
+    root = load_libraries().get(name)
+    if not root:
+        raise RuntimeError(f'unknown video library "{name}"')
+    root = Path(root)
+    if not root.is_dir():
+        raise RuntimeError(f'the folder of the video library "{name}" is not available: {root} '
+                           '(an external disk not connected?)')
+    return root
+
+
+def local_path(library, rel):
+    """A path inside a library; never outside it, whatever `rel` says."""
+    root = library_root(library).resolve()
+    path = (root / rel).resolve() if rel else root
+    if path != root and root not in path.parents:
+        raise RuntimeError('path outside the library')
+    return path
+
+
+def local_video_file(spec):
+    if not isinstance(spec, dict) or not spec.get('library') or not spec.get('path'):
+        raise RuntimeError('need file: {library, path}')
+    path = local_path(spec['library'], spec['path'])
+    if not is_video(path) or not path.is_file():
+        raise RuntimeError(f'video not found: {spec["path"]} in the library "{spec["library"]}"')
+    return path
+
+
+def local_key(path):
+    """An 11-character id for a local file, in the YouTube id's place (frame and
+    transcript caches); it changes when the file does."""
+    stat = path.stat()
+    return hashlib.sha1(f'{path}|{stat.st_size}|{stat.st_mtime_ns}'.encode()).hexdigest()[:11]
+
+
+def choose_in_dialog(kind, prompt):
+    """The macOS folder or file dialog, in front of RemNote. None if cancelled."""
+    prompt = prompt.replace('"', "'")
+    picker = (f'choose folder with prompt "{prompt}"' if kind == 'folder'
+              else f'choose file with prompt "{prompt}" of type {{"public.movie"}}')
+    with DIALOG_LOCK:
+        proc = subprocess.run(['osascript', '-e', 'activate', '-e', f'POSIX path of ({picker})'],
+                              capture_output=True, text=True, timeout=900)
+    if proc.returncode != 0:
+        if '-128' in proc.stderr:  # User canceled.
+            return None
+        raise RuntimeError(f'the file dialog failed: {proc.stderr.strip()[-300:]}')
+    return Path(proc.stdout.strip())
+
+
+def handle_video_choose(req, entry):
+    """kind 'folder' or 'file': the user picks one; it is placed in a library."""
+    kind = 'file' if req.get('kind') == 'file' else 'folder'
+    picked = choose_in_dialog(kind, req.get('prompt') or
+                              ('Choose a folder of videos' if kind == 'folder' else 'Choose a video'))
+    if not picked:
+        return {'cancelled': True}
+    if kind == 'file' and not is_video(picked):
+        raise RuntimeError(f'not a video the player can open (mp4, m4v, mov, webm): {picked.name}')
+    library, rel = library_for(picked)
+    entry.update(kind=kind, library=library, path=rel)
+    return {'cancelled': False, 'library': library, 'root': load_libraries()[library], 'path': rel}
+
+
+def handle_video_libraries(req, entry):
+    return {'libraries': [{'name': name, 'root': root, 'available': Path(root).is_dir()}
+                          for name, root in load_libraries().items()]}
+
+
+def handle_video_library_relink(req, entry):
+    """Points a library at another folder (the disk mounted elsewhere, the
+    folder moved), chosen in the dialog."""
+    name = req.get('library') or ''
+    with LIBRARY_LOCK:
+        if name not in load_libraries():
+            raise RuntimeError(f'unknown video library "{name}"')
+    picked = choose_in_dialog('folder', f'Where is the video library "{name}" now?')
+    if not picked:
+        return {'cancelled': True}
+    with LIBRARY_LOCK:
+        libraries = load_libraries()
+        libraries[name] = str(picked.resolve())
+        save_libraries(libraries)
+    entry.update(library=name, root=libraries[name])
+    return {'cancelled': False, 'library': name, 'root': libraries[name]}
+
+
+def natural_key(name):
+    """'Aula 2' before 'Aula 10'."""
+    return [(0, int(part), '') if part.isdigit() else (1, 0, part.lower())
+            for part in re.split(r'(\d+)', name)]
+
+
+def scan_folder(root, path):
+    folder = {'name': path.name, 'path': path.relative_to(root).as_posix() if path != root else '',
+              'videos': [], 'folders': []}
+    try:
+        entries = sorted(path.iterdir(), key=lambda p: natural_key(p.name))
+    except OSError:
+        return folder
+    for child in entries:
+        if child.name.startswith('.'):
+            continue
+        if child.is_dir():
+            sub = scan_folder(root, child)
+            if sub['videos'] or sub['folders']:
+                folder['folders'].append(sub)
+        elif is_video(child):
+            folder['videos'].append({'name': child.stem, 'path': child.relative_to(root).as_posix()})
+    return folder
+
+
+def handle_video_scan(req, entry):
+    """The videos under a library folder, in natural order, nested by subfolder."""
+    library = req.get('library') or ''
+    root = library_root(library).resolve()
+    tree = scan_folder(root, local_path(library, req.get('path') or ''))
+    entry.update(library=library, path=req.get('path') or '')
+    return {'library': library, 'tree': tree}
+
+
+def handle_video_file(req, entry):
+    """Whether a library's video is there, for a player that couldn't load it
+    (the media route answers without CORS, so the plugin can't read its errors)."""
+    path = local_video_file(req.get('file'))
+    return {'size': path.stat().st_size}
+
+
+MEDIA_PREFIX = '/media/'
+MEDIA_CHUNK = 1 << 20
+
 ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match,
           '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
-          '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy}
+          '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy,
+          '/video-choose': handle_video_choose, '/video-libraries': handle_video_libraries,
+          '/video-library-relink': handle_video_library_relink, '/video-scan': handle_video_scan,
+          '/video-file': handle_video_file}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -928,8 +1129,59 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/':
             return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL,
                                         'ytDlp': find_tool('yt-dlp'), 'ffmpeg': find_tool('ffmpeg'),
-                                        'transcripts': True, 'whisper': whisper_ready()})
+                                        'transcripts': True, 'whisper': whisper_ready(), 'localVideo': True})
+        if self.path.startswith(MEDIA_PREFIX):
+            return self.send_media()
         self.send_json(404, {'ok': False, 'error': 'POST /ocr or /locate'})
+
+    def send_media(self):
+        """GET /media/<library>/<path>: a library's video file, with Range, for
+        a <video> element. No CORS header: playing needs none, and without it
+        no page can read the files through the helper."""
+        try:
+            library, _, rel = urllib.parse.unquote(self.path[len(MEDIA_PREFIX):].split('?')[0]).partition('/')
+            path = local_video_file({'library': library, 'path': rel})
+        except RuntimeError as e:
+            self.send_response(404)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(str(e).encode())
+            return
+        size = path.stat().st_size
+        start, end = 0, size - 1
+        match = re.match(r'bytes=(\d*)-(\d*)', self.headers.get('Range') or '')
+        if match and (match.group(1) or match.group(2)):
+            if match.group(1):
+                start = int(match.group(1))
+                end = min(int(match.group(2)), size - 1) if match.group(2) else size - 1
+            else:  # the last N bytes
+                start = max(0, size - int(match.group(2)))
+            if start > end or start >= size:
+                self.send_response(416)
+                self.send_header('Content-Range', f'bytes */{size}')
+                self.end_headers()
+                return
+            self.send_response(206)
+            self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+        else:
+            self.send_response(200)
+        self.send_header('Content-Type', VIDEO_TYPES[path.suffix.lower()])
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Content-Length', str(end - start + 1))
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        try:
+            with open(path, 'rb') as f:
+                f.seek(start)
+                left = end - start + 1
+                while left > 0:
+                    chunk = f.read(min(MEDIA_CHUNK, left))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    left -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the player seeks by dropping a request and starting another
 
     def do_POST(self):
         route = ROUTES.get(self.path)

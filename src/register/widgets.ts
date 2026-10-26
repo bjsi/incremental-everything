@@ -378,6 +378,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: { height: 'auto', width: '100%' },
   });
 
+  // Import Local Videos: opened by its command after the helper's folder dialog.
+  plugin.app.registerWidget('local_video_import', WidgetLocation.Popup, {
+    dimensions: { width: 480, height: 'auto' },
+  });
+
   // The timer's controls over RemNote's video page; opened by lib/video_review_bar.ts.
   plugin.app.registerWidget('video_review_bar', WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 'auto' },

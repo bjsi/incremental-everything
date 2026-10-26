@@ -57,6 +57,9 @@ import {
   videoExtractUrlSlotCode,
   videoExtractStartSlotCode,
   videoExtractEndSlotCode,
+  localVideoPowerupCode,
+  localVideoLibrarySlotCode,
+  localVideoPathSlotCode,
 } from './consts';
 import { safeRemTextToString } from './pdfUtils';
 
@@ -85,6 +88,8 @@ const PLUGIN_SLOT_DISPLAY_NAMES: Record<string, string> = {
   [`${videoExtractPowerupCode}:${videoExtractUrlSlotCode}`]: 'Video URL',
   [`${videoExtractPowerupCode}:${videoExtractStartSlotCode}`]: 'Start Time',
   [`${videoExtractPowerupCode}:${videoExtractEndSlotCode}`]: 'End Time',
+  [`${localVideoPowerupCode}:${localVideoLibrarySlotCode}`]: 'Library',
+  [`${localVideoPowerupCode}:${localVideoPathSlotCode}`]: 'Path',
 };
 
 // Session memo of resolved slot rems, keyed by `${powerupCode}:${slotCode}`.

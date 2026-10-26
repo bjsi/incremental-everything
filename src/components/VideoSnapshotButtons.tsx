@@ -6,6 +6,7 @@ import {
   checkVideoHelper,
   formatVideoTime,
   saveVideoSnapshot,
+  VideoFrameSource,
   VideoHelperStatus,
 } from '../lib/video_snapshot';
 
@@ -96,7 +97,7 @@ const STAGE_TEXT: Record<Stage, string> = {
 };
 
 interface VideoSnapshotButtonsProps {
-  videoId: string;
+  source: VideoFrameSource;
   /** The player's current time; read when a button is pressed. */
   time: number | undefined;
   /** Where the "📸 MM:SS" Rems go: the IncRem under review. */
@@ -104,7 +105,7 @@ interface VideoSnapshotButtonsProps {
 }
 
 export const VideoSnapshotButtons: React.FC<VideoSnapshotButtonsProps> = ({
-  videoId,
+  source,
   time,
   parentId,
 }) => {
@@ -131,7 +132,7 @@ export const VideoSnapshotButtons: React.FC<VideoSnapshotButtonsProps> = ({
     setDone(null);
     try {
       const { lines } = await saveVideoSnapshot(plugin, {
-        videoId,
+        source,
         seconds,
         parentId,
         transcribe,

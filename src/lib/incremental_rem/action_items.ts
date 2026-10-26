@@ -11,7 +11,9 @@ import {
   videoExtractUrlSlotCode,
   videoExtractStartSlotCode,
   videoExtractEndSlotCode,
+  localVideoPowerupCode,
 } from '../consts';
+import { localVideoUrl, parseLocalVideoUrl, readLocalVideo } from '../local_video_ref';
 
 /**
  * Options for {@link remToActionItemType}.
@@ -62,6 +64,19 @@ export const remToActionItemType = async (
         // Find the parent video Rem
         const parentId = rem.parent;
         const parentRem = parentId ? await plugin.rem.findOne(parentId) : null;
+
+        const file = parseLocalVideoUrl(String(videoUrl));
+        if (file) {
+          return {
+            type: 'local-video-highlight',
+            rem: parentRem || rem,
+            extract: rem,
+            file,
+            url: String(videoUrl),
+            startTime: Number(startTime),
+            endTime: Number(endTime),
+          };
+        }
 
         return {
           type: 'youtube-highlight',
@@ -114,6 +129,10 @@ export const remToActionItemType = async (
     } else {
       return { extract: rem, type: 'html-highlight', rem: htmlRem };
     }
+  } else if (await rem.hasPowerup(localVideoPowerupCode)) {
+    const file = await readLocalVideo(rem);
+    if (file) return { rem, type: 'local-video', file, url: localVideoUrl(file) };
+    return { rem, type: 'rem' };
   } else if (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
     return { rem, type: 'pdf' };
   } else if (await rem.hasPowerup('vi')) {

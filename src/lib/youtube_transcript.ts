@@ -10,6 +10,7 @@
  */
 
 import { callVideoHelper } from './video_snapshot';
+import { parseLocalVideoUrl } from './local_video_ref';
 
 const RE_YOUTUBE =
     /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i;
@@ -51,10 +52,13 @@ export async function fetchTranscript(
     videoIdOrUrl: string,
     { source = 'auto', range }: { source?: TranscriptSource; range?: { start: number; end: number } } = {}
 ): Promise<Transcript> {
-    const videoId = extractVideoId(videoIdOrUrl);
+    // A local video (local-video:// URL) has no captions: the helper always
+    // transcribes its audio.
+    const file = parseLocalVideoUrl(videoIdOrUrl);
+    const videoId = file ? file.path : extractVideoId(videoIdOrUrl);
     if (!videoId) throw new Error(`Not a YouTube video: ${videoIdOrUrl}`);
     const transcript = await callVideoHelper<Transcript & { cached: boolean }>('/video-transcript', {
-        videoId,
+        ...(file ? { file } : { videoId }),
         source,
         ...(range ? { start: range.start, end: range.end } : {}),
     });

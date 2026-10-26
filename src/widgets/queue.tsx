@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { VideoExtractViewer } from '../components/VideoExtractViewer';
+import { LocalVideoViewer } from '../components/LocalVideoViewer';
 import { NativeVideoViewer } from '../components/NativeVideoViewer';
 import { ExtractViewer } from '../components/ExtractViewer';
 import { IsolatedCardViewer } from '../components/IsolatedCardViewer';
@@ -411,6 +412,8 @@ export function QueueComponent() {
               onSwitchPlayer={remAndType.nativeAvailable ? () => setVideoPlayer('remnote') : undefined}
             />
           )
+        ) : remAndType.type === 'local-video' || remAndType.type === 'local-video-highlight' ? (
+          <LocalVideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'video' ? (
           <NativeVideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' ? (

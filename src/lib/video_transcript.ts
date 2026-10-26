@@ -53,10 +53,10 @@ export async function transcriptTargetForRem(plugin: RNPlugin, rem: PluginRem): 
   let current: PluginRem | undefined = rem;
   for (let depth = 0; current && depth < 10; depth++) {
     const item = await remToActionItemType(plugin, current, { silent: true });
-    if (item?.type === 'youtube-highlight') {
+    if (item?.type === 'youtube-highlight' || item?.type === 'local-video-highlight') {
       return { parentId: item.extract._id, url: item.url, range: { start: item.startTime, end: item.endTime } };
     }
-    if (item?.type === 'youtube') return { parentId: current._id, url: item.url };
+    if (item?.type === 'youtube' || item?.type === 'local-video') return { parentId: current._id, url: item.url };
     current = current.parent ? await plugin.rem.findOne(current.parent) : undefined;
   }
   return null;

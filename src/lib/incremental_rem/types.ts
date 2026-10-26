@@ -1,11 +1,14 @@
 import { z } from 'zod';
 import { PluginRem } from '@remnote/plugin-sdk';
+import type { LocalVideoFile } from '../local_video_ref';
 
 export type ActionItemType =
   | 'pdf'
   | 'html'
   | 'youtube'
   | 'youtube-highlight'
+  | 'local-video'
+  | 'local-video-highlight'
   | 'video'
   | 'rem'
   | 'pdf-highlight'
@@ -37,11 +40,31 @@ export type YoutubeHighlightActionItem = {
   nativeAvailable?: boolean;
 };
 
+/** A video file on this computer (the Local Video powerup); `url` is its local-video:// URL. */
+export type LocalVideoActionItem = {
+  type: 'local-video';
+  rem: PluginRem;
+  file: LocalVideoFile;
+  url: string;
+};
+/** An extract of a local video: a VideoExtract whose URL is local-video://. */
+export type LocalVideoHighlightActionItem = {
+  type: 'local-video-highlight';
+  rem: PluginRem;       // parent video Rem (the extract itself when it has no parent)
+  extract: PluginRem;
+  file: LocalVideoFile;
+  url: string;
+  startTime: number;    // seconds
+  endTime: number;      // seconds
+};
+
 export type RemAndType =
   | PDFActionItem
   | HTMLActionItem
   | YoutubeActionItem
   | YoutubeHighlightActionItem
+  | LocalVideoActionItem
+  | LocalVideoHighlightActionItem
   | VideoActionItem
   | RemActionItem
   | PDFHighlightActionItem

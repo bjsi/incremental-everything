@@ -119,7 +119,7 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
 
                 {videoId && <PlayerControls info={info} connected={connected} send={send} />}
                 {videoId && (
-                    <VideoSnapshotButtons videoId={videoId} time={info.currentTime} parentId={extract._id} />
+                    <VideoSnapshotButtons source={{ videoId }} time={info.currentTime} parentId={extract._id} />
                 )}
                 {videoId && (
                     <VideoTranscriptButton

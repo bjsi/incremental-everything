@@ -114,6 +114,9 @@ export function parseOutline(markup: string): OutlineLine[] {
   return lines;
 }
 
+/** The video a frame is grabbed from: a YouTube video, or a file in a video library. */
+export type VideoFrameSource = { videoId: string } | { file: { library: string; path: string } };
+
 export interface SnapshotProgress {
   (stage: 'grabbing' | 'saving' | 'transcribing'): void;
 }
@@ -127,17 +130,17 @@ export interface SnapshotProgress {
 export async function saveVideoSnapshot(
   plugin: RNPlugin,
   opts: {
-    videoId: string;
+    source: VideoFrameSource;
     seconds: number;
     parentId: RemId;
     transcribe: boolean;
     onProgress?: SnapshotProgress;
   }
 ): Promise<{ heading: RemId; lines: number }> {
-  const { videoId, seconds, parentId, transcribe, onProgress } = opts;
+  const { source, seconds, parentId, transcribe, onProgress } = opts;
   onProgress?.('grabbing');
   const frame = await callVideoHelper<{ frameId: string; mime: string; image: string }>('/video-frame', {
-    videoId,
+    ...source,
     seconds,
   });
 
