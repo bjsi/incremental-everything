@@ -18,7 +18,7 @@ import {
     editorReviewTimerOriginKey,
     editorReviewTimerDateOverrideKey,
 } from './consts';
-import { determineIncRemType } from './incRemHelpers';
+import { openIncRemForReview } from './incRemHelpers';
 import { markIncRemTransition } from './queue_session';
 
 /**
@@ -402,12 +402,6 @@ export const handleReviewInEditorRem = async (
         // Target missing (deleted?) — fall through to the default navigation.
     }
 
-    const incRemType = await determineIncRemType(plugin, rem);
-
-    if (incRemType === 'pdf-note') {
-        await rem.openRemAsPage();
-    } else {
-        await plugin.window.openRem(rem);
-    }
+    await openIncRemForReview(plugin, rem);
 };
 

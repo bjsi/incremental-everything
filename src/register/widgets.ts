@@ -378,6 +378,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: { height: 'auto', width: '100%' },
   });
 
+  // The timer's controls over RemNote's video page; opened by lib/video_review_bar.ts.
+  plugin.app.registerWidget('video_review_bar', WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+
   // Register incremental rem counter widget below document title
   plugin.app.registerWidget('inc_rem_counter', WidgetLocation.DocumentBelowTitle, {
     dimensions: { height: 'auto', width: '100%' },

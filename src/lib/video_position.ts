@@ -42,3 +42,43 @@ export async function setNativeVideoPosition(rem: PluginRem, seconds: number) {
   if (!(await rem.hasPowerup(IN_PROGRESS))) return;
   await rem.setPowerupProperty(IN_PROGRESS, LAST_WATCHED, [String(seconds)]);
 }
+
+const VIDEO = 'vi';
+const VIDEO_URL = 'u';
+
+/** The URL of a RemNote video Rem (the Video powerup's), which keys the plugin's position. */
+export async function nativeVideoUrl(rem: PluginRem): Promise<string | undefined> {
+  if (!(await rem.hasPowerup(VIDEO))) return undefined;
+  return (await rem.getPowerupProperty(VIDEO, VIDEO_URL)) || undefined;
+}
+
+/**
+ * Before a RemNote video Rem opens in RemNote's player: offer the plugin's
+ * position there as "Resume watching at…". A no-op for any other Rem.
+ */
+export async function primeNativeVideoPosition(plugin: RNPlugin, rem: PluginRem) {
+  try {
+    const url = await nativeVideoUrl(rem);
+    if (!url) return;
+    const seconds = await getPluginVideoPosition(plugin, url);
+    if (seconds > 0) await setNativeVideoPosition(rem, seconds);
+  } catch (e) {
+    console.error('[VideoPosition] Could not set the resume time:', e);
+  }
+}
+
+/**
+ * After RemNote's player: keep where it got to as the plugin's position. Zero
+ * is skipped, since the page resets `ip.l` when it opens. A no-op for any
+ * other Rem.
+ */
+export async function pullNativeVideoPosition(plugin: RNPlugin, rem: PluginRem) {
+  try {
+    const url = await nativeVideoUrl(rem);
+    if (!url) return;
+    const seconds = await getNativeVideoPosition(rem);
+    if (seconds) await setPluginVideoPosition(plugin, url, seconds);
+  } catch (e) {
+    console.error('[VideoPosition] Could not save the position:', e);
+  }
+}

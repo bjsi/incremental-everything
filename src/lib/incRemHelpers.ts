@@ -3,6 +3,7 @@ import { ActionItemType, IncrementalRem } from './incremental_rem/types';
 import { remToActionItemType, ActionItemTypeOptions } from './incremental_rem/action_items';
 import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
 import { creationFoldRemIdsKey } from './consts';
+import { primeNativeVideoPosition } from './video_position';
 
 /**
  * Extract plain text from RemNote rich text format.
@@ -58,6 +59,21 @@ export async function determineIncRemType(
     return type;
   } catch {
     return 'unknown';
+  }
+}
+
+/**
+ * Opens an IncRem in the editor for a review: a note under a PDF as its own
+ * page (not the PDF viewer), anything else as RemNote opens it. A RemNote video
+ * Rem opens on RemNote's video page, which is first offered the plugin's
+ * position to resume at.
+ */
+export async function openIncRemForReview(plugin: RNPlugin, rem: PluginRem): Promise<void> {
+  await primeNativeVideoPosition(plugin, rem);
+  if ((await determineIncRemType(plugin, rem)) === 'pdf-note') {
+    await rem.openRemAsPage();
+  } else {
+    await plugin.window.openRem(rem);
   }
 }
 

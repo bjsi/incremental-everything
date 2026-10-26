@@ -38,6 +38,7 @@ import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerLogosBridge } from '../lib/logos_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
+import { registerVideoReviewBar } from '../lib/video_review_bar';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
@@ -138,6 +139,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   // RemNote window can find them.
   registerWindowSourcesPresence(plugin);
   await registerWidgets(plugin);
+  // The review timer's floating bar over RemNote's video page.
+  registerVideoReviewBar(plugin);
 
   // Register CSS rules
   // PDF highlight CSS is (re)registered reactively: the "peek" toggle (command +

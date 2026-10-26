@@ -1,4 +1,4 @@
-import { DocumentViewer, PluginRem, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { DocumentViewer, PluginRem, usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import {
   getNativeVideoPosition,
@@ -6,6 +6,7 @@ import {
   setNativeVideoPosition,
   setPluginVideoPosition,
 } from '../lib/video_position';
+import { useNativeVideoMirror } from './useNativeVideoMirror';
 
 interface NativeVideoViewerProps {
   actionItem: {
@@ -21,8 +22,6 @@ interface NativeVideoViewerProps {
 }
 
 const LOG = '[NativeVideo]';
-// ip.l is written every 3 s while playing; smaller moves aren't worth a write.
-const MIN_MOVE_SECONDS = 2;
 
 /**
  * RemNote's own video page for a video Rem: a DocumentViewer of the Rem shows
@@ -33,7 +32,8 @@ export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({ actionItem
   const remId = actionItem.rem._id;
   // Without a URL there is nothing to keep in step: show the page at once.
   const [prepared, setPrepared] = React.useState(!url);
-  const mirrored = React.useRef<number | undefined>();
+  // While RemNote's player plays, its position is copied back.
+  const { mirrored } = useNativeVideoMirror(remId, url, prepared);
 
   // Before the page opens, put the plugin's position in "Resume watching at…".
   React.useEffect(() => {
@@ -55,24 +55,6 @@ export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({ actionItem
       cancelled = true;
     };
   }, [remId, url]);
-
-  // While RemNote's player plays, copy its position back. Zero is skipped: the
-  // page very likely resets ip.l to 0 when it opens, before anything is played.
-  const nativePosition = useTrackerPlugin(
-    async (rp) => {
-      const rem = await rp.rem.findOne(remId);
-      return rem ? getNativeVideoPosition(rem) : undefined;
-    },
-    [remId]
-  );
-  React.useEffect(() => {
-    if (!url || !prepared || !nativePosition) return;
-    if (mirrored.current !== undefined && Math.abs(nativePosition - mirrored.current) < MIN_MOVE_SECONDS) return;
-    mirrored.current = nativePosition;
-    setPluginVideoPosition(plugin, url, nativePosition).catch((e) =>
-      console.error(LOG, 'Could not save the position:', e)
-    );
-  }, [nativePosition, prepared]);
 
   const switchToPlugin = async () => {
     if (url) {

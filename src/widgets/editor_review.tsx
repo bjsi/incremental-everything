@@ -12,7 +12,7 @@ import { powerupCode, prioritySlotCode, pageRangeWidgetId } from '../lib/consts'
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { safeRemTextToString, getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
-import { determineIncRemType } from '../lib/incRemHelpers';
+import { openIncRemForReview } from '../lib/incRemHelpers';
 import { openRemInNewPane } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
@@ -382,14 +382,12 @@ const EditorReviewInput: React.FC<{
       // the effect would already have run, found nothing, and skipped (race).
       let rem: Awaited<ReturnType<typeof plugin.rem.findOne>> = undefined;
       let hostRem: Awaited<ReturnType<typeof getActivePdfForIncRem>> = null;
-      let incRemType: Awaited<ReturnType<typeof determineIncRemType>> | undefined;
       let bookmarkHighlightId: string | undefined;
       try {
         rem = await plugin.rem.findOne(remId);
         if (rem) {
           const pdfRem = await getActivePdfForIncRem(plugin, rem);
           hostRem = pdfRem ?? (await findHTMLinRem(plugin, rem));
-          incRemType = await determineIncRemType(plugin, rem);
 
           if (hostRem) {
             const history = await getPageHistory(plugin, remId, hostRem._id);
@@ -468,10 +466,8 @@ const EditorReviewInput: React.FC<{
           if (!bookmarkHighlightId) {
             await openRemInNewPane(plugin, hostRem._id);
           }
-        } else if (incRemType === 'pdf-note') {
-          await rem.openRemAsPage();
         } else {
-          await plugin.window.openRem(rem);
+          await openIncRemForReview(plugin, rem);
         }
       } catch (e) {
         console.error('[EditorReview.handleStartTimer] Failed to open & scroll', e);

@@ -633,6 +633,8 @@ export const videoExtractEndSlotCode = 'endTime';
 export const videoProbeRemsSessionKey = 'video-probe-rems';
 export const videoProbeOriginalLastWatchedKey = 'video-probe-original-last-watched';
 export const videoFloatingProbeIdKey = 'video-floating-probe-id';
+// The floating review bar over RemNote's video page (lib/video_review_bar.ts).
+export const videoReviewBarIdKey = 'video-review-bar-id';
 
 // IncRem Notes Sidebar (right sidebar widget)
 // Stable rem id published by ExtractViewer while a Rem-type IncRem is shown in
