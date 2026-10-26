@@ -63,6 +63,7 @@ import {
   IsolatedQueueMode,
   defaultVideoPlayerId,
   DefaultVideoPlayer,
+  tidyAutoCaptionsId,
   autoFocusQueueDashboardId,
   hideCardPriorityTagSettingId,
   showLeftBorderForIncRemsSettingId,
@@ -153,6 +154,7 @@ export interface IESettings {
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
   [defaultVideoPlayerId]: DefaultVideoPlayer;
+  [tidyAutoCaptionsId]: boolean;
   [autoFocusQueueDashboardId]: boolean;
 
   // Editor indicators
@@ -243,6 +245,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
   [defaultVideoPlayerId]: 'plugin',
+  [tidyAutoCaptionsId]: true,
   [autoFocusQueueDashboardId]: false,
 
   [hideCardPriorityTagSettingId]: true,
@@ -299,6 +302,7 @@ export type SettingGroupId =
   | 'scheduling'
   | 'priority'
   | 'queue'
+  | 'incrementalVideo'
   | 'priorityQueue'
   | 'editor'
   | 'fsrs'
@@ -348,6 +352,11 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     blurb: 'Defaults and editing behaviour for priority values.',
   },
   queue: { label: 'Queue Display', blurb: 'What the queue shows, and holds back, during review.' },
+  incrementalVideo: {
+    label: 'Incremental Video',
+    blurb: 'Which player a video opens in, and how its transcripts are written.',
+    helpPath: 'Incremental-Video/',
+  },
   priorityQueue: {
     label: 'Priority Queue',
     blurb:
@@ -814,8 +823,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [defaultVideoPlayerId]: {
     kind: 'dropdown',
-    group: 'queue',
-    helpPath: 'Incremental-Video/',
+    group: 'incrementalVideo',
     title: 'Default Player for RemNote Videos',
     description:
       'Which player a video added through RemNote\'s Upload File › YouTube URL opens in, in the ' +
@@ -827,6 +835,16 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'plugin', label: "The plugin's player" },
       { value: 'remnote', label: "RemNote's player" },
     ],
+  },
+  [tidyAutoCaptionsId]: {
+    kind: 'boolean',
+    group: 'incrementalVideo',
+    title: 'Tidy Automatic Captions with Claude',
+    description:
+      "When a video transcript comes from YouTube's automatic captions, Claude adds punctuation, " +
+      'fixes words the recognition clearly got wrong and puts key terms in bold, through the local ' +
+      "helper and your own Claude account. The raw text is written first and replaced as it's tidied. " +
+      'Captions by the uploader and transcripts made from the audio are left as they are.',
   },
   [autoFocusQueueDashboardId]: {
     kind: 'boolean',

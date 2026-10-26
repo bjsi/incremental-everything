@@ -7,7 +7,7 @@ import {
   videoExtractStartSlotCode,
   videoExtractEndSlotCode,
 } from './consts';
-import { addVideoTranscript } from './video_transcript';
+import { addVideoTranscript, shouldTidy, tidyTranscript } from './video_transcript';
 import { showMessageDialog } from './message_dialog';
 import { checkVideoHelper, formatVideoTime } from './video_snapshot';
 
@@ -29,8 +29,13 @@ async function addExtractTranscript(
     return true;
   }
   try {
-    const { blocks } = await addVideoTranscript(plugin, { parentId: extractId, url, range: { start, end } });
+    const written = await addVideoTranscript(plugin, { parentId: extractId, url, range: { start, end } });
+    const blocks = written.remIds.length;
     await plugin.app.toast(`📝 Added transcript (${blocks} block${blocks > 1 ? 's' : ''})`);
+    // Tidying goes on behind the priority popup; the raw text stays if it fails.
+    if (await shouldTidy(plugin, written)) {
+      tidyTranscript(plugin, written).catch((e) => console.warn('[VideoExtract] Could not tidy the transcript:', e));
+    }
     return true;
   } catch (e) {
     console.warn('[VideoExtract] Could not fetch transcript:', e);

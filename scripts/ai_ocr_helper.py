@@ -15,22 +15,32 @@ For YouTube videos it grabs the exact frame at a given time (`/video-frame`,
 with yt-dlp and ffmpeg: the plugin's player can't be captured from inside
 RemNote) and transcribes a grabbed frame into an outline (`/video-transcribe`).
 It also fetches a video's captions (`/video-transcript`, with yt-dlp), which
-the plugin turns into transcript Rems for a whole video or an extract.
+the plugin turns into transcript Rems for a whole video or an extract. When a
+video has no captions, or on request, it transcribes the audio itself with
+whisper.cpp, on this Mac. YouTube's automatic captions can be tidied up by
+Claude (`/transcript-tidy`): punctuation, sentences, key terms in bold.
 
     python3 scripts/ai_ocr_helper.py          # listens on 127.0.0.1:3457
 
 Requires PyMuPDF (`pip install pymupdf`) and a logged-in `claude` CLI; video
-frames also need `brew install yt-dlp ffmpeg`.
+frames also need `brew install yt-dlp ffmpeg`. Transcribing audio needs
+`brew install whisper-cpp` and a model in ~/.incremental-remnote/ai-ocr/whisper/
+(see WHISPER_MODEL below).
 
 Environment:
     IR_AI_PORT      port (default 3457)
     IR_AI_MODEL     claude model alias (default sonnet)
     IR_AI_ORIGINS   comma-separated allowed Origin headers; unset = allow all
                     (and log each Origin so it can be pinned)
+    IR_WHISPER_MODEL  path of the whisper.cpp model (default whisper/ggml-large-v3-turbo-q5_0.bin)
 
 Files live in ~/.incremental-remnote/ai-ocr/:
     prompt.md       the transcription instructions — edit freely, re-read per request
     video-prompt.md the same for video frames
+    transcript-prompt.md  how Claude tidies YouTube's automatic captions
+    video-transcripts/    fetched captions and audio transcripts, per video
+    video-audio/          downloaded audio, kept for a week
+    whisper/        the whisper.cpp model, and the optional VAD model that skips silence
     requests.log    one JSON line per request (includes the raw highlight Data)
     crops/          the last image sent for each highlight
     pdf-cache/      downloaded PDFs
@@ -46,6 +56,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unicodedata
@@ -68,6 +79,16 @@ PROMPT_FILE = HOME / 'prompt.md'
 VIDEO_PROMPT_FILE = HOME / 'video-prompt.md'
 VIDEO_FRAMES = HOME / 'video-frames'
 VIDEO_TRANSCRIPTS = HOME / 'video-transcripts'
+VIDEO_AUDIO = HOME / 'video-audio'
+TRANSCRIPT_PROMPT_FILE = HOME / 'transcript-prompt.md'
+WHISPER_DIR = HOME / 'whisper'
+# large-v3-turbo, 5-bit: 574 MB, close to large-v3's accuracy at several times
+# its speed. https://huggingface.co/ggerganov/whisper.cpp
+WHISPER_MODEL = Path(os.environ.get('IR_WHISPER_MODEL') or WHISPER_DIR / 'ggml-large-v3-turbo-q5_0.bin')
+# Silero voice activity detection: skips silence and music, where Whisper
+# otherwise makes words up, and halves the time. Used when present.
+# https://huggingface.co/ggml-org/whisper-vad
+WHISPER_VAD_MODEL = WHISPER_DIR / 'ggml-silero-v5.1.2.bin'
 
 DPI = 220
 # PDF points of margin around the highlight box. Vertical is larger: a line's
@@ -128,6 +149,18 @@ If part of the frame is illegible, transcribe what you can and mark the gap as [
 """
 
 
+DEFAULT_TRANSCRIPT_PROMPT = r"""Clean up passages of a speech transcript made by YouTube's automatic speech recognition. The input is a JSON array of consecutive passages. Do not acknowledge the request, do not comment, and do not ask questions: output a JSON array of strings and nothing else.
+
+- Return exactly as many strings as you received, in the same order: the cleaned version of each passage at the same position. Never merge, split, move or drop passages, even when a sentence runs on from one passage into the next.
+- Add punctuation and capitalisation, and split run-on speech into sentences.
+- Correct a word only when the recognition clearly got it wrong and the context makes the intended word certain (names, technical terms). Otherwise keep the speaker's own words, in their language: never translate, summarise or rephrase.
+- Drop filler sounds that carry no meaning.
+- Keep a time marker at the start of a passage, such as [12:34], exactly as it is.
+- Each passage stays one paragraph: no line breaks. Where YouTube marks a change of speaker with ">>", start the new speaker's words with an em dash (—) instead.
+- Put the passage's key terms and concepts in **bold**: one to three per passage at most, each a word or a short phrase, never a whole sentence. Use no other markup.
+"""
+
+
 def log(entry):
     with open(LOG, 'a') as f:
         f.write(json.dumps(entry, ensure_ascii=False) + '\n')
@@ -143,6 +176,12 @@ def video_prompt():
     if not VIDEO_PROMPT_FILE.exists():
         VIDEO_PROMPT_FILE.write_text(DEFAULT_VIDEO_PROMPT)
     return VIDEO_PROMPT_FILE.read_text()
+
+
+def transcript_prompt():
+    if not TRANSCRIPT_PROMPT_FILE.exists():
+        TRANSCRIPT_PROMPT_FILE.write_text(DEFAULT_TRANSCRIPT_PROMPT)
+    return TRANSCRIPT_PROMPT_FILE.read_text()
 
 
 def find_tool(name):
@@ -681,7 +720,11 @@ def parse_json3(body):
     return segments
 
 
-def video_transcript(video_id, refresh=False):
+class NoCaptions(RuntimeError):
+    pass
+
+
+def caption_transcript(video_id, refresh=False):
     path = VIDEO_TRANSCRIPTS / f'{video_id}.json'
     if path.exists() and not refresh and time.time() - path.stat().st_mtime < TRANSCRIPT_TTL:
         return {**json.loads(path.read_text()), 'cached': True}
@@ -695,32 +738,173 @@ def video_transcript(video_id, refresh=False):
         raise RuntimeError(f'yt-dlp could not read the video: {proc.stderr.strip()[-400:]}')
     track = caption_track(json.loads(proc.stdout))
     if not track:
-        raise RuntimeError('this video has no captions in its own language')
+        raise NoCaptions('this video has no captions in its own language')
     language, kind, url = track
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req, timeout=60, context=ssl_context()) as resp:
         segments = parse_json3(resp.read())
     if not segments:
-        raise RuntimeError(f'the {language} captions came back empty')
+        raise NoCaptions(f'the {language} captions came back empty')
     result = {'videoId': video_id, 'language': language, 'kind': kind, 'segments': segments}
     path.write_text(json.dumps(result))
     return {**result, 'cached': False}
 
 
+# --- the audio, transcribed here by whisper.cpp ------------------------------
+
+AUDIO_TTL = 7 * 24 * 3600
+WHISPER_LOCK = threading.Lock()  # one transcription at a time: they share the GPU
+
+
+def whisper_ready():
+    return bool(find_tool('whisper-cli') and find_tool('ffmpeg') and WHISPER_MODEL.exists())
+
+
+def video_audio(video_id):
+    """The video's audio, downloaded whole once: yt-dlp fetches it in chunks in
+    seconds, while cutting a range straight from YouTube's stream is throttled
+    to near real time. Ranges are then cut locally."""
+    for path in VIDEO_AUDIO.glob(f'{video_id}.*'):
+        if path.suffix != '.part' and time.time() - path.stat().st_mtime < AUDIO_TTL:
+            return path
+    ytdlp = find_tool('yt-dlp')
+    if not ytdlp:
+        raise RuntimeError('yt-dlp not found (brew install yt-dlp)')
+    proc = subprocess.run([ytdlp, '-f', 'bestaudio[ext=m4a]/bestaudio', '--no-playlist', '--no-warnings',
+                           '--no-progress', '-o', str(VIDEO_AUDIO / f'{video_id}.%(ext)s'),
+                           f'https://www.youtube.com/watch?v={video_id}'],
+                          capture_output=True, text=True, timeout=900)
+    found = [p for p in VIDEO_AUDIO.glob(f'{video_id}.*') if p.suffix != '.part']
+    if proc.returncode != 0 or not found:
+        raise RuntimeError(f'yt-dlp could not download the audio: {proc.stderr.strip()[-400:]}')
+    return found[0]
+
+
+def transcribe_audio(path, start=None, end=None):
+    """Whisper on the audio file between `start` and `end` (seconds; the whole
+    file without them). Returns (language, segments), offsets in the file's time.
+    Takes a local file, so a local video can use it as it is."""
+    if not whisper_ready():
+        raise RuntimeError('Whisper is not set up: brew install whisper-cpp, and put the model at '
+                           f'{WHISPER_MODEL}')
+    with tempfile.TemporaryDirectory(dir=VIDEO_AUDIO) as tmp:
+        wav, out = Path(tmp) / 'clip.wav', Path(tmp) / 'out'
+        cmd = [find_tool('ffmpeg'), '-hide_banner', '-loglevel', 'error']
+        if start:
+            cmd += ['-ss', f'{start:.3f}']
+        if end is not None:
+            cmd += ['-to', f'{end:.3f}']
+        cmd += ['-i', str(path), '-ac', '1', '-ar', '16000', '-y', str(wav)]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if proc.returncode != 0:
+            raise RuntimeError(f'ffmpeg could not cut the audio: {proc.stderr.strip()[-400:]}')
+        cmd = [find_tool('whisper-cli'), '-m', str(WHISPER_MODEL), '-f', str(wav), '-l', 'auto',
+               '-sns', '-t', str(min(8, os.cpu_count() or 4)), '-oj', '-of', str(out), '-np']
+        if WHISPER_VAD_MODEL.exists():
+            cmd += ['--vad', '-vm', str(WHISPER_VAD_MODEL)]
+        with WHISPER_LOCK:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3 * 3600)
+        result = Path(f'{out}.json')
+        if proc.returncode != 0 or not result.exists():
+            raise RuntimeError(f'whisper failed: {proc.stderr.strip()[-400:]}')
+        data = json.loads(result.read_text(errors='replace'))
+    offset = start or 0
+    segments = []
+    for line in data.get('transcription') or []:
+        text = (line.get('text') or '').strip()
+        if text:
+            begin, finish = line['offsets']['from'] / 1000, line['offsets']['to'] / 1000
+            segments.append({'offset': offset + begin, 'duration': finish - begin, 'text': text})
+    return (data.get('result') or {}).get('language') or '', segments
+
+
+def audio_transcript(video_id, start=None, end=None, refresh=False):
+    """The audio's transcript: the whole video's is cached, and a range is cut
+    from it when there is one; otherwise only the range is transcribed."""
+    path = VIDEO_TRANSCRIPTS / f'{video_id}.audio.json'
+    whole = start is None and end is None
+    if path.exists() and not refresh:
+        result = json.loads(path.read_text())
+        if not whole:
+            result['segments'] = [s for s in result['segments']
+                                  if s['offset'] + s['duration'] > (start or 0)
+                                  and (end is None or s['offset'] < end)]
+        return {**result, 'cached': True}
+    language, segments = transcribe_audio(video_audio(video_id), start, end)
+    if not segments:
+        raise RuntimeError('Whisper heard no speech' + ('' if whole else ' in this range'))
+    result = {'videoId': video_id, 'language': language, 'kind': 'whisper', 'segments': segments}
+    if whole:
+        path.write_text(json.dumps(result))
+    return {**result, 'cached': False}
+
+
 def handle_video_transcript(req, entry):
+    """source: 'captions' (the default), 'audio' (Whisper), or 'auto' (captions,
+    else Whisper when it is set up). start / end (seconds) limit what Whisper
+    transcribes; captions always come whole, cached, for the plugin to cut."""
     video_id = req.get('videoId') or ''
     if not VIDEO_ID.match(video_id):
         raise RuntimeError('need a YouTube videoId')
-    result = video_transcript(video_id, refresh=bool(req.get('refresh')))
+    source = req.get('source') or 'captions'
+    start, end = req.get('start'), req.get('end')
+    for value in (start, end):
+        if value is not None and (not isinstance(value, (int, float)) or value < 0):
+            raise RuntimeError('start and end are seconds >= 0')
+    refresh = bool(req.get('refresh'))
+    if source == 'audio':
+        result = audio_transcript(video_id, start, end, refresh)
+    else:
+        try:
+            result = caption_transcript(video_id, refresh)
+        except NoCaptions as e:
+            if source != 'auto':
+                raise
+            if not whisper_ready():
+                raise NoCaptions(f'{e}, and Whisper is not set up to transcribe its audio') from e
+            result = audio_transcript(video_id, start, end, refresh)
     # The segments themselves would swamp the request log.
-    entry.update(videoId=video_id, language=result['language'], kind=result['kind'],
+    entry.update(videoId=video_id, source=source, language=result['language'], kind=result['kind'],
                  segments=len(result['segments']), cached=result['cached'])
     return result
 
 
+# ---------------------------------------------------------------------------
+# /transcript-tidy — Claude cleans up automatic captions
+# ---------------------------------------------------------------------------
+
+MAX_TIDY_BLOCKS = 40
+MAX_TIDY_CHARS = 30000
+
+
+def handle_transcript_tidy(req, entry):
+    """Blocks of YouTube's automatic captions in, the same blocks cleaned up out:
+    punctuation, sentences, key terms in bold. The reply must keep the count,
+    so each block goes back to its own Rem."""
+    blocks = req.get('blocks')
+    if (not isinstance(blocks, list) or not blocks or len(blocks) > MAX_TIDY_BLOCKS
+            or not all(isinstance(b, str) for b in blocks) or sum(map(len, blocks)) > MAX_TIDY_CHARS):
+        raise RuntimeError(f'need 1 to {MAX_TIDY_BLOCKS} text blocks, {MAX_TIDY_CHARS} characters at most')
+    language = req.get('language') or 'unknown'
+    content = [{'type': 'text', 'text': f'Language: {language}\n\n' + json.dumps(blocks, ensure_ascii=False)}]
+    reply, model = run_claude(content, transcript_prompt())
+    try:
+        tidied = json.loads(reply[reply.index('['):reply.rindex(']') + 1])
+    except ValueError:
+        raise RuntimeError('Claude did not answer with a list of passages')
+    if not isinstance(tidied, list) or len(tidied) != len(blocks) or not all(isinstance(b, str) for b in tidied):
+        raise RuntimeError(f'Claude returned {len(tidied) if isinstance(tidied, list) else "no"} passages '
+                           f'for {len(blocks)}')
+    # Each block is one Rem's text: line breaks (Claude likes one before each
+    # speaker's dash, whatever the prompt says) become spaces.
+    tidied = [re.sub(r'\s*\n\s*', ' ', block).strip() for block in tidied]
+    entry.update(model=model, blocks=len(blocks))
+    return {'blocks': tidied}
+
+
 ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match,
           '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
-          '/video-transcript': handle_video_transcript}
+          '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -744,7 +928,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/':
             return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL,
                                         'ytDlp': find_tool('yt-dlp'), 'ffmpeg': find_tool('ffmpeg'),
-                                        'transcripts': True})
+                                        'transcripts': True, 'whisper': whisper_ready()})
         self.send_json(404, {'ok': False, 'error': 'POST /ocr or /locate'})
 
     def do_POST(self):
@@ -780,10 +964,15 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    for d in (HOME, PDF_CACHE, CROPS, VIDEO_FRAMES, VIDEO_TRANSCRIPTS):
+    for d in (HOME, PDF_CACHE, CROPS, VIDEO_FRAMES, VIDEO_TRANSCRIPTS, VIDEO_AUDIO, WHISPER_DIR):
         d.mkdir(parents=True, exist_ok=True)
     prompt()
     video_prompt()
+    transcript_prompt()
+    # Downloaded audio is only a cache: clear what's past its week.
+    for old in VIDEO_AUDIO.glob('*'):
+        if old.is_file() and time.time() - old.stat().st_mtime > AUDIO_TTL:
+            old.unlink(missing_ok=True)
     print(f'AI OCR helper on http://127.0.0.1:{PORT}  (claude: {find_claude()}, model: {MODEL})', flush=True)
     print(f'Prompt: {PROMPT_FILE}', flush=True)
     ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()

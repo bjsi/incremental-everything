@@ -60,12 +60,18 @@ Every YouTube IncRem can be watched in either of two players, with a switch butt
   - Extracts of `vi` videos resolve with `nativeAvailable`; the queue offers 🎬 RemNote player / ▶️ Plugin player on them. The plugin's player is always the starting one for an extract, whatever the default setting, because only it stops at the end.
   - In RemNote's player an extract shows the parent's video page with `ip.l` pre-set to the start (only if the Rem already has `ip`), a ✂️ start – end chip, and "ends at X · now Y", then "✓ end of extract reached". Its position isn't mirrored back: the whole video's position stays where it was.
   - Not covered: Review in Editor on an extract opens the extract Rem itself, a plain document, not the video page.
-- [ ] **4b. Transcripts back, through the helper.** Code written 2026-10-26, awaiting the in-app test.
+- [x] **4b. Transcripts back, through the helper.** Tested in the app 2026-10-26.
   - The old proxy (`yt-local-proxy.js`, port 3456) is dead: YouTube refuses its Innertube ANDROID request. The helper's new `/video-transcript` route uses `yt-dlp -J` to pick the track (the uploader's captions in the video's language, else `<lang>-orig`, never a translation) and caches it in `~/.incremental-remnote/ai-ocr/video-transcripts/` for 30 days.
   - `lib/video_transcript.ts`: an extract gets ~300-character blocks under it, as before; a whole video gets a "📜 Transcript (lang, kind)" Rem with ~600-character blocks that start with their time.
   - 📜 in the plugin player, the extract player, RemNote's player view (whole video or extract) and the floating review bar; the command **Add Video Transcript** (`avt`) on the queue item, the focused Rem, the Rem under review, or an open pane's Rem, walking up from a note to its video or extract.
   - Extract creation skips the transcript quietly when the helper can't fetch it; a failed fetch opens a dialog in place of the priority popup.
   - With the docs: drop `yt-local-proxy.js` and its plist, and rewrite the docs page's "Automatic Transcription" section around the helper.
+- [x] **4c. Transcripts from the audio (Whisper) and tidied by Claude.** Tested in the app 2026-10-26. Groundwork for local videos.
+  - Helper: `whisper.cpp` (`brew install whisper-cpp`), model `ggml-large-v3-turbo-q5_0.bin` (574 MB) and the Silero VAD model in `~/.incremental-remnote/ai-ocr/whisper/`. `GET /` reports `whisper`. `/video-transcript` takes `source` (`captions` / `audio` / `auto` = captions, else Whisper) and `start` / `end`. The audio is downloaded whole once (`video-audio/`, a week) and cut locally; a whole video's Whisper transcript is cached, a range is cut from it or transcribed alone. `transcribe_audio(path, start, end)` takes any local file, ready for local videos.
+  - Measured (M4 Pro): 1 min of audio in 3.5 s with VAD (8 s without); the whole 43-min video in 104 s; audio download 11 s.
+  - `/transcript-tidy` (prompt `transcript-prompt.md`): Claude returns the same number of blocks, punctuated, misrecognitions fixed, key terms in **bold**; line breaks are joined by the helper. Only YouTube's automatic captions are tidied (setting **Tidy Automatic Captions with Claude**, default on), 15 blocks per call; raw blocks are written first and replaced as each batch returns. Bold only (`boldMarkupToRichText`): speech has "R$ 500", which the PDF markup parser would read as a formula.
+  - Settings: both video settings moved to their own **Incremental Video** group.
+  - Plugin: 📜 and `avt` use `auto`; new command **Add Video Transcript from Audio** (`avta`) forces Whisper. Extract creation tidies in the background, behind the priority popup.
 - [ ] **5. Docs.** `docs/Incremental-Video.md` (the "two ways to watch" section changes completely) and the changelog, once approved.
 
 ## Later: local videos (desktop)

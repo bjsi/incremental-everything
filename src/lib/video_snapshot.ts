@@ -23,9 +23,17 @@ export interface VideoHelperStatus {
   ai: boolean;
   /** It can fetch a video's captions: a version with /video-transcript, and yt-dlp found. */
   transcripts: boolean;
+  /** It can transcribe audio itself: whisper.cpp, ffmpeg and a Whisper model found. */
+  whisper: boolean;
 }
 
-export const HELPER_DOWN: VideoHelperStatus = { reachable: false, frames: false, ai: false, transcripts: false };
+export const HELPER_DOWN: VideoHelperStatus = {
+  reachable: false,
+  frames: false,
+  ai: false,
+  transcripts: false,
+  whisper: false,
+};
 
 export async function checkVideoHelper(): Promise<VideoHelperStatus> {
   const controller = new AbortController();
@@ -38,6 +46,7 @@ export async function checkVideoHelper(): Promise<VideoHelperStatus> {
       frames: !!(body?.ytDlp && body?.ffmpeg),
       ai: !!body?.claude,
       transcripts: !!(body?.ytDlp && body?.transcripts),
+      whisper: !!body?.whisper,
     };
   } catch {
     return HELPER_DOWN;

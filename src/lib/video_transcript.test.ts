@@ -4,7 +4,7 @@
 import './sdk_test_env';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { transcriptBlocks } from './video_transcript';
+import { boldMarkupToRichText, transcriptBlocks } from './video_transcript';
 import { segmentsInRange } from './youtube_transcript';
 
 const seg = (offset: number, text: string) => ({ offset, duration: 2, text });
@@ -44,5 +44,21 @@ describe('segmentsInRange', () => {
       segmentsInRange(lines, 10, 20).map((s) => s.text),
       ['overlaps start', 'inside']
     );
+  });
+});
+
+describe('boldMarkupToRichText', () => {
+  it('turns **key terms** into bold and leaves the rest plain', () => {
+    assert.deepEqual(boldMarkupToRichText('os juízes do **Tribunal Marítimo** julgam **acidentes**.'), [
+      'os juízes do ',
+      { i: 'm', text: 'Tribunal Marítimo', b: true },
+      ' julgam ',
+      { i: 'm', text: 'acidentes', b: true },
+      '.',
+    ]);
+  });
+
+  it('leaves dollar signs alone', () => {
+    assert.deepEqual(boldMarkupToRichText('custa R$ 500 e US$ 90'), ['custa R$ 500 e US$ 90']);
   });
 });
