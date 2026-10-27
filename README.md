@@ -17,7 +17,7 @@ Incremental RemNote allows you to interleave your flashcard reviews with notes, 
 ### The Core Loop
 - **Incremental Reading**: Read and review 1000s of notes, books, and websites in parallel. [Learn more](https://www.youtube.com/watch?v=oNCLLNZEtz0).
 - **Incremental Writing**: Write your essays and blog posts incrementally to maximize creativity. [Learn more](https://www.youtube.com/watch?v=LLS_8Y744lk).
-- **Incremental Video**: Watch and take notes on your YouTube video backlog.
+- **Incremental Video**: Watch your YouTube backlog and your own video files a segment at a time, with timed extracts and transcripts. [Learn more](https://hugomarins.github.io/incremental-remnote/Incremental-Video/).
 - **Incremental Tasks**: Clear out your tasklist between flashcard reviews.
 
 ### 🧠 Advanced Prioritization
@@ -141,12 +141,15 @@ The plugin now features **Automatic Light Mode**.
 
 ### Incremental Video
 
-- You can tag YouTube videos with the `Incremental` tag to watch them incrementally.
-- It will work if you tag the link Rem itself, or a Rem with the YouTube link as a source.
-- **Video Extracts**: Create precise sub-clips with specific start/end timestamps, each with its own schedule and priority.
-- **Auto-Transcription**: Automatically fetch YouTube transcripts for extract ranges to make content searchable and ready for clozing. [P.S.: Currently down after YouTube recent anti-bot measures]
-- The plugin will automatically save your progress and playback rate.
-- You can open the resizable notes section on the left to take notes while you watch.
+- Make a YouTube video Incremental — added with RemNote's **Upload File › Paste YouTube URL**, or saved with the RemNote Clipper — and watch it a segment at a time.
+- **Two players**: the plugin's (resume, speed, ±30 s, notes beside the video, extracts that stop at their end) or RemNote's own (transcript, Highlight Moment, AI Tutor), with a button to switch.
+- **Video Extracts**: Mark passages with exact start and end times, each with its own schedule and priority. They resume where their last review stopped, and long ones can be cut again.
+- **Transcripts and titles**: Through a small local helper, from the video's captions or its audio (Whisper, on your computer), tidied by Claude — and each new extract gets a title from its transcript.
+- **Screenshots**: Save the exact frame, and transcribe what's on screen.
+- **Local videos**: Import a folder of video files from your computer or an external disk as Incremental Rems, introduced one a day if you like (macOS desktop).
+- **Review in Editor** keeps a player beside your notes.
+
+📖 [Incremental Video in the User's Manual](https://hugomarins.github.io/incremental-remnote/Incremental-Video/)
 
 ![Incremental Video](https://hugomarins.github.io/incremental-remnote/assets/YT-extract-mode.png)
 
