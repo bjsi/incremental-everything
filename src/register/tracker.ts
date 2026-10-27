@@ -203,10 +203,17 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
               }
             }
           );
-          await flushCacheUpdatesNow(plugin as any);
+          // Only when the walk re-inherited something: flushCacheUpdatesNow forces
+          // a full percentile recalculation over the whole card-priority cache even
+          // with nothing pending, and most cascades (IncRems with no flashcards
+          // below them) change nothing. The rems the walk did change are already
+          // queued by updateCardPriorityCache.
+          if (updated > 0) await flushCacheUpdatesNow(plugin as any);
+          // `updated` counts DESCENDANT flashcards whose inherited priority was
+          // rewritten. The roots were already written by whoever queued the cascade.
           console.log(
             `[Tracker] Background inheritance cascade complete in ${Math.round(performance.now() - t)}ms ` +
-              `(${rems.length} root(s), ${updated} rem(s) updated)`
+              `(${rems.length} root(s); ${updated} descendant card priorit${updated === 1 ? 'y' : 'ies'} re-inherited)`
           );
         }
 
@@ -309,11 +316,17 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     // remains the place to set up an inheritance anchor deliberately.
     if (job.remIds?.length) {
       console.log(`[Tracker] pendingPrioritySave (batch) picked up for ${job.remIds.length} rems`);
+      const batchStartedAt = Date.now();
       const cascadeRemIds: string[] = [];
+      // One IncRem cache write for the whole batch. Writing it per rem moved the
+      // ~8MB cache across the bridge three times per rem, and every write re-fired
+      // each visible priority badge, which reads that same cache: ~15 s per rem,
+      // measured on a 17-rem selection.
+      const incCacheChanges: IncRemCacheChanges = new Map();
+      let wroteCardPriority = false;
       try {
         const { setCardPriority } = await import('../lib/card_priority');
         const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
-        const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
         const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
 
         for (const remId of job.remIds) {
@@ -333,7 +346,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
               event: job.event ?? 'popup',
             });
             const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
-            if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
+            if (updatedIncRem) incCacheChanges.set(remId, updatedIncRem);
             cascadeRemIds.push(remId);
           }
 
@@ -356,11 +369,19 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
               priority: job.cardPriority,
               source: job.cardSource,
             } as any);
+            wroteCardPriority = true;
             cascadeRemIds.push(remId);
           }
         }
 
-        await flushCacheUpdatesNow(plugin as any);
+        const writtenAt = Date.now();
+        await applyIncRemCacheChanges(plugin, incCacheChanges);
+        const incCachedAt = Date.now();
+        // Only when a card priority was written: flushCacheUpdatesNow forces a
+        // full percentile recalculation over the whole card-priority cache even
+        // with nothing pending, which an IncRem-only batch has no use for.
+        if (wroteCardPriority) await flushCacheUpdatesNow(plugin as any);
+        const cachedAt = Date.now();
 
         if (job.triggerCascade && cascadeRemIds.length) {
           // The cascade watcher accepts an array, so all touched rems cascade
@@ -372,7 +393,12 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
           );
         }
 
-        console.log(`[Tracker] pendingPrioritySave (batch) complete for ${job.remIds.length} rems`);
+        console.log(
+          `[Tracker] pendingPrioritySave (batch) complete for ${job.remIds.length} rems in ` +
+            `${cachedAt - batchStartedAt} ms (writes ${writtenAt - batchStartedAt} ms, ` +
+            `IncRem cache ${incCachedAt - writtenAt} ms, card cache ` +
+            `${wroteCardPriority ? `${cachedAt - incCachedAt} ms` : 'skipped'})`
+        );
       } catch (err) {
         console.error('[Tracker] pendingPrioritySave (batch) failed:', err);
       } finally {
@@ -853,9 +879,17 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
       const { setCardPriority } = await import('../lib/card_priority');
       const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
-      const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
       const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
       const isLight = await shouldUseLightMode(plugin as any);
+
+      // Everything that is not per-rem is done once after the loop: the IncRem
+      // cache (~8MB, see the batch save above), the card-cache flush, the widget
+      // refresh, the cascade and the queue guard. The cascade in particular used
+      // to be set to ONE rem id per iteration, so rems written before the watcher
+      // woke up could be overwritten by the next and never cascade.
+      const incCacheChanges: IncRemCacheChanges = new Map();
+      const writtenRemIds: string[] = [];
+      let wroteCardPriority = false;
 
       for (const [remId, agg] of byRem) {
         const rem = await plugin.rem.findOne(remId);
@@ -875,7 +909,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
                 event: agg.event ?? 'quick',
               });
               const updated = await getIncrementalRemFromRem(plugin as any, rem);
-              if (updated) await updateIncrementalRemCache(plugin as any, updated);
+              if (updated) incCacheChanges.set(remId, updated);
               messages.push(`IncRem ${oldP} → ${newP}`);
               didWrite = true;
             }
@@ -896,31 +930,37 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
             updateCardPriorityCache(plugin as any, rem._id, true, {
               remId: rem._id, priority: newP, source: 'manual',
             } as any);
-            await flushCacheUpdatesNow(plugin as any);
+            wroteCardPriority = true;
             messages.push(`Card ${oldP} → ${newP}`);
             didWrite = true;
           }
         }
 
         if (didWrite) {
-          // Signal card-priority display widgets to refresh.
-          const { cardPriorityCacheRefreshKey } = await import('../lib/consts');
-          await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
-
-          // The watcher applies the flashcard-prioritisation gate.
-          await plugin.storage.setSession('pendingInheritanceCascade', remId);
-
-          // Global-context survivor so the queue event-guard lets this through.
-          try {
-            const manualRems = await plugin.storage.getSession<string[]>('manual_priority_pending_rems') || [];
-            if (!manualRems.includes(remId)) {
-              manualRems.push(remId);
-              await plugin.storage.setSession('manual_priority_pending_rems', manualRems);
-            }
-          } catch (_) { }
-
+          writtenRemIds.push(remId);
           console.log(`[Tracker] deltaQueue applied for ${remId}: ${messages.join(', ')}`);
         }
+      }
+
+      if (writtenRemIds.length > 0) {
+        await applyIncRemCacheChanges(plugin, incCacheChanges);
+        if (wroteCardPriority) await flushCacheUpdatesNow(plugin as any);
+
+        // Signal card-priority display widgets to refresh.
+        const { cardPriorityCacheRefreshKey } = await import('../lib/consts');
+        await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+
+        // The watcher accepts an array and applies the flashcard-prioritisation gate.
+        await plugin.storage.setSession('pendingInheritanceCascade', writtenRemIds);
+
+        // Global-context survivor so the queue event-guard lets this through.
+        try {
+          const manualRems = await plugin.storage.getSession<string[]>('manual_priority_pending_rems') || [];
+          const added = writtenRemIds.filter((id) => !manualRems.includes(id));
+          if (added.length > 0) {
+            await plugin.storage.setSession('manual_priority_pending_rems', [...manualRems, ...added]);
+          }
+        } catch (_) { }
       }
     } catch (err) {
       console.error('[Tracker] deltaQueue failed:', err);

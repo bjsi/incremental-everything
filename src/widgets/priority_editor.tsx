@@ -7,10 +7,11 @@ import {
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority, CardPriorityInfo } from '../lib/card_priority';
-import { allIncrementalRemKey, allCardPriorityInfoKey, pageRangeWidgetId, pendingPriorityDeltaQueueKey, priorityEditorDisplayModeId } from '../lib/consts';
+import { allIncrementalRemSlimKey, allCardPriorityInfoKey, pageRangeWidgetId, pendingPriorityDeltaQueueKey, priorityEditorDisplayModeId } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
 import { PriorityDeltaEntry } from '../lib/quick_priority';
 import { IncrementalRem } from '../lib/incremental_rem';
+import type { SlimIncRem } from '../lib/incremental_rem/cache';
 import { calculateRelativePercentile, formatDuration } from '../lib/utils';
 import { PriorityBadge, ReadPointIcon } from '../components';
 import {
@@ -188,7 +189,10 @@ export function PriorityEditor() {
         getCardPriority(plugin, rem),
         rem.getCards(),
         rem.hasPowerup('cardPriority'),
-        plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+        // The slim projection, not the full cache: the percentile needs only
+        // remId + priority, and this tracker runs once per visible row and
+        // re-runs on every cache write — the full key is ~8MB on a large KB.
+        plugin.storage.getSession<SlimIncRem[]>(allIncrementalRemSlimKey),
         plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
         getIESetting(plugin, priorityEditorDisplayModeId),
       ]);

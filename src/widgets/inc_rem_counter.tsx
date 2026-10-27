@@ -1,7 +1,7 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
-import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
-import { IncrementalRem } from '../lib/incremental_rem';
+import { allIncrementalRemSlimKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
+import type { SlimIncRem } from '../lib/incremental_rem/cache';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { generateAndStoreGraphData } from '../lib/priority_graph_data';
 import { PriorityDistributionGraphComponent } from './priority_distribution_graph';
@@ -22,7 +22,9 @@ function IncRemCounter() {
         const ctx = await rp.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
         const documentId = ctx?.documentId;
 
-        const allIncRems = (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+        // Slim projection: counting needs only remId + nextRepDate, and this
+        // re-runs on every IncRem cache write (the full key is ~8MB).
+        const allIncRems = (await rp.storage.getSession<SlimIncRem[]>(allIncrementalRemSlimKey)) || [];
 
         if (!documentId) {
           const now = Date.now();
