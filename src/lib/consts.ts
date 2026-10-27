@@ -632,6 +632,13 @@ export const videoExtractPowerupCode = 'videoExtract';
  * notes pane hosts too, stays empty for it.
  */
 export const localVideoQueueNotesKey = 'local-video-queue-notes';
+/**
+ * Session: `{ remId, videoId, at }`, a nested Video Extract just opened for
+ * review whose video page should open in a pane beside it. Done by the index
+ * widget (lib/video_review_bar.ts): the widget that opened the review may not
+ * outlive the navigation.
+ */
+export const pendingVideoPaneKey = 'pending-video-pane';
 export const videoExtractUrlSlotCode = 'videoUrl';
 export const videoExtractStartSlotCode = 'startTime';
 export const videoExtractEndSlotCode = 'endTime';

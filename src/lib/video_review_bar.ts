@@ -1,5 +1,11 @@
 import { AppEvents, ReactRNPlugin } from '@remnote/plugin-sdk';
-import { editorReviewTimerRemIdKey, editorReviewTimerStartKey, videoReviewBarIdKey } from './consts';
+import {
+  editorReviewTimerRemIdKey,
+  editorReviewTimerStartKey,
+  pendingVideoPaneKey,
+  videoReviewBarIdKey,
+} from './consts';
+import { openRemInNewPane } from './remHelpers';
 import { isNativeVideoRem } from './native_video';
 import { nativeVideoOfExtract } from './video_position';
 
@@ -9,7 +15,8 @@ import { nativeVideoOfExtract } from './video_position';
  * while a review runs on a RemNote video Rem whose page is open, or on an
  * extract of one with that video's page open beside it, its controls come in
  * a floating bar instead (widgets/video_review_bar.tsx). This decides when
- * that bar is open. It runs in the index widget, which lives all session.
+ * that bar is open, and opens the video's page beside a nested extract
+ * opened for review. It runs in the index widget, which lives all session.
  */
 
 const BAR_POSITION = { bottom: 90, right: 40 };
@@ -23,6 +30,26 @@ async function barWanted(plugin: ReactRNPlugin): Promise<boolean> {
   if (!rem) return false;
   const videoId = (await isNativeVideoRem(rem)) ? remId : (await nativeVideoOfExtract(plugin, rem))?.video._id;
   return !!videoId && (await plugin.window.getOpenPaneRemIds()).includes(videoId);
+}
+
+/** A pending video pane older than this is from a review that went elsewhere. */
+const PENDING_PANE_MS = 15000;
+
+/**
+ * Once a nested extract opened for review is on screen, opens its video's
+ * page in a pane to its right (lib/incRemHelpers.ts, openIncRemForReview).
+ */
+async function openPendingVideoPane(plugin: ReactRNPlugin) {
+  const pending = await plugin.storage.getSession<{ remId: string; videoId: string; at: number }>(
+    pendingVideoPaneKey
+  );
+  if (!pending) return;
+  const open = await plugin.window.getOpenPaneRemIds();
+  const stale = Date.now() - pending.at > PENDING_PANE_MS;
+  if (!stale && !open.includes(pending.remId)) return; // the extract's page isn't open yet
+  await plugin.storage.setSession(pendingVideoPaneKey, null);
+  if (stale || open.includes(pending.videoId)) return;
+  await openRemInNewPane(plugin, pending.videoId);
 }
 
 async function syncBar(plugin: ReactRNPlugin) {
@@ -47,6 +74,7 @@ export function registerVideoReviewBar(plugin: ReactRNPlugin) {
     clearTimeout(timer);
     timer = setTimeout(() => {
       running = running
+        .then(() => openPendingVideoPane(plugin))
         .then(() => syncBar(plugin))
         .catch((e) => console.error('[VideoReviewBar] sync failed', e));
     }, 400);
@@ -60,6 +88,7 @@ export function registerVideoReviewBar(plugin: ReactRNPlugin) {
     plugin.track(async (rp) => {
       await rp.storage.getSession(editorReviewTimerRemIdKey);
       await rp.storage.getSession(editorReviewTimerStartKey);
+      await rp.storage.getSession(pendingVideoPaneKey);
       schedule();
     });
     plugin.event.addListener(AppEvents.URLChange, undefined, schedule);
