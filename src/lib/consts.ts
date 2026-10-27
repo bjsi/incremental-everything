@@ -649,10 +649,6 @@ export const localVideoPowerupCode = 'localVideo';
 export const localVideoLibrarySlotCode = 'library';
 export const localVideoPathSlotCode = 'path';
 
-// Debug Video Detection probes (session only)
-export const videoProbeRemsSessionKey = 'video-probe-rems';
-export const videoProbeOriginalLastWatchedKey = 'video-probe-original-last-watched';
-export const videoFloatingProbeIdKey = 'video-floating-probe-id';
 // The floating review bar over RemNote's video page (lib/video_review_bar.ts).
 export const videoReviewBarIdKey = 'video-review-bar-id';
 

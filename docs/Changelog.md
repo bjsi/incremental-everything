@@ -2,6 +2,48 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.166 - October 26th, 2026
+
+### ✨ New
+
+**Incremental Video**: Rebuilt from the ground up — two players for YouTube videos, extracts that resume and can be cut again, transcripts and titles by AI, and video files from your computer.
+
+📖 [Incremental Video](Incremental-Video.md)
+
+**Two Players**: Added RemNote's own player (transcript, Highlight Moment, AI Tutor) for videos added with Upload File › YouTube URL, with a button to switch players; both resume from the same position.
+
+📖 [Two players](Incremental-Video.md#two-players)
+
+**Plugin's Video Player**: Added ±30 s, speed controls, a resume chip, a resizable notes pane and 📸 screenshots of the exact frame, with 📸✨ to transcribe what's on screen.
+
+📖 [The plugin's player](Incremental-Video.md#plugin-player)
+
+**Video Extracts**: Extracts can now be made in RemNote's player too, resume where their last review stopped, and can be cut into shorter extracts when 1.5 minutes or longer.
+
+📖 [Video Extracts](Incremental-Video.md#video-extracts)
+
+**Video Transcripts**: Transcripts are back, through the local helper — the uploader's captions, YouTube's automatic captions tidied by Claude, or the audio transcribed by Whisper on your computer — and Claude now titles each new extract from its transcript.
+
+📖 [Transcripts](Incremental-Video.md#transcripts)
+
+**Local Videos**: Added Import Local Videos (`ilv`) to turn a folder of video files into Incremental Rems, introduced one a day if you like, with the same player, extracts and transcripts (macOS desktop).
+
+📖 [Local videos](Incremental-Video.md#local-videos)
+
+**Review in Editor**: Videos now keep a player in the editor — RemNote's video page with a floating review bar, or the plugin's player under a local video's title.
+
+📖 [Reviewing in the Editor](Incremental-Video.md#review-in-editor)
+
+### ♻️ Changed
+
+**Video Transcripts**: The old transcript proxy (`yt-local-proxy.js`) was removed; if you installed it, unload its LaunchAgent and set up the helper instead.
+
+📖 [Setting up the helper for video](Incremental-Video.md#setup)
+
+### 🐛 Fixed
+
+**Plugin's Video Player**: Fixed YouTube videos showing a black player.
+
 ## v1.0.164 - October 22nd, 2026
 
 ### ⚡ Improved

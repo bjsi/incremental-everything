@@ -91,6 +91,14 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 
 ---
 
+## Incremental Video { #incremental-video }
+
+| Setting | Type | Default | Description |
+| --- | --- | --- | --- |
+| **Default Player for RemNote Videos** | Dropdown | `The plugin's player` | Which player a video added with RemNote's **Upload File › YouTube URL** opens in, in the queue: the plugin's (resume, speed, extracts that stop at their end, screenshots) or RemNote's (transcript, Highlight Moment, AI Tutor, Summary). The card's switch overrides it for that card. Videos saved with the Clipper always use the plugin's player. 📖 [Two players](Incremental-Video.md#two-players). |
+| **Tidy Automatic Captions with Claude** | Boolean | `true` | When a transcript comes from YouTube's automatic captions, Claude adds punctuation, fixes words the recognition clearly got wrong and puts key terms in bold, through the local helper. The raw text is written first and replaced as it is tidied. 📖 [Transcripts](Incremental-Video.md#transcripts). |
+| **Title Video Extracts with Claude** | Boolean | `true` | When a Video Extract gets its transcript, Claude adds a short title after its range, in the language of the video. An extract you have renamed is left as it is. 📖 [Titles from the transcript](Incremental-Video.md#extract-titles). |
+
 ## Priority Queue
 
 *In the IE Settings popup, under **Priority Queue**.* How the [Priority Queue](Priority-Review-Document.md) document refreshes, and how long [cooling](Priority-Review-Document.md#cooling-spoiler-protection-across-sessions) keeps a spoiled Rem out of it.

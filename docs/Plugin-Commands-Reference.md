@@ -162,6 +162,20 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   ![Queue in Mobile showing No Inc Rem in this Device indicator](assets/queue-mobile-devicenoincrem-indicator.png){ width="400" }
 
 
+### Video Commands { #video-commands }
+
+- **[Add Video Transcript](Incremental-Video.md#transcripts)** — `quick: avt`
+  Writes the transcript of a YouTube video, or of a Video Extract's range, from the video's captions — from its audio when it has none and Whisper is set up. Works on the queue item, the focused Rem, the Rem under review or an open pane's Rem, and from a note inside a video or extract. Needs the [helper](Incremental-Video.md#setup).
+
+- **[Add Video Transcript from Audio](Incremental-Video.md#transcripts)** — `quick: avta`
+  The same, transcribed from the audio with Whisper on your computer even when the video has captions.
+
+- **[Import Local Videos](Incremental-Video.md#import-local-videos)** — `quick: ilv`
+  Pick a folder of videos on your computer and import it as a document of Incremental Rems, one per video, all due today or one more every N days. Desktop on macOS, with the [helper](Incremental-Video.md#setup).
+
+- **[Link Local Video](Incremental-Video.md#link-local-video)** — `quick: llv`
+  Pick one video file for the focused Rem and make the Rem Incremental.
+
 ---
 
 ## Utilities
@@ -565,7 +579,7 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 - **Cancel No Inc Rem Timer**
   Stops system checks when queues are temporarily empty.
 
-- **Debug Incremental RemNote** / **Debug Video Detection**
+- **Debug Incremental RemNote**
   Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
 
 - **Toggle Priority Band Colour Logging**

@@ -358,18 +358,6 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerWidget('video_debug', WidgetLocation.Popup, {
-    dimensions: {
-      width: '560px',
-      height: 'auto',
-    },
-  });
-
-  // Opened from the video_debug popup only.
-  plugin.app.registerWidget('video_floating_probe', WidgetLocation.FloatingWidget, {
-    dimensions: { height: 'auto', width: 'auto' },
-  });
-
   plugin.app.registerWidget('editor_review', WidgetLocation.Popup, {
     dimensions: { height: 'auto', width: '500px' },
   });

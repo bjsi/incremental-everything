@@ -2392,21 +2392,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerCommand({
-    id: 'debug-video',
-    name: 'Debug Video Detection',
-    action: async () => {
-      const rem = await plugin.focus.getFocusedRem();
-      if (!rem) {
-        await plugin.app.toast('Please focus on a rem first');
-        return;
-      }
-      await plugin.widget.openPopup('video_debug', {
-        remId: rem._id,
-      });
-    },
-  });
-
   // Pre-computation command
   await plugin.app.registerCommand({
     id: 'update-card-priorities',
