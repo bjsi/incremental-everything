@@ -30,7 +30,7 @@ import { VideoTranscriptButton } from './VideoTranscriptButton';
 // local helper (lib/local_video.ts): resume, speed, extracts, screenshots and
 // transcripts from the audio, as for YouTube. An extract plays its range and
 // pauses at its end. In the queue the notes sit beside the video; in the
-// editor (widgets/local_video_editor.tsx) the document is the notes, so the
+// editor (components/LocalVideoEditorPlayer) the document is the notes, so the
 // video comes alone, above it.
 
 const barButton: React.CSSProperties = {
