@@ -15,6 +15,7 @@ import {
   videoExtractStartSlotCode,
   videoExtractUrlSlotCode,
 } from './consts';
+import { findExtractVideoRem } from './video_extract_tree';
 import type { LocalVideoActionItem, LocalVideoHighlightActionItem } from './incremental_rem/types';
 
 export * from './local_video_ref';
@@ -101,10 +102,10 @@ export async function localVideoItemForRem(
   ]);
   const file = url ? parseLocalVideoUrl(String(url)) : null;
   if (!file || start == null || end == null) return null;
-  const parent = rem.parent ? await plugin.rem.findOne(rem.parent) : undefined;
+  const video = await findExtractVideoRem(plugin, rem);
   return {
     type: 'local-video-highlight',
-    rem: parent || rem,
+    rem: video || rem,
     extract: rem,
     file,
     url: String(url),

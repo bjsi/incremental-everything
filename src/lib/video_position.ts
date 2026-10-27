@@ -4,6 +4,7 @@ import {
   videoExtractPowerupCode,
   videoExtractStartSlotCode,
 } from './consts';
+import { findExtractVideoRem } from './video_extract_tree';
 
 /**
  * Where a video was left, shared by the plugin's player and RemNote's.
@@ -91,16 +92,17 @@ export async function nativeVideoUrl(rem: PluginRem): Promise<string | undefined
 }
 
 /**
- * A Video Extract whose parent is a RemNote video Rem: in the editor, RemNote
- * shows the parent's video page beside it, whose "Resume watching at…" is the
- * parent's `ip.l`.
+ * A Video Extract of a RemNote video Rem (its nearest video ancestor, above
+ * any extracts it was cut from). In the editor, RemNote shows the parent's
+ * video page beside a child extract, whose "Resume watching at…" is the
+ * video's `ip.l`.
  */
 export async function nativeVideoOfExtract(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<{ video: PluginRem; url: string; segment: { start: number; end: number } } | undefined> {
-  if (!(await rem.hasPowerup(videoExtractPowerupCode)) || !rem.parent) return undefined;
-  const video = await plugin.rem.findOne(rem.parent);
+  if (!(await rem.hasPowerup(videoExtractPowerupCode))) return undefined;
+  const video = await findExtractVideoRem(plugin, rem);
   const url = video ? await nativeVideoUrl(video) : undefined;
   if (!video || !url) return undefined;
   const [start, end] = await Promise.all([

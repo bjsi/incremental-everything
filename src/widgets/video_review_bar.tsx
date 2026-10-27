@@ -17,6 +17,7 @@ import { formatVideoTime } from '../lib/video_snapshot';
 import { nativeVideoOfExtract, nativeVideoUrl } from '../lib/video_position';
 import { useNativeExtractProgress, useNativeVideoMirror } from '../components/useNativeVideoMirror';
 import { NativeExtractButtons } from '../components/NativeExtractButtons';
+import { allowsSubExtracts } from '../lib/video_extract_tree';
 import { VideoTranscriptButton } from '../components/VideoTranscriptButton';
 
 // The Editor Review Timer's controls over RemNote's video page, where the timer
@@ -139,7 +140,7 @@ function VideoReviewBar() {
         </span>
       </span>
 
-      {video?.url && !segment && (
+      {video?.url && (!segment || allowsSubExtracts(segment)) && (
         <NativeExtractButtons parentId={timer.remId} url={video.url} position={position} />
       )}
       {video?.url && <VideoTranscriptButton target={{ parentId: timer.remId, url: video.url, range: segment }} />}

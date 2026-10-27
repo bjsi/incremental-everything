@@ -9,6 +9,8 @@ import { VideoSnapshotButtons } from './VideoSnapshotButtons';
 import { VideoTranscriptButton } from './VideoTranscriptButton';
 import { useExtractResume, useVideoPositionSaver } from './useVideoPosition';
 import { extractPositionKey } from '../lib/video_position';
+import { allowsSubExtracts } from '../lib/video_extract_tree';
+import { PluginExtractButtons } from './PluginExtractButtons';
 
 interface VideoExtractViewerProps {
     actionItem: YoutubeHighlightActionItem;
@@ -145,6 +147,14 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                 )}
 
                 {videoId && <PlayerControls info={info} connected={connected} send={send} />}
+                {videoId && allowsSubExtracts({ start: startTime, end: endTime }) && (
+                    <PluginExtractButtons
+                        position={info.currentTime ?? resume?.start ?? startTime}
+                        pause={() => send({ command: 'pause' })}
+                        parentId={extract._id}
+                        url={url}
+                    />
+                )}
                 {videoId && (
                     <VideoSnapshotButtons source={{ videoId }} time={info.currentTime} parentId={extract._id} />
                 )}

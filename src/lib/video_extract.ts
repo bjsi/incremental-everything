@@ -52,7 +52,8 @@ async function addExtractTranscript(
 }
 
 /**
- * Creates a Video Extract: an Incremental child of the video Rem with the
+ * Creates a Video Extract: an Incremental child of the video Rem (or of the
+ * extract it was cut from, which `parentId` names then) with the
  * VideoExtract powerup (URL, start, end), followed by the range's transcript
  * as child Rems when the video has captions, then the priority popup. The same for
  * extracts taken in the plugin's player and in RemNote's.

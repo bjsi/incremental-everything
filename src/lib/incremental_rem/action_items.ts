@@ -14,6 +14,7 @@ import {
   localVideoPowerupCode,
 } from '../consts';
 import { localVideoUrl, parseLocalVideoUrl, readLocalVideo } from '../local_video_ref';
+import { findExtractVideoRem } from '../video_extract_tree';
 
 /**
  * Options for {@link remToActionItemType}.
@@ -61,9 +62,8 @@ export const remToActionItemType = async (
       const endTime = await rem.getPowerupProperty(videoExtractPowerupCode, videoExtractEndSlotCode);
 
       if (videoUrl && startTime != null && endTime != null) {
-        // Find the parent video Rem
-        const parentId = rem.parent;
-        const parentRem = parentId ? await plugin.rem.findOne(parentId) : null;
+        // The video Rem: the nearest ancestor holding the video (an extract can be cut from an extract).
+        const parentRem = await findExtractVideoRem(plugin, rem);
 
         const file = parseLocalVideoUrl(String(videoUrl));
         if (file) {

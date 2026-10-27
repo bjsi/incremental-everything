@@ -19,6 +19,7 @@ import {
   useVideoPositionSaver,
 } from './useVideoPosition';
 import { extractPositionKey, videoPositionKey } from '../lib/video_position';
+import { allowsSubExtracts } from '../lib/video_extract_tree';
 import { VideoNotesSplit } from './VideoNotesSplit';
 import { PlayerControls } from './PlayerControls';
 import { PluginExtractButtons } from './PluginExtractButtons';
@@ -265,11 +266,11 @@ export const LocalVideoViewer: React.FC<{
         <PlayerControls info={info} connected={connected} send={send} />
         <VideoSnapshotButtons source={{ file }} time={info.currentTime} parentId={notesRemId} />
         <VideoTranscriptButton target={{ parentId: notesRemId, url, range: segment }} />
-        {!segment && (
+        {(!segment || allowsSubExtracts(segment)) && (
           <PluginExtractButtons
             position={position}
             pause={() => send({ command: 'pause' })}
-            parentId={actionItem.rem._id}
+            parentId={notesRemId}
             url={url}
           />
         )}

@@ -59,7 +59,7 @@ const Nudged: React.FC<{ label: string; value: number; onChange: (v: number) => 
 );
 
 interface NativeExtractButtonsProps {
-  /** The video Rem the extract goes under. */
+  /** The video Rem, or the extract being cut again: the new extract goes under it. */
   parentId: RemId;
   /** The video's URL, stored on the extract. */
   url: string;

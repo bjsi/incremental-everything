@@ -13,7 +13,7 @@ interface PluginExtractButtonsProps {
   /** The player's current time, in seconds. */
   position: number;
   pause: () => void;
-  /** The video's Rem: the extract goes under it. */
+  /** The video's Rem, or the extract being cut again: the new extract goes under it. */
   parentId: RemId;
   /** The video's URL, stored on the extract. */
   url: string;

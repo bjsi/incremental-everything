@@ -10,6 +10,7 @@ import {
 import { formatVideoTime } from '../lib/video_snapshot';
 import { useNativeExtractProgress, useNativeVideoMirror } from './useNativeVideoMirror';
 import { NativeExtractButtons } from './NativeExtractButtons';
+import { allowsSubExtracts } from '../lib/video_extract_tree';
 import { VideoTranscriptButton } from './VideoTranscriptButton';
 
 interface NativeVideoViewerProps {
@@ -137,6 +138,9 @@ export const NativeVideoViewer: React.FC<NativeVideoViewerProps> = ({
                   ? '✓ end of extract reached'
                   : `ends at ${formatVideoTime(segment.end)} · now ${position !== undefined ? formatVideoTime(position) : '—'}`}
               </span>
+              {url && extractId && allowsSubExtracts(segment) && (
+                <NativeExtractButtons parentId={extractId} url={url} position={position} />
+              )}
               {url && extractId && <VideoTranscriptButton target={{ parentId: extractId, url, range: segment }} />}
             </>
           ) : (
