@@ -147,7 +147,7 @@ O plugin agora possui **Modo Leve Automático**.
 
 📖 [Vídeo Incremental no Manual do Usuário](https://hugomarins.github.io/incremental-remnote/Incremental-Video/)
 
-![Vídeo Incremental](https://hugomarins.github.io/incremental-remnote/assets/YT-extract-mode.png)
+![Vídeo Incremental](https://hugomarins.github.io/incremental-remnote/assets/YT-plugin-player.png)
 
 ### Matemática Incremental
 

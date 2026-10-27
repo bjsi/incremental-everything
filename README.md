@@ -151,7 +151,7 @@ The plugin now features **Automatic Light Mode**.
 
 📖 [Incremental Video in the User's Manual](https://hugomarins.github.io/incremental-remnote/Incremental-Video/)
 
-![Incremental Video](https://hugomarins.github.io/incremental-remnote/assets/YT-extract-mode.png)
+![Incremental Video](https://hugomarins.github.io/incremental-remnote/assets/YT-plugin-player.png)
 
 ### Incremental Mathematics
 

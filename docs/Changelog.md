@@ -8,6 +8,8 @@ This page documents the major changes and improvements for each version of the I
 
 **Incremental Video**: Rebuilt from the ground up — two players for YouTube videos, extracts that resume and can be cut again, transcripts and titles by AI, and video files from your computer.
 
+![A RemNote video in the queue, in the plugin's player: the top bar with From the start, the RemNote player switch, −30s, pause, +30s, the time, speed, screenshots, transcript and Extract; the notes on the left and the video on the right](assets/YT-plugin-player.png){ width="900" }
+
 📖 [Incremental Video](Incremental-Video.md)
 
 **Two Players**: Added RemNote's own player (transcript, Highlight Moment, AI Tutor) for videos added with Upload File › YouTube URL, with a button to switch players; both resume from the same position.

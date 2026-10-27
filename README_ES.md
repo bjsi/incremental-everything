@@ -147,7 +147,7 @@ El complemento ahora cuenta con **Modo Ligero Automático**.
 
 📖 [Video Incremental en el Manual de Usuario](https://hugomarins.github.io/incremental-remnote/Incremental-Video/)
 
-![Video Incremental](https://hugomarins.github.io/incremental-remnote/assets/YT-extract-mode.png)
+![Video Incremental](https://hugomarins.github.io/incremental-remnote/assets/YT-plugin-player.png)
 
 ### Matemáticas Incrementales
 

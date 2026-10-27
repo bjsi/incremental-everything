@@ -43,6 +43,8 @@ Built for incremental watching:
 - **📸 [Screenshots](#screenshots)** and **📜 [transcripts](#transcripts)**.
 - **Notes beside the video** (📝 shows or hides them). Drag the divider to resize, or focus it and use `←` `→`; the split is remembered on each device. For a RemNote video, the notes are the Rem's children under its name.
 
+![A RemNote video in the queue, in the plugin's player: the top bar with From the start, the RemNote player switch, −30s, pause, +30s, the time, speed, screenshots, transcript and Extract; the notes on the left and the video on the right](assets/YT-plugin-player.png){ width="900" }
+
 To show a YouTube video, the plugin keeps one document in your knowledge base, **▶️ Incremental RemNote video player**. Leave it there; if it is deleted, it is made again the next time a video plays.
 
 ### RemNote's player { #remnote-player }
