@@ -2,6 +2,24 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.169 - October 27th, 2026
+
+### ⚡ Improved
+
+**Bulk Priority**: Changing the priority of a multi-selection with `Opt+P` or `Ctrl+Opt+P` is much faster: 18 Rems now take about 12 seconds instead of several minutes.
+
+📖 [Bulk Priority for a Multi-Selection](Prioritization-&-Sorting.md#bulk-priority-for-a-multi-selection)
+
+**Priority Editor Widget**: The priority badges and the Incremental Rem counter no longer slow the editor down after each review or priority change on large knowledge bases.
+
+📖 [Priority Editor Widget](Prioritization-&-Sorting.md#priority-editor-widget)
+
+### 🐛 Fixed
+
+**Quick Priority**: Fixed `Ctrl+Opt+↑/↓` over a multi-selection sometimes skipping the flashcard-priority update under some of the selected Rems, and made it faster.
+
+📖 [Quick Priority Shortcuts](Prioritization-&-Sorting.md#quick-priority-shortcuts)
+
 ## v1.0.168 - October 27th, 2026
 
 ### ⚡ Improved
