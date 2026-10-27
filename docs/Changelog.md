@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.167 - October 26th, 2026
+
+### ⚡ Improved
+
+**Editor Review Timer**: In a split view the timer now shows in one pane only (the top-left one) instead of in every pane, and moves to another pane if you close that one.
+
+📖 [Always in view](Reviewing-Items-in-the-Editor.md#timer-stays-in-view)
+
 ## v1.0.166 - October 26th, 2026
 
 ### ✨ New

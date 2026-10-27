@@ -429,6 +429,9 @@ export const cardInfoBarHeightKey = 'card-info-bar-height';
 // heights (per document id) and index.tsx moves RemNote's sticky headers below it.
 export const editorReviewTimerHeadersCssId = 'incremental-everything-editor-review-timer-headers';
 export const editorReviewTimerHeightsKey = 'editor-review-timer-heights';
+// Widget instance ids of the mounted timers, so only one pane shows the timer
+// (lib/editor_review_timer_primary).
+export const editorReviewTimerInstancesKey = 'editor-review-timer-instances';
 export const collapseTopBarCssId = 'incremental-everything-collapse-top-bar'; // CSS registration ID
 export const incrementalQueueActiveKey = 'incremental-queue-active';
 export const activeHighlightIdKey = 'active-highlight-id-key';

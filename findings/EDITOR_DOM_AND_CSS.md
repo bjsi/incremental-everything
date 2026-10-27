@@ -92,3 +92,9 @@ So anything a plugin pins to the top of the pane is painted over by them. `.rn-s
 
 Shipped in v1.0.153 (`src/lib/editor_review_timer_sticky.ts`): the Editor Review Timer reports its height through a session key and the index widget registers the margin. DocumentAboveToolbar's widget context has a `documentId` but no pane id, so the offset cannot be per pane; the tallest reported timer is used.
 
+## Telling a widget's instances apart
+
+Read from the 1.28.57 bundle, Oct 26 2026. Every instance of a widget gets the same iframe `src` (`…?widgetName=<file>&pluginId=<id>`), and DocumentAboveToolbar's context carries no pane id, so neither CSS nor the context distinguishes the copies in a split view. `plugin.widget.getDimensions(widgetInstanceId)` does: the host looks the id up among **this plugin's** active instances and returns that iframe's `getBoundingClientRect()`. It returns `undefined` once the instance is destroyed, and a zero rect while its pane is `display:none` (a background tab). The id is a global sequential **number** (the bridge validates it with zod), while `getWidgetContext()` types it as a string, so coerce it. An empty `height: 'auto'` widget's iframe carries an inline `height: 0px`, so `iframe:not([style*="height: 0px"])` selects the copies that render something.
+
+Used in v1.0.167 (`src/lib/editor_review_timer_primary.ts`): the timer's instances list their ids in a session key, and only the top-most, then left-most visible one renders. The sticky-header margin skips panes whose timer iframe is 0px tall.
+

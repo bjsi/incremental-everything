@@ -142,9 +142,11 @@ The timer widget is designed to be fully responsive. If used in a narrow sidebar
 
 #### Always in view { #timer-stays-in-view }
 
-The timer stays pinned to the top of the pane while you scroll, so **Next**, **Dismiss** and **End Review** are always within reach, however long the document is. Each pane showing the document has its own pinned bar.
+The timer stays pinned to the top of the pane while you scroll, so **Next**, **Dismiss** and **End Review** are always within reach, however long the document is.
 
-RemNote's **sticky headers** (the parent Rems that stay visible while you scroll their descendants) are moved down to sit just below the timer, and return to the top of the pane when the review ends. In a split view with panes of different widths, the pane whose timer is shorter shows a small gap above its sticky headers: one offset is used for all panes, sized for the tallest timer.
+In a split view, only **one pane** shows the timer: the top-most one, or the left-most of the panes on the same row. It stays there while you move through items with **Next**. If you close that pane, the timer moves to the next pane in that order within a couple of seconds. Panes in other RemNote tabs don't count.
+
+RemNote's **sticky headers** (the parent Rems that stay visible while you scroll their descendants) are moved down to sit just below the timer, and return to the top of the pane when the review ends. Panes without the timer keep their sticky headers at the top.
 
 RemNote does not show this bar inside the PDF viewer itself: press **Notes** to open the Rem that holds the PDF, and the timer is there.
 

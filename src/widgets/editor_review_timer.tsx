@@ -18,6 +18,7 @@ import {
   MAX_NOTE_LENGTH,
 } from '../lib/history_notes';
 import { clearEditorReviewTimerHeights, reportEditorReviewTimerHeight } from '../lib/editor_review_timer_sticky';
+import { useIsPrimaryEditorReviewTimer } from '../lib/editor_review_timer_primary';
 import {
   dismissEditorReview,
   editorTimerElapsedMs,
@@ -838,4 +839,15 @@ function EditorReviewTimer() {
   );
 }
 
-renderWidget(EditorReviewTimer);
+/** Every document pane mounts the timer; only one of them shows it (lib/editor_review_timer_primary). */
+function EditorReviewTimerWidget() {
+  const plugin = usePlugin();
+  const reviewActive = useTrackerPlugin(
+    async (rp) => !!(await rp.storage.getSession<string>('editor-review-timer-rem-id')),
+    []
+  );
+  const primary = useIsPrimaryEditorReviewTimer(plugin, !!reviewActive);
+  return primary ? <EditorReviewTimer /> : null;
+}
+
+renderWidget(EditorReviewTimerWidget);
