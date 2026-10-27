@@ -82,6 +82,7 @@ export type IsolatedQueueMode = 'highlights' | 'rems' | 'both' | 'none';
 export const defaultVideoPlayerId = 'default-video-player';
 export type DefaultVideoPlayer = 'plugin' | 'remnote';
 export const tidyAutoCaptionsId = 'tidy-auto-captions';
+export const titleVideoExtractsId = 'title-video-extracts';
 export const priorityStepSizeId = 'priority-step-size';
 export const enableHideInQueueIntegrationId = 'enable-hide-in-queue-integration';
 

@@ -9,7 +9,9 @@ import {
 } from './youtube_transcript';
 import { callVideoHelper, checkVideoHelper, formatVideoTime } from './video_snapshot';
 import { getIESetting } from './settings';
-import { tidyAutoCaptionsId } from './consts';
+import { tidyAutoCaptionsId, titleVideoExtractsId, videoExtractPowerupCode } from './consts';
+import { safeRemTextToString } from './pdfUtils';
+import { findExtractVideoRem } from './video_extract_tree';
 
 /**
  * Transcript Rems for a YouTube video or a Video Extract, from the video's
@@ -156,7 +158,41 @@ export async function addVideoTranscript(
   });
   const remIds: RemId[] = [];
   for (const text of texts) remIds.push((await addChild(plugin, parentId, text))._id);
+  // An extract's transcript also names it, behind whatever comes next.
+  if (range) {
+    titleVideoExtract(plugin, target.parentId, texts.join('\n'), transcript.language).catch((e) =>
+      console.warn('[VideoTranscript] Could not title the extract:', e)
+    );
+  }
   return { transcript, remIds, texts };
+}
+
+/** The name an extract is created with, before any title. */
+const UNTITLED_EXTRACT = /^Video Extract \[[^\]]*\]$/;
+
+/**
+ * Has Claude read an extract's transcript and adds the title it gives after
+ * the extract's time range. Only while the extract still has the name it was
+ * created with, before the call and after: a name the user wrote stays. A
+ * no-op with the setting off or without Claude in the helper.
+ */
+export async function titleVideoExtract(plugin: RNPlugin, extractId: RemId, text: string, language?: string) {
+  if (!(await getIESetting(plugin, titleVideoExtractsId))) return;
+  if (!(await checkVideoHelper()).extractTitles) return;
+  const nameOf = async (rem: PluginRem) => (await safeRemTextToString(plugin, rem.text ?? [])).trim();
+  const rem = await plugin.rem.findOne(extractId);
+  if (!rem || !(await rem.hasPowerup(videoExtractPowerupCode))) return;
+  const name = await nameOf(rem);
+  if (!UNTITLED_EXTRACT.test(name)) return;
+  const video = await findExtractVideoRem(plugin, rem);
+  const { title } = await callVideoHelper<{ title: string }>('/extract-title', {
+    text,
+    language,
+    video: video ? await nameOf(video) : undefined,
+  });
+  const now = await plugin.rem.findOne(extractId);
+  if (!now || (await nameOf(now)) !== name) return; // renamed meanwhile
+  await now.setText([`${name} — ${title}`]);
 }
 
 /**

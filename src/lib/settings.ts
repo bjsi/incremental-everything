@@ -64,6 +64,7 @@ import {
   defaultVideoPlayerId,
   DefaultVideoPlayer,
   tidyAutoCaptionsId,
+  titleVideoExtractsId,
   autoFocusQueueDashboardId,
   hideCardPriorityTagSettingId,
   showLeftBorderForIncRemsSettingId,
@@ -155,6 +156,7 @@ export interface IESettings {
   [isolatedQueueModeId]: IsolatedQueueMode;
   [defaultVideoPlayerId]: DefaultVideoPlayer;
   [tidyAutoCaptionsId]: boolean;
+  [titleVideoExtractsId]: boolean;
   [autoFocusQueueDashboardId]: boolean;
 
   // Editor indicators
@@ -246,6 +248,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [isolatedQueueModeId]: 'highlights',
   [defaultVideoPlayerId]: 'plugin',
   [tidyAutoCaptionsId]: true,
+  [titleVideoExtractsId]: true,
   [autoFocusQueueDashboardId]: false,
 
   [hideCardPriorityTagSettingId]: true,
@@ -845,6 +848,15 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'fixes words the recognition clearly got wrong and puts key terms in bold, through the local ' +
       "helper and your own Claude account. The raw text is written first and replaced as it's tidied. " +
       'Captions by the uploader and transcripts made from the audio are left as they are.',
+  },
+  [titleVideoExtractsId]: {
+    kind: 'boolean',
+    group: 'incrementalVideo',
+    title: 'Title Video Extracts with Claude',
+    description:
+      'When a Video Extract gets its transcript, Claude reads it and adds a short title after the ' +
+      'time range, in the language of the video: "Video Extract [11:40 – 11:57] — …". Through the ' +
+      'local helper and your own Claude account. An extract you have renamed is left as it is.',
   },
   [autoFocusQueueDashboardId]: {
     kind: 'boolean',

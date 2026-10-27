@@ -25,6 +25,8 @@ export interface VideoHelperStatus {
   transcripts: boolean;
   /** It can transcribe audio itself: whisper.cpp, ffmpeg and a Whisper model found. */
   whisper: boolean;
+  /** Claude can name a Video Extract from its transcript (`/extract-title`). */
+  extractTitles: boolean;
 }
 
 export const HELPER_DOWN: VideoHelperStatus = {
@@ -33,6 +35,7 @@ export const HELPER_DOWN: VideoHelperStatus = {
   ai: false,
   transcripts: false,
   whisper: false,
+  extractTitles: false,
 };
 
 export async function checkVideoHelper(): Promise<VideoHelperStatus> {
@@ -47,6 +50,7 @@ export async function checkVideoHelper(): Promise<VideoHelperStatus> {
       ai: !!body?.claude,
       transcripts: !!(body?.ytDlp && body?.transcripts),
       whisper: !!body?.whisper,
+      extractTitles: !!(body?.claude && body?.extractTitles),
     };
   } catch {
     return HELPER_DOWN;

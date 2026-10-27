@@ -18,7 +18,8 @@ It also fetches a video's captions (`/video-transcript`, with yt-dlp), which
 the plugin turns into transcript Rems for a whole video or an extract. When a
 video has no captions, or on request, it transcribes the audio itself with
 whisper.cpp, on this Mac. YouTube's automatic captions can be tidied up by
-Claude (`/transcript-tidy`): punctuation, sentences, key terms in bold.
+Claude (`/transcript-tidy`): punctuation, sentences, key terms in bold. And
+Claude names a Video Extract from its transcript (`/extract-title`).
 
     python3 scripts/ai_ocr_helper.py          # listens on 127.0.0.1:3457
 
@@ -38,6 +39,7 @@ Files live in ~/.incremental-remnote/ai-ocr/:
     prompt.md       the transcription instructions — edit freely, re-read per request
     video-prompt.md the same for video frames
     transcript-prompt.md  how Claude tidies YouTube's automatic captions
+    extract-title-prompt.md  how Claude names a Video Extract from its transcript
     video-transcripts/    fetched captions and audio transcripts, per video
     video-audio/          downloaded audio, kept for a week
     whisper/        the whisper.cpp model, and the optional VAD model that skips silence
@@ -81,6 +83,7 @@ VIDEO_FRAMES = HOME / 'video-frames'
 VIDEO_TRANSCRIPTS = HOME / 'video-transcripts'
 VIDEO_AUDIO = HOME / 'video-audio'
 TRANSCRIPT_PROMPT_FILE = HOME / 'transcript-prompt.md'
+EXTRACT_TITLE_PROMPT_FILE = HOME / 'extract-title-prompt.md'
 WHISPER_DIR = HOME / 'whisper'
 # large-v3-turbo, 5-bit: 574 MB, close to large-v3's accuracy at several times
 # its speed. https://huggingface.co/ggerganov/whisper.cpp
@@ -160,6 +163,15 @@ DEFAULT_TRANSCRIPT_PROMPT = r"""Clean up passages of a speech transcript made by
 - Put the passage's key terms and concepts in **bold**: one to three per passage at most, each a word or a short phrase, never a whole sentence. Use no other markup.
 """
 
+DEFAULT_EXTRACT_TITLE_PROMPT = r"""Give a title to an excerpt of a video, from its transcript. Do not acknowledge the request, do not comment, and do not ask questions: output the title and nothing else, on one line.
+
+- Write it in the transcript's language, never translated.
+- Say what this excerpt is about specifically: its topic, claim or example, as a reader skimming a list of excerpts of the same video would need to tell them apart. Never a generic label such as "Introduction" or "Continuation".
+- At most 10 words. No quotation marks, no final full stop, no markup, and no phrasing such as "In this excerpt" or "The speaker".
+- The video's title, when given, is context only: don't repeat it.
+- The transcript may come from speech recognition and contain errors; rely on what is clear.
+"""
+
 
 def log(entry):
     with open(LOG, 'a') as f:
@@ -170,6 +182,12 @@ def prompt():
     if not PROMPT_FILE.exists():
         PROMPT_FILE.write_text(DEFAULT_PROMPT)
     return PROMPT_FILE.read_text()
+
+
+def extract_title_prompt():
+    if not EXTRACT_TITLE_PROMPT_FILE.exists():
+        EXTRACT_TITLE_PROMPT_FILE.write_text(DEFAULT_EXTRACT_TITLE_PROMPT)
+    return EXTRACT_TITLE_PROMPT_FILE.read_text()
 
 
 def video_prompt():
@@ -918,6 +936,34 @@ def handle_transcript_tidy(req, entry):
 
 
 # ---------------------------------------------------------------------------
+# /extract-title — Claude names a Video Extract from its transcript
+# ---------------------------------------------------------------------------
+
+MAX_TITLE_INPUT_CHARS = 30000
+MAX_TITLE_CHARS = 120
+
+
+def handle_extract_title(req, entry):
+    """An extract's transcript in, a short title for it out, in its language."""
+    text = req.get('text')
+    if not isinstance(text, str) or not text.strip() or len(text) > MAX_TITLE_INPUT_CHARS:
+        raise RuntimeError(f'need the transcript text, {MAX_TITLE_INPUT_CHARS} characters at most')
+    lines = [f"Language: {req.get('language') or 'unknown'}"]
+    if isinstance(req.get('video'), str) and req['video'].strip():
+        lines.append(f"Video: {req['video'].strip()}")
+    content = [{'type': 'text', 'text': '\n'.join(lines) + '\n\nTranscript:\n' + text.strip()}]
+    reply, model = run_claude(content, extract_title_prompt())
+    # One line, without the quotes, markup or full stop Claude may add anyway.
+    title = next((line.strip() for line in reply.splitlines() if line.strip()), '')
+    title = re.sub(r'[*_`#]', '', title).strip().strip('"“”«»\'').rstrip('.').strip()
+    if not title:
+        raise RuntimeError('Claude returned no title')
+    title = title[:MAX_TITLE_CHARS]
+    entry.update(model=model, title=title)
+    return {'title': title}
+
+
+# ---------------------------------------------------------------------------
 # Local videos: libraries, the macOS file dialogs, scanning, serving
 # ---------------------------------------------------------------------------
 #
@@ -1103,6 +1149,7 @@ MEDIA_CHUNK = 1 << 20
 ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match,
           '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
           '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy,
+          '/extract-title': handle_extract_title,
           '/video-choose': handle_video_choose, '/video-libraries': handle_video_libraries,
           '/video-library-relink': handle_video_library_relink, '/video-scan': handle_video_scan,
           '/video-file': handle_video_file}
@@ -1129,7 +1176,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/':
             return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL,
                                         'ytDlp': find_tool('yt-dlp'), 'ffmpeg': find_tool('ffmpeg'),
-                                        'transcripts': True, 'whisper': whisper_ready(), 'localVideo': True})
+                                        'transcripts': True, 'whisper': whisper_ready(), 'localVideo': True,
+                                        'extractTitles': True})
         if self.path.startswith(MEDIA_PREFIX):
             return self.send_media()
         self.send_json(404, {'ok': False, 'error': 'POST /ocr or /locate'})
