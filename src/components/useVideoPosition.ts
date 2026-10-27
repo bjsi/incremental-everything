@@ -2,7 +2,7 @@ import { usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
 import { YouTubeEmbedInfo } from '../lib/youtube_embed_bridge';
 import { YT_PAUSED, YT_PLAYING } from './PluginYouTubePlayer';
-import { ExtractResume, getExtractResume } from '../lib/video_position';
+import { ExtractResume, getExtractResume, videoPositionKey, videoRateKey } from '../lib/video_position';
 
 // Where a video was left and at what speed, per URL (synced storage), shared by
 // the plugin's YouTube player and its local video player. An extract has its
@@ -13,8 +13,8 @@ export function useSavedVideoSettings(url: string) {
   const plugin = usePlugin();
   return useRunAsync(async () => {
     const [position, playbackRate] = await Promise.all([
-      plugin.storage.getSynced<number>(`${url}-position`),
-      plugin.storage.getSynced<number>(`${url}-playbackRate`),
+      plugin.storage.getSynced<number>(videoPositionKey(url)),
+      plugin.storage.getSynced<number>(videoRateKey(url)),
     ]);
     return { position: position ?? 0, playbackRate: playbackRate ?? 1 };
   }, [url]);
@@ -38,7 +38,7 @@ export function useExtractResume(
 /** Saves a speed the user chose for the video. */
 export function useSaveVideoRate(url: string) {
   const plugin = usePlugin();
-  return React.useCallback((rate: number) => plugin.storage.setSynced(`${url}-playbackRate`, rate), [url]);
+  return React.useCallback((rate: number) => plugin.storage.setSynced(videoRateKey(url), rate), [url]);
 }
 
 /**

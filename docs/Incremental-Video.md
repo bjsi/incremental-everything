@@ -115,6 +115,24 @@ So a list of extracts of one video says what each is about. The title arrives a 
 
 ---
 
+## Where you stopped, in the history { #history }
+
+Each review records where the video was left in the [Repetition History](Repetition-History-and-Statistics.md#notes-and-where-you-stopped) (`Ctrl+Shift+H`), on the line under the review's row, as PDF reviews record the page:
+
+| Line | Meaning |
+|------|---------|
+| `▶ 1:42 of 1:26–2:04` | An extract, stopped at 1:42 within its range |
+| `▶ 2:01 of 1:26–2:04 · ✓ end` | An extract watched to its end (or its last 5 seconds) |
+| `▶ 12:34 / 45:00 (28%)` | A whole video, with its length |
+| `▶ 12:34 · 1.5×` | A whole video whose length isn't known, played at 1.5× |
+
+- The time is the one the next review resumes from, so the rows show how far each session got.
+- The **length** is known only for RemNote videos that RemNote's player has opened. YouTube links and local videos show the time alone.
+- The **speed** is the plugin's player's, shown when it isn't 1×. A session in RemNote's player at another speed still shows the plugin's.
+- In the queue, the position is saved at once when you pause and every 5 seconds while playing. Pressing **Next** while it plays can record a time a few seconds behind; pause first for the exact one.
+
+---
+
 ## Screenshots { #screenshots }
 
 In the plugin's player, **📸** saves the current frame under the Incremental Rem, in a Rem named after the time (`📸 12:34`). **📸✨** also transcribes the frame — slide text, formulas, diagrams' labels — into an outline under it, with Claude. Screenshots are taken by the [helper](#setup) from the video itself, at the exact time.

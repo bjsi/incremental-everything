@@ -14,6 +14,15 @@ Gives you detailed insights into your review history for any specific Incrementa
 
 ![Repetition History Popup](assets/repetition-history-popup.png){ width="400" }
 
+### Notes and where you stopped { #notes-and-where-you-stopped }
+
+A row can have a line under it with the **📝 note** you typed during that review, and where the review left its source:
+
+- **PDF or web page:** the page, the page range, the PDF's name and the last bookmark (`p.57 of 40–80 · Deep Learning.pdf · 🔖 “…”`).
+- **Video:** the time the video was left at, with the extract's range or the video's length, and the speed (`▶ 1:42 of 1:26–2:04 · 1.5×`). See [Incremental Video](Incremental-Video.md#history).
+
+Since each row keeps its own position, the history shows how far every session got.
+
 ## 2. Aggregated History View
 
 Gives you a high-level overview of progress stats for a Rem and **all its descendants**. Perfect for checking your progress on a specific book, course, or topic.

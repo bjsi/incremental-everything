@@ -9,6 +9,7 @@ import {
   getPageHistory,
   safeRemTextToString,
 } from './pdfUtils';
+import { buildVideoContext } from './video_position';
 
 /**
  * User notes and machine context attached to history entries (IncrementalRep.notes /
@@ -79,19 +80,24 @@ export async function consumePendingReviewNote(
 
 /**
  * Snapshot the reading-session state for a history entry: active PDF, current
- * page, page range, and the last bookmark text. Unlike the live synced-storage
+ * page, page range, and the last bookmark text — or, for a video IncRem, where
+ * the video was left (buildVideoContext). Unlike the live synced-storage
  * keys these values come from, the snapshot is persisted inside the rem's
  * History slot, so it survives synced-storage loss and records the historical
  * trajectory (page at EACH rep, not just now).
  *
- * Returns undefined when there is nothing meaningful to record (non-PDF/HTML
- * rems, or a PDF with no saved position/range/bookmark). Never throws.
+ * Returns undefined when there is nothing meaningful to record (rems with no
+ * PDF/HTML or video, or no saved position/range/bookmark). Never throws.
  */
 export async function buildRepContext(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<RepContext | undefined> {
   try {
+    // A video IncRem: where the video was left (lib/video_position.ts).
+    const video = await buildVideoContext(plugin, rem);
+    if (video) return video;
+
     const pdfRem = await getActivePdfForIncRem(plugin, rem);
     if (!pdfRem) return undefined;
 

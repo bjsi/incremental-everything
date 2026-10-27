@@ -207,8 +207,19 @@ export const IncrementalRep = z.object({
       pdfName: z.string().optional(),
       /** Text of the last bookmark/highlight rem from this session, if any. */
       bookmark: z.string().optional(),
-      /** Playback position in seconds (YouTube / video extracts). */
+      /**
+       * Playback position in seconds, where the video was left (any video
+       * IncRem: RemNote video, local video, YouTube link, Video Extract). For an
+       * extract it is a time in the whole video, between videoStart and videoEnd.
+       */
       videoTime: z.number().optional(),
+      /** A Video Extract's segment, in seconds of the whole video. Omitted for whole videos. */
+      videoStart: z.number().optional(),
+      videoEnd: z.number().optional(),
+      /** The whole video's length in seconds, when known (only RemNote's player records it). */
+      videoDuration: z.number().optional(),
+      /** Playback speed in the plugin's player; omitted at 1×. */
+      videoRate: z.number().optional(),
       /**
        * Name of the source flashcard, when this rep was imported from a card
        * removed by 'Preserve history & remove' (eventType 'importedRep').

@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.169 - October 27th, 2026
 
+### ✨ New
+
+**Incremental Video**: The Repetition History now records where each review left the video: the time, the extract's range or the video's length, and the playback speed.
+
+📖 [Where you stopped, in the history](Incremental-Video.md#history)
+
 ### ⚡ Improved
 
 **Bulk Priority**: Changing the priority of a multi-selection with `Opt+P` or `Ctrl+Opt+P` is much faster: 18 Rems now take about 12 seconds instead of several minutes.

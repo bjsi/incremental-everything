@@ -17,7 +17,7 @@ export const allowsSubExtracts = (segment: { start: number; end: number }) =>
 /** How far up to look; an outline nested deeper than this is not an extract chain. */
 const MAX_DEPTH = 30;
 
-const isYouTubeUrl = (url: string | undefined) => !!url && ['youtube', 'youtu.be'].some((x) => url.includes(x));
+export const isYouTubeUrl = (url: string | undefined) => !!url && ['youtube', 'youtu.be'].some((x) => url.includes(x));
 
 /** The Rem holds a video: a RemNote video, a local video, or a YouTube link. */
 async function holdsVideo(rem: PluginRem): Promise<boolean> {
