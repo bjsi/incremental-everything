@@ -518,7 +518,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       const timeStr = formatDuration(Math.round(outcome.totalReviewSeconds)) || '0s';
       const ok = confirm(
-        `🔀 Transfer Incremental data to parent\n\n` +
+        outcome.mode === 'finish'
+          ? `🔀 Finish an interrupted transfer\n\n` +
+              `From: "${outcome.sourceName}"\n` +
+              `To:   "${outcome.destinationName}"\n\n` +
+              `An earlier transfer already moved this Rem's data onto the parent but stopped ` +
+              `before removing it from here, so both Rems carry the same history ` +
+              `(${outcome.history.length} entr(ies)). All of them are on the parent.\n\n` +
+              `"${outcome.sourceName}" stops being an Incremental Rem. Its text and children are untouched.\n\nContinue?`
+          : `🔀 Transfer Incremental data to parent\n\n` +
           `From: "${outcome.sourceName}"\n` +
           `To:   "${outcome.destinationName}"\n\n` +
           `• ${outcome.history.length} history entr(ies) move across` +
@@ -530,6 +538,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           (outcome.hasReadingState ? `• Reading state (pages / read points) moves too\n` : '') +
           (outcome.destinationDismissedReps > 0
             ? `• ${outcome.destinationDismissedReps} dismissed entr(ies) already on the parent are revived and kept\n`
+            : '') +
+          (outcome.schedulerChange
+            ? `\n⚠️ The scheduler changes: this Rem uses ${outcome.schedulerChange.from}, ` +
+              `the parent will use ${outcome.schedulerChange.to}. The scheduler comes from the ` +
+              `Rem's type and does not move with the data — change it in the Reschedule popup ` +
+              `(Ctrl+J) on the parent afterwards if needed.\n`
             : '') +
           `\n"${outcome.sourceName}" stops being an Incremental Rem. Its text and children are untouched.\n\nContinue?`
       );
@@ -549,9 +563,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       try {
         await executeTransferIncRemToParent(plugin, outcome, { advanceQueue });
-        await plugin.app.toast(
-          `✅ Incremental data moved to "${outcome.destinationName}".`
-        );
+        const doneMessage =
+          outcome.mode === 'finish'
+            ? `✅ Interrupted transfer finished — "${outcome.sourceName}" is no longer Incremental.`
+            : `✅ Incremental data moved to "${outcome.destinationName}".`;
+        console.log(`[TransferIncRem] ${doneMessage}`);
+        await plugin.app.toast(doneMessage);
       } catch (e) {
         console.error('[TransferIncRem] Error:', e);
         await plugin.app.toast('❌ Error during the transfer — see console.');

@@ -556,6 +556,11 @@ export const pendingIncRemCreateTailKey = 'pendingIncRemCreateTail';
 // the persistent index widget. A queue, not a slot, so reviews in quick succession
 // cannot overwrite each other. See lib/incremental_rem/review_jobs.ts.
 export const pendingReviewJobQueueKey = 'pendingReviewJobQueue';
+// Follow-up of 'Transfer Incremental Data to Parent Rem' (cache, bands, host indexes,
+// cascade): the command commits both Rems and appends a job here; tracker.ts drains it.
+// A queue so transfers in quick succession cannot overwrite each other. See
+// lib/incremental_rem/transfer.ts.
+export const pendingIncRemTransferTailKey = 'pendingIncRemTransferTail';
 // Rem ids that were made Incremental moments ago and whose priority popup is about
 // to open (extract-with-priority, Toggle Incremental, the PDF/HTML/video highlight
 // "Create IncRem" flows). The popup reads this list once on mount, clears it, and

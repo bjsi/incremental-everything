@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.168 - October 27th, 2026
+
+### ⚡ Improved
+
+**Transfer Incremental Data to Parent**: The confirmation now warns when the parent will use a different scheduler, and running `ttp` again on the source of an interrupted transfer finishes it.
+
+📖 [Finishing an interrupted transfer](Create-Incremental-Rem-from-PDF-Highlights.md#finish-interrupted-transfer)
+
+### 🐛 Fixed
+
+**Transfer Incremental Data to Parent**: Fixed transfers that froze the plugin midway and left the full history on both the parent and the child.
+
+📖 [Transferring an Incremental Rem to its Parent](Create-Incremental-Rem-from-PDF-Highlights.md#transfer-to-parent)
+
 ## v1.0.167 - October 26th, 2026
 
 ### ⚡ Improved

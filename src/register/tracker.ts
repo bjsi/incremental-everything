@@ -1,7 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache, writeIncRemCaches, applyIncRemCacheChanges } from '../lib/incremental_rem/cache';
 import { PriorityChangeEvent } from '../lib/priority_history';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, pendingIncRemTransferTailKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -12,6 +12,7 @@ import { withQueueMutex } from '../lib/mutex';
 import { runIncRemCreateTail, IncRemCreateTailJob } from '../lib/highlightActions';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { runReviewJob, ReviewJob, IncRemCacheChanges } from '../lib/incremental_rem/review_jobs';
+import { runIncRemTransferTail, IncRemTransferTailJob } from '../lib/incremental_rem/transfer';
 import { showMessageDialog } from '../lib/message_dialog';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
@@ -684,6 +685,55 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       }
     } finally {
       reviewJobsRunning = false;
+      incRemBatchActive = false;
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }
+  });
+
+  // Transfer Incremental Data to Parent follow-up (lib/incremental_rem/transfer.ts):
+  // the command commits both Rems and appends a job; the cache patch, band syncs,
+  // host indexes and cascade run here. Same drain loop as the review jobs, with one
+  // cache write per round.
+  let transferTailRunning = false;
+  plugin.track(async (rp) => {
+    const queued = await rp.storage.getSession<IncRemTransferTailJob[]>(pendingIncRemTransferTailKey);
+    if (!queued || queued.length === 0 || transferTailRunning) return;
+
+    transferTailRunning = true;
+    incRemBatchActive = true;
+    await plugin.storage.setSession('plugin_operation_active', true);
+    const cascadeRemIds: string[] = [];
+    try {
+      while (true) {
+        const jobs = (await plugin.storage.getSession<IncRemTransferTailJob[]>(pendingIncRemTransferTailKey)) || [];
+        if (jobs.length === 0) break;
+        await plugin.storage.setSession(pendingIncRemTransferTailKey, null);
+
+        const cacheChanges: IncRemCacheChanges = new Map();
+        for (const job of jobs) {
+          console.log('[Tracker] transferTail picked up for destination:', job.destinationId);
+          try {
+            const { cascadeRemId } = await runIncRemTransferTail(plugin, job, cacheChanges);
+            if (cascadeRemId) cascadeRemIds.push(cascadeRemId);
+            console.log(`[Tracker] transferTail complete for "${job.destinationName}"`);
+          } catch (err) {
+            console.error('[Tracker] transferTail failed:', err);
+          }
+        }
+
+        try {
+          await applyIncRemCacheChanges(plugin, cacheChanges);
+        } catch (err) {
+          console.error('[Tracker] transferTail cache patch failed:', err);
+        }
+      }
+
+      // Set BEFORE the flags clear so the cascade watcher picks it up under suppression.
+      if (cascadeRemIds.length > 0) {
+        await plugin.storage.setSession('pendingInheritanceCascade', cascadeRemIds);
+      }
+    } finally {
+      transferTailRunning = false;
       incRemBatchActive = false;
       await plugin.storage.setSession('plugin_operation_active', false);
     }
