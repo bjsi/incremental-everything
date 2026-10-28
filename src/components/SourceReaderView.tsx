@@ -1,5 +1,6 @@
 import { usePlugin, ReactRNPlugin, PDFWebReader } from '@remnote/plugin-sdk';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { safeRemTextToString } from '../lib/pdfUtils';
 
 export interface SourceReaderViewProps {
   /** Source-document rem to feed into PDFWebReader. */
@@ -20,6 +21,24 @@ export interface SourceReaderViewProps {
 export function SourceReaderView({ hostRemId, hoveredRemId, kind, onClose }: SourceReaderViewProps) {
   const plugin = usePlugin() as ReactRNPlugin;
   const hasScrolled = useRef(false);
+  const [sourceName, setSourceName] = useState('');
+
+  // Name of the source document, shown after "Source" in the header.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rem = await plugin.rem.findOne(hostRemId);
+        const name = rem ? (await safeRemTextToString(plugin, rem.text)).trim() : '';
+        if (!cancelled) setSourceName(name);
+      } catch (e) {
+        console.error('[SourceReaderView] name lookup error', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hostRemId, plugin]);
 
   // Scroll the reader to the hovered highlight (highlights only).
   //
@@ -90,8 +109,24 @@ export function SourceReaderView({ hostRemId, hoveredRemId, kind, onClose }: Sou
           flex: '0 0 auto',
         }}
       >
-        <span style={{ fontWeight: 600, fontSize: '13px' }}>📄 Source</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span
+          style={{
+            fontWeight: 600,
+            fontSize: '13px',
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            marginRight: '8px',
+          }}
+          title={sourceName || undefined}
+        >
+          📄 Source
+          {sourceName && (
+            <span style={{ fontWeight: 400, color: 'var(--rn-clr-content-secondary)' }}>: {sourceName}</span>
+          )}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '0 0 auto' }}>
           {kind === 'highlight' && hoveredRemId && (
             <button
               onClick={async () => {

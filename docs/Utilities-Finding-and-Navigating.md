@@ -162,6 +162,10 @@ The command inspects the hovered reference's target and only acts on **Reader so
 
 So you can hover *any* pin and press the shortcut safely; only genuine sources open a viewer.
 
+### Source name in the header
+
+The header shows the name of the PDF or article after **📄 Source**, so you know which document you're looking at. A long name is cut off with "…"; hover the header to read it in full.
+
 ### Scroll to Highlight
 
 For PDF/HTML **highlights**, the viewer auto-scrolls to the highlighted passage once the reader finishes mounting (the embedded PDF engine takes a few seconds to initialize, so the scroll is retried a few times). If you then scroll around the document and want to jump back, click the **🔖 Scroll to Highlight** button in the header to re-center on the highlight at any time.

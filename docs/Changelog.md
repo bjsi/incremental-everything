@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.171 - October 28th, 2026
+
+### ⚡ Improved
+
+**Open Source in Popup**: The popup header (`Opt+O` / `Opt+Shift+O`) now shows the name of the PDF or article after "Source".
+
+📖 [Source name in the header](Utilities-Finding-and-Navigating.md#source-name-in-the-header)
+
 ## v1.0.170 - October 27th, 2026
 
 ### ⚡ Improved
