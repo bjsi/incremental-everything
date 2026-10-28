@@ -298,3 +298,34 @@ What identifies one is that the Rem holds an image **and nothing else** — no c
 Two consequences worth knowing: caption an area highlight and the next scan swaps its tags — `PdfAreaHighlight` off, `HasImage` on — and the ring turns blue; and a Rem holding only an image that did **not** come from a PDF, a figure pasted into your own notes, gets `HasImage` and stays blue, since the yellow means "this leads into the source document".
 
 > **Only image pins.** Pins to ordinary Rems are left alone. Ringing *every* pin was tried and says nothing — a marker that appears on all of them carries no information.
+
+## Readable Breadcrumbs in Rem Preview
+
+When you hover a reference, RemNote's **Preview** popup shows the Rem's ancestors as breadcrumbs at the top, but cuts each name to about five characters: `AN1 P... > Highl... > Page...`. That is too short to tell which book or section the Rem comes from.
+
+The plugin fixes this automatically. Nothing to switch on. Each breadcrumb now shows about 13 characters in a normal-size popup, and RemNote still folds the middle ancestors of a deep path into a `...` menu.
+
+### Why RemNote cuts them so short
+
+RemNote picks how many characters each breadcrumb gets from the width of the breadcrumb row, then cuts the text before it is drawn. In the Preview popup that row never grows past 300px, so every name gets roughly five characters, however much room the popup has. The plugin lets the row use the empty space in the popup's header and gives RemNote a slightly larger width to calculate from, so it shows more of each name.
+
+### Optional: a wider popup
+
+The popup itself stays at RemNote's 700px. If you want it wider, and the breadcrumbs longer with it, paste this into **Settings → Custom CSS** and change the width:
+
+```css
+/* Reference/Preview popup: make it wider */
+:root { --ref-popup-width: 900px; }
+
+.rn-popup:has([data-icon="brain"]) {
+  max-width: calc(100vw - 32px) !important;
+}
+.rn-popup:has([data-icon="brain"]) [class~="w-[calc(min(700px,100vw-100px))]"] {
+  width: min(var(--ref-popup-width), calc(100vw - 100px));
+}
+.rn-popup:has([data-icon="brain"]) [class~="max-w-[calc(700px-128px)]"] {
+  max-width: none;
+}
+```
+
+At 900px each breadcrumb shows about 22 characters. The rule widens the whole popup (Reference, Explain and Mnemonic tabs too), so it does not change width when you switch tabs. RemNote places the hover popup once, when it opens. With a very large width, check that it still fits when the reference is near the right edge of the screen.

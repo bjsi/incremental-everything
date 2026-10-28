@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.170 - October 27th, 2026
+
+### ⚡ Improved
+
+**Rem Preview**: The breadcrumbs at the top of the hover preview now show about 13 characters per ancestor instead of 5, and an optional Custom CSS rule widens the popup for longer ones.
+
+📖 [Readable Breadcrumbs in Rem Preview](Utilities-Finding-and-Navigating.md#readable-breadcrumbs-in-rem-preview)
+
 ## v1.0.169 - October 27th, 2026
 
 ### ✨ New

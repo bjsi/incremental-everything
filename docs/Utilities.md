@@ -25,6 +25,7 @@ Reach a Rem, a source or a figure that RemNote’s own search will not surface.
 - [Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open)
 - [Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup)
 - [Filter a Document by Images](Utilities-Finding-and-Navigating.md#filter-a-document-by-images)
+- [Readable Breadcrumbs in Rem Preview](Utilities-Finding-and-Navigating.md#readable-breadcrumbs-in-rem-preview)
 
 ## [Queue Display](Utilities-Queue-Display.md)
 
