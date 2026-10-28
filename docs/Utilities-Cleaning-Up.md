@@ -1,6 +1,6 @@
 # Cleaning Up
 
-Commands that clear out Rems an import left behind, find flashcards that cannot be practised, and store the images and audio a Rem only links to.
+Commands that clear out Rems an import left behind, find flashcards that cannot be practised, store the images and audio a Rem only links to, and repair references an import broke.
 
 ## Delete Empty Extra Card Detail Rems
 
@@ -278,3 +278,102 @@ The message tells you how many images were skipped, and why.
 * The cycle is remembered **until you restart RemNote**. After that, the images you sized with this command count as sized, and the command leaves them alone — use RemNote's image menu to change them.
 * The Rem is edited in place and only the image's size changes, so its **flashcards and their history are untouched**.
 
+---
+
+## Repair Broken References { #repair-broken-references }
+
+A tool in the **Debug** popup that repairs references showing only the word **"Loading"**: it moves each one to the Rem it should point at and keeps it a pin, a reference or an inline link as before.
+
+### What you see
+
+A reference or a 📍 pin that renders as **Loading**, and stays that way. A Rem with three broken pins at the end reads `…da onda (H/L).LoadingLoadingLoading`. Clicking does nothing, and the text it used to show is nowhere in the outline.
+
+The reference points at a Rem ID that **no Rem in your knowledge base carries**. RemNote asked its server for that Rem, got nothing back, and keeps waiting. The Rem was not deleted, so the trash does not have it. It usually never existed in this knowledge base at all.
+
+### Why it happens { #why-references-break }
+
+* **Importing or moving Rems between knowledge bases.** Exporting a part of one knowledge base and importing it into another (a `.rem` file, or copying a whole tree across) gives every copied Rem a new ID. The references inside are supposed to be rewritten to match. When that rewrite goes wrong, a reference ends up with an ID that was never created, while the Rem it meant is sitting right there under another ID. Rebuilding a knowledge base this way can break hundreds of references at once.
+* **The target was deleted completely**, not just moved to the trash, after the reference was made. Deleted **Daily Documents** are a common case: every Rem that referenced that date breaks at once.
+
+### Finding the right targets in your backups { #finding-targets-in-backups }
+
+The broken reference holds only an ID, so finding where it should point means looking at an **older copy** of your knowledge base, one from before the break:
+
+* **RemNote's automatic backups.** The desktop app keeps a few days of them, next to its database, in `remnote/remnote-<knowledge-base-id>/backups/` inside your home folder.
+* **Exports** you made yourself, as JSON or `.rem`. Both are zip files with a `rem.json` inside.
+* **Copies of the database file** (`remnote.db`) you have kept anywhere else.
+
+The live database is the `remnote.db` in that same folder. It is a SQLite file: every Rem is a row of the `quanta` table, with its content as JSON. Two routes lead from a broken ID to the right Rem:
+
+1. **The target is in an older backup.** If the missing ID is found there, the backup shows what it was: its text, and where it lived. If a Rem with the same content exists today, point the reference at it. For a deleted Daily Document, open that date in RemNote to create it again, then point the reference at the new one.
+2. **The Rem was copied.** A copied Rem remembers where it came from in a field called `srcRemId`. Find that original Rem in a backup or export of the knowledge base it came from. Its references are in the same order as the copy's, so the original's reference in the same position names the **original target**. Today's Rem whose `srcRemId` is that original target is where the broken reference should point.
+
+This is slow by hand and quick for an AI agent that can read files, so the next section gives a prompt for one.
+
+### Let an AI build the plan { #ai-prompt-for-the-plan }
+
+An AI agent that can run code on your computer (Claude Code, for example) can do the whole analysis and hand you a file ready to paste. Copy the prompt below and fill in the three lines in brackets:
+
+```text
+In my RemNote knowledge base some references render only as "Loading": their target
+Rem ID does not exist. I need a JSON plan to repoint them, for the "Repoint references"
+tool of the Incremental RemNote plugin.
+
+Example Rem with broken references: [Rem ID, e.g. CqKslkB7iQIvgkewd]
+Live database: [path to remnote.db, e.g. ~/remnote/remnote-<kb-id>/remnote.db]
+Older copies to search: [backup .db / .db.zip files and JSON / .rem exports, oldest last]
+
+Rules:
+- Never write to any database. Open the live one as file:<path>?mode=ro and the
+  backups as file:<path>?immutable=1. Unzip archives into a temporary folder.
+- A Rem is a row of table `quanta` (_id, doc JSON). In exports (rem.json) it is an
+  element of the "docs" array. The front is doc.key and the back doc.value, both
+  rich-text arrays. A reference is {"i":"q","_id":…}; a pin is a reference with
+  "pin":true; an inline link is a text element with "qId".
+- A reference is broken when its target is not in `quanta`. Most such IDs are listed
+  in `missing_ids_quanta`.
+
+Steps:
+1. Scan the live database for every broken reference: Rem, side (key/value), position,
+   type (pin/reference/inline link), missing ID, and whether it carries
+   "textOfDeletedRem".
+2. For each one, try in order:
+   a. The missing ID itself in an older copy. Report its text and its parent. If it was
+      a Daily Document (parent named "Daily Document"), look for a live Daily
+      Document with the same name.
+   b. The Rem's "srcRemId" (it was copied): find that source Rem in an older copy,
+      line up its references with the live Rem's in the same position (only if both
+      sides have the same number of references), take the original target ID, and
+      use it if it exists live, or else the live Rem whose srcRemId equals it.
+3. Keep only the matches where the new target exists in the live database and exactly
+   one candidate was found.
+
+Output:
+- plan.json: {"<remId>": {"<missingId>": "<newTargetId>"}}, minified.
+- report: counts per outcome, the Daily Document dates I need to create (with how many
+  references each would fix), and for the rest the text recovered from older copies.
+Start with my example Rem and show me what you found before running the whole scan.
+
+Once the dates it lists exist, ask it to run the scan again: those references then go into the plan as well.
+
+### Repointing { #repointing-references }
+
+1. Put the cursor in any Rem and run **`Debug Incremental RemNote`**.
+2. Scroll to **Repoint references**.
+3. Paste the plan into the box and click a button:
+    * **Repoint** fixes the Rem the cursor is in. Paste `{ "oldId": "newId" }`, one line per broken reference.
+    * **Repoint across KB** fixes every Rem in a plan. Paste `{ "remId": { "oldId": "newId" } }` and confirm the number of Rems.
+
+A progress line counts the Rems as they are done, and the summary says how many references were repointed, how many Rems were unchanged or no longer exist, and how many failed (the console lists which).
+
+Only the ID inside each reference changes. A pin stays a pin, and a reference keeps its *Show Content*, alias and cloze settings. Nothing else on the Rem is touched.
+
+!!! tip "Fix one Rem first"
+    Run **Repoint** on one Rem from the plan and check it shows the right text before running the whole plan.
+
+Good to know:
+
+* **Nothing is written if any new target is missing**: the summary lists those IDs instead, so a typo cannot swap one broken reference for another.
+* **Running a plan twice is harmless.** Rems already repointed are reported as *unchanged*, so after an interruption just paste and run again.
+* **There is no undo button.** Keep the plan file: it records every reference changed, with its old and new ID.
+* References whose target no longer exists anywhere stay as they are. Many of them still carry the target's last text (RemNote keeps it in the reference), which the AI report above lists, so you can retype what matters.

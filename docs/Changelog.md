@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.172 - October 28th, 2026
 
+### ✨ New
+
+**Repair Broken References**: Added a tool to the Debug popup that repoints references showing only "Loading" (often left by importing or moving Rems between knowledge bases) to the Rems they should point at, one Rem or a whole plan at once, with an AI prompt in the docs that finds the matches in your backups.
+
+📖 [Repair Broken References](Utilities-Cleaning-Up.md#repair-broken-references)
+
 ### ⚡ Improved
 
 **Open Source in Popup**: The popup and the floating window now take 80% of your screen's height instead of a fixed size, so they no longer run off a laptop screen and use the extra room on a large monitor.

@@ -54,12 +54,13 @@ Mark a statement as true or false with one command, and make that kind of questi
 
 ## [Cleaning Up](Utilities-Cleaning-Up.md)
 
-Clear out Rems an import left behind, audit disabled cards, store the images and audio a Rem only links to, and size imported images that show cropped in the queue.
+Clear out Rems an import left behind, audit disabled cards, store the images and audio a Rem only links to, size imported images that show cropped in the queue, and repair references that show "Loading".
 
 - [Delete Empty Extra Card Detail Rems](Utilities-Cleaning-Up.md#delete-empty-extra-card-detail-rems)
 - [Card Enablement Audit](Utilities-Cleaning-Up.md#card-enablement-audit)
 - [Store Linked Images & Audio in RemNote](Utilities-Cleaning-Up.md#store-linked-images-audio)
 - [Cycle Image Size (`Opt+Shift+G`) — New](Utilities-Cleaning-Up.md#cycle-image-size)
+- [Repair Broken References — New](Utilities-Cleaning-Up.md#repair-broken-references)
 
 ## [Under the Hood](Utilities-Under-the-Hood.md)
 
