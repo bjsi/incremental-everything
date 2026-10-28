@@ -545,8 +545,8 @@ export function getRetrievabilityColor(r: number): string {
  * A popup height that follows the screen instead of being fixed.
  *
  * A number chosen once for one monitor is wrong on every other: 900px fills a
- * laptop edge to edge and wastes half a desktop display. This takes three
- * quarters of the screen, which leaves room for the window chrome and RemNote's
+ * laptop edge to edge and wastes half a desktop display. This takes four
+ * fifths of the screen, which leaves room for the window chrome and RemNote's
  * own margins, and clamps it so neither end can be absurd.
  *
  * It reads the *display*, not the RemNote window, because that is the only

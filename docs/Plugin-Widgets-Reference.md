@@ -523,20 +523,21 @@ A centered **modal** popup that renders the **PDF or web article behind a hovere
 - **Auto-scroll to highlight:** for highlights, the embedded reader scrolls to the highlighted passage once it mounts (retried a few times while the PDF engine initializes).
 - **🔖 Scroll to Highlight button** in the header re-centers on the highlight after you've scrolled around the document.
 - **Queue-safe:** uses a modal overlay (not a pane), so the queue, your position, and the rating buttons stay intact underneath.
+- **Screen-fitted height:** 80% of the display's height (600–1500 px), measured when the plugin loads.
 
 📖 **Full documentation:** [Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup)
 
 ### 6.6. Source Popup (floating, non-blocking)
 **Trigger:** **Hover** a reference pin → press `Opt+Shift+O` / `Alt+Shift+O` (command: `Open Hovered Source in Floating Window`)
 
-The **non-blocking** sibling of 6.5: the *same* reader, but opened as a **floating window on the right portion of the screen (≈48% width)** instead of a centered modal. Because it has no backdrop, the **card/editor stays visible beside it** — built for the case where you want to glance back and forth between the source and the card without the close/reopen churn a modal forces.
+The **non-blocking** sibling of 6.5: the *same* reader, but opened as a **floating window on the right portion of the screen (40% width)** instead of a centered modal. Because it has no backdrop, the **card/editor stays visible beside it** — built for the case where you want to glance back and forth between the source and the card without the close/reopen churn a modal forces.
 
 **Differences from the modal (6.5):**
 
 - **Stays open while you use the PDF:** clicking into the reader to **highlight, select text, or click existing highlights** does **not** dismiss it (the click-outside-to-close behavior is disabled — clicks land in the reader's iframe).
 - **Auto-closes on card advance:** when the queue loads the next card, the floating window closes itself so a previous source never lingers.
 - **Esc closes it without closing the queue:** the plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it. (When focus is inside the PDF iframe, the reader handles Esc itself; use `✕` there.)
-- **Fixed size:** RemNote floating widgets aren't user-resizable; the window opens at ≈48% viewport width, anchored top-right.
+- **Fixed size:** RemNote floating widgets aren't user-resizable; the window opens at 40% viewport width and 80% of the display's height, anchored top-right.
 
 Shares the source-detection and 🔖 Scroll to Highlight behaviors with 6.5.
 

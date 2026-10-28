@@ -545,7 +545,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('pdf_source_popup', WidgetLocation.Popup, {
     dimensions: {
       width: 1000,
-      height: 800,
+      height: screenFittedHeight(600),
     },
   });
 
@@ -559,10 +559,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
       // EXPERIMENT: width accepts a string (per WidgetOptions type), so try a
       // viewport-relative width that adapts to screen size. If the float opens
       // as a ~48px sliver, RemNote parsed this numerically — revert to a fixed
-      // number (e.g. 1100). Height MUST stay a fixed number (PDFWebReader needs
-      // an explicit height; the type forbids a string here anyway).
+      // number (e.g. 1100). Height MUST stay a number (PDFWebReader needs an
+      // explicit height; the type forbids a string here anyway), so it is
+      // fitted to the display once at registration instead.
       width: '40vw',
-      height: 1000,
+      height: screenFittedHeight(600),
     },
   });
 

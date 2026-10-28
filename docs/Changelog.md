@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.172 - October 28th, 2026
+
+### ⚡ Improved
+
+**Open Source in Popup**: The popup and the floating window now take 80% of your screen's height instead of a fixed size, so they no longer run off a laptop screen and use the extra room on a large monitor.
+
+📖 [Height follows your screen](Utilities-Finding-and-Navigating.md#height-follows-your-screen)
+
 ## v1.0.171 - October 28th, 2026
 
 ### ⚡ Improved

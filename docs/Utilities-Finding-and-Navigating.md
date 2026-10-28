@@ -135,7 +135,8 @@ Both are triggered the same way — **hover** the reference pin, then press a sh
 | --- | --- | --- |
 | Command | `Open Hovered Source in Popup` | `Open Hovered Source in Floating Window` |
 | Shortcut | **`Opt+O` / `Alt+O`** | **`Opt+Shift+O` / `Alt+Shift+O`** |
-| Placement | Centered, large | Right portion of the screen (≈48% width) |
+| Placement | Centered, large | Right portion of the screen (40% width) |
+| Height | 80% of the screen | 80% of the screen |
 | Blocks the UI behind it | **Yes** — a backdrop covers/dims the card | **No** — the card/editor stays visible beside it |
 | Best for | "Open → read → close → rate" in one focused glance | **Peeking back and forth** between source and card without close/reopen |
 | Closes on | `✕`, Esc, or clicking outside | `✕`, Esc, or advancing to the next card (does **not** close on outside click, so you can highlight/select in the PDF) |
@@ -166,6 +167,10 @@ So you can hover *any* pin and press the shortcut safely; only genuine sources o
 
 The header shows the name of the PDF or article after **📄 Source**, so you know which document you're looking at. A long name is cut off with "…"; hover the header to read it in full.
 
+### Height follows your screen
+
+Both variants are 80% of your display's height (at least 600 px, at most 1500 px), so they fill a laptop screen without running off the bottom and use the extra room on a large monitor. The height is measured when the plugin loads: after moving RemNote to another display, reload the plugin to refit it.
+
 ### Scroll to Highlight
 
 For PDF/HTML **highlights**, the viewer auto-scrolls to the highlighted passage once the reader finishes mounting (the embedded PDF engine takes a few seconds to initialize, so the scroll is retried a few times). If you then scroll around the document and want to jump back, click the **🔖 Scroll to Highlight** button in the header to re-center on the highlight at any time.
@@ -177,7 +182,7 @@ The floating variant is designed so the source sits **beside** your card while y
 - **Stays open while you use the PDF.** Unlike a modal, clicking into the reader to highlight, select text, or click existing highlights will **not** dismiss it.
 - **Closes itself when you advance the card,** so a previous card's source never lingers over the next one.
 - **Esc closes it** — without closing the queue. The plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it; Esc closes the float instead. (When focus is inside the PDF itself, the browser handles Esc within the reader; use the `✕` button there.)
-- **Not user-resizable.** RemNote floating widgets have a fixed registered size; the window opens at ≈48% of the screen width on the right.
+- **Not user-resizable.** RemNote floating widgets have a fixed registered size; the window opens at 40% of the screen width on the right.
 
 ![PDF Source shown in floating widget](assets/source-floating-widget.png){ width="900" }
 

@@ -403,7 +403,7 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   📖 See [Utilities → Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup).
 
 - **Open Hovered Source in Floating Window** (`Opt+Shift+O` / `Alt+Shift+O`)
-  Same source viewer as above, but opened as a **non-blocking floating window on the right (~48% width)** instead of a centered modal — so the **card/editor stays visible beside it** for peeking back and forth without close/reopen. **Hover** the pin, then press the shortcut.
+  Same source viewer as above, but opened as a **non-blocking floating window on the right (40% width)** instead of a centered modal — so the **card/editor stays visible beside it** for peeking back and forth without close/reopen. **Hover** the pin, then press the shortcut.
 
   - **Stays open while you use the PDF:** highlighting, selecting, or clicking highlights in the reader does **not** dismiss it (outside-click-to-close is disabled).
   - **Auto-closes on card advance**, so a previous card's source never lingers over the next.
