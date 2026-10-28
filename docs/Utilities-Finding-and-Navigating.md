@@ -305,6 +305,14 @@ When you hover a reference, RemNote's **Preview** popup shows the Rem's ancestor
 
 The plugin fixes this automatically. Nothing to switch on. Each breadcrumb now shows about 13 characters in a normal-size popup, and RemNote still folds the middle ancestors of a deep path into a `...` menu.
 
+**Before**
+
+![The Rem Preview popup before the fix, its breadcrumbs cut to "SH4... › High... › Pag...", outlined in red](assets/rem-preview-breadcrumb-before.png){ width="800" }
+
+**After**
+
+![The Rem Preview popup over a reference, its breadcrumbs reading "SH4M 3+ PDF › Highlights › Page 022" in full, outlined in red](assets/rem-preview-breadcrumb.png){ width="800" }
+
 ### Why RemNote cuts them so short
 
 RemNote picks how many characters each breadcrumb gets from the width of the breadcrumb row, then cuts the text before it is drawn. In the Preview popup that row never grows past 300px, so every name gets roughly five characters, however much room the popup has. The plugin lets the row use the empty space in the popup's header and gives RemNote a slightly larger width to calculate from, so it shows more of each name.

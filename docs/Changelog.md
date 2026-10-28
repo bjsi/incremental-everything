@@ -8,6 +8,14 @@ This page documents the major changes and improvements for each version of the I
 
 **Rem Preview**: The breadcrumbs at the top of the hover preview now show about 13 characters per ancestor instead of 5, and an optional Custom CSS rule widens the popup for longer ones.
 
+**Before**
+
+![The Rem Preview popup before the fix, its breadcrumbs cut to "SH4... › High... › Pag...", outlined in red](assets/rem-preview-breadcrumb-before.png){ width="800" }
+
+**After**
+
+![The Rem Preview popup over a reference, its breadcrumbs reading "SH4M 3+ PDF › Highlights › Page 022" in full, outlined in red](assets/rem-preview-breadcrumb.png){ width="800" }
+
 📖 [Readable Breadcrumbs in Rem Preview](Utilities-Finding-and-Navigating.md#readable-breadcrumbs-in-rem-preview)
 
 ## v1.0.169 - October 27th, 2026
