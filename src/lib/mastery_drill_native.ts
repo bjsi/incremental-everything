@@ -136,6 +136,9 @@ interface Session {
   /** Times the drill pressed Keep Practicing itself this session. */
   keepPracticingPresses: number;
   tripped: boolean;
+  /** Drill cards shown, for the bar's per-card actions (NativeDrillState). */
+  currentCardId?: string;
+  previousCardId?: string;
 }
 
 /** True when `subQueueId` is the regular-queue drill's document. Synchronous. */
@@ -267,6 +270,17 @@ export async function startNativeDrill(plugin: RNPlugin): Promise<void> {
 
 const publishState = (plugin: RNPlugin, state: NativeDrillState) =>
   plugin.storage.setSession(nativeDrillStateKey, state);
+
+const publishSession = (plugin: RNPlugin, s: Session) =>
+  publishState(plugin, { active: true, buried: s.buried, currentCardId: s.currentCardId, previousCardId: s.previousCardId });
+
+/** A drill card came on screen. Published only for drill cards, so it never races a skip. */
+function showCard(plugin: RNPlugin, s: Session, cardId: string) {
+  if (s.currentCardId === cardId) return;
+  if (s.currentCardId) s.previousCardId = s.currentCardId;
+  s.currentCardId = cardId;
+  void publishSession(plugin, s);
+}
 
 /**
  * Applies the ratings no QueueCompleteCard reported (Card Cluster members) to the drill list:
@@ -439,7 +453,7 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
         void plugin.app.registerCSS(BURY_CSS_ID, buryScreenCss(hidden));
         if (!s.buried) {
           s.buried = true;
-          void publishState(plugin, { active: true, buried: true });
+          void publishSession(plugin, s);
         }
         void plugin.app.toast(
           `Mastery Drill: RemNote hid ${hidden > 0 ? hidden : 'some'} drill card${hidden === 1 ? '' : 's'}. Press Keep Practicing (or Esc) to drill ${hidden === 1 ? 'it' : 'them'}.`
@@ -464,6 +478,7 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     if (s.allowed.has(cardId)) {
       s.shown++;
       s.watch.add(cardId);
+      showCard(plugin, s, cardId);
       return;
     }
     if (s.tripped) return;
@@ -513,6 +528,7 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     const visible = await plugin.storage.getSession<string>(CLUSTER_VISIBLE_CARD_KEY);
     if (session !== s || !visible || !s.allowed.has(visible)) return;
     s.watch.add(visible);
+    showCard(plugin, s, visible);
     scheduleReconcile(plugin, s);
   });
 

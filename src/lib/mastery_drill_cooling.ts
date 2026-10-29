@@ -79,3 +79,48 @@ export function formatDrillWait(ms: number): string {
   const days = Math.round(ms / DAY_MS);
   return `${days} day${days === 1 ? '' : 's'}`;
 }
+
+/**
+ * Old = ready to drill for longer than the threshold. Time spent cooling does not
+ * count, so a Hard card that waited a week is not flagged the moment it is ready.
+ */
+export function isOldDrillEntry(item: FinalDrillEntry, c: DrillCooling, thresholdDays: number, now: number): boolean {
+  if (typeof item === 'string' || !item.addedAt) return false;
+  const readyAt = drillReadyAt(item, c);
+  return readyAt <= now && now - readyAt > thresholdDays * DAY_MS;
+}
+
+export interface DrillSummary {
+  /** Every entry of this knowledge base, cooling or not. */
+  kbItems: FinalDrillEntry[];
+  /** Card ids past their cooling: what a drill serves now. */
+  readyIds: string[];
+  coolingCount: number;
+  /** When the first cooling entry becomes ready; undefined when none is cooling. */
+  firstReadyAt: number | undefined;
+  oldCount: number;
+}
+
+/** What both drill headers show, from the synced list. `inKb` picks this knowledge base's entries. */
+export function summarizeDrill(
+  items: FinalDrillEntry[],
+  inKb: (item: FinalDrillEntry) => boolean,
+  c: DrillCooling,
+  oldThresholdDays: number,
+  now: number
+): DrillSummary {
+  const summary: DrillSummary = { kbItems: [], readyIds: [], coolingCount: 0, firstReadyAt: undefined, oldCount: 0 };
+  for (const item of items) {
+    if (!inKb(item)) continue;
+    summary.kbItems.push(item);
+    const readyAt = drillReadyAt(item, c);
+    if (readyAt > now) {
+      summary.coolingCount++;
+      if (summary.firstReadyAt === undefined || readyAt < summary.firstReadyAt) summary.firstReadyAt = readyAt;
+    } else {
+      summary.readyIds.push(typeof item === 'string' ? item : item.cardId);
+      if (isOldDrillEntry(item, c, oldThresholdDays, now)) summary.oldCount++;
+    }
+  }
+  return summary;
+}

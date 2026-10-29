@@ -3,7 +3,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DrillCooling, drillCoolingMs, drillReadyAt, formatDrillWait, returnsAtOnce, toCooling } from './mastery_drill_cooling';
+import { DrillCooling, drillCoolingMs, drillReadyAt, formatDrillWait, returnsAtOnce, summarizeDrill, toCooling } from './mastery_drill_cooling';
 
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -50,5 +50,23 @@ describe('drill cooling', () => {
     assert.equal(formatDrillWait(5 * 60 * MIN), '5 h');
     assert.equal(formatDrillWait(3 * DAY), '3 days');
     assert.equal(formatDrillWait(DAY * 1.6), '2 days');
+  });
+
+  it('summarizes one knowledge base: ready, cooling, first release and old entries', () => {
+    const now = 100 * DAY;
+    const items = [
+      'legacy',
+      { cardId: 'again-fresh', kbId: 'kb', addedAt: now - 60 * MIN },
+      { cardId: 'again-old', kbId: 'kb', addedAt: now - 10 * DAY },
+      { cardId: 'hard-cooling', kbId: 'kb', addedAt: now - 5 * DAY, intervalMs: 365 * DAY },
+      { cardId: 'other-kb', kbId: 'other', addedAt: now - 10 * DAY },
+    ];
+    const s = summarizeDrill(items, (i) => typeof i === 'string' || i.kbId === 'kb', defaults, 7, now);
+    assert.equal(s.kbItems.length, 4);
+    assert.deepEqual(s.readyIds, ['legacy', 'again-old']);
+    assert.equal(s.coolingCount, 2);
+    assert.equal(s.firstReadyAt, now - 60 * MIN + 180 * MIN);
+    // again-old became ready 10 days minus 3 h ago; hard-cooling is not old however long it waited.
+    assert.equal(s.oldCount, 1);
   });
 });

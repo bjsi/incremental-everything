@@ -1,77 +1,127 @@
-import { renderWidget, usePlugin, useSessionStorageState, useSyncedStorageState } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useSessionStorageState, useSyncedStorageState, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import '../style.css';
 import '../App.css';
-import { NativeDrillState, nativeDrillStateKey } from '../lib/mastery_drill_launch';
-import { FinalDrillEntry, finalDrillIdsKey } from '../lib/mastery_drill_status';
+import { MasteryDrillHeader } from '../components/MasteryDrillHeader';
+import { oldItemThresholdId } from '../lib/consts';
+import { dropFromLiveQueue, markDrillCardEditLater, removeFromDrill } from '../lib/mastery_drill_actions';
+import { FinalDrillEntry, summarizeDrill } from '../lib/mastery_drill_cooling';
+import {
+  MasteryDrillPanelRequest,
+  NativeDrillState,
+  masteryDrillPanelWidgetId,
+  nativeDrillStateKey,
+} from '../lib/mastery_drill_launch';
+import { finalDrillIdsKey, finalDrillResumeTriggerKey, useDrillCooling } from '../lib/mastery_drill_status';
+import { useIESetting } from '../lib/settings';
+
+/** How often the counts are re-aged, so a card leaving its cooling shows up as Remaining. */
+const REFRESH_MS = 60_000;
 
 /**
  * The regular-queue Mastery Drill's bar, under the queue's top bar. Renders nothing
  * unless that drill is on screen (lib/mastery_drill_native publishes the state).
  *
- * It carries what the popup drill offered around its embedded queue and the regular
- * queue does not: taking the current card out of the drill, and the card list. Rating,
- * priority and the card info are the regular queue's own, plus every plugin's widgets.
+ * The same header as the popup drill (components/MasteryDrillHeader), minus the
+ * priority badge, which the regular queue already shows in the card info bar. The
+ * popup swaps its window for a panel; here each panel opens in a popup
+ * (widgets/mastery_drill_panel.tsx). Rating and the card itself are the queue's own.
  */
 function MasteryDrillQueueBar() {
   const plugin = usePlugin();
   const [state] = useSessionStorageState<NativeDrillState | undefined>(nativeDrillStateKey, undefined);
-  const [items, setItems] = useSyncedStorageState<FinalDrillEntry[]>(finalDrillIdsKey, []);
-  const [busy, setBusy] = React.useState(false);
+  const [items] = useSyncedStorageState<FinalDrillEntry[]>(finalDrillIdsKey, []);
+  const cooling = useDrillCooling();
+  const oldThreshold = useIESetting(oldItemThresholdId);
+  const kb = useTrackerPlugin(async (rp) => ({
+    id: (await rp.kb.getCurrentKnowledgeBaseData())?._id as string | undefined,
+    isPrimary: await rp.kb.isPrimaryKnowledgeBase(),
+  }));
 
-  if (!state?.active) return null;
+  const active = !!state?.active;
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => setNow(Date.now()), REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [active]);
 
-  const removeCurrent = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const card = await plugin.queue.getCurrentCard();
-      if (!card) {
-        await plugin.app.toast('No card on screen.');
-        return;
-      }
-      const cardId = card._id;
-      await setItems(items.filter((item) => (typeof item === 'string' ? item : item.cardId) !== cardId));
-      await plugin.queue.removeCurrentCardFromQueue(false);
-      await plugin.app.toast('Card removed from the Mastery Drill.');
-    } finally {
-      setBusy(false);
+  const summary = React.useMemo(
+    () =>
+      kb?.id
+        ? summarizeDrill(items, (item) => (typeof item === 'string' ? kb.isPrimary : item.kbId === kb.id), cooling, oldThreshold, now)
+        : null,
+    [items, kb?.id, kb?.isPrimary, cooling, oldThreshold, now]
+  );
+
+  if (!state?.active || !summary) return null;
+
+  const openPanel = (request: MasteryDrillPanelRequest) => plugin.widget.openPopup(masteryDrillPanelWidgetId, request);
+
+  /** Runs `fn` on the drill card on screen, or says there is none. */
+  const withCard = (cardId: string | undefined, none: string, fn: (cardId: string) => Promise<void>) => async () => {
+    if (!cardId) {
+      await plugin.app.toast(none);
+      return;
     }
+    await fn(cardId);
   };
-
-  const button: React.CSSProperties = {
-    padding: '1px 8px',
-    fontSize: '11px',
-    lineHeight: 1.6,
-    borderRadius: '4px',
-    border: '1px solid var(--rn-clr-border-primary)',
-    background: 'var(--rn-clr-background-primary)',
-    color: 'var(--rn-clr-content-secondary)',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  };
+  const noCurrent = 'No drill card on screen.';
 
   return (
-    <div style={{ padding: '2px 12px', fontSize: '12px', color: 'var(--rn-clr-content-secondary)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 600, color: 'var(--rn-clr-content-primary)' }}>🎯 Mastery Drill</span>
-        <button style={button} disabled={busy} onClick={removeCurrent} title="Take the card on screen out of the drill">
-          Remove from Drill
-        </button>
-        <button
-          style={button}
-          onClick={() => plugin.widget.openPopup('mastery_drill_list')}
-          title="Every card in the drill, and whether RemNote can show it"
-        >
-          Card List
-        </button>
-      </div>
-      {state.buried && (
-        <div style={{ marginTop: '2px', fontSize: '11px' }}>
-          RemNote hid some drill cards because a related card was just skipped. At "Time to Take a Break",
-          press <b>Keep Practicing</b> (or Esc) to get them. It only affects this drill.
-        </div>
-      )}
+    <div style={{ paddingBottom: '2px' }}>
+      <MasteryDrillHeader
+        variant="queue"
+        readyCount={summary.readyIds.length}
+        coolingCount={summary.coolingCount}
+        firstReadyAt={summary.firstReadyAt}
+        oldCount={summary.oldCount}
+        oldThreshold={oldThreshold}
+        onOpenCardList={() => plugin.widget.openPopup('mastery_drill_list')}
+        onClearAll={() => openPanel({ view: 'clear-all' })}
+        onClearLowPriority={() => openPanel({ view: 'clear-low' })}
+        onClearOld={() => openPanel({ view: 'clear-old' })}
+        goToRemTitle="Go to the current Rem (leaves the drill)"
+        onGoToRem={withCard(state.currentCardId, noCurrent, async (cardId) => {
+          const card = await plugin.card.findOne(cardId);
+          const rem = card?.remId ? await plugin.rem.findOne(card.remId) : undefined;
+          if (!rem) return;
+          await plugin.window.openRem(rem);
+          await plugin.storage.setSession(finalDrillResumeTriggerKey, Date.now());
+        })}
+        onEditLater={async (message) =>
+          withCard(state.currentCardId, noCurrent, async (cardId) => {
+            if (!(await markDrillCardEditLater(plugin, cardId, message))) return;
+            const dropped = await dropFromLiveQueue(plugin, cardId);
+            await plugin.app.toast(
+              dropped
+                ? 'Card marked for Edit Later and removed from drill.'
+                : 'Marked for Edit Later and removed from the drill. It stays on screen until you rate it.'
+            );
+          })()
+        }
+        onEditPrevious={withCard(state.previousCardId, 'No previous drill card yet.', async (cardId) => {
+          await openPanel({ view: 'edit', cardId, isCurrent: false });
+        })}
+        onEditCurrent={withCard(state.currentCardId, noCurrent, async (cardId) => {
+          await openPanel({ view: 'edit', cardId, isCurrent: true });
+        })}
+        onRemoveCurrent={withCard(state.currentCardId, noCurrent, async (cardId) => {
+          await removeFromDrill(plugin, [cardId]);
+          const dropped = await dropFromLiveQueue(plugin, cardId);
+          await plugin.app.toast(
+            dropped ? 'Card removed from the Mastery Drill.' : 'Card removed from the Mastery Drill. It stays on screen until you rate it.'
+          );
+        })}
+        notice={
+          state.buried ? (
+            <>
+              RemNote hid some drill cards because a related card was just skipped. At "Time to Take a Break", press{' '}
+              <b>Keep Practicing</b> (or Esc) to get them. It only affects this drill.
+            </>
+          ) : undefined
+        }
+      />
     </div>
   );
 }

@@ -633,6 +633,13 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
         height: screenFittedHeight(560),
       },
     });
+    // The bar's panels: clear confirmations, Clear Low Priority, the card editor.
+    plugin.app.registerWidget('mastery_drill_panel', WidgetLocation.Popup, {
+      dimensions: {
+        width: 900,
+        height: screenFittedHeight(560),
+      },
+    });
 
     // Mastery Drill notification banner
     plugin.app.registerWidget('mastery_drill_notification', WidgetLocation.SidebarEnd, {
