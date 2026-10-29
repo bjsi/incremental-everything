@@ -11,11 +11,8 @@ export interface SourceReaderViewProps {
   kind: string | null;
   /** Close handler — differs between the modal and floating hosts. */
   onClose: () => void;
-  /**
-   * Floating host only: makes the header a drag handle. Receives pointerdowns
-   * that did not start on a header button.
-   */
-  onHeaderPointerDown?: (e: React.PointerEvent<HTMLDivElement>) => void;
+  /** Floating host only: makes the header a drag handle (lib/floating_widget_drag). */
+  onHeaderPointerDown?: (e: React.PointerEvent<HTMLElement>) => void;
 }
 
 /**
@@ -109,13 +106,7 @@ export function SourceReaderView({
       }}
     >
       <div
-        onPointerDown={
-          onHeaderPointerDown &&
-          ((e) => {
-            if ((e.target as HTMLElement).closest('button')) return;
-            onHeaderPointerDown(e);
-          })
-        }
+        onPointerDown={onHeaderPointerDown}
         style={{
           display: 'flex',
           alignItems: 'center',

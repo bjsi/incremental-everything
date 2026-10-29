@@ -20,6 +20,7 @@ Run **`Find Rem (insert reference / open in pane)`** (quick code `fir`) or press
 - **Ctrl/Cmd+Shift+Enter** or **Ctrl/Cmd+Shift+click** → appends a **pin at the end of the Rem you are editing, keeping your selected text**. See [Pin a source at the end of a Rem](#pin-a-source-at-the-end-of-a-rem) below.
 - **↑/↓** navigate · **Esc** closes.
 - **Concepts only** checkbox narrows results to Concept-type Rems.
+- **Drag the title row** to move the box if it covers what you need to see; the search box keeps your typing. It opens at your cursor again next time.
 
 The Rem you triggered the picker from is **excluded from results** — a Rem can't reference itself.
 

@@ -6,9 +6,9 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ New
 
-**Source Popup**: The floating Source window (`Opt+Shift+O`) can now be moved by dragging its header, and the next one opens where you left it.
+**Floating Windows**: The floating Source window (`Opt+Shift+O`) and the Find Rem picker (`Opt+Shift+F`) can now be moved by dragging their header; the Source window reopens where you left it.
 
-📖 [Floating window — interaction & closing](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing)
+📖 [Floating Source window](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing) · [Find Rem](Utilities-Finding-and-Navigating.md#how-to-invoke)
 
 ## v1.0.173 - October 29th, 2026
 

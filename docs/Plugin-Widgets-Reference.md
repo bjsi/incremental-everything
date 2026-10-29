@@ -511,6 +511,7 @@ A **floating** picker (it doesn't cover the editor like a popup) that finds Rems
 - **Cloze-aware insertion:** a reference inserted while the cursor/selection is inside a cloze stays *inside* the cloze instead of breaking it.
 - **Accent-insensitive** (`navegacao interior` → `Navegação Interior`) and **selection-aware** (selected text seeds the box and is replaced by the reference on insert, like native `[[`).
 - Each result row shows a **type badge**, the Rem's **back text**, and a short **`root / … / parent` breadcrumb**; a **Concepts only** toggle narrows the list.
+- **Movable:** drag the title row to move the box; it opens at the cursor again next time.
 
 📖 **Full documentation:** [Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open) · root-cause explainer: [Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)
 

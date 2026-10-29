@@ -7,17 +7,13 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SourceReaderView } from '../components/SourceReaderView';
+import { useFloatingWidgetDrag, FloatingPosition } from '../lib/floating_widget_drag';
 import {
   sourceFloatingTargetKey,
   sourceFloatingActiveIdKey,
   sourceFloatingPositionKey,
   sourceFloatingDefaultPosition,
 } from '../lib/consts';
-
-type FloatPosition = { top: number; right: number };
-
-// Part of the float that must stay on screen when dragged toward an edge.
-const KEEP_VISIBLE_PX = 120;
 
 /**
  * FLOATING variant of the Source popup — non-blocking, opens to the side so the
@@ -36,7 +32,7 @@ export function PdfSourceFloating() {
   const [kind, setKind] = useState<string | null>(null);
   const [floatingWidgetId, setFloatingWidgetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const positionRef = useRef<FloatPosition>(sourceFloatingDefaultPosition);
+  const positionRef = useRef<FloatingPosition | null>(sourceFloatingDefaultPosition);
 
   useEffect(() => {
     const init = async () => {
@@ -44,7 +40,7 @@ export function PdfSourceFloating() {
         const ctx = await plugin.widget.getWidgetContext<WidgetLocation.FloatingWidget>();
         setFloatingWidgetId(ctx?.floatingWidgetId ?? null);
         positionRef.current =
-          (await plugin.storage.getSession<FloatPosition>(sourceFloatingPositionKey)) ||
+          (await plugin.storage.getSession<FloatingPosition>(sourceFloatingPositionKey)) ||
           sourceFloatingDefaultPosition;
 
         const data =
@@ -112,57 +108,13 @@ export function PdfSourceFloating() {
     };
   }, [floatingWidgetId, plugin, close]);
 
-  // Drag-by-header. RemNote draws no frame or handle for floating widgets — the
-  // host only offers setFloatingWidgetPosition, which re-renders the same
-  // wrapper (the iframe is not remounted, so the reader keeps its page).
-  //
-  // - Pointer capture keeps moves coming while the cursor crosses the nested
-  //   PDF iframe or leaves ours.
-  // - screenX/Y, not clientX/Y: the iframe moves under the cursor, so client
-  //   coordinates drift by however far the host has already moved it.
-  // - One position call per animation frame; each is an async host round trip.
-  const onHeaderPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!floatingWidgetId || e.button !== 0) return;
-      e.preventDefault();
-      const handle = e.currentTarget;
-      const pointerId = e.pointerId;
-      handle.setPointerCapture(pointerId);
-
-      const start = { x: e.screenX, y: e.screenY, ...positionRef.current };
-      let frame: number | null = null;
-
-      const send = () => {
-        frame = null;
-        plugin.window.setFloatingWidgetPosition(floatingWidgetId, positionRef.current).catch(() => {});
-      };
-      const onMove = (ev: PointerEvent) => {
-        if (ev.pointerId !== pointerId) return;
-        const maxTop = window.screen.availHeight - KEEP_VISIBLE_PX;
-        const minRight = KEEP_VISIBLE_PX - window.innerWidth;
-        const maxRight = window.screen.availWidth - KEEP_VISIBLE_PX;
-        positionRef.current = {
-          top: Math.round(Math.min(Math.max(start.top + ev.screenY - start.y, 0), maxTop)),
-          right: Math.round(Math.min(Math.max(start.right - (ev.screenX - start.x), minRight), maxRight)),
-        };
-        if (frame === null) frame = requestAnimationFrame(send);
-      };
-      const onEnd = (ev: PointerEvent) => {
-        if (ev.pointerId !== pointerId) return;
-        handle.removeEventListener('pointermove', onMove);
-        handle.removeEventListener('pointerup', onEnd);
-        handle.removeEventListener('pointercancel', onEnd);
-        if (handle.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId);
-        if (frame !== null) cancelAnimationFrame(frame);
-        send();
-        plugin.storage.setSession(sourceFloatingPositionKey, positionRef.current).catch(() => {});
-      };
-      handle.addEventListener('pointermove', onMove);
-      handle.addEventListener('pointerup', onEnd);
-      handle.addEventListener('pointercancel', onEnd);
+  const savePosition = useCallback(
+    (position: FloatingPosition) => {
+      plugin.storage.setSession(sourceFloatingPositionKey, position).catch(() => {});
     },
-    [floatingWidgetId, plugin]
+    [plugin]
   );
+  const onHeaderPointerDown = useFloatingWidgetDrag(plugin, floatingWidgetId, positionRef, savePosition);
 
   if (loading) {
     return <div style={{ padding: '16px' }}>Loading source…</div>;
