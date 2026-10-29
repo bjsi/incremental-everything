@@ -528,8 +528,9 @@ function FinalDrill() {
         onClearAll={() => setShowClearAllConfirm(true)}
         onClearLowPriority={() => setShowClearLowPriorityView(true)}
         onClearOld={() => setShowClearOldConfirm(true)}
-        priority={
-          currentCardData?.priority
+        onRemoveCurrent={removeCurrentFromDrill}
+        cardActions={{
+          priority: currentCardData?.priority
             ? {
                 info: currentCardData.priority,
                 onSave: async (value) => {
@@ -537,19 +538,17 @@ function FinalDrill() {
                   if (rem) await setCardPriority(plugin, rem, value, 'manual', false, { event: 'drill' });
                 },
               }
-            : null
-        }
-        goToRemTitle="Go to the current Rem (closes popup)"
-        onGoToRem={async () => {
-          const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
-          if (!cardId) return;
-          const card = await plugin.card.findOne(cardId);
-          if (card?.remId) await goToRem(card.remId);
+            : null,
+          onGoToRem: async () => {
+            const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
+            if (!cardId) return;
+            const card = await plugin.card.findOne(cardId);
+            if (card?.remId) await goToRem(card.remId);
+          },
+          onEditLater: editLaterCurrent,
+          onEditPrevious: () => startEditing('previous'),
+          onEditCurrent: () => startEditing('current'),
         }}
-        onEditLater={editLaterCurrent}
-        onEditPrevious={() => startEditing('previous')}
-        onEditCurrent={() => startEditing('current')}
-        onRemoveCurrent={removeCurrentFromDrill}
         showDescription
       />
 

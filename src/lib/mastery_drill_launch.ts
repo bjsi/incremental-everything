@@ -28,19 +28,17 @@ export const masteryDrillPanelWidgetId = 'mastery_drill_panel';
 export type MasteryDrillPanelRequest =
   | { view: 'clear-all' }
   | { view: 'clear-old' }
-  | { view: 'clear-low' }
-  | { view: 'edit'; cardId: string; isCurrent: boolean };
+  | { view: 'clear-low' };
 
 export interface NativeDrillState {
   active: boolean;
   /** RemNote buried at least one drill card this session ("Time to Take a Break"). */
   buried: boolean;
   /**
-   * The drill card on screen and the one before it. Skipped cards never count, and
+   * The drill card on screen, for Remove from Drill. Skipped cards never count, and
    * inside a Card Cluster this is the sibling shown, not the cluster's anchor.
    */
   currentCardId?: string;
-  previousCardId?: string;
 }
 
 export async function openMasteryDrill(plugin: RNPlugin, mode?: MasteryDrillMode): Promise<void> {

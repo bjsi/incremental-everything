@@ -4,7 +4,7 @@ import '../style.css';
 import '../App.css';
 import { MasteryDrillHeader } from '../components/MasteryDrillHeader';
 import { oldItemThresholdId } from '../lib/consts';
-import { dropFromLiveQueue, markDrillCardEditLater, removeFromDrill } from '../lib/mastery_drill_actions';
+import { dropFromLiveQueue, removeFromDrill } from '../lib/mastery_drill_actions';
 import { FinalDrillEntry, summarizeDrill } from '../lib/mastery_drill_cooling';
 import {
   MasteryDrillPanelRequest,
@@ -12,7 +12,7 @@ import {
   masteryDrillPanelWidgetId,
   nativeDrillStateKey,
 } from '../lib/mastery_drill_launch';
-import { finalDrillIdsKey, finalDrillResumeTriggerKey, useDrillCooling } from '../lib/mastery_drill_status';
+import { finalDrillIdsKey, useDrillCooling } from '../lib/mastery_drill_status';
 import { useIESetting } from '../lib/settings';
 
 /** How often the counts are re-aged, so a card leaving its cooling shows up as Remaining. */
@@ -22,10 +22,10 @@ const REFRESH_MS = 60_000;
  * The regular-queue Mastery Drill's bar, under the queue's top bar. Renders nothing
  * unless that drill is on screen (lib/mastery_drill_native publishes the state).
  *
- * The same header as the popup drill (components/MasteryDrillHeader), minus the
- * priority badge, which the regular queue already shows in the card info bar. The
+ * The popup drill's header (components/MasteryDrillHeader) without its card row:
+ * Go to Rem, Edit Later, editing and priority are the regular queue's own. The
  * popup swaps its window for a panel; here each panel opens in a popup
- * (widgets/mastery_drill_panel.tsx). Rating and the card itself are the queue's own.
+ * (widgets/mastery_drill_panel.tsx).
  */
 function MasteryDrillQueueBar() {
   const plugin = usePlugin();
@@ -58,15 +58,18 @@ function MasteryDrillQueueBar() {
 
   const openPanel = (request: MasteryDrillPanelRequest) => plugin.widget.openPopup(masteryDrillPanelWidgetId, request);
 
-  /** Runs `fn` on the drill card on screen, or says there is none. */
-  const withCard = (cardId: string | undefined, none: string, fn: (cardId: string) => Promise<void>) => async () => {
+  const removeCurrent = async () => {
+    const cardId = state.currentCardId;
     if (!cardId) {
-      await plugin.app.toast(none);
+      await plugin.app.toast('No drill card on screen.');
       return;
     }
-    await fn(cardId);
+    await removeFromDrill(plugin, [cardId]);
+    const dropped = await dropFromLiveQueue(plugin, cardId);
+    await plugin.app.toast(
+      dropped ? 'Card removed from the Mastery Drill.' : 'Card removed from the Mastery Drill. It stays on screen until you rate it.'
+    );
   };
-  const noCurrent = 'No drill card on screen.';
 
   return (
     <div style={{ paddingBottom: '2px' }}>
@@ -81,38 +84,7 @@ function MasteryDrillQueueBar() {
         onClearAll={() => openPanel({ view: 'clear-all' })}
         onClearLowPriority={() => openPanel({ view: 'clear-low' })}
         onClearOld={() => openPanel({ view: 'clear-old' })}
-        goToRemTitle="Go to the current Rem (leaves the drill)"
-        onGoToRem={withCard(state.currentCardId, noCurrent, async (cardId) => {
-          const card = await plugin.card.findOne(cardId);
-          const rem = card?.remId ? await plugin.rem.findOne(card.remId) : undefined;
-          if (!rem) return;
-          await plugin.window.openRem(rem);
-          await plugin.storage.setSession(finalDrillResumeTriggerKey, Date.now());
-        })}
-        onEditLater={async (message) =>
-          withCard(state.currentCardId, noCurrent, async (cardId) => {
-            if (!(await markDrillCardEditLater(plugin, cardId, message))) return;
-            const dropped = await dropFromLiveQueue(plugin, cardId);
-            await plugin.app.toast(
-              dropped
-                ? 'Card marked for Edit Later and removed from drill.'
-                : 'Marked for Edit Later and removed from the drill. It stays on screen until you rate it.'
-            );
-          })()
-        }
-        onEditPrevious={withCard(state.previousCardId, 'No previous drill card yet.', async (cardId) => {
-          await openPanel({ view: 'edit', cardId, isCurrent: false });
-        })}
-        onEditCurrent={withCard(state.currentCardId, noCurrent, async (cardId) => {
-          await openPanel({ view: 'edit', cardId, isCurrent: true });
-        })}
-        onRemoveCurrent={withCard(state.currentCardId, noCurrent, async (cardId) => {
-          await removeFromDrill(plugin, [cardId]);
-          const dropped = await dropFromLiveQueue(plugin, cardId);
-          await plugin.app.toast(
-            dropped ? 'Card removed from the Mastery Drill.' : 'Card removed from the Mastery Drill. It stays on screen until you rate it.'
-          );
-        })}
+        onRemoveCurrent={removeCurrent}
         notice={
           state.buried ? (
             <>

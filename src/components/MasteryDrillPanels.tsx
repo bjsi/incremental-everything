@@ -1,7 +1,8 @@
 /**
  * The Mastery Drill's full-window panels: the clear confirmations, Clear Low
  * Priority and the card editor. The popup drill shows them in place of its queue;
- * the regular-queue drill's bar opens them in widgets/mastery_drill_panel.tsx.
+ * the regular-queue drill's bar opens the first two in widgets/mastery_drill_panel.tsx
+ * (the regular queue edits cards natively).
  *
  * Keyboard: ←/→ (or Tab) move the selection ring between the buttons, Enter runs
  * the selected one, Esc goes back. Keys are read on the container, never on the

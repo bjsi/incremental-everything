@@ -2,10 +2,12 @@
  * The Mastery Drill header, shared by the popup drill (widgets/mastery_drill.tsx)
  * and the regular-queue drill's bar (widgets/mastery_drill_queue_bar.tsx).
  *
- * Row 1 manages the drill as a whole (counts, card list, clearing); row 2 acts on
- * the card on screen. The header only renders and collects the Edit Later note and
- * the priority edit: what each action does, and where its panel opens, is up to the
- * widget — the popup swaps its whole window, the queue bar opens a popup.
+ * Row 1 manages the drill (counts, card list, clearing, Remove from Drill). Row 2 is
+ * the popup's only: Go to Rem, Edit Later and the editors stand in for what the
+ * regular queue gives natively, so its bar has row 1 alone. The header only renders
+ * and collects the Edit Later note and the priority edit: what each action does,
+ * and where its panel opens, is up to the widget — the popup swaps its whole
+ * window, the queue bar opens a popup.
  */
 
 import React from 'react';
@@ -26,14 +28,16 @@ export interface MasteryDrillHeaderProps {
   onClearAll: () => void;
   onClearLowPriority: () => void;
   onClearOld: () => void;
-  /** The current card's priority, editable in place. Left out where the host shows priority itself. */
-  priority?: { info: CardPriorityInfo; onSave: (value: number) => Promise<void> } | null;
-  onGoToRem: () => void;
-  onEditLater: (message: string) => Promise<void>;
-  onEditPrevious: () => void;
-  onEditCurrent: () => void;
   onRemoveCurrent: () => void;
-  goToRemTitle?: string;
+  /** Row 2, popup only. */
+  cardActions?: {
+    /** The current card's priority, editable in place. */
+    priority?: { info: CardPriorityInfo; onSave: (value: number) => Promise<void> } | null;
+    onGoToRem: () => void;
+    onEditLater: (message: string) => Promise<void>;
+    onEditPrevious: () => void;
+    onEditCurrent: () => void;
+  };
   showDescription?: boolean;
   /** Shown under the rows, e.g. the regular-queue drill's buried-cards hint. */
   notice?: React.ReactNode;
@@ -46,18 +50,18 @@ const neutral: React.CSSProperties = {
 };
 
 export function MasteryDrillHeader(props: MasteryDrillHeaderProps) {
-  const { variant, readyCount, coolingCount, firstReadyAt, oldCount, oldThreshold, priority } = props;
+  const { variant, readyCount, coolingCount, firstReadyAt, oldCount, oldThreshold, cardActions } = props;
+  const priority = cardActions?.priority;
   const compact = variant === 'queue';
   const [editLaterOpen, setEditLaterOpen] = React.useState(false);
   const [editLaterMessage, setEditLaterMessage] = React.useState('');
   const [editingPriority, setEditingPriority] = React.useState<number | null>(null);
 
-  // Row 2 is the popup's main toolbar; in the queue strip it matches row 1.
-  const actionSize = compact ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm';
+  const actionSize = 'px-3 py-1.5 text-sm';
   const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
   const confirmEditLater = async () => {
-    await props.onEditLater(editLaterMessage);
+    await cardActions?.onEditLater(editLaterMessage);
     setEditLaterOpen(false);
     setEditLaterMessage('');
   };
@@ -69,7 +73,7 @@ export function MasteryDrillHeader(props: MasteryDrillHeaderProps) {
   return (
     <div className={compact ? 'flex flex-col' : 'border-b rn-clr-border-primary flex flex-col'}>
       {/* Row 1: the drill as a whole */}
-      <div className={`flex items-center gap-2 flex-wrap ${compact ? 'px-3 pt-1' : 'px-2 pt-2 pb-1'}`}>
+      <div className={`flex items-center gap-2 flex-wrap ${compact ? 'px-3 py-1' : 'px-2 pt-2 pb-1'}`}>
         <span
           className={`whitespace-nowrap flex-shrink-0 ${compact ? 'font-semibold text-sm' : 'font-bold text-lg'}`}
           style={{ color: 'var(--rn-clr-content-primary)' }}
@@ -120,6 +124,13 @@ export function MasteryDrillHeader(props: MasteryDrillHeaderProps) {
         >
           Clear Low Priority
         </button>
+        <button
+          onClick={props.onRemoveCurrent}
+          className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 font-medium whitespace-nowrap"
+          title="Remove the card on screen from the Mastery Drill"
+        >
+          Remove from Drill
+        </button>
         {oldCount > 0 && (
           <div
             className="flex items-center gap-1.5 px-2 py-1 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800"
@@ -138,8 +149,9 @@ export function MasteryDrillHeader(props: MasteryDrillHeaderProps) {
         )}
       </div>
 
-      {/* Row 2: the card on screen */}
-      <div className={`flex items-center gap-2 flex-wrap ${compact ? 'px-3 pt-1 pb-1' : 'px-2 pb-2'}`}>
+      {/* Row 2: the card on screen (popup only) */}
+      {cardActions && (
+      <div className="flex items-center gap-2 flex-wrap px-2 pb-2">
         {priority && (
           <div className="cursor-pointer" onClick={() => setEditingPriority(priority.info.priority)} title="Click to change priority">
             <PriorityBadge
@@ -153,10 +165,10 @@ export function MasteryDrillHeader(props: MasteryDrillHeaderProps) {
           </div>
         )}
         <button
-          onClick={props.onGoToRem}
+          onClick={cardActions.onGoToRem}
           className={`${actionSize} rounded transition-colors shadow-sm font-medium whitespace-nowrap`}
           style={neutral}
-          title={props.goToRemTitle ?? 'Go to the current Rem'}
+          title="Go to the current Rem (closes popup)"
         >
           Go to Rem
         </button>
@@ -171,7 +183,7 @@ export function MasteryDrillHeader(props: MasteryDrillHeaderProps) {
           Edit Later
         </button>
         <button
-          onClick={props.onEditPrevious}
+          onClick={cardActions.onEditPrevious}
           className={`${actionSize} rounded font-medium transition-colors shadow-sm whitespace-nowrap`}
           style={{ ...neutral, backgroundColor: 'var(--rn-clr-background-secondary)' }}
           title="Edit the card you just rated"
@@ -179,20 +191,14 @@ export function MasteryDrillHeader(props: MasteryDrillHeaderProps) {
           Edit Previous
         </button>
         <button
-          onClick={props.onEditCurrent}
+          onClick={cardActions.onEditCurrent}
           className={`${actionSize} rounded bg-blue-500 text-white hover:bg-blue-600 font-medium transition-colors shadow-sm whitespace-nowrap`}
           title="Edit the currently visible card"
         >
           Edit Current
         </button>
-        <button
-          onClick={props.onRemoveCurrent}
-          className={`${actionSize} rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 font-medium transition-colors whitespace-nowrap`}
-          title="Remove current card from the Mastery Drill"
-        >
-          Remove from Drill
-        </button>
       </div>
+      )}
 
       {editingPriority !== null && priority && (
         <div className="px-2 pt-1">

@@ -9,23 +9,17 @@ import {
 import React from 'react';
 import '../style.css';
 import '../App.css';
-import { MasteryDrillCardEditor, MasteryDrillConfirm, MasteryDrillLowPriority } from '../components/MasteryDrillPanels';
+import { MasteryDrillConfirm, MasteryDrillLowPriority } from '../components/MasteryDrillPanels';
 import { oldItemThresholdId } from '../lib/consts';
-import {
-  clearDrillForKb,
-  clearOldDrillItems,
-  dropFromLiveQueue,
-  markDrillCardEditLater,
-  removeFromDrill,
-} from '../lib/mastery_drill_actions';
+import { clearDrillForKb, clearOldDrillItems, removeFromDrill } from '../lib/mastery_drill_actions';
 import { FinalDrillEntry, summarizeDrill } from '../lib/mastery_drill_cooling';
 import { MasteryDrillPanelRequest } from '../lib/mastery_drill_launch';
-import { finalDrillIdsKey, finalDrillResumeTriggerKey, useDrillCooling } from '../lib/mastery_drill_status';
+import { finalDrillIdsKey, useDrillCooling } from '../lib/mastery_drill_status';
 import { useIESetting } from '../lib/settings';
 
 /**
- * The regular-queue drill bar's panels (clear confirmations, Clear Low Priority, the
- * card editor) — the same components the popup drill shows in place of its queue.
+ * The regular-queue drill bar's panels (clear confirmations, Clear Low Priority) —
+ * the same components the popup drill shows in place of its queue.
  * Which one comes from the popup's context (MasteryDrillPanelRequest).
  */
 function MasteryDrillPanel() {
@@ -41,10 +35,6 @@ function MasteryDrillPanel() {
     id: (await rp.kb.getCurrentKnowledgeBaseData())?._id as string | undefined,
     isPrimary: await rp.kb.isPrimaryKnowledgeBase(),
   }));
-  const editRemId = useTrackerPlugin(
-    async (rp) => (request?.view === 'edit' ? (await rp.card.findOne(request.cardId))?.remId ?? null : null),
-    [request]
-  );
 
   const summary = React.useMemo(
     () =>
@@ -91,50 +81,14 @@ function MasteryDrillPanel() {
     );
   }
 
-  if (request.view === 'clear-low') {
-    return (
-      <MasteryDrillLowPriority
-        items={summary.kbItems}
-        onRemove={async (cardIds) => {
-          await removeFromDrill(plugin, cardIds);
-          await close();
-        }}
-        onBack={close}
-      />
-    );
-  }
-
-  const { cardId, isCurrent } = request;
-  if (!editRemId) {
-    return editRemId === null ? (
-      <div className="p-4 text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-        This card no longer exists.
-      </div>
-    ) : null;
-  }
-
   return (
-    <MasteryDrillCardEditor
-      remId={editRemId}
-      doneLabel="Done / Back to Queue"
-      onEditLater={async (message) => {
-        if (!(await markDrillCardEditLater(plugin, cardId, message))) return;
-        const dropped = isCurrent && (await dropFromLiveQueue(plugin, cardId));
-        await plugin.app.toast(
-          isCurrent && !dropped
-            ? 'Marked for Edit Later and removed from the drill. It stays on screen until you rate it.'
-            : 'Card marked for Edit Later and removed from drill.'
-        );
+    <MasteryDrillLowPriority
+      items={summary.kbItems}
+      onRemove={async (cardIds) => {
+        await removeFromDrill(plugin, cardIds);
         await close();
       }}
-      onGoToRem={async () => {
-        const rem = await plugin.rem.findOne(editRemId);
-        if (!rem) return;
-        await plugin.window.openRem(rem);
-        await plugin.storage.setSession(finalDrillResumeTriggerKey, Date.now());
-        await close();
-      }}
-      onDone={close}
+      onBack={close}
     />
   );
 }

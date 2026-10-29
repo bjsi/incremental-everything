@@ -30,6 +30,13 @@ const QUEUE_VARIANT_CSS = `
     min-height: 0.5rem;
     flex-shrink: 0;
   }
+  /* The slot is a flex child of the queue box without shrink-0: once a revealed answer
+     overflows the box, flexbox squeezes the wrapper and its overflow:hidden clips the bar. */
+  .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=mastery_drill_queue_bar&"]) {
+    flex-shrink: 0;
+  }
+  /* In Beautiful the overlay below also covers the drill bar's right end: the regular-queue
+     drill narrows it while it runs (BAR_CSS in lib/mastery_drill_native.ts). */
   .rn-queue:not(.queue-beautiful-box) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"] {
     display: none;
   }
@@ -633,7 +640,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
         height: screenFittedHeight(560),
       },
     });
-    // The bar's panels: clear confirmations, Clear Low Priority, the card editor.
+    // The bar's panels: clear confirmations and Clear Low Priority.
     plugin.app.registerWidget('mastery_drill_panel', WidgetLocation.Popup, {
       dimensions: {
         width: 900,
