@@ -1,3 +1,5 @@
+//This file exists so that every ID the plugin shares with RemNote, or passes between its own widgets, is spelled in exactly one place.
+
 // powerup
 export const powerupCode = 'incremental';
 export const prioritySlotCode = 'priority';
@@ -115,7 +117,8 @@ export const titleCaseAcronymsId = 'title-case-acronyms';
 export const sourceHighlightColorId = 'source-highlight-color';
 export type HighlightColorName = 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple';
 /** Create IncRem also pins the passage in a PDF's other view (page ↔ Text Reader) — lib/pdf_source_pins pinOtherViewOfHighlight. */
-export const pinOtherReaderViewOnCreateIncRemId = 'pin-other-reader-view-on-create-increm';export const enableMasteryDrillId = 'enable-mastery-drill';
+export const pinOtherReaderViewOnCreateIncRemId = 'pin-other-reader-view-on-create-increm';
+export const enableMasteryDrillId = 'enable-mastery-drill';
 /** Pre-inversion id, kept only so the migration can convert stored values. */
 export const legacySkipMasteryDrillId = 'skip_mastery_drill';
 export const oldItemThresholdId = 'old_item_threshold';
@@ -513,8 +516,6 @@ export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // loadCardPriorityCache, read by the 'Update all inherited Card Priorities'
 // cleanup so it can skip re-scanning to find them.
 export const orphanRemIdsKey = 'orphan-rem-ids-key';
-// Pending priority save job: written by priority_light popup before closing,
-// picked up and executed by tracker.ts in the persistent index widget.
 // Setting id AND registerCSS id for the table-cell priority badges.
 export const showPriorityBandsInTablesId = 'showPriorityBandsInTables';
 // Bumped whenever the band→percentile mapping should be recomputed and the band
@@ -530,7 +531,13 @@ export const priorityBandColorsReloadKey = 'priority-band-colors-reload';
 // so it survives a reload once switched on. Toggled by the
 // `toggle-priority-band-logging` command.
 export const priorityBandVerboseLogsKey = 'priority-band-verbose-logs';
+// Pending priority save job: written by priority_light popup before closing,
+// picked up and executed by tracker.ts in the persistent index widget.
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
+// The card priority a popup just saved, for the queue's displays to show until the
+// tracker's card-priority cache write catches up. One small setSession, so it
+// survives popup teardown — see lib/card_priority/pending_priority.ts.
+export const pendingCardPriorityKey = 'pendingCardPriority';
 // Rem ids a priority popup should apply to when opened in batch mode (Opt+P /
 // Ctrl+Opt+P over a multi-rem selection, e.g. several table rows). Written by the
 // command, read by priority.tsx / priority_light.tsx. Distinct from

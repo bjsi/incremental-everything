@@ -15,6 +15,7 @@ import {
   displayPriorityShieldId,
   displayWeightedShieldId,
   cardPriorityCacheRefreshKey,
+  pendingCardPriorityKey,
   seenCardInSessionKey,
   coolingCacheKey,
   priorityCalcScopeRemIdsKey,
@@ -30,8 +31,10 @@ import {
   isPerCardDue,
   getCardPriority,
   PerCardShieldItem,
+  estimateCardRemPercentile,
 } from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
+import { PendingCardPriority, pendingCardPriorityFor } from '../lib/card_priority/pending_priority';
 import { reportCardInfoBarHeight } from '../lib/card_info_bar_dock';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
@@ -174,6 +177,12 @@ export function CardInfoBar() {
   // 2. Add a new tracker to listen for the refresh signal.
   const refreshSignal = useTrackerPlugin(
     (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
+    []
+  );
+
+  // What a priority popup just saved, until the tracker's cache write catches up.
+  const pendingCardPriority = useTrackerPlugin(
+    (rp) => rp.storage.getSession<PendingCardPriority>(pendingCardPriorityKey),
     []
   );
 
@@ -565,8 +574,26 @@ export function CardInfoBar() {
   }, [rem]);
 
   // --- 🔌 COMBINE RESULTS ---
-  // Prefer cache-based cardInfo; fall back to on-demand lightCardInfo (covers Light Mode + cache-not-ready)
-  const finalCardInfo = cardInfo || lightCardInfo;
+  // Prefer cache-based cardInfo; fall back to on-demand lightCardInfo (covers Light Mode + cache-not-ready).
+  // A value a popup just saved overrides either until what was read is at least as new.
+  const baseCardInfo = cardInfo || lightCardInfo;
+  const pending = pendingCardPriorityFor(pendingCardPriority, rem?._id, baseCardInfo);
+  const finalCardInfo = useMemo(
+    () =>
+      baseCardInfo && pending
+        ? { ...baseCardInfo, priority: pending.priority, source: pending.source }
+        : baseCardInfo,
+    [baseCardInfo, pending]
+  );
+
+  // The cached kbPercentile was ranked with the old priority. Until the cache
+  // catches up, place the new one in the same per-card universe so the colour
+  // and the "% KB" move with the number.
+  const estimatedKbPercentile = useMemo(() => {
+    if (!rem || !cardInfo || !finalCardInfo || !allPrioritizedCardInfo) return undefined;
+    if (finalCardInfo.priority === cardInfo.priority) return undefined;
+    return estimateCardRemPercentile(allPrioritizedCardInfo, rem._id, finalCardInfo.priority);
+  }, [rem, cardInfo, finalCardInfo, allPrioritizedCardInfo]);
 
   // Detect whether the stats separator `|` has flex-wrapped to a new line.
   // CSS cannot observe line-breaks in a flex-wrap container, so we compare the
@@ -616,7 +643,9 @@ export function CardInfoBar() {
   // KB percentile is read directly from the main cache, which is already fast.
   // Only show relative data when the cache is actually populated
   const cacheReady = !!(cardInfo && allPrioritizedCardInfo && allPrioritizedCardInfo.length > 0);
-  const kbPercentile = (!useLightMode && cacheReady && cardInfo) ? cardInfo.kbPercentile : undefined;
+  const kbPercentile = (!useLightMode && cacheReady && cardInfo)
+    ? (estimatedKbPercentile ?? cardInfo.kbPercentile)
+    : undefined;
 
   const priorityColor = kbPercentile !== undefined ? percentileToHslColor(kbPercentile) : '#6b7280';
 

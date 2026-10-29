@@ -438,13 +438,18 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true, {
           event: job.event ?? 'popup',
         });
-        const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
-        updateCardPriorityCache(plugin as any, rem._id, true, {
+        const { updateCardPriorityCache, whenCardPriorityCacheFlushed } = await import('../lib/card_priority/cache');
+        // Awaited, then waited on — not followed by flushCacheUpdatesNow. The call
+        // reads the Rem's card data back before queueing the entry, and starts the
+        // flush itself; forcing a flush alongside it wrote the cache once with the
+        // OLD value (nothing queued yet) and then a second time with the new one,
+        // two full passes over the ~8MB cache before the card info bar caught up.
+        await updateCardPriorityCache(plugin as any, rem._id, true, {
           remId: rem._id,
           priority: job.cardPriority,
           source: job.cardSource,
         } as any);
-        await flushCacheUpdatesNow(plugin as any);
+        await whenCardPriorityCacheFlushed();
         console.log(`[Tracker] Card priority written: ${job.cardPriority}`);
       }
 

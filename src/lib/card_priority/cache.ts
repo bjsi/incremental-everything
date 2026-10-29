@@ -40,6 +40,19 @@ export function getPendingCacheUpdate(remId: RemId): CardPriorityInfo | null | u
 
 let isFlushing = false;
 let needsHeavyRecalcNextRound = false;
+/** Settles when the running flush loop has drained — see whenCardPriorityCacheFlushed. */
+let activeFlush: Promise<void> | null = null;
+
+/**
+ * Waits for the flush in progress, which drains every update queued before it
+ * ends. For a caller that has just queued an update (updateCardPriorityCache
+ * starts the flush itself) and must not move on until it is written. Calling
+ * flushCacheUpdatesNow instead would return at once while that flush runs and
+ * then schedule a second full pass over the cache.
+ */
+export function whenCardPriorityCacheFlushed(): Promise<void> {
+  return activeFlush ?? Promise.resolve();
+}
 
 async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   if (pendingUpdates.size === 0 && !forceHeavyRecalc) return;
@@ -50,6 +63,8 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   }
 
   isFlushing = true;
+  let settleFlush!: () => void;
+  activeFlush = new Promise<void>((resolve) => (settleFlush = resolve));
 
   try {
     while (pendingUpdates.size > 0 || needsHeavyRecalcNextRound || forceHeavyRecalc) {
@@ -140,6 +155,8 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
     console.error(`[Cache] Error inside while loop:`, err);
   } finally {
     isFlushing = false;
+    activeFlush = null;
+    settleFlush();
   }
 }
 

@@ -11,7 +11,7 @@ import { getPowerupSlotByCodeSafe } from '../lib/powerup_slot_compat';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemFromRem, initIncrementalRem, IncrementalRem } from '../lib/incremental_rem';
 import { scanBatchTargets } from '../lib/priority_targets';
-import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import {
   getCardPriority,
   setCardPriority,
@@ -39,7 +39,7 @@ import {
   pendingCardPriorityRemovalKey,
   batchPriorityTargetRemIdsKey
 } from '../lib/consts';
-import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
+import { publishPendingCardPriority } from '../lib/card_priority/pending_priority';
 import { writeCardPriorityCache } from '../lib/card_priority/persistence';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { getRemCardContent, safeRemTextToString } from '../lib/pdfUtils';
@@ -660,33 +660,12 @@ function Priority() {
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
 
-    // We no longer trigger direct SDK Database writes from the popup (such as setPowerupProperty).
-    // All SDK network writes are gracefully deferred to the background tracker via `pendingPrioritySaveKey`.
-    // This function now solely focuses on instantaneous optimistic cache updates.
-
-    // Construct Optimistic IncRem Object
-    const currentNow = Date.now();
-    const optimisticIncRem: IncrementalRem = incRemInfo ? {
-      ...incRemInfo,
-      priority: priority,
-      // If we are just updating priority, nextRepDate etc shouldn't change unless it was new
-    } : {
-      // Fallback for newly initialized inc rem
-      remId: rem._id,
-      nextRepDate: currentNow, // Approximate
-      priority: priority,
-      history: [],
-      // Other fields might be missing if we construct from scratch, but updateIncrementalRemCache 
-      // mainly needs remId and priority for sorting/percentiles if it does a light update.
-      // However, for full correctness, initIncrementalRem above handles the DB side.
-      // The cache update might need more fields.
-      // Let's rely on the fact that if !incRemInfo, the cache probably doesn't have it either, 
-      // so a full refresh might be safer or we construct a minimal valid object.
-      // For now, let's assume if it exists we use it, if not we rely on background sync or a minimal object.
-    } as IncrementalRem;
-
-    // Fire-and-forget cache update
-    updateIncrementalRemCache(plugin, optimisticIncRem);
+    // No DB writes and no IncRem cache patch from the popup: the tracker does
+    // both, from the `pendingPrioritySaveKey` job saveAndClose posts. A cache
+    // patch here would read the ~8MB cache first, and that read's reply arrives
+    // after the popup's iframe is gone. The same job triggers the inheritance
+    // cascade, after the new value is written — triggering it from here ran it
+    // against the old value, beside the tracker's own writes.
 
     // 🔌 Conditionally update session cache
     if (performanceMode === PERFORMANCE_MODE_FULL && sessionCache && originalScopeId) {
@@ -700,72 +679,17 @@ function Priority() {
 
       plugin.storage.setSession(queueSessionCacheKey, updatedCache).catch(console.error);
     }
-
-
-    // 🌲 Cascade inherited card priorities to descendants (fire-and-forget, unconditional)
-    // Changing an IncRem priority can affect descendant card rems with source 'inherited'
-    // (cards that inherit from this IncRem because no closer card priority anchor exists).
-    // Always triggered regardless of derivedData — that hook may not have resolved yet when
-    // the user saves quickly. Cost is just a setSession write; tracker.ts is protected by
-    // cascadeRunning serialization and returns instantly for leaf rems with no descendants.
-    // Unconditional: the tracker's cascade watcher applies the
-    // flashcard-prioritisation gate, and the cascade no longer needs Full Mode —
-    // without the card-priority cache it resolves has-cards per rem instead.
-    plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
-  }, [rem, incRemInfo, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
+  }, [rem, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
   const saveCardPriority = useCallback(async (priority: number) => {
     if (!rem) return;
 
-    // 1. Optimistic Updates (FIRST for responsiveness)
+    // The new value reaches the card-priority displays through the pending key
+    // (publishPendingCardPriority — one setSession, which survives the teardown),
+    // and the cache through the tracker. Patching the cache from here needed a
+    // read of the ~8MB cache whose reply arrived after the popup was gone.
+    publishPendingCardPriority(plugin, rem._id, priority, 'manual');
 
-    // Construct Optimistic Info to avoid DB reads (fixes Close Lag & Race Condition)
-    const optimisticInfo: CardPriorityInfo | null = cardInfo ? {
-      ...cardInfo,
-      priority: priority,
-      source: 'manual',
-      lastUpdated: Date.now()
-    } : {
-      // Fallback if we somehow didn't have cardInfo but are saving (e.g. inheritance only)
-      remId: rem._id,
-      priority: priority,
-      source: 'manual',
-      lastUpdated: Date.now(),
-      cardCount: 1, // approximate
-      dueCards: 0,
-      kbPercentile: 0
-    };
-
-    // 🔌 Only do cache updates in 'full' mode
-    if (performanceMode === PERFORMANCE_MODE_FULL) {
-      // DANGEROUS TO USE INTERNAL RAM CACHE LOCALLY BECAUSE WIDGET IFRAME WILL DIE!
-      // Must directly write to global Session Storage before closing!
-      try {
-        const currentCache = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
-        const existingIndex = currentCache.findIndex(i => i.remId === rem._id);
-        const newCache = [...currentCache];
-        if (existingIndex !== -1) {
-          newCache[existingIndex] = optimisticInfo;
-        } else {
-          newCache.push(optimisticInfo);
-        }
-        await writeCardPriorityCache(plugin, newCache);
-        console.log(`[Priority] Fast optimistic push cross-iframe succeeded for ${rem._id}`);
-      } catch (err) {
-        console.error("Fast cache set failed", err);
-      }
-
-      if (sessionCache && originalScopeId) {
-        // Minimal lag: rely on global refresh or previous logic without blocking
-      }
-    }
-
-    // 🔔 Signal refresh for listeners (e.g. display widget) in ALL modes
-    // This ensures that even in Light Mode, the display widget updates its color immediately.
-    plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
-
-
-    // 2. Critical Writes (Fire and Forget)
     // Signal events.ts to allow this update even if in queue (Global Context Survivor)
     try {
       const manualRems = await plugin.storage.getSession<string[]>('manual_priority_pending_rems') || [];
@@ -777,18 +701,13 @@ function Priority() {
       console.error(err);
     }
 
-    // Notice: We NO LONGER perform `rem.addPowerup` or `setCardPriority` here!
-    // The intensive SDK writes and event wrapping have been successfully deferred 
-    // to the persistent background tracker via `pendingPrioritySaveKey` in saveAndClose.
-
-    // 🌲 Cascade inherited card priorities to descendants
-    // This instructs the tracker to eventually trigger the inheritance cascade.
-    plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
-
-  }, [rem, plugin, sessionCache, originalScopeId, performanceMode, cardInfo, hasCardPriorityPowerup]); // 🔌 Add performanceMode
+    // `rem.addPowerup`, `setCardPriority`, the cache write and the inheritance
+    // cascade all run in the background tracker, from the `pendingPrioritySaveKey`
+    // job saveAndClose posts.
+  }, [rem, plugin]);
 
   // Convert an inherited card priority to manual without changing its numeric value.
-  // saveCardPriority alone only patches the session cache; the SOURCE_SLOT in the DB
+  // saveCardPriority alone only publishes the pending value; the SOURCE_SLOT in the DB
   // is only written by the background tracker watching pendingPrioritySaveKey. Without
   // this dual write, the optimistic 'manual' flip is immediately overwritten the next
   // time getCardPriority reads SOURCE_SLOT from the DB.
@@ -799,18 +718,18 @@ function Priority() {
     //    DB write propagates back via useTrackerPlugin (see the auto-clear effect).
     setConvertedToManual(true);
 
-    // 2. Optimistic cache update + descendant cascade trigger.
+    // 2. Pending value for the card-priority displays.
     saveCardPriority(cardInfo.priority).catch(console.error);
 
-    // 3. Persist source='manual' to the DB via the background tracker.
-    //    triggerCascade=false because saveCardPriority already scheduled one.
+    // 3. Persist source='manual' to the DB via the background tracker, which
+    //    also runs the descendant cascade once the source is written.
     plugin.storage.setSession(pendingPrioritySaveKey, {
       remId: rem._id,
       incPriority: null,
       cardPriority: cardInfo.priority,
       cardSource: 'manual',
       needsAddPowerup: !hasCardPriorityPowerup,
-      triggerCascade: false,
+      triggerCascade: true,
       event: 'popup',
     }).catch(console.error);
   }, [rem, cardInfo, hasCardPriorityPowerup, saveCardPriority, plugin]);
@@ -858,11 +777,14 @@ function Priority() {
     const incChanged = showIncSection && incP !== incRemInfo?.priority;
     const cardChanged = (showCardSection || showInheritanceSection) && cardP !== cardInfo?.priority;
 
-    // 1. Fire-and-Forget Optimistic Saves (For UI responsiveness / Cache consistency)
-    if (showIncSection) {
+    // 1. Fire-and-Forget Optimistic Saves (For UI responsiveness)
+    // Only for what changed: the pending card value outranks the cache until the
+    // tracker's write stamps a newer lastUpdated, and an unchanged value sends
+    // no job — so publishing it would show, say, an inherited value as manual.
+    if (incChanged) {
       saveIncPriority(incP).catch(console.error);
     }
-    if (showCardSection || showInheritanceSection) {
+    if (cardChanged) {
       saveCardPriority(cardP).catch(console.error);
     }
 

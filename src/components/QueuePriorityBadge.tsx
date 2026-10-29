@@ -3,14 +3,17 @@ import React, { useEffect, useState } from 'react';
 import { PriorityBadge } from './PriorityBadge';
 import {
   displayQueueToolbarPriorityId,
-  allIncrementalRemKey,
+  allIncrementalRemSlimKey,
   allCardPriorityInfoKey,
   currentIncRemKey,
+  pendingCardPriorityKey,
 } from '../lib/consts';
-import { CardPriorityInfo, getCardPriority } from '../lib/card_priority';
-import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
+import { CardPriorityInfo, estimateCardRemPercentile, getCardPriority } from '../lib/card_priority';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import type { SlimIncRem } from '../lib/incremental_rem/cache';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
-import { calculateRelativePercentile } from '../lib/utils';
+import { PendingCardPriority, pendingCardPriorityFor } from '../lib/card_priority/pending_priority';
+import { calculateRelativePercentileAt } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { useIESetting } from '../lib/settings';
 import { getQueueVisibleCard } from '../lib/queue_visible_card';
@@ -82,11 +85,18 @@ export function QueuePriorityBadge({ active = true }: { active?: boolean }) {
   );
   const useLightMode = effectiveMode === 'light';
 
-  // Incremental data
+  // Incremental data. The slim projection: ranking needs only remId + priority,
+  // and the full key is ~8MB on a large KB.
   const allIncRems = useTrackerPlugin(
-    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+    (rp) => rp.storage.getSession<SlimIncRem[]>(allIncrementalRemSlimKey),
     []
   ) || [];
+
+  // What a priority popup just saved, until the tracker's cache write catches up.
+  const pendingCardPriority = useTrackerPlugin(
+    (rp) => rp.storage.getSession<PendingCardPriority>(pendingCardPriorityKey),
+    []
+  );
 
   // Card cache data
   const allPrioritizedCardInfo = useTrackerPlugin(
@@ -122,18 +132,25 @@ export function QueuePriorityBadge({ active = true }: { active?: boolean }) {
     priority = incRemInfo.priority;
     source = 'incremental';
     if (!useLightMode && allIncRems.length > 0) {
-      percentile = calculateRelativePercentile(allIncRems, incRemInfo.remId);
+      // Ranked at the priority read from the Rem, which the tracker writes before
+      // it rewrites the cache.
+      percentile = calculateRelativePercentileAt(allIncRems, incRemInfo.remId, incRemInfo.priority);
     }
   } else {
     // Card logic
     const cardCacheInfo = allPrioritizedCardInfo?.find(info => info.remId === rem._id);
-    const finalCardInfo = cardCacheInfo || lightCardInfo;
+    const baseCardInfo = cardCacheInfo || lightCardInfo;
+    const pending = pendingCardPriorityFor(pendingCardPriority, rem._id, baseCardInfo);
 
-    if (finalCardInfo) {
-      priority = finalCardInfo.priority;
-      source = finalCardInfo.source;
+    if (baseCardInfo) {
+      priority = pending?.priority ?? baseCardInfo.priority;
+      source = pending?.source ?? baseCardInfo.source;
       if (!useLightMode && cardCacheInfo) {
-        percentile = cardCacheInfo.kbPercentile;
+        // The cached kbPercentile was ranked with the old priority; estimate the
+        // new one's place until the cache catches up.
+        percentile = priority !== cardCacheInfo.priority && allPrioritizedCardInfo
+          ? estimateCardRemPercentile(allPrioritizedCardInfo, rem._id, priority)
+          : cardCacheInfo.kbPercentile;
       }
     }
   }
