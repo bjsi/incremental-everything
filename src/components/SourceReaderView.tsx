@@ -11,6 +11,11 @@ export interface SourceReaderViewProps {
   kind: string | null;
   /** Close handler — differs between the modal and floating hosts. */
   onClose: () => void;
+  /**
+   * Floating host only: makes the header a drag handle. Receives pointerdowns
+   * that did not start on a header button.
+   */
+  onHeaderPointerDown?: (e: React.PointerEvent<HTMLDivElement>) => void;
 }
 
 /**
@@ -18,7 +23,13 @@ export interface SourceReaderViewProps {
  * (pdf_source_floating) Source-popup variants. Renders the SDK PDFWebReader for
  * a Reader source and, for highlights, auto-scrolls to the highlighted passage.
  */
-export function SourceReaderView({ hostRemId, hoveredRemId, kind, onClose }: SourceReaderViewProps) {
+export function SourceReaderView({
+  hostRemId,
+  hoveredRemId,
+  kind,
+  onClose,
+  onHeaderPointerDown,
+}: SourceReaderViewProps) {
   const plugin = usePlugin() as ReactRNPlugin;
   const hasScrolled = useRef(false);
   const [sourceName, setSourceName] = useState('');
@@ -98,11 +109,21 @@ export function SourceReaderView({ hostRemId, hoveredRemId, kind, onClose }: Sou
       }}
     >
       <div
+        onPointerDown={
+          onHeaderPointerDown &&
+          ((e) => {
+            if ((e.target as HTMLElement).closest('button')) return;
+            onHeaderPointerDown(e);
+          })
+        }
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 12px',
+          cursor: onHeaderPointerDown ? 'move' : undefined,
+          userSelect: onHeaderPointerDown ? 'none' : undefined,
+          touchAction: onHeaderPointerDown ? 'none' : undefined,
           // Conspicuous separator: --rn-clr-content-tertiary is a real, clearly
           // visible theme-aware grey (the faint border vars barely showed).
           borderBottom: '2px solid var(--rn-clr-content-tertiary, #6b7280)',

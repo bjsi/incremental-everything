@@ -539,6 +539,7 @@ The **non-blocking** sibling of 6.5: the *same* reader, but opened as a **floati
 - **Stays open while you use the PDF:** clicking into the reader to **highlight, select text, or click existing highlights** does **not** dismiss it (the click-outside-to-close behavior is disabled — clicks land in the reader's iframe).
 - **Auto-closes on card advance:** when the queue loads the next card, the floating window closes itself so a previous source never lingers.
 - **Esc closes it without closing the queue:** the plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it. (When focus is inside the PDF iframe, the reader handles Esc itself; use `✕` there.)
+- **Movable:** drag the header (not its buttons) to move the window; the next one opens at the last position, for the rest of the session.
 - **Fixed size:** RemNote floating widgets aren't user-resizable; the window opens at 40% viewport width and 80% of the display's height, anchored top-right.
 
 Shares the source-detection and 🔖 Scroll to Highlight behaviors with 6.5.

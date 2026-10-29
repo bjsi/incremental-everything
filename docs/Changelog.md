@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.174 - October 29th, 2026
+
+### ✨ New
+
+**Source Popup**: The floating Source window (`Opt+Shift+O`) can now be moved by dragging its header, and the next one opens where you left it.
+
+📖 [Floating window — interaction & closing](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing)
+
 ## v1.0.173 - October 29th, 2026
 
 ### ✨ New

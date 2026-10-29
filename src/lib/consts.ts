@@ -696,6 +696,10 @@ export const currentHostDocumentIdKey = 'current-host-document-id';
 export const sourceFloatingWidgetId = 'pdf_source_floating';
 export const sourceFloatingTargetKey = 'source-floating-target';
 export const sourceFloatingActiveIdKey = 'source-floating-active-id';
+// Where the float was last dragged to (by its header), so the next open lands
+// there. Kept in {top, right} form — the iframe can't read the host's width.
+export const sourceFloatingPositionKey = 'source-floating-position';
+export const sourceFloatingDefaultPosition = { top: 48, right: 24 };
 
 
 // Convert literal \[..\] / \(..\) / **..** left by PDF text-layer extraction
