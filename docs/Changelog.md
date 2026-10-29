@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.173 - October 29th, 2026
+
+### ⚡ Improved
+
+**Priority Popups**: A priority changed with `Opt+P` or `Ctrl+Opt+P` now shows on the Card Info Bar, the queue's priority badge and the Priority Editor almost at once, instead of after up to 10 seconds.
+
+📖 [After You Save a Priority](Prioritization-&-Sorting.md#after-you-save-a-priority)
+
 ## v1.0.172 - October 28th, 2026
 
 ### ✨ New

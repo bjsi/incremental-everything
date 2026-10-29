@@ -72,6 +72,12 @@ There are several ways to set priorities in Incremental RemNote, each designed f
 *   **Priority Editor Widget:** An always-on visual control in the editor or queue.
 *   **Batch Tools:** Advanced tables for managing priorities en masse for documents or tags.
 
+### After You Save a Priority { #after-you-save-a-priority }
+
+Both priority popups close as soon as you save; the plugin finishes writing the new value in the background. The [Card Info Bar](Plugin-Widgets-Reference.md#11-card-info-bar), the [queue's priority badge](Plugin-Widgets-Reference.md#12-queue-toolbar-priority) and the Priority Editor widget show the new number almost at once.
+
+For the few seconds the background work takes, the badge **colour** and the Card Info Bar's **"% KB"** figure are an estimate of where the new priority ranks. They then settle on the exact value, which can differ by a fraction of a percent when other items share the same priority.
+
 ---
 
 ### Main Priority Popup
