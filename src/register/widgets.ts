@@ -21,7 +21,8 @@ import { screenFittedHeight } from '../lib/utils';
    the breadcrumbs, and the ~36px badge row fits inside it. The spacer moves to
    the next sibling so the card sits exactly where RemNote puts it. The width cap
    keeps the transparent iframe from swallowing clicks across the whole strip
-   when the card content scrolls under it. */
+   when the card content scrolls under it; lib/queue_beautiful_bar_fit narrows
+   it further, to the widget's reported content width. */
 const QUEUE_VARIANT_CSS = `
   .queue-beautiful-chrome-actions .rn-queue__widget-toolbar:has(> div > iframe[data-plugin-id="incremental-everything"]:is([src*="widgetName=queue_toolbar_priority&"], [src*="widgetName=no_inc_timer_indicator&"])) {
     display: none;
@@ -35,8 +36,8 @@ const QUEUE_VARIANT_CSS = `
   .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=mastery_drill_queue_bar&"]) {
     flex-shrink: 0;
   }
-  /* In Beautiful the overlay below also covers the drill bar's right end: the regular-queue
-     drill narrows it while it runs (BAR_CSS in lib/mastery_drill_native.ts). */
+  /* In Beautiful the overlay below also covers the drill bar's right end. Both are sized to
+     the overlay's content by lib/queue_beautiful_bar_fit; the width below is the fallback. */
   .rn-queue:not(.queue-beautiful-box) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"] {
     display: none;
   }

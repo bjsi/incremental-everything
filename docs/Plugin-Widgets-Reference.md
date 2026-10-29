@@ -56,6 +56,8 @@ Unlike the *Card Info Bar*, which in the Compact queue lives at the bottom of fl
 
 In RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) the badge sits in the **top-right corner of the card**, in the blank space above the breadcrumbs, rather than in the top bar — the card layout itself is unchanged. The *No Inc Rem* countdown moves there with it. Switching back to *Compact* returns both to the toolbar.
 
+The corner area is only as wide as what it shows: the badge, or the badge and the countdown while a *No Inc Rem* timer runs. Clicks beside it reach the card, and the [regular-queue Mastery Drill's bar](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill) keeps its buttons clear of it.
+
 
 ### 1.3. Answer Buttons Info Bar
 *(Incremental Rems only)*
@@ -688,6 +690,7 @@ A focused sub-queue of flashcards rated *Forgot* or *Hard*, designed for deliber
 - **Old Items Warning**: cards lingering past the configured threshold (default 7 days) are flagged; clear them with a single click.
 - **Clear Queue**: empty the entire drill at any time.
 - **List Cards**: lists every card in the drill with a status saying whether RemNote can still show it, and removes the ones it cannot. See [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list).
+- **In the regular queue**, the drill bar under the queue's top bar carries the same queue tools (counts, List Cards, Clear Queue, Clear Low Priority, Clear Old, Remove from Drill), without the per-card editing buttons. See [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill).
 
 📖 **Full documentation:** [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
 

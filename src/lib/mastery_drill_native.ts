@@ -76,22 +76,6 @@ const CLUSTER_VISIBLE_CARD_KEY = 'clusterVisibleCardId';
  */
 const BURY_CSS_ID = 'mastery-drill-native-bury-screen';
 
-/*
- * Beautiful queue only. queue_beautiful_bar is laid over the card box's top-right corner at
- * min(360px, 60%) wide (QUEUE_VARIANT_CSS in register/widgets.ts), which covers the right end
- * of this drill's bar. Its content is right-aligned and, in a drill, is just the priority
- * badge, so while the drill runs it narrows to 160px and the bar's buttons keep out of it.
- * Registered per session: outside a drill the strip keeps its room for the timer indicator.
- */
-const BAR_CSS_ID = 'mastery-drill-native-bar';
-const BAR_CSS = `
-  .queue-beautiful-box > .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) {
-    width: 160px !important;
-  }
-  .queue-beautiful-box > .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=mastery_drill_queue_bar&"]) {
-    padding-right: 168px;
-  }
-`;
 const buryScreenCss = (hiddenDrillCards: number) => `
 .queue-message--daily-target-checkpoint [data-test="Queue Checkpoint Abort Button"] {
   background: var(--rn-clr-background-accent, #3b82f6) !important;
@@ -348,7 +332,6 @@ function endSession(plugin: RNPlugin, reason: string) {
   scheduleReconcile(plugin, s);
   void plugin.app.registerCSS(MASK_CSS_ID, '');
   void plugin.app.registerCSS(BURY_CSS_ID, '');
-  void plugin.app.registerCSS(BAR_CSS_ID, '');
   void publishState(plugin, { active: false, buried: false });
   const sorted = [...s.skipMs].sort((a, b) => a - b);
   console.log(
@@ -445,7 +428,6 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
 .rn-queue__content { animation: ie-mastery-drill-reveal 120ms ease-out ${delay}ms backwards; }`
         : ''
     );
-    void plugin.app.registerCSS(BAR_CSS_ID, BAR_CSS);
     void publishState(plugin, { active: true, buried: false });
     console.log(`${LOG} queue entered`);
   });

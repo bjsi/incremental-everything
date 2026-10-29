@@ -4,11 +4,29 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.173 - October 29th, 2026
 
+### ✨ New
+
+**Mastery Drill**: A card rated *Hard* now waits a share of its new interval before returning to the drill (default 5%, between the Minimum Delay and a 7-day maximum), so a card sent a year out is checked from long-term memory days later instead of three hours later.
+
+📖 [Why Hard cards wait longer](History-Queue-Dashboard-and-Mastery-Drill.md#hard-card-delay)
+
 ### ⚡ Improved
 
 **Priority Popups**: A priority changed with `Opt+P` or `Ctrl+Opt+P` now shows on the Card Info Bar, the queue's priority badge and the Priority Editor almost at once, instead of after up to 10 seconds.
 
 📖 [After You Save a Priority](Prioritization-&-Sorting.md#after-you-save-a-priority)
+
+**Mastery Drill**: The drill bar in the regular queue now has the popup's queue tools — the Remaining and cooling counts, List Cards, Clear Queue, Clear Low Priority and Clear Old — next to Remove from Drill.
+
+📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill)
+
+**Mastery Drill**: The Old Items warning now counts a card's age from when it became ready to drill, so a card that was still cooling is never flagged as old.
+
+📖 [Queue Management](History-Queue-Dashboard-and-Mastery-Drill.md#queue-management)
+
+**Beautiful Queue**: The priority badge's area in the card's top-right corner now fits the badge, widening only while the No Inc Rem countdown shows, so clicks across the rest of the card's top edge reach the card.
+
+📖 [In the Beautiful queue variant](Plugin-Widgets-Reference.md#beautiful-queue-variant)
 
 ## v1.0.172 - October 28th, 2026
 

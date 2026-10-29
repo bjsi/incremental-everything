@@ -29,8 +29,9 @@ import {
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey, editorReviewTimerHeightsKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey, queueBeautifulBarWidthKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
+import { registerQueueBeautifulBarFitCss } from '../lib/queue_beautiful_bar_fit';
 import { registerEditorReviewTimerHeadersCss } from '../lib/editor_review_timer_sticky';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
@@ -163,6 +164,13 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     const barHeight = await rp.storage.getSession<number>(cardInfoBarHeightKey);
     await registerCardInfoBarDockCss(plugin, barHeight);
+  });
+
+  // The Beautiful queue's top-right strip fits queue_beautiful_bar's content, which the
+  // widget reports (lib/queue_beautiful_bar_fit). Also runs at activation with the default.
+  plugin.track(async (rp) => {
+    const width = await rp.storage.getSession<number>(queueBeautifulBarWidthKey);
+    await registerQueueBeautifulBarFitCss(plugin, width);
   });
 
   // The pinned Editor Review Timer sits where RemNote draws its sticky headers, so
