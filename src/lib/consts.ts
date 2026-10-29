@@ -123,6 +123,10 @@ export const enableMasteryDrillId = 'enable-mastery-drill';
 export const legacySkipMasteryDrillId = 'skip_mastery_drill';
 export const oldItemThresholdId = 'old_item_threshold';
 export const masteryDrillMinDelayMinutesId = 'mastery_drill_min_delay_minutes';
+/** Hard-rated drill cards cool for this share of the interval the rating gave them… */
+export const masteryDrillHardIntervalPercentId = 'mastery_drill_hard_interval_percent';
+/** …capped here, in days. The Minimum Delay stays the floor. */
+export const masteryDrillHardMaxDaysId = 'mastery_drill_hard_max_days';
 export const disableFinalDrillNotificationId = 'disable_final_drill_notification';
 /** Where the drill runs: the popup's embedded queue, or RemNote's own queue. */
 export const masteryDrillModeId = 'mastery_drill_mode';

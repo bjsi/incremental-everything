@@ -1,6 +1,7 @@
 import { clearSelectionCache } from '../lib/editor_selection';
 import { AppEvents, ReactRNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
 import { deferDuringNativeDrill, isNativeDrillQueue, registerNativeDrillListeners } from '../lib/mastery_drill_native';
+import { FinalDrillEntry, buildDrillEntry } from '../lib/mastery_drill_status';
 import { deferDuringLearnNew, registerQueueCoolingListeners } from '../lib/queue_cooling_skip';
 import * as _ from 'remeda';
 import {
@@ -934,7 +935,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
           try {
             const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
             const currentKbId = kbData?._id;
-            type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+            type FinalDrillItem = FinalDrillEntry;
             let finalDrillIds =
               ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
             const getCardId = (item: FinalDrillItem) =>
@@ -944,7 +945,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
               // Re-adding restarts the cooling of a card that was already in the drill.
               finalDrillIds = [
                 ...finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId),
-                { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
+                await buildDrillEntry(plugin, effectiveCardId, currentKbId, score),
               ];
               await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
             } else if (score >= QueueInteractionScore.GOOD) {
@@ -1053,7 +1054,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
               const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
               const currentKbId = kbData?._id;
 
-              type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+              type FinalDrillItem = FinalDrillEntry;
               let finalDrillIds =
                 ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
               const getCardId = (item: FinalDrillItem) =>
@@ -1063,7 +1064,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                 // Re-adding restarts the cooling of a card that was already in the drill.
                 finalDrillIds = [
                   ...finalDrillIds.filter((item) => getCardId(item) !== clusterCardId),
-                  { cardId: clusterCardId, kbId: currentKbId, addedAt: Date.now() },
+                  await buildDrillEntry(plugin, clusterCardId, currentKbId, score),
                 ];
                 await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
               } else if (score >= QueueInteractionScore.GOOD) {
@@ -1485,7 +1486,7 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
     const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
     const currentKbId = kbData?._id;
 
-    type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+    type FinalDrillItem = FinalDrillEntry;
     let finalDrillIds =
       ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
     const getCardId = (item: FinalDrillItem) =>
@@ -1493,10 +1494,10 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
 
     if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
       // A card already in the drill restarts its cooling: its answer was just revealed, so the
-      // minimum delay must run again from now rather than from when it first entered the drill.
+      // delay must run again from now rather than from when it first entered the drill.
       finalDrillIds = [
         ...finalDrillIds.filter((item) => getCardId(item) !== cardId),
-        { cardId, kbId: currentKbId, addedAt: Date.now() },
+        await buildDrillEntry(plugin, cardId, currentKbId, score),
       ];
       await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
     } else if (score >= QueueInteractionScore.GOOD) {

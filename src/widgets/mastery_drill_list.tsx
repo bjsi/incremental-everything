@@ -3,10 +3,8 @@ import React from 'react';
 import '../style.css';
 import '../App.css';
 import { MasteryDrillCardList } from '../components/MasteryDrillCardList';
-import { masteryDrillMinDelayMinutesId } from '../lib/consts';
 import { FinalDrillItem, drillItemCardId, isDrillItemInKb } from '../lib/mastery_drill_audit';
-import { finalDrillIdsKey } from '../lib/mastery_drill_status';
-import { useIESetting } from '../lib/settings';
+import { finalDrillIdsKey, useDrillCooling } from '../lib/mastery_drill_status';
 
 /**
  * The Mastery Drill card list on its own, for the regular-queue drill (opened from
@@ -15,7 +13,7 @@ import { useIESetting } from '../lib/settings';
 function MasteryDrillList() {
   const plugin = usePlugin();
   const [allItems, setAllItems] = useSyncedStorageState<FinalDrillItem[]>(finalDrillIdsKey, []);
-  const minDelayMinutes = useIESetting(masteryDrillMinDelayMinutesId);
+  const cooling = useDrillCooling();
 
   const kb = useTrackerPlugin(async (rp) => ({
     id: (await rp.kb.getCurrentKnowledgeBaseData())?._id as string | undefined,
@@ -46,7 +44,7 @@ function MasteryDrillList() {
     <div className="h-full w-full flex flex-col" style={{ backgroundColor: 'var(--rn-clr-background-primary)' }}>
       <MasteryDrillCardList
         items={items}
-        minDelayMinutes={minDelayMinutes ?? 0}
+        cooling={cooling}
         onRemove={removeCards}
         onGoToRem={goToRem}
         onClose={() => plugin.widget.closePopup()}

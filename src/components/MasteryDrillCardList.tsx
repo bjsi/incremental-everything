@@ -27,6 +27,7 @@ import {
   auditDrillItem,
   drillItemCardId,
 } from '../lib/mastery_drill_audit';
+import { DrillCooling, drillReadyAt, formatDrillWait } from '../lib/mastery_drill_status';
 import { scoreColor, scoreLabel } from '../lib/rating_labels';
 import { openRemInBrowserTab } from '../lib/remHelpers';
 import { formatTimeAgo } from '../lib/utils';
@@ -68,14 +69,14 @@ const smallButton: React.CSSProperties = {
 
 export function MasteryDrillCardList({
   items,
-  minDelayMinutes,
+  cooling,
   onRemove,
   onGoToRem,
   onClose,
 }: {
   /** The drill items of the current knowledge base. */
   items: FinalDrillItem[];
-  minDelayMinutes: number;
+  cooling: DrillCooling;
   onRemove: (cardIds: string[]) => Promise<void>;
   onGoToRem: (remId: string) => Promise<void>;
   onClose: () => void;
@@ -140,10 +141,11 @@ export function MasteryDrillCardList({
   const loading = audits.size < items.length;
   const unplayable = rows.filter((r) => UNPLAYABLE_STATUSES.has(r.status));
   const now = Date.now();
-  const minDelayMs = minDelayMinutes * 60 * 1000;
-  const coolingCount = items.filter(
-    (item) => typeof item !== 'string' && item.addedAt && now - item.addedAt < minDelayMs,
-  ).length;
+  const readyAtById = React.useMemo(
+    () => new Map(items.map((item) => [drillItemCardId(item), drillReadyAt(item, cooling)])),
+    [items, cooling],
+  );
+  const coolingCount = Array.from(readyAtById.values()).filter((readyAt) => readyAt > now).length;
 
   React.useEffect(() => {
     if (selectedIndex > rows.length - 1) setSelectedIndex(Math.max(rows.length - 1, 0));
@@ -273,7 +275,7 @@ export function MasteryDrillCardList({
             </div>
           )}
           {rows.map((row, index) => {
-            const coolingLeftMs = row.addedAt ? row.addedAt + minDelayMs - now : 0;
+            const coolingLeftMs = (readyAtById.get(row.cardId) ?? 0) - now;
             const color = statusColor(row.status);
             return (
               <div
@@ -342,7 +344,7 @@ export function MasteryDrillCardList({
                       />
                     )}
                     <span>{row.addedAt ? `added ${formatTimeAgo(row.addedAt)}` : 'added before dates were recorded'}</span>
-                    {coolingLeftMs > 0 && <span>· cooling, {Math.ceil(coolingLeftMs / 60000)} min left</span>}
+                    {coolingLeftMs > 0 && <span>· cooling, {formatDrillWait(coolingLeftMs)} left</span>}
                     {row.lastScore !== null && row.lastRatedAt && (
                       <span>
                         · last <strong style={{ color: scoreColor(row.lastScore) }}>{scoreLabel(row.lastScore)}</strong>{' '}

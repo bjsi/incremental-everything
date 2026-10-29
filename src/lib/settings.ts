@@ -92,6 +92,8 @@ import {
   enableMasteryDrillId,
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
+  masteryDrillHardIntervalPercentId,
+  masteryDrillHardMaxDaysId,
   disableFinalDrillNotificationId,
   masteryDrillModeId,
   MasteryDrillMode,
@@ -193,6 +195,8 @@ export interface IESettings {
   [enableMasteryDrillId]: boolean;
   [oldItemThresholdId]: number;
   [masteryDrillMinDelayMinutesId]: number;
+  [masteryDrillHardIntervalPercentId]: number;
+  [masteryDrillHardMaxDaysId]: number;
   [disableFinalDrillNotificationId]: boolean;
   [masteryDrillModeId]: MasteryDrillMode;
   [masteryDrillRevealDelayId]: number;
@@ -280,6 +284,8 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
   [masteryDrillMinDelayMinutesId]: 180,
+  [masteryDrillHardIntervalPercentId]: 5,
+  [masteryDrillHardMaxDaysId]: 7,
   [disableFinalDrillNotificationId]: false,
   [masteryDrillModeId]: 'native',
   [masteryDrillRevealDelayId]: 500,
@@ -995,7 +1001,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     integer: true,
     unit: 'days',
     title: 'Old Items Threshold',
-    description: 'Items older than this trigger a warning in the Mastery Drill.',
+    description:
+      'Items that have been ready to drill for longer than this trigger a warning in the Mastery ' +
+      'Drill. Time spent waiting out a delay does not count.',
   },
   [masteryDrillMinDelayMinutesId]: {
     kind: 'number',
@@ -1007,7 +1015,36 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     title: 'Mastery Drill Minimum Delay',
     description:
       'A card rated Again or Hard will not appear in the drill until this long after its last ' +
-      'review, so the same card is not repeated too soon.',
+      'review, so the same card is not repeated too soon. Hard cards with long intervals wait ' +
+      'longer (see the two settings below).',
+  },
+  [masteryDrillHardIntervalPercentId]: {
+    kind: 'number',
+    group: 'masteryDrill',
+    showWhen: { id: enableMasteryDrillId, equals: true },
+    min: 0,
+    max: 100,
+    unit: '% of interval',
+    title: 'Hard Cards: Share of the Interval',
+    description:
+      'A card rated Hard waits for this share of the new interval the rating gave it before it ' +
+      'returns to the drill, so you recall it from long-term memory rather than from the review ' +
+      'you just did. Never shorter than the Minimum Delay, never longer than the maximum below. ' +
+      '5% means a card sent 60 days out waits 3 days. Cards rated Again always use the Minimum ' +
+      'Delay. 0 gives Hard cards the Minimum Delay too.',
+  },
+  [masteryDrillHardMaxDaysId]: {
+    kind: 'number',
+    group: 'masteryDrill',
+    showWhen: { id: enableMasteryDrillId, equals: true },
+    min: 0,
+    max: 365,
+    integer: true,
+    unit: 'days',
+    title: 'Hard Cards: Maximum Delay',
+    description:
+      'The longest a card rated Hard waits before it returns to the drill, however long its ' +
+      'interval. A 1-year card at 5% would wait 18 days; the default 7 days caps it.',
   },
   [disableFinalDrillNotificationId]: {
     kind: 'boolean',

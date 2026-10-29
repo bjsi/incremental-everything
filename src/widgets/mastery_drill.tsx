@@ -17,8 +17,12 @@ import { MasteryDrillCardList } from '../components/MasteryDrillCardList';
 import { getCardPriority, setCardPriority } from '../lib/card_priority';
 import { InlinePriorityEditor } from '../components/InlineEditors';
 import { useIESetting } from '../lib/settings';
-import { masteryDrillMinDelayMinutesId, oldItemThresholdId } from '../lib/consts';
+import { oldItemThresholdId } from '../lib/consts';
 import { FinalDrillItem, drillItemCardId, isDrillItemInKb } from '../lib/mastery_drill_audit';
+import { drillReadyAt, formatDrillWait, useDrillCooling } from '../lib/mastery_drill_status';
+
+/** Longest single wait before re-checking the cooling cards: setTimeout overflows past ~24.8 days. */
+const MAX_RECHECK_MS = 60 * 60 * 1000;
 
 function FinalDrill() {
   const plugin = usePlugin();
@@ -33,7 +37,8 @@ function FinalDrill() {
   const recheckTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const oldItemThreshold = useIESetting(oldItemThresholdId);
-  const minDelayMinutes = useIESetting(masteryDrillMinDelayMinutesId);
+  const cooling = useDrillCooling();
+  const [firstReadyAt, setFirstReadyAt] = useState<number | undefined>();
 
   const [showClearOldConfirm, setShowClearOldConfirm] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
@@ -102,7 +107,6 @@ function FinalDrill() {
       let earliestUnblock: number | undefined;
       const now = Date.now();
       const msPerDay = 1000 * 60 * 60 * 24;
-      const minDelayMs = minDelayMinutes * 60 * 1000;
 
       for (const item of finalDrillIdsRaw) {
         if (!isDrillItemInKb(item, currentKbId, isPrimary)) continue;
@@ -110,17 +114,15 @@ function FinalDrill() {
 
         const cardId = drillItemCardId(item);
         const addedAt = typeof item === 'string' ? undefined : item.addedAt;
+        const unblockAt = drillReadyAt(item, cooling);
 
-        if (addedAt) {
-          const daysOld = (now - addedAt) / msPerDay;
-          if (daysOld > oldItemThreshold) oldCount++;
-        }
+        // Age counts from when the card became drillable: a Hard card cooling for days is not old.
+        if (addedAt && unblockAt <= now && (now - unblockAt) / msPerDay > oldItemThreshold) oldCount++;
 
-        if (addedAt && (now - addedAt) < minDelayMs) {
+        if (unblockAt > now) {
           delayed++;
-          const unblockAt = addedAt + minDelayMs;
           if (earliestUnblock === undefined || unblockAt < earliestUnblock) earliestUnblock = unblockAt;
-          console.log(`[MasteryDrill] Card ${cardId} cooling — addedAt=${new Date(addedAt).toISOString()}, remaining=${Math.round((unblockAt - now) / 60000)}min`);
+          console.log(`[MasteryDrill] Card ${cardId} cooling — addedAt=${new Date(addedAt!).toISOString()}, remaining=${formatDrillWait(unblockAt - now)}`);
         } else {
           activeIds.push(cardId);
         }
@@ -131,6 +133,7 @@ function FinalDrill() {
         setKbItems(relevantItems);
         setDelayedCount(delayed);
         setOldItemsCount(oldCount);
+        setFirstReadyAt(earliestUnblock);
         setIsLoaded(true);
 
         // Schedule a recheck when the first delayed card becomes available
@@ -139,7 +142,7 @@ function FinalDrill() {
           const msUntilUnblock = earliestUnblock - Date.now() + 500;
           recheckTimerRef.current = setTimeout(() => {
             if (!cancelled) updateDerivedState();
-          }, Math.max(msUntilUnblock, 1000));
+          }, Math.min(Math.max(msUntilUnblock, 1000), MAX_RECHECK_MS));
         }
       }
     }
@@ -149,7 +152,7 @@ function FinalDrill() {
       cancelled = true;
       clearTimeout(recheckTimerRef.current);
     };
-  }, [finalDrillIdsRaw, plugin, oldItemThreshold, minDelayMinutes]);
+  }, [finalDrillIdsRaw, plugin, oldItemThreshold, cooling]);
 
   // --- Resurrection guard ---------------------------------------------------------------
   // RemNote's embedded <Queue> snapshots `cardIds` when its controller is built (QueueMain does
@@ -284,8 +287,8 @@ function FinalDrill() {
 
     const newIds = finalDrillIdsRaw.filter(item => {
       if (typeof item !== 'string' && item.kbId === currentKbId && item.addedAt) {
-        const daysOld = (now - item.addedAt) / msPerDay;
-        if (daysOld > oldItemThreshold) return false;
+        const readyAt = drillReadyAt(item, cooling);
+        if (readyAt <= now && (now - readyAt) / msPerDay > oldItemThreshold) return false;
       }
       return true;
     });
@@ -449,7 +452,7 @@ function FinalDrill() {
   const cardListView = showCardList && (
     <MasteryDrillCardList
       items={kbItems}
-      minDelayMinutes={minDelayMinutes}
+      cooling={cooling}
       onRemove={removeCardsFromDrill}
       onGoToRem={goToRem}
       onClose={closeCardList}
@@ -642,7 +645,7 @@ function FinalDrill() {
       >
         <h3 className="text-lg font-bold mb-2">Clear Old Items?</h3>
         <p className="mb-6 text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-          This will remove {oldItemsCount} items that have been in the queue for more than {oldItemThreshold} days. {filteredIds.length - oldItemsCount} items will remain.
+          This will remove {oldItemsCount} items that have been ready to drill for more than {oldItemThreshold} days. {filteredIds.length - oldItemsCount} items will remain.
         </p>
         <div className="flex gap-4">
           <button
@@ -824,7 +827,8 @@ function FinalDrill() {
           <>
             <h3 className="text-lg font-bold mb-2">All Cards Cooling Down</h3>
             <p className="text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-              {delayedCount} card{delayedCount !== 1 ? 's are' : ' is'} waiting for the {minDelayMinutes}-minute minimum delay to pass before appearing here again.
+              {delayedCount} card{delayedCount !== 1 ? 's are' : ' is'} waiting out a delay before appearing here again
+              {firstReadyAt !== undefined ? ` — the first in ${formatDrillWait(firstReadyAt - Date.now())}` : ''}.
             </p>
             <p className="text-xs mt-2" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               The drill will refresh automatically when the first card is ready.
@@ -868,7 +872,7 @@ function FinalDrill() {
                 color: 'var(--rn-clr-content-secondary)',
                 border: '1px solid var(--rn-clr-border-primary)',
               }}
-              title={`${delayedCount} card${delayedCount !== 1 ? 's are' : ' is'} within the ${minDelayMinutes}-min minimum delay and will appear later`}
+              title={`${delayedCount} card${delayedCount !== 1 ? 's are' : ' is'} still cooling and will appear later${firstReadyAt !== undefined ? ` (the first in ${formatDrillWait(firstReadyAt - Date.now())})` : ''}`}
             >
               {delayedCount} cooling
             </span>
@@ -891,7 +895,7 @@ function FinalDrill() {
           {oldItemsCount > 0 && (
             <div
               className="flex items-center gap-1.5 px-2 py-1 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800"
-              title={`${oldItemsCount} card${oldItemsCount !== 1 ? 's have' : ' has'} been waiting in the drill queue for more than ${oldItemThreshold} days. The Mastery Drill is intended for cards you recently rated Hard or Again — after this much time, the spaced repetition algorithm will handle them at their scheduled date instead. You can remove them here if you prefer to trust the scheduler rather than drilling them now.`}
+              title={`${oldItemsCount} card${oldItemsCount !== 1 ? 's have' : ' has'} been ready to drill for more than ${oldItemThreshold} days. The Mastery Drill is intended for cards you recently rated Hard or Again — after this much time, the spaced repetition algorithm will handle them at their scheduled date instead. You can remove them here if you prefer to trust the scheduler rather than drilling them now.`}
             >
               <span className="text-xs text-yellow-800 dark:text-yellow-200 whitespace-nowrap">
                 {oldItemsCount} &gt; {oldItemThreshold} days.
