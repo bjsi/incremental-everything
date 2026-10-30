@@ -127,6 +127,8 @@ export interface FSRSCalibrationBreakdown {
   initialStability: S0Breakdown;
 
   totalCards: number;
+  /** Cards left out by the "Exclude other schedulers" checkbox. */
+  excludedOtherSchedulerCards: number;
   ignorePreReset: boolean;
 
   // Period metadata — mirrors CardAnalyticsBreakdown so the view can sync its
@@ -172,13 +174,16 @@ export async function computeFSRSCalibrationBreakdown(
   ignorePreReset: boolean,
   period: PeriodSpec,
   onProgress?: (done: number, total: number) => void,
+  /** Cards to leave out entirely, from lib/scheduler_cards.ts. */
+  excludedCardIds?: Set<string> | null,
 ): Promise<FSRSCalibrationBreakdown> {
   const { startMs, endMs } = period;
   const { w } = resolveWeights(weights);
   const DECAY = -w[20];
   const FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
 
-  const allCards = (await plugin.card.getAll()) || [];
+  const everyCard = (await plugin.card.getAll()) || [];
+  const allCards = excludedCardIds ? everyCard.filter((c) => !excludedCardIds.has(c._id)) : everyCard;
 
   // Pre-allocate the accumulators for all three grids.
   const accA: CellAcc[][] = Array.from({ length: R_BUCKET_COUNT }, () =>
@@ -431,6 +436,7 @@ export async function computeFSRSCalibrationBreakdown(
     ),
 
     totalCards: N,
+    excludedOtherSchedulerCards: everyCard.length - N,
     ignorePreReset,
     period: period.id,
     periodStartMs: period.startMs,

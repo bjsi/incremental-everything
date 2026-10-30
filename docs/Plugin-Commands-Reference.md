@@ -450,6 +450,9 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 - **Incremental RemNote: Settings** (`is`)
   Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
 
+- **Import Other-Scheduler Cards List**
+  Imports the list of cards RemNote schedules with something other than the Global Default, created by `scripts/export_scheduler_cards.py`. It labels those cards and adds an **Exclude other schedulers** checkbox to Card Analytics and FSRS Calibration. The same popup shows the current list and can remove it. See [Cards on other schedulers](Reviewing-Items-in-the-Queue.md#cards-on-other-schedulers).
+
 - **Import Incremental Rems with History**
   Bulk-imports Incremental Rems from a **JSON payload** — including each rem's **full repetition history**, priority and next-repetition date. Built for migrating an external study log (e.g. a spreadsheet with years of study sessions) into the plugin's native history format.
 

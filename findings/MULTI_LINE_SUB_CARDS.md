@@ -189,6 +189,16 @@ After the corrections, `src/lib/fsrs.ts` agrees with RemNote's library within 0.
 | Vocabulary | RemNote's stability | 3.4% | 12.4% | 2.36 |
 | Questions (SM-2) | Actual interval in days, since SM-2 has no stability | 8.7% | 37.7% | 1.09 |
 
+**What RemNote does itself (1.29.1-beta):**
+
+- **Live:** on each displayed card, the answer buttons call `rem.getNextSpacingDateInteractionInfoScheduler()` once, then compute all the grades with that scheduler. `getSpacedRepetitionScheduler` asks the in-memory WASM graph (`get_spaced_repetition_scheduler_source_rem`), caches the answer until the graph changes, and has no bridge cost.
+- **Bulk:** the code read doesn't resolve per card. `computeCardBurden` takes the first card's scheduler, and the deck schedule tool takes the deck's.
+- **Plugins:** the Rem mapper (`mapRemToPluginInterface`) is a whitelist of `_id`, `owner`, `createdAt`, `parent`, `type`, `u`, `children`, `text` and `backText`, so `src` never reaches a plugin. The card mapper has no scheduler field either.
+
+**Cost on this KB, if a plugin resolved it:** 45,708 Rems own cards, at median depth 7 (p99 12). A walk per Rem is 311,880 parent reads, or 55,782 with memoization. Reading `parent` and `src` for all 434,676 Rems straight from `remnote.db` took about 1 second.
+
+**In the plugin:** `scripts/export_scheduler_cards.py` writes the non-Global cards to a JSON file, and the "Import Other-Scheduler Cards List" command stores it (`src/lib/scheduler_cards.ts`). The Global scheduler's id is the `spacedRepetitionSchedulerIdKb` row in `knowledge_base_data`. This KB's list has 7,016 cards, including those not yet practised, and takes one key of 247 KB in UTF-16 (27.5% of the ceiling).
+
 ## Method
 
 Start from module `188814` in `build/js/21517.*.bundle.js`, then `670163` (`LZ`, `R`, `O`) and `440825` (FSRS) in the same bundle. The FSRS library is module `673402`, which has no dependencies and runs in Node with a small `r.d` shim. Find them again by searching for `From sub-item {{subItemId}}` or `multiLineDrivenBy`. Minified names change between builds.

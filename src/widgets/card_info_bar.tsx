@@ -39,6 +39,7 @@ import { reportCardInfoBarHeight } from '../lib/card_info_bar_dock';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
+import { CardSchedulerLabel } from '../components/OtherSchedulers';
 import {
   computeFSRSState,
   parseWeightsString,
@@ -821,6 +822,7 @@ export function CardInfoBar() {
               {showFsrsDsr && fsrsState && fsrsTooltips && (
                 <>
                   <span style={{ opacity: 0.4 }}>|</span>
+                  <CardSchedulerLabel cardId={cardRepData?.cardId} />
                   <span title={fsrsTooltips.dsr} style={{ cursor: 'help' }}>
                     D: <strong>{fsrsState.d.toFixed(2)}</strong>
                     {' · '}

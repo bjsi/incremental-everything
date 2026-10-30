@@ -1999,6 +1999,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Import the cards RemNote schedules with something other than the Global Default,
+  // from a JSON file written by scripts/export_scheduler_cards.py
+  plugin.app.registerCommand({
+    id: 'import-scheduler-cards',
+    name: 'Import Other-Scheduler Cards List',
+    description:
+      'Label the cards on a scheduler other than the Global Default, and allow leaving them out of Card Analytics and FSRS Calibration.',
+    action: async () => {
+      await plugin.widget.openPopup('import_scheduler_cards');
+    },
+  });
+
   // Command to jump to rem by ID using a popup widget
   plugin.app.registerCommand({
     id: 'jump-to-rem-by-id',

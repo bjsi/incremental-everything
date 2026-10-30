@@ -4,7 +4,21 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.175 - October 30th, 2026
 
+### ✨ New
+
+**Other Schedulers**: Cards on a scheduler other than the Global Default can now be labelled and left out of Card Analytics and FSRS Calibration, using a list created by a script on your computer.
+
+📖 [Cards on other schedulers](Reviewing-Items-in-the-Queue.md#cards-on-other-schedulers)
+
 ### ⚡ Improved
+
+**FSRS Figures**: Difficulty, Stability and the per-grade forecasts now match RemNote's own FSRS exactly, when the plugin's weights match the card's scheduler.
+
+📖 [How accurate the figures are](Reviewing-Items-in-the-Queue.md#how-accurate-the-figures-are)
+
+**List and Set Cards**: Partial repetitions no longer count toward the main card in the FSRS figures, the Forgetting Curve, FSRS Calibration and Card Analytics retention, as in RemNote; they still count as reps and time.
+
+📖 [Partial list and set cards](Reviewing-Items-in-the-Queue.md#partial-list-and-set-cards)
 
 **Cycle Image Size**: Now also resizes images you have already sized, after a confirmation with thumbnails, and *Original* puts your sizes back. It also asks before resizing more than 5 images (adjustable in Settings), adds a *Small* size, and shows the size set in a small clickable bar instead of a toast.
 

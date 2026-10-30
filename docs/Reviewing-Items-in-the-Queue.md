@@ -515,7 +515,9 @@ Zooming out goes well past where the chart opens. The forecast is computed until
 
 #### What the curve is, and is not
 
-The curve is computed by the plugin's own FSRS implementation, from the weights and retention in [FSRS settings](Plugin-Settings-Reference.md#fsrs) — **not** from the scheduler RemNote actually runs on the card, which the plugin API does not expose. It therefore describes your real scheduling only where those settings match it. If your cards use a per-document scheduler, or Anki SM-2, or FSRS with different weights, treat the curve as an estimate of that model rather than a record of RemNote's decisions.
+The curve is computed by the plugin's own FSRS implementation, from the weights and retention in [FSRS settings](Plugin-Settings-Reference.md#fsrs) — **not** from the scheduler RemNote actually runs on the card, which the plugin API does not expose. It therefore describes your real scheduling only where those settings match it. If your cards use a per-document scheduler, or Anki SM-2, or FSRS with different weights, treat the curve as an estimate of that model rather than a record of RemNote's decisions. See [Cards on other schedulers](#cards-on-other-schedulers).
+
+On a list or set card, the curve follows the main card only, so [partial repetitions](#partial-list-and-set-cards) don't appear on it.
 
 To hide it in the Queue Dashboard, set **Forgetting Curve** to *Hidden* in [Queue Dashboard settings](Plugin-Settings-Reference.md#queue-dashboard). In the Repetition History popup it follows **Display FSRS DSR Stats**.
 
@@ -533,6 +535,52 @@ To get accurate D/S/R values that match RemNote's internal calculations, you nee
 4.  Paste the weights string (e.g., `[1, 3, 10, 45, 7.011, 0.46, ...]`).
 
 If left empty, the official FSRS v6.1.1 default weights are used, which will produce approximate but likely inaccurate values for your specific study patterns.
+
+#### How accurate the figures are { #how-accurate-the-figures-are }
+
+With the same weights as the card's scheduler, the plugin's Difficulty, Stability and per-grade forecasts match RemNote's FSRS. This was checked on a real knowledge base of about 38,000 FSRS cards, all within 0.001%.
+
+Two things can still make a figure differ from what you see in RemNote:
+
+*   **Different weights.** The plugin has one set of weights, so the match only holds for cards whose scheduler uses those weights. See [Cards on other schedulers](#cards-on-other-schedulers).
+*   **Intervals.** The interval a grade would schedule is calculated from Stability, without RemNote's rounding to whole days or its random fuzz, so it can be slightly off from RemNote's date.
+
+Retrievability (R) uses the real time since the last review, so it decreases smoothly during the day. RemNote counts whole UTC days when it calculates the next Stability, and the plugin does the same for that calculation.
+
+#### Partial list and set cards { #partial-list-and-set-cards }
+
+When RemNote shows only some items of a list or set card, that repetition is **partial**, and it doesn't count toward the main card's schedule. The plugin follows the same rule:
+
+*   **D, S, R and the Forgetting Curve** ignore partial repetitions, so they stay the same until the next full repetition. In the Flashcard Repetition History, a partial repetition's row shows the values carried over from the previous one, with `—` for its R and SInc.
+*   **FSRS Calibration** leaves them out.
+*   **Card Analytics** leaves them out of Retention, Lapses, Avg Grade and Avg pR, but still counts them in Reps, Time and Cost, because they are real study time.
+
+The due date works differently: the date the card shows is the earliest of the main card's date and the dates of items you recently forgot or partially recalled. So a list card can come back much sooner than its Stability suggests.
+
+#### Cards on other schedulers { #cards-on-other-schedulers }
+
+RemNote lets you assign a different scheduler to a document, under **Settings → Schedulers**. The plugin can't see which scheduler a card uses, so it applies your [FSRS Global Weights](#required-setup-fsrs-weights) to every card. On cards using other weights, or Anki SM-2, the D, S and R shown are only the plugin's estimate.
+
+You can give the plugin a list of those cards. It's optional, and needs a computer with Python 3 and the RemNote desktop app:
+
+1.  Get [`scripts/export_scheduler_cards.py`](https://github.com/hugomarins/incremental-remnote/blob/main/scripts/export_scheduler_cards.py) and run it:
+
+    ```bash
+    python3 export_scheduler_cards.py
+    ```
+
+    It only reads your local RemNote database, and writes a file to your `Downloads` folder.
+
+2.  In RemNote, run the command **Import Other-Scheduler Cards List** and choose that file.
+
+The script uses your main knowledge base. For another one, run it with `--list` to see their ids, then with `--kb <id>`, and import the file while that knowledge base is open.
+
+Once the list is imported:
+
+*   **A label** such as `Questions · Anki SM-2` appears next to the FSRS figures in the Card Info Bar and the Flashcard Repetition History.
+*   **An "Exclude other schedulers" checkbox** appears in [Card Analytics](Prioritization-&-Sorting.md#card-memory-analytics) and [FSRS Calibration](Prioritization-&-Sorting.md#fsrs-calibration). It's off by default.
+
+The list syncs with your knowledge base, so it also works on your other devices. It doesn't update by itself: cards created under another scheduler count as Global until you run the script and import again. To delete the list, run the same command and choose **Remove list**.
 
 ![DSR Settings](assets/DSR-settings.png){ width="800" }
 

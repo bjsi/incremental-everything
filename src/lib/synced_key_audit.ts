@@ -38,6 +38,7 @@ import {
   authoritativeShardKey,
 } from './authoritative_aggregates';
 import { flashcardHistorySpec, remHistorySpec, shardKey } from './history_shards';
+import { MAX_SCHEDULER_SHARDS, schedulerManifestKey, schedulerShardKey } from './scheduler_cards';
 
 // ---------------------------------------------------------------------------
 // Synced-storage key audit
@@ -536,6 +537,18 @@ async function buildCandidates(
     coverage: 'partial',
     note: 'Same kbId discovery limits as the sorting settings above.',
     keys: kbIds.map((kbId) => authoritativeShardKey(kbId)),
+  });
+
+  // 3d. Other-scheduler cards list — a manifest and its shards, per KB.
+  families.push({
+    family: 'Other-scheduler cards (per KB)',
+    pattern: 'scheduler-cards_{kbId}[_{n}]',
+    coverage: 'partial',
+    note: 'Same kbId discovery limits as the sorting settings above.',
+    keys: kbIds.flatMap((kbId) => [
+      schedulerManifestKey(kbId),
+      ...Array.from({ length: MAX_SCHEDULER_SHARDS }, (_, i) => schedulerShardKey(kbId, i)),
+    ]),
   });
 
   // 4. Rem universes.

@@ -27,6 +27,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useMemo, useEffect, useState } from 'react';
 import { computeFSRSStatesPerReview, computeFSRSState, parseWeightsString } from '../lib/fsrs';
+import { CardSchedulerLabel } from '../components/OtherSchedulers';
 import { formatStabilityDays, formatTimeAgo, getRetrievabilityColor, screenFittedHeight } from '../lib/utils';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { displayFsrsDsrId, fsrsWeightsId, powerupCode, dismissedPowerupCode } from '../lib/consts';
@@ -1203,6 +1204,8 @@ function FlashcardRepetitionHistory() {
                                         fontSize: 11,
                                         color: 'var(--rn-clr-content-secondary)',
                                     }}>
+                                        <CardSchedulerLabel cardId={card._id} />
+                                        {' '}
                                         <strong>D:</strong> {fsrs.finalState.d.toFixed(2)}
                                         {' · '}
                                         <strong>S:</strong> {fsrs.finalState.s.toFixed(1)}d{formatStabilityDays(fsrs.finalState.s) !== `${fsrs.finalState.s.toFixed(2)}d` ? ` (${formatStabilityDays(fsrs.finalState.s)})` : ''}

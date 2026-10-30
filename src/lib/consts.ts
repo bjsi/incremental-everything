@@ -722,6 +722,10 @@ export const logosBridgeEnabledId = 'logos-bridge-enabled';
 export const logosAutoOpenId = 'logos-auto-open';
 export const openInLogosCommandId = 'open-in-logos';
 
+// --- Cards on a scheduler other than the Global Default (lib/scheduler_cards.ts) ---
+// Synced and per KB: `<prefix>_<kbId>` is the manifest, `<prefix>_<kbId>_<n>` the shards.
+export const schedulerCardsKeyPrefix = 'scheduler-cards';
+
 // --- Priority Queue cooling (lib/priority_review_document/cooling*.ts) ---
 // The cooling SET is never stored: it is a function of card data, recomputed on
 // every refresh. Two keys support it:

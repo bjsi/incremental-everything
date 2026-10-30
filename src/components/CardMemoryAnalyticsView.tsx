@@ -9,6 +9,8 @@
 
 import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
+import { ExcludeOtherSchedulersToggle, useSchedulerManifest } from './OtherSchedulers';
+import { SchedulerCardsManifest, getOtherSchedulerCardIds } from '../lib/scheduler_cards';
 import {
   CardAnalyticsBreakdown,
   CardAnalyticsRow,
@@ -979,6 +981,9 @@ function StatusBar({
   breakdown,
   ignorePreReset,
   onToggleIgnorePreReset,
+  schedulerManifest,
+  excludeOtherSchedulers,
+  onToggleExcludeOtherSchedulers,
   onRecompute,
   onExport,
   onScanPaused,
@@ -988,6 +993,9 @@ function StatusBar({
   breakdown: CardAnalyticsBreakdown;
   ignorePreReset: boolean;
   onToggleIgnorePreReset: (next: boolean) => void;
+  schedulerManifest: SchedulerCardsManifest | null;
+  excludeOtherSchedulers: boolean;
+  onToggleExcludeOtherSchedulers: (next: boolean) => void;
   onRecompute: () => void;
   onExport: () => void;
   onScanPaused: () => void;
@@ -1026,6 +1034,11 @@ function StatusBar({
             (skipped {breakdown.cardsSkippedNoPriority.toLocaleString()} without a known priority)
           </span>
         )}
+        {(breakdown.excludedOtherSchedulerCards ?? 0) > 0 && (
+          <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '6px' }}>
+            · {breakdown.excludedOtherSchedulerCards.toLocaleString()} on other schedulers excluded
+          </span>
+        )}
         {breakdown.pausedScanApplied ? (
           pausedScan && (
             <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '6px' }}>
@@ -1060,6 +1073,12 @@ function StatusBar({
           />
           Ignore reps before last RESET
         </label>
+        <ExcludeOtherSchedulersToggle
+          manifest={schedulerManifest}
+          checked={excludeOtherSchedulers}
+          disabled={disabled}
+          onChange={onToggleExcludeOtherSchedulers}
+        />
         <button
           type="button"
           onClick={onScanPaused}
@@ -1409,6 +1428,10 @@ export function CardMemoryAnalyticsView() {
   // has never run, which is NOT the same as "no decks are paused" — the table
   // says so explicitly rather than reporting a confident zero.
   const [pausedScan, setPausedScan] = React.useState<PausedDeckScan | null>(null);
+  const schedulerManifest = useSchedulerManifest();
+  const [excludeOtherSchedulers, setExcludeOtherSchedulers] = React.useState<boolean>(false);
+  // Read by compute, whose signature every period and RESET handler already shares.
+  const excludeOtherSchedulersRef = React.useRef(false);
 
   const compute = React.useCallback(
     async (flag: boolean, p: Period, cs: string, ce: string) => {
@@ -1437,6 +1460,7 @@ export function CardMemoryAnalyticsView() {
           (done, total) => setProgress({ done, total }),
           undefined,
           pausedRemIds,
+          excludeOtherSchedulersRef.current ? await getOtherSchedulerCardIds(plugin as any) : null,
         );
         await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
         // Persist user prefs (period + ignorePreReset) across app restarts
@@ -1448,6 +1472,7 @@ export function CardMemoryAnalyticsView() {
             customStart: cs,
             customEnd: ce,
             ignorePreReset: flag,
+            excludeOtherSchedulers: excludeOtherSchedulersRef.current,
           })
           .catch(() => {});
         setCache(breakdown);
@@ -1495,6 +1520,7 @@ export function CardMemoryAnalyticsView() {
         (done, total) => setProgress({ done, total }),
         (row) => rows.push(row),
         pausedRemIds,
+        excludeOtherSchedulersRef.current ? await getOtherSchedulerCardIds(plugin as any) : null,
       );
 
       setPhaseLabel('Resolving Rem context for unscheduled cards…');
@@ -1572,6 +1598,11 @@ export function CardMemoryAnalyticsView() {
       .catch(() => {});
   }, [plugin]);
 
+  const applyExcludeOtherSchedulers = (next: boolean) => {
+    excludeOtherSchedulersRef.current = next;
+    setExcludeOtherSchedulers(next);
+  };
+
   // Mount: prefer the in-memory session cache (instant). If absent, fall back
   // to the last-selected period saved in device-local storage so that re-opens
   // after a full RemNote restart still remember the user's choice. If neither
@@ -1585,6 +1616,7 @@ export function CardMemoryAnalyticsView() {
         customStart?: string;
         customEnd?: string;
         ignorePreReset?: boolean;
+        excludeOtherSchedulers?: boolean;
       } | null>(cardAnalyticsLastPeriodKey),
     ])
       .then(([c, saved]) => {
@@ -1592,6 +1624,7 @@ export function CardMemoryAnalyticsView() {
         if (c && c.buckets && c.buckets.length === 10) {
           setCache(c);
           setIgnorePreReset(c.ignorePreReset ?? false);
+          applyExcludeOtherSchedulers((c.excludedOtherSchedulerCards ?? 0) > 0);
           setPeriod(((c.period as Period) ?? 'thisYear'));
           setCustomStart(c.periodCustomStart ?? '');
           setCustomEnd(c.periodCustomEnd ?? '');
@@ -1607,6 +1640,7 @@ export function CardMemoryAnalyticsView() {
         setCustomStart(cs);
         setCustomEnd(ce);
         setIgnorePreReset(flag);
+        applyExcludeOtherSchedulers(saved?.excludeOtherSchedulers ?? false);
         // 'custom' / 'since' without a usable start date can't compute — skip
         // the auto-compute and wait for the user to type / pick one.
         const hasUsableStart = !!cs;
@@ -1627,6 +1661,10 @@ export function CardMemoryAnalyticsView() {
   const handleToggleIgnorePreReset = (next: boolean) => {
     setIgnorePreReset(next);
     compute(next, period, customStart, customEnd);
+  };
+  const handleToggleExcludeOtherSchedulers = (next: boolean) => {
+    applyExcludeOtherSchedulers(next);
+    compute(ignorePreReset, period, customStart, customEnd);
   };
   const handlePeriodChange = (p: Period) => {
     setPeriod(p);
@@ -1683,6 +1721,9 @@ export function CardMemoryAnalyticsView() {
             breakdown={cache}
             ignorePreReset={ignorePreReset}
             onToggleIgnorePreReset={handleToggleIgnorePreReset}
+            schedulerManifest={schedulerManifest}
+            excludeOtherSchedulers={excludeOtherSchedulers}
+            onToggleExcludeOtherSchedulers={handleToggleExcludeOtherSchedulers}
             onRecompute={() => compute(ignorePreReset, period, customStart, customEnd)}
             onExport={runExport}
             onScanPaused={runPausedScan}

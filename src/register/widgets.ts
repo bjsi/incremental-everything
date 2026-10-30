@@ -405,6 +405,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: { height: 'auto', width: 620 },
   });
 
+  // Import the list written by scripts/export_scheduler_cards.py
+  plugin.app.registerWidget('import_scheduler_cards', WidgetLocation.Popup, {
+    dimensions: { height: 'auto', width: 520 },
+  });
+
   // Register parent selector popup for creating rems under incremental rems.
   // The height follows the screen; keep it in sync with the container height in
   // widgets/parent_selector.tsx, whose tree list absorbs the difference.

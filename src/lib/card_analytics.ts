@@ -107,6 +107,8 @@ export interface CardAnalyticsBreakdown {
    * `byPriorityPrefix[100]` equals `overall` (modulo label / priorityRange).
    */
   byPriorityPrefix: CardBucketStats[];
+  /** Cards left out by the "Exclude other schedulers" checkbox. */
+  excludedOtherSchedulerCards: number;
   /** False when no paused-deck scan was available, so `paused` counts read 0
    *  because nothing was looked at — not because nothing is paused. */
   pausedScanApplied: boolean;
@@ -699,6 +701,8 @@ export async function computeCardAnalyticsBreakdown(
    * expected to say so, rather than let "we never looked" read as "none".
    */
   pausedRemIds?: Set<string> | null,
+  /** Cards to leave out entirely, from lib/scheduler_cards.ts. They don't shift anyone's percentile. */
+  excludedCardIds?: Set<string> | null,
 ): Promise<CardAnalyticsBreakdown> {
   const { startMs, endMs } = period;
   // Map remId → inherited rem priority. Filter out rems with explicit zero cards.
@@ -714,8 +718,10 @@ export async function computeCardAnalyticsBreakdown(
 
   const validCards: any[] = [];
   let cardsSkippedNoPriority = 0;
+  let excludedOtherSchedulerCards = 0;
   for (const c of allCards) {
-    if (remPriority.has(c.remId)) validCards.push(c);
+    if (excludedCardIds?.has(c._id)) excludedOtherSchedulerCards++;
+    else if (remPriority.has(c.remId)) validCards.push(c);
     else cardsSkippedNoPriority++;
   }
 
@@ -833,6 +839,7 @@ export async function computeCardAnalyticsBreakdown(
     totalCards: N,
     computedAt: Date.now(),
     pausedScanApplied: !!pausedRemIds,
+    excludedOtherSchedulerCards,
     cardsSkippedNoPriority,
     ignorePreReset,
     period: period.id,
