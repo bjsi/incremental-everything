@@ -138,6 +138,8 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 !!! warning "Display and statistics only — these do not schedule anything"
     Nothing in this group can move a due date. Your scheduling is **RemNote's**, and is configured in **RemNote Settings → Schedulers**. These settings tell the plugin *what your scheduler is doing*, so that the numbers it shows you describe your real reviews — set them to **match** what you use there. Changing them here alone does not change your scheduling; it only makes the readouts wrong.
 
+**FSRS Global Weights** and **Requested Retention** are saved for each knowledge base, and show a *this knowledge base* badge in the popup. You can [fill them with a script](Reviewing-Items-in-the-Queue.md#import-scheduler-data).
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | **Display FSRS DSR Stats (Flashcards)** | Boolean | `true` | Shows calculated FSRS Difficulty (D), Stability (S), and Retrievability (R) for flashcards in the [Card Info Bar](Plugin-Widgets-Reference.md#11-card-info-bar) widget. Requires FSRS v6 scheduler. 📖 [Card Stats & FSRS Integration](Reviewing-Items-in-the-Queue.md#card-stats-fsrs-integration). |

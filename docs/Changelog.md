@@ -12,6 +12,10 @@ This page documents the major changes and improvements for each version of the I
 
 ### ⚡ Improved
 
+**FSRS Settings**: FSRS Global Weights and Requested Retention are now saved for each knowledge base, and a script can fill them from your Global Default Scheduler. A secondary knowledge base now uses the FSRS defaults until you set its own values, so if you pasted weights while working in one, enter them there again.
+
+📖 [Required setup](Reviewing-Items-in-the-Queue.md#required-setup-fsrs-weights) · [Import your scheduler data](Reviewing-Items-in-the-Queue.md#import-scheduler-data)
+
 **FSRS Figures**: Difficulty, Stability and the per-grade forecasts now match RemNote's own FSRS exactly, when the plugin's weights match the card's scheduler.
 
 📖 [How accurate the figures are](Reviewing-Items-in-the-Queue.md#how-accurate-the-figures-are)
