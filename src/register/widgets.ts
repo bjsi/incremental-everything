@@ -116,6 +116,19 @@ const SIDEBAR_END_PADDING_CSS = `
   }
 `;
 
+// A floating widget's wrapper is z-50, but the reader's Notes (z 12), Explain (z 20)
+// and every default popup (z 30) sit below it, in #controlled-popup-portal. While the
+// Source float is open, lift that whole portal: popups keep their order among themselves.
+// Tablets excluded: their popups are absolute, and this would clip them to the portal.
+const SOURCE_FLOATING_POPUPS_CSS = `
+  @media (pointer: fine) {
+    body:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=pdf_source_floating"]) #controlled-popup-portal {
+      position: relative;
+      z-index: 60;
+    }
+  }
+`;
+
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
 
@@ -590,6 +603,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
       height: screenFittedHeight(600),
     },
   });
+  await plugin.app.registerCSS('source-floating-popups', SOURCE_FLOATING_POPUPS_CSS);
 
   // Outline Restructure preview popup (Before | After + per-rem preserve toggles).
   plugin.app.registerWidget('outline_restructure_preview', WidgetLocation.Popup, {
