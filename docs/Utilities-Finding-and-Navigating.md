@@ -158,6 +158,7 @@ The command inspects the hovered reference's target and only acts on **Reader so
 | --- | --- |
 | **PDF highlight** | Opens the host PDF and auto-scrolls to the highlight |
 | **HTML / web-article highlight** | Opens the article (Reader Mode) at the highlight |
+| **PDF Text Reader highlight** | Opens the host PDF and scrolls to the highlight when the PDF is in its Text Reader view |
 | **PDF source document** (the uploaded file Rem) | Opens the PDF at the top |
 | **HTML source** (a non-YouTube Link Rem) | Opens the article |
 | **A plain Rem** (no PDF/HTML source) | **Nothing happens** — you get a toast and default behavior is left untouched |
@@ -180,10 +181,10 @@ For PDF/HTML **highlights**, the viewer auto-scrolls to the highlighted passage 
 
 The floating variant is designed so the source sits **beside** your card while you study, which is why it behaves a little differently from the modal:
 
-- **Stays open while you use the PDF.** Unlike a modal, clicking into the reader to highlight, select text, or click existing highlights will **not** dismiss it.
+- **Stays open while you use the PDF.** Unlike a modal, clicking into the reader to highlight, select text, or click existing highlights will **not** dismiss it. The highlight's Notes, Explain and other popups open on top of the window.
 - **Closes itself when you advance the card,** so a previous card's source never lingers over the next one.
 - **Esc closes it** — without closing the queue. The plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it; Esc closes the float instead. (When focus is inside the PDF itself, the browser handles Esc within the reader; use the `✕` button there.)
-- **Drag the header to move it.** Press anywhere on the header bar (except its buttons) and drag; it stays partly on screen at every edge. The next floating window opens where you last left it, until RemNote restarts.
+- **Drag the header to move it.** Press anywhere on the header bar (except its buttons) and drag; it stays partly on screen at every edge. The next floating window opens where you last left it, until RemNote restarts. Highlights respond again a moment after you let go.
 - **Not user-resizable.** RemNote floating widgets have a fixed registered size; the window opens at 40% of the screen width on the right.
 
 ![PDF Source shown in floating widget](assets/source-floating-widget.png){ width="900" }

@@ -2,6 +2,18 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.176 - October 30th, 2026
+
+### 🐛 Fixed
+
+**Open Source in Popup / Floating Window**: Now also opens PDF Text Reader highlights and web-article highlights, which it was rejecting as "not a PDF/HTML source".
+
+📖 [What it opens](Utilities-Finding-and-Navigating.md#what-it-opens)
+
+**Floating Source Window**: The highlight's Notes, Explain and other popups now appear on top of the window instead of behind it, and highlights can still be clicked after you drag the window.
+
+📖 [Floating window](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing)
+
 ## v1.0.175 - October 30th, 2026
 
 ### ✨ New

@@ -15,7 +15,7 @@ A finding earns a file here when getting it wrong costs real time: a silent fail
 | [EDITOR_DOM_AND_CSS.md](EDITOR_DOM_AND_CSS.md) | The editor's DOM and what plugin CSS can reach: `data-rem-tags`, the bullet, the tag bar, table cells; pinning a widget in a pane, sticky headers, telling a widget's instances apart (`getDimensions`) |
 | [MEDIA_AND_FILE_STORAGE.md](MEDIA_AND_FILE_STORAGE.md) | Linked vs stored images and audio (`%LOCAL_FILE%`), and the two importer calls through which a plugin can upload |
 | [VIDEO_PLAYBACK.md](VIDEO_PLAYBACK.md) | Why YouTube embeds die in the plugin sandbox, the Embed Website + postMessage escape, RemNote video Rems (`vi` URL, `ip` LastWatchedTime), local video files, transcripts (dead ANDROID proxy, RemNote's server RPC, yt-dlp works) |
-| [PLUGIN_BRIDGE_AND_SDK.md](PLUGIN_BRIDGE_AND_SDK.md) | Plugin bridge and SDK traps: storage limits, built-in powerup membership, retired slots, lazy children, shortcuts, filtered document widgets that don't follow a zoom, theme variables in iframes, build pitfalls |
+| [PLUGIN_BRIDGE_AND_SDK.md](PLUGIN_BRIDGE_AND_SDK.md) | Plugin bridge and SDK traps: storage limits, built-in powerup membership, retired slots, lazy children, shortcuts, filtered document widgets that don't follow a zoom, PDF readers inside floating widgets, theme variables in iframes, build pitfalls |
 | [support-reports/](support-reports/) | Reports sent to RemNote support, with their follow-ups |
 
 ## How findings are established

@@ -13,7 +13,14 @@ export interface SourceReaderViewProps {
   onClose: () => void;
   /** Floating host only: makes the header a drag handle (lib/floating_widget_drag). */
   onHeaderPointerDown?: (e: React.PointerEvent<HTMLElement>) => void;
+  /** Floating host only: bump after moving the host, so the reader re-reads its position. */
+  moveCount?: number;
 }
+
+// How long to wait for the host to apply the last move, then how long the reader
+// must stay 1px shorter: two changes landing in one host frame would cancel out.
+const REANCHOR_DELAY_MS = 100;
+const REANCHOR_HOLD_MS = 150;
 
 /**
  * Shared reader UI for both the modal (pdf_source_popup) and floating
@@ -26,10 +33,26 @@ export function SourceReaderView({
   kind,
   onClose,
   onHeaderPointerDown,
+  moveCount = 0,
 }: SourceReaderViewProps) {
   const plugin = usePlugin() as ReactRNPlugin;
   const hasScrolled = useRef(false);
   const [sourceName, setSourceName] = useState('');
+  const [reanchoring, setReanchoring] = useState(false);
+
+  // The PDF canvas caches its on-screen origin and re-reads it only when its size
+  // changes, so after a move every click lands where the reader used to be and
+  // misses the highlights. Height only: a width change would rescale the page.
+  // The padding shrinks the embed's parent, which the SDK forwards to the host.
+  useEffect(() => {
+    if (!moveCount) return;
+    const start = setTimeout(() => setReanchoring(true), REANCHOR_DELAY_MS);
+    const end = setTimeout(() => setReanchoring(false), REANCHOR_DELAY_MS + REANCHOR_HOLD_MS);
+    return () => {
+      clearTimeout(start);
+      clearTimeout(end);
+    };
+  }, [moveCount]);
 
   // Name of the source document, shown after "Source" in the header.
   useEffect(() => {
@@ -190,7 +213,7 @@ export function SourceReaderView({
           </button>
         </div>
       </div>
-      <div style={{ flex: '1 1 auto', minHeight: 0 }}>
+      <div style={{ flex: '1 1 auto', minHeight: 0, paddingBottom: reanchoring ? 1 : 0 }}>
         <PDFWebReader
           key={hostRemId}
           remId={hostRemId}

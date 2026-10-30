@@ -32,6 +32,7 @@ export function PdfSourceFloating() {
   const [kind, setKind] = useState<string | null>(null);
   const [floatingWidgetId, setFloatingWidgetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [moveCount, setMoveCount] = useState(0);
   const positionRef = useRef<FloatingPosition | null>(sourceFloatingDefaultPosition);
 
   useEffect(() => {
@@ -108,13 +109,14 @@ export function PdfSourceFloating() {
     };
   }, [floatingWidgetId, plugin, close]);
 
-  const savePosition = useCallback(
+  const onDragEnd = useCallback(
     (position: FloatingPosition) => {
       plugin.storage.setSession(sourceFloatingPositionKey, position).catch(() => {});
+      setMoveCount((n) => n + 1);
     },
     [plugin]
   );
-  const onHeaderPointerDown = useFloatingWidgetDrag(plugin, floatingWidgetId, positionRef, savePosition);
+  const onHeaderPointerDown = useFloatingWidgetDrag(plugin, floatingWidgetId, positionRef, onDragEnd);
 
   if (loading) {
     return <div style={{ padding: '16px' }}>Loading source…</div>;
@@ -135,6 +137,7 @@ export function PdfSourceFloating() {
       kind={kind}
       onClose={close}
       onHeaderPointerDown={onHeaderPointerDown}
+      moveCount={moveCount}
     />
   );
 }
