@@ -9,6 +9,7 @@ import {
 import { getEffectiveSelection } from './editor_selection';
 import {
   applyImageSizeStep,
+  describeImageSize,
   ImageSizeStep,
   isSizableImage,
   isUnsizedImage,
@@ -21,9 +22,10 @@ import { resolveQueueCommandTarget } from './queue_target';
 import { sanitizeRichTextForSetText } from './richTextSanitize';
 
 /**
- * The bridge half of "Cycle Image Size": find the images under a Rem that
- * nobody has sized, and walk them through Fit, Large, Medium and back to how
- * they were. The shapes themselves are in lib/image_sizing.ts.
+ * The bridge half of "Cycle Image Size": find the images under a Rem and walk
+ * them through Fit, Large, Medium, Small and back to how they were. The shapes
+ * themselves are in lib/image_sizing.ts; the confirmation and the on-screen
+ * feedback around a press are in lib/image_size_session.ts.
  */
 
 const LOG = '[ImageSize]';
@@ -37,13 +39,17 @@ const MEASURE_TIMEOUT_MS = 8000;
 const VALID_PERCENTS = new Set([5, 25, 50, 100]);
 
 /**
- * What the command has done this session.
+ * What the command has done, per Rem.
  *
- * Needed because a sized image looks exactly like one the user sized: without
- * a record the second press would skip everything the first one changed. Kept
- * for the session only — after a restart those images count as sized.
+ * Needed because a sized image looks exactly like one the user sized: without a
+ * record the next press could not tell them apart, and the size to go back to
+ * would be gone. Local rather than session, because that size may be one the
+ * user chose: a plugin reload mid-cycle must not lose it. Device-only, and
+ * forgotten after IMAGE_RECORD_MAX_AGE_MS.
  */
-const IMAGE_SIZE_CYCLE_KEY = 'image-size-cycle-state';
+const IMAGE_SIZE_RECORDS_KEY = 'image-size-records';
+
+const IMAGE_RECORD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface ImageRecord {
   /** The element before the first step touched it, for the Original step. */
@@ -51,15 +57,47 @@ interface ImageRecord {
   natural: NaturalSize;
   /** Size signature of what was last written; a mismatch means a manual resize since. */
   written: string;
+  step: ImageSizeStep;
+  /** The original is a size the user chose, so changing this image needs their consent. */
+  userSized: boolean;
 }
 
 interface RemRecord {
-  step: ImageSizeStep;
+  at: number;
   /** Keyed by image url. */
   images: Record<string, ImageRecord>;
 }
 
-type CycleState = Record<RemId, RemRecord>;
+type ImageRecords = Record<RemId, RemRecord>;
+
+export interface ScannedImage {
+  url: string;
+  /** Whose size the image is on: `user` needs consent before it changes. */
+  kind: 'unsized' | 'user';
+  /** Its current size, for showing in the confirmation. */
+  sizeLabel: string;
+  original: any;
+  natural: NaturalSize;
+  /** The step an earlier press left it on, if any. */
+  step?: ImageSizeStep;
+}
+
+interface ScannedRem {
+  rem: PluginRem;
+  /** Every image element of the Rem, resizable or not. */
+  elements: any[];
+  images: ScannedImage[];
+}
+
+export interface ImageScan {
+  /** Rems looked at. */
+  scanned: number;
+  rems: ScannedRem[];
+  /** Occlusions, drawings and PDF/HTML highlight images, never touched. */
+  protectedImages: number;
+  /** Images whose file could not be loaded to measure it. */
+  unmeasurable: number;
+}
 
 export interface ImageSizeCycleResult {
   /** The step this press applied; undefined when nothing was eligible. */
@@ -68,15 +106,16 @@ export interface ImageSizeCycleResult {
   scanned: number;
   /** Images rewritten. */
   changed: number;
-  /** Images left alone because the user has already sized them. */
+  /** Images left alone because the user has sized them and did not include them. */
   userSized: number;
-  /** Occlusions, drawings and PDF/HTML highlight images, never touched. */
   protectedImages: number;
-  /** Unsized images whose file could not be loaded to measure it. */
   unmeasurable: number;
   /** Rems whose write threw. */
   failed: number;
 }
+
+export const scannedImages = (scan: ImageScan): ScannedImage[] =>
+  scan.rems.flatMap((scanned) => scanned.images);
 
 const imagesOf = (richText: RichTextInterface | undefined): any[] =>
   (richText ?? []).filter((el) => typeof el !== 'string' && (el as any).i === 'i');
@@ -128,14 +167,19 @@ async function collectScope(roots: PluginRem[]): Promise<PluginRem[]> {
   return [...seen.values()];
 }
 
+/** A URL the image can be loaded from, or undefined. */
+export async function resolveImageSrc(plugin: RNPlugin, element: any): Promise<string | undefined> {
+  const src: string = element.url;
+  if (/^(https?:|data:)/i.test(src)) return src;
+  // `%LOCAL_FILE%…` — richText.toString resolves it to the stored file's URL.
+  const resolved = (await safeRemTextToString(plugin, [element]).catch(() => '')).trim();
+  return /^https?:/i.test(resolved) ? resolved : undefined;
+}
+
 /** The file's own pixel size, or undefined when it cannot be loaded. */
 async function measureImage(plugin: RNPlugin, element: any): Promise<NaturalSize | undefined> {
-  let src: string = element.url;
-  if (!/^(https?:|data:)/i.test(src)) {
-    // `%LOCAL_FILE%…` — richText.toString resolves it to the stored file's URL.
-    src = (await safeRemTextToString(plugin, [element]).catch(() => '')).trim();
-    if (!/^https?:/i.test(src)) return undefined;
-  }
+  const src = await resolveImageSrc(plugin, element);
+  if (!src) return undefined;
   return new Promise((resolve) => {
     const img = new Image();
     const timer = setTimeout(() => resolve(undefined), MEASURE_TIMEOUT_MS);
@@ -163,98 +207,125 @@ async function isHighlightRem(rem: PluginRem): Promise<boolean> {
   }
 }
 
-interface Candidate {
-  original: any;
-  natural: NaturalSize;
-}
+const readRecords = async (plugin: RNPlugin): Promise<ImageRecords> =>
+  (await plugin.storage.getLocal<ImageRecords>(IMAGE_SIZE_RECORDS_KEY)) || {};
 
-interface RemPlan {
-  rem: PluginRem;
-  /** Keyed by image url. */
-  candidates: Map<string, Candidate>;
-  /** The step this Rem was left on by an earlier press, if any. */
-  previousStep?: ImageSizeStep;
-}
-
-/**
- * Move every unsized image under `roots` to the next step of the cycle.
- *
- * The step is decided once per press — the one after whatever an earlier press
- * left on the first Rem it finds a record for, else Fit — and applied to every
- * eligible image, so a scope always ends up uniform.
- */
-export async function cycleImageSizes(
-  plugin: RNPlugin,
-  roots: PluginRem[]
-): Promise<ImageSizeCycleResult> {
-  const result: ImageSizeCycleResult = {
-    scanned: 0,
-    changed: 0,
-    userSized: 0,
-    protectedImages: 0,
-    unmeasurable: 0,
-    failed: 0,
-  };
-  const state = (await plugin.storage.getSession<CycleState>(IMAGE_SIZE_CYCLE_KEY)) || {};
+/** Everything under `roots` the command could resize, and how each image stands. Writes nothing. */
+export async function scanImageScope(plugin: RNPlugin, roots: PluginRem[]): Promise<ImageScan> {
+  const records = await readRecords(plugin);
   const scope = await collectScope(roots);
-  result.scanned = scope.length;
-
+  const scan: ImageScan = { scanned: scope.length, rems: [], protectedImages: 0, unmeasurable: 0 };
   const measured = new Map<string, NaturalSize | undefined>();
-  const plans: RemPlan[] = [];
 
   for (const rem of scope) {
-    const images = [...imagesOf(rem.text), ...imagesOf(rem.backText)];
-    if (images.length === 0) continue;
+    const elements = [...imagesOf(rem.text), ...imagesOf(rem.backText)];
+    if (elements.length === 0) continue;
 
     // An area highlight's image IS the highlight; RemNote regenerates it.
     if (await isHighlightRem(rem)) {
-      result.protectedImages += images.length;
+      scan.protectedImages += elements.length;
       continue;
     }
 
-    const record = state[rem._id];
-    const candidates = new Map<string, Candidate>();
-    let ours = false;
-    for (const el of images) {
+    const record = records[rem._id];
+    const images = new Map<string, ScannedImage>();
+    for (const el of elements) {
       if (!isSizableImage(el)) {
-        result.protectedImages++;
+        scan.protectedImages++;
         continue;
       }
       const known = record?.images[el.url];
       if (known && known.written === sizeSignature(el)) {
-        candidates.set(el.url, { original: known.original, natural: known.natural });
-        ours = true;
+        images.set(el.url, {
+          url: el.url,
+          kind: known.userSized ? 'user' : 'unsized',
+          sizeLabel: describeImageSize(el, known.natural, known.step),
+          original: known.original,
+          natural: known.natural,
+          step: known.step,
+        });
         continue;
       }
       if (!measured.has(el.url)) measured.set(el.url, await measureImage(plugin, el));
       const natural = measured.get(el.url);
-      if (!isUnsizedImage(el, natural)) {
-        result.userSized++;
-      } else if (!natural) {
-        result.unmeasurable++;
-      } else {
-        candidates.set(el.url, { original: el, natural });
+      if (!natural) {
+        scan.unmeasurable++;
+        continue;
       }
+      // Anything else here is new to the command, including an image resized
+      // by hand since its last press: that size is the one to go back to now.
+      images.set(el.url, {
+        url: el.url,
+        kind: isUnsizedImage(el, natural) ? 'unsized' : 'user',
+        sizeLabel: describeImageSize(el, natural),
+        original: el,
+        natural,
+      });
     }
-    if (candidates.size === 0) continue;
+    if (images.size > 0) scan.rems.push({ rem, elements, images: [...images.values()] });
+  }
+  return scan;
+}
 
-    // setText drops a `percent` it does not accept. A user-sized neighbour
-    // carrying one would silently lose it, so such a Rem is left as it is.
-    const wouldDamageNeighbour = images.some(
+export interface ApplyImageSizesOptions {
+  /** Go straight to this size instead of the one after the last press. */
+  step?: ImageSizeStep;
+  /** Also resize the images the user has sized. */
+  includeUserSized: boolean;
+}
+
+/**
+ * Move the images of `scan` to the next step of the cycle.
+ *
+ * The step is decided once per press — the one after whatever an earlier press
+ * left on the first image it finds a record for, else Fit — and applied to every
+ * eligible image, so a scope always ends up uniform.
+ */
+export async function applyImageSizes(
+  plugin: RNPlugin,
+  scan: ImageScan,
+  { step: chosenStep, includeUserSized }: ApplyImageSizesOptions
+): Promise<ImageSizeCycleResult> {
+  const result: ImageSizeCycleResult = {
+    scanned: scan.scanned,
+    changed: 0,
+    userSized: 0,
+    protectedImages: scan.protectedImages,
+    unmeasurable: scan.unmeasurable,
+    failed: 0,
+  };
+
+  const plans: { rem: PluginRem; candidates: Map<string, ScannedImage> }[] = [];
+  for (const { rem, elements, images } of scan.rems) {
+    const eligible = images.filter((image) => includeUserSized || image.kind !== 'user');
+    result.userSized += images.length - eligible.length;
+    if (eligible.length === 0) continue;
+
+    const candidates = new Map(eligible.map((image) => [image.url, image]));
+    // setText drops a `percent` it does not accept. A neighbour carrying one
+    // would silently lose it, so such a Rem is left as it is.
+    const wouldDamageNeighbour = elements.some(
       (el) =>
         !candidates.has(el.url) && el.percent !== undefined && !VALID_PERCENTS.has(el.percent)
     );
     if (wouldDamageNeighbour) {
-      result.userSized += candidates.size;
+      result.userSized += eligible.length;
       continue;
     }
-    plans.push({ rem, candidates, previousStep: ours ? record?.step : undefined });
+    plans.push({ rem, candidates });
   }
 
   if (plans.length === 0) return result;
 
-  const step = nextImageSizeStep(plans.find((plan) => plan.previousStep)?.previousStep);
+  const step =
+    chosenStep ??
+    nextImageSizeStep(
+      plans.flatMap(({ candidates }) => [...candidates.values()]).find((image) => image.step)?.step
+    );
   result.step = step;
+
+  const records = await readRecords(plugin);
+  const now = Date.now();
 
   for (const { rem, candidates } of plans) {
     const written: Record<string, ImageRecord> = {};
@@ -265,7 +336,13 @@ export async function cycleImageSizes(
         const candidate = typeof element !== 'string' && el.i === 'i' && candidates.get(el.url);
         if (!candidate || !isSizableImage(el)) return element;
         const sized = applyImageSizeStep(candidate.original, step, candidate.natural);
-        written[el.url] = { ...candidate, written: sizeSignature(sized) };
+        written[el.url] = {
+          original: candidate.original,
+          natural: candidate.natural,
+          written: sizeSignature(sized),
+          step,
+          userSized: candidate.kind === 'user',
+        };
         return sized;
       }) as RichTextInterface;
     };
@@ -277,17 +354,26 @@ export async function cycleImageSizes(
       if (backText) await rem.setBackText(sanitizeRichTextForSetText(backText));
       result.changed += Object.keys(written).length;
 
-      // Back at Original the images are unsized again, so the record goes and
-      // the next press starts the cycle over.
-      if (step === 'original') delete state[rem._id];
-      else state[rem._id] = { step, images: written };
+      // Records of images this press left out stay: they hold sizes to go back to.
+      const images = { ...records[rem._id]?.images, ...written };
+      for (const [url, image] of Object.entries(written)) {
+        // Back at Original an unsized image is unsized again, so its record goes
+        // and the next press starts over. A user-sized one looks like any other
+        // sized image, so it keeps its record to stay in the cycle.
+        if (step === 'original' && !image.userSized) delete images[url];
+      }
+      if (Object.keys(images).length > 0) records[rem._id] = { at: now, images };
+      else delete records[rem._id];
     } catch (error) {
       result.failed++;
       console.warn(`${LOG} could not resize the images of`, rem._id, error);
     }
   }
 
-  await plugin.storage.setSession(IMAGE_SIZE_CYCLE_KEY, state);
+  for (const [remId, record] of Object.entries(records)) {
+    if (now - record.at > IMAGE_RECORD_MAX_AGE_MS) delete records[remId];
+  }
+  await plugin.storage.setLocal(IMAGE_SIZE_RECORDS_KEY, records);
   console.log(`${LOG} ${step}:`, result);
   return result;
 }

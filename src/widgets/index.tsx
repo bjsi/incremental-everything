@@ -40,6 +40,7 @@ import { registerLogosBridge } from '../lib/logos_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { registerVideoReviewBar } from '../lib/video_review_bar';
+import { registerImageSizeSession } from '../lib/image_size_session';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
@@ -142,6 +143,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerWidgets(plugin);
   // The review timer's floating bar over RemNote's video page.
   registerVideoReviewBar(plugin);
+  // Runs Cycle Image Size's presses, and what its popup and floating widget ask for.
+  registerImageSizeSession(plugin);
 
   // Register CSS rules
   // PDF highlight CSS is (re)registered reactively: the "peek" toggle (command +

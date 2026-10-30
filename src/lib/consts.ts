@@ -118,6 +118,8 @@ export const sourceHighlightColorId = 'source-highlight-color';
 export type HighlightColorName = 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple';
 /** Create IncRem also pins the passage in a PDF's other view (page ↔ Text Reader) — lib/pdf_source_pins pinOtherViewOfHighlight. */
 export const pinOtherReaderViewOnCreateIncRemId = 'pin-other-reader-view-on-create-increm';
+/** Cycle Image Size asks first when a press would resize more images than this — lib/image_size_session. */
+export const imageSizeConfirmAboveId = 'image-size-confirm-above';
 export const enableMasteryDrillId = 'enable-mastery-drill';
 /** Pre-inversion id, kept only so the migration can convert stored values. */
 export const legacySkipMasteryDrillId = 'skip_mastery_drill';

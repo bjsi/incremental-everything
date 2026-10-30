@@ -679,6 +679,14 @@ The front door to the persistent review document, one per scope.
 
 📖 **Full documentation:** [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup)
 
+### 6.15. Cycle Image Size Confirmation and Size Bar
+**Trigger:** `Opt+Shift+G` / `Alt+Shift+G` (command: `Cycle Image Size`, quick code `cis`).
+
+- **Confirmation popup:** appears before a press that would change images you have sized, or more images than the *Cycle Image Size: Ask Above* setting. It shows thumbnails of the images with their current sizes.
+- **Size bar:** a floating bar at the bottom-right showing the size just set, the number of images changed and any skipped. Click a size to go straight to it. It hides 4 seconds after the last press.
+
+📖 **Full documentation:** [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size)
+
 ## 7. Mastery Drill
 
 ### 7.1. Mastery Drill Popup

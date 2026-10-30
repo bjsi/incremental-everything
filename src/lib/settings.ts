@@ -88,6 +88,7 @@ import {
   titleCaseAcronymsId,
   sourceHighlightColorId,
   pinOtherReaderViewOnCreateIncRemId,
+  imageSizeConfirmAboveId,
   HighlightColorName,
   enableMasteryDrillId,
   oldItemThresholdId,
@@ -190,6 +191,7 @@ export interface IESettings {
   [titleCaseAcronymsId]: string;
   [sourceHighlightColorId]: HighlightColorName;
   [pinOtherReaderViewOnCreateIncRemId]: boolean;
+  [imageSizeConfirmAboveId]: number;
 
   // Mastery Drill
   [enableMasteryDrillId]: boolean;
@@ -280,6 +282,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [titleCaseAcronymsId]: '',
   [sourceHighlightColorId]: 'Orange',
   [pinOtherReaderViewOnCreateIncRemId]: false,
+  [imageSizeConfirmAboveId]: 5,
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
@@ -1316,6 +1319,17 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'and created (in the Source Highlight Colour) when not.\n\n' +
       'Needs the local AI helper running. If it is not, or the passage cannot be found in the other ' +
       'view, the Rem is created as usual with its single pin.',
+  },
+  [imageSizeConfirmAboveId]: {
+    kind: 'number',
+    group: 'misc',
+    min: 0,
+    integer: true,
+    unit: 'images',
+    title: 'Cycle Image Size: Ask Above',
+    description:
+      'Cycle Image Size shows its confirmation before resizing more images than this at once. ' +
+      '0 asks every time. It always asks before changing images you have sized yourself.',
   },
 };
 

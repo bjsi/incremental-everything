@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.175 - October 30th, 2026
+
+### ⚡ Improved
+
+**Cycle Image Size**: Now also resizes images you have already sized, after a confirmation with thumbnails, and *Original* puts your sizes back. It also asks before resizing more than 5 images (adjustable in Settings), adds a *Small* size, and shows the size set in a small clickable bar instead of a toast.
+
+📖 [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size)
+
 ## v1.0.174 - October 29th, 2026
 
 ### ✨ New

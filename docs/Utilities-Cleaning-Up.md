@@ -229,7 +229,7 @@ In the **browser**, a file is only reachable when its server allows other sites 
 
 ## Cycle Image Size { #cycle-image-size }
 
-**`Cycle Image Size`** (`Opt+Shift+G` / `Alt+Shift+G`, `quick: cis`) gives a size to the images that never got one in RemNote — typically the images of imported cards — so they stop showing up cropped in the flashcard queue. Press it again to move to the next size.
+**`Cycle Image Size`** (`Opt+Shift+G` / `Alt+Shift+G`, `quick: cis`) resizes the images of a card or Rem in one go. It fixes images that never got a size in RemNote — typically those of imported cards, which the flashcard queue can show cropped — and it lets you enlarge or shrink images you have already sized, then put your sizes back. Press it again to move to the next size.
 
 ![A queue card whose imported diagram is cropped behind scrollbars; the command is pressed and the image redraws whole](assets/cycle-image-size.gif){ width="900" }
 
@@ -247,7 +247,7 @@ In the **editor**, put the cursor in a Rem, or select several, and press the sho
 
 Either way it covers the Rem **and three levels below it** — children, grandchildren and great-grandchildren — front and back.
 
-### The four sizes
+### The five sizes { #the-five-sizes }
 
 Each press moves all the images it found one step along:
 
@@ -256,26 +256,43 @@ Each press moves all the images it found one step along:
 | **Fit** | The image at its real size, never wider than the card. The same as dragging its edge. |
 | **Large** | Full width — RemNote's own *Large Image*. |
 | **Medium** | Half width — RemNote's own *Medium Image*. |
-| **Original** | Back to how the image was before the first press. |
+| **Small** | Quarter width — RemNote's own *Small Image*. |
+| **Original** | Back to how the image was before the first press, including a size you had given it. |
 
-After *Original* the next press starts again at *Fit*. A message names the step and says how many images changed.
+After *Original* the next press starts again at *Fit*.
+
+### The size bar { #the-size-bar }
+
+Each press shows a small bar at the bottom-right of the RemNote window, with the size just set, how many images changed, and how many were skipped and why.
+
+Click a size in the bar to go straight to it. The bar hides 4 seconds after your last press, and stays open while the mouse is over it.
+
+### When it asks first { #when-it-asks-first }
+
+A confirmation appears before a press that would change **images you have sized** (by dragging or through the image menu), or **more than 5 images**. The limit is the setting **Cycle Image Size: Ask Above** ([Settings → Other](Plugin-Settings-Reference.md#other)); at 0 it asks every time.
+
+It shows a thumbnail of each image: those you sized, labelled **Small**, **Medium**, **Large** or **Custom** with their dimensions, and those not sized. Choose **Resize all**, **Only the ones not sized** (when there are both) or **Cancel**, with the arrow keys and `Enter`, or `Esc` to cancel.
+
+Your answer holds for that card or Rem until **10 minutes after your last press**, so you can keep cycling without being asked again. A different card or Rem asks again if it needs to.
 
 ### Which images it changes
 
-Only images **nobody has sized in RemNote**: those with no stored size at all, and those whose stored size is still the file's own pixel size.
+Images you have not sized change without a confirmation, up to the limit above. Images you have sized change only after you confirm.
 
 Left alone:
 
-* images **you have resized**, by dragging or through the image menu;
 * **Image Occlusion** images, drawings and cropped images — their boxes are placed relative to the image's size;
 * the image of a **PDF or web highlight**;
 * an image whose file cannot be loaded to measure it.
 
-The message tells you how many images were skipped, and why.
+The size bar tells you how many images were skipped, and why.
 
 ### Good to know
 
-* The cycle is remembered **until you restart RemNote**. After that, the images you sized with this command count as sized, and the command leaves them alone — use RemNote's image menu to change them.
+* An image you made small can grow with *Fit* or *Large*, but **never past the file's own width**.
+* The sizes to go back to are kept **on this device for 7 days**, and survive restarting RemNote. After that, an image's current size counts as its original.
+* If you resize an image by hand during a cycle, *Original* goes back to that new size.
+* An image you set through the menu that still has its file's exact dimensions looks the same as an untouched import, so it counts as not sized. *Original* still restores it.
 * The Rem is edited in place and only the image's size changes, so its **flashcards and their history are untouched**.
 
 ---

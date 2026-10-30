@@ -5,8 +5,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyImageSizeStep,
+  describeImageSize,
   isSizableImage,
   isUnsizedImage,
+  needsImageSizeConfirmation,
   nextImageSizeStep,
   sizeSignature,
 } from './image_sizing';
@@ -17,11 +19,12 @@ const ANKI = { i: 'i', url: URL, title: '', percent: 50, width: 1071, height: 10
 const NATURAL = { width: 1071, height: 1017 };
 
 describe('nextImageSizeStep', () => {
-  it('walks fit, large, medium, original and wraps', () => {
+  it('walks fit, large, medium, small, original and wraps', () => {
     assert.equal(nextImageSizeStep(undefined), 'fit');
     assert.equal(nextImageSizeStep('fit'), 'large');
     assert.equal(nextImageSizeStep('large'), 'medium');
-    assert.equal(nextImageSizeStep('medium'), 'original');
+    assert.equal(nextImageSizeStep('medium'), 'small');
+    assert.equal(nextImageSizeStep('small'), 'original');
     assert.equal(nextImageSizeStep('original'), 'fit');
   });
 });
@@ -70,9 +73,10 @@ describe('applyImageSizeStep', () => {
     assert.equal(out.title, '');
     assert.equal(out.url, URL);
   });
-  it('large and medium set the menu percentages', () => {
+  it('large, medium and small set the menu percentages', () => {
     assert.equal((applyImageSizeStep(ANKI, 'large', NATURAL) as any).percent, 100);
     assert.equal((applyImageSizeStep(ANKI, 'medium', NATURAL) as any).percent, 50);
+    assert.equal((applyImageSizeStep(ANKI, 'small', NATURAL) as any).percent, 25);
   });
   it('never enlarges a small image', () => {
     const small = { i: 'i', url: URL };
@@ -87,5 +91,38 @@ describe('applyImageSizeStep', () => {
     const fit = applyImageSizeStep(ANKI, 'fit', NATURAL);
     assert.notEqual(sizeSignature(fit), sizeSignature(ANKI));
     assert.equal(sizeSignature(applyImageSizeStep(ANKI, 'fit', NATURAL)), sizeSignature(fit));
+  });
+});
+
+describe('describeImageSize', () => {
+  const sized = { i: 'i', url: URL, width: 300, height: 285 };
+  it('names what the image menu writes', () => {
+    assert.equal(describeImageSize({ ...sized, percent: 25 }, NATURAL), 'Small');
+    assert.equal(describeImageSize({ ...sized, percent: 50 }, NATURAL), 'Medium');
+    assert.equal(describeImageSize({ ...sized, percent: 100 }, NATURAL), 'Large');
+  });
+  it('a drag-resize is custom, rounded', () => {
+    const dragged = { i: 'i', url: URL, width: 439.32, height: 417.17 };
+    assert.equal(describeImageSize(dragged, NATURAL), 'Custom 439×417');
+  });
+  it('an untouched import is not sized, whatever percent it came with', () => {
+    assert.equal(describeImageSize(ANKI, NATURAL), 'Not sized');
+  });
+  it('a step from an earlier press wins, except Original', () => {
+    assert.equal(describeImageSize(sized, NATURAL, 'fit'), 'Fit');
+    assert.equal(describeImageSize(sized, NATURAL, 'original'), 'Custom 300×285');
+  });
+});
+
+describe('needsImageSizeConfirmation', () => {
+  it('asks whenever a user-sized image is involved', () => {
+    assert.equal(needsImageSizeConfirmation({ total: 1, userSized: 1 }, 5), true);
+  });
+  it('asks above the limit, not at it', () => {
+    assert.equal(needsImageSizeConfirmation({ total: 5, userSized: 0 }, 5), false);
+    assert.equal(needsImageSizeConfirmation({ total: 6, userSized: 0 }, 5), true);
+  });
+  it('a limit of 0 always asks', () => {
+    assert.equal(needsImageSizeConfirmation({ total: 1, userSized: 0 }, 0), true);
   });
 });

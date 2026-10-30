@@ -557,6 +557,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Cycle Image Size: the confirmation, and the size it just set (lib/image_size_session.ts).
+  plugin.app.registerWidget('image_size_confirm', WidgetLocation.Popup, {
+    dimensions: {
+      width: 540,
+      height: 'auto',
+    },
+  });
+  plugin.app.registerWidget('image_size_feedback', WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+
   // Floating (non-blocking) variant of the Source popup — opens to the side so
   // the queue/editor stays visible. Positioned + auto-closed by the
   // `open-source-in-floating` command and the QueueLoadCard listener.
