@@ -151,7 +151,41 @@ Of the 923 cards in this KB with `subCardScores`, 148 have partial repetitions s
 
 **Check against RemNote's FSRS:** on the 148 affected cards, the plugin's stability is within 5% of RemNote's on 132 cards, up from 47. The median error fell from 10.5% to 0.2%. The fix was tested on `remnote.db` data, with no change to RemNote.
 
-**Separate, not fixed:** `src/lib/fsrs.ts` chooses its formula by card state and uses fractional days, while ts-fsrs uses whole UTC days and the short-term formula for same-day reviews. Even ordinary cards differ (93.6% of 4,800 sampled are within 5%). The largest gap comes from a same-day Forgot: card `FKOqcYfR…` has S 83.75 in RemNote and 25.37 in the plugin.
+**Separate, not fixed:** `src/lib/fsrs.ts` differs from RemNote's FSRS in four ways. See [Scheduler assignment and replay accuracy](#scheduler-assignment-and-replay-accuracy).
+
+## Scheduler assignment and replay accuracy
+
+**Where it's stored.** A Rem's `src` field holds a scheduler id from the `spaced_repetition_scheduler` table. The counts match Settings > Schedulers exactly (6 Vocabulary, 97 Questions, 0 imported). A card uses the scheduler from its Rem or nearest ancestor with `src`, through `get_spaced_repetition_scheduler_source_rem` in the WASM graph. If that id no longer exists, RemNote falls back to the Global Default.
+
+The ancestor walk is inferred, because the WASM isn't readable. It was checked against `ne.text`, which records what scheduled each card at its last rating: 16,061 of 16,149 Global cards say FSRS, and 2,427 of 2,433 Questions cards don't.
+
+Cards with history, by resolved scheduler (October 30, 2026):
+
+| Scheduler | Type | Cards |
+|---|---|---|
+| Global Default | FSRS, optimized weights | 35,655 |
+| Deleted scheduler, so Global Default | FSRS, optimized weights | 1,839 |
+| Questions | SM-2 | 3,597 |
+| Vocabulary | FSRS, default weights | 600 |
+
+**Algorithm differences.** Running both sides with the card's own scheduler weights, so the weights can't explain the gap, these four changes to the plugin's math raise agreement with RemNote's FSRS to 100% within 0.1% on all 38,056 FSRS cards:
+
+| Applied in turn | Global, within 5% | Vocabulary, within 5% |
+|---|---|---|
+| Plugin today | 93.8% | 76.8% |
+| Same UTC day uses the short-term formula, whatever the card's state | 98.9% | 94.0% |
+| Elapsed time in whole UTC days | 99.8% | 99.5% |
+| Short-term Hard can't lower stability | 100% | 100% |
+| Mean reversion uses the unclamped Easy difficulty | 100% (all within 0.1%) | 100% (all within 0.1%) |
+
+The last one only matters when the Easy initial difficulty falls below 1, as with default weights.
+
+**Scheduler differences.** The plugin has one weight set and no API for a card's scheduler, so non-Global cards also differ for this reason. Assuming the plugin's weights equal the Global Default (the setting isn't in `remnote.db`):
+
+| Cards | Compared with | Within 5% | Within 25% | Median plugin ÷ RemNote |
+|---|---|---|---|---|
+| Vocabulary | RemNote's stability | 3.4% | 12.4% | 2.36 |
+| Questions (SM-2) | Actual interval in days, since SM-2 has no stability | 8.7% | 37.7% | 1.09 |
 
 ## Method
 
