@@ -107,7 +107,8 @@ export async function handleQuickPriorityChange(
         return;
     }
 
-    const rem = await plugin.rem.findOne(remId);
+    const targetRemId = remId;
+    const rem = await plugin.rem.findOne(targetRemId);
     if (!rem) return;
 
     // 3. Quick eligibility check — determine which priority types apply to this rem.
@@ -129,7 +130,7 @@ export async function handleQuickPriorityChange(
     const doAppend = async () => {
         const existing = await plugin.storage.getSession<PriorityDeltaEntry[]>(pendingPriorityDeltaQueueKey) || [];
         const entry: PriorityDeltaEntry = {
-            remId,
+            remId: targetRemId,
             incDelta: targetsInc ? delta : 0,
             cardDelta: targetsCard ? delta : 0,
             hasIncPowerup,
@@ -139,7 +140,7 @@ export async function handleQuickPriorityChange(
         };
         existing.push(entry);
         await plugin.storage.setSession(pendingPriorityDeltaQueueKey, existing);
-        console.log(`[QuickPriority] Queued delta ${delta} for remId ${remId} (queue length: ${existing.length})`);
+        console.log(`[QuickPriority] Queued delta ${delta} for remId ${targetRemId} (queue length: ${existing.length})`);
     };
 
     // Use the shared mutex

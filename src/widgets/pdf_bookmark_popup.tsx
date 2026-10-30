@@ -364,7 +364,7 @@ export function PdfBookmarkPopup() {
               backgroundColor: 'var(--rn-clr-blue, #3b82f6)', color: 'white', cursor: 'pointer',
               fontWeight: 500, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px'
             }}
-            onClick={async () => { await saveBookmark(activeQueueContext.incrementalRemId); plugin.widget.closePopup(); }}
+            onClick={async () => { if (!activeQueueContext.incrementalRemId) return; await saveBookmark(activeQueueContext.incrementalRemId); plugin.widget.closePopup(); }}
           >
             {activeContextSource === 'editor-timer'
               ? 'Update Current Editor Review Reading'

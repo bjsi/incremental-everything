@@ -433,8 +433,9 @@ function Priority() {
         ]);
       }
 
-      finalScopedIncRems = scopeIds ? safeAllIncRems.filter(r => scopeIds.has(r.remId)) : safeAllIncRems;
-      let tempScopedCardRems = scopeIds ? safeAllCardInfos.filter(ci => scopeIds.has(ci.remId)) : safeAllCardInfos;
+      const resolvedScopeIds = scopeIds;
+      finalScopedIncRems = resolvedScopeIds ? safeAllIncRems.filter(r => resolvedScopeIds.has(r.remId)) : safeAllIncRems;
+      let tempScopedCardRems = resolvedScopeIds ? safeAllCardInfos.filter(ci => resolvedScopeIds.has(ci.remId)) : safeAllCardInfos;
 
       finalPrioritySourceCounts = tempScopedCardRems.reduce((counts, rem) => ({ ...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0, incremental: 0 });
 
@@ -580,7 +581,7 @@ function Priority() {
     const ancestors: PluginRem[] = [];
     let current: PluginRem | undefined = rem;
     while (current?.parent) {
-      const parent = await plugin.rem.findOne(current.parent);
+      const parent: PluginRem | undefined = await plugin.rem.findOne(current.parent);
       if (parent) { ancestors.push(parent); current = parent; } else { break; }
     }
     const hierarchy: Scope[] = [{ remId: null, name: 'All KB' }];
