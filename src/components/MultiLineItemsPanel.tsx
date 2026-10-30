@@ -22,10 +22,10 @@ const LAST_2_INFO =
   'Recalled. An item in trouble can bring the card back before its normal date, and the lowest ' +
   'recent scores decide which items the next partial card tests.\n\n' +
   'Where the scores come from: on a list card, you rate each item as it is revealed. On a set card, ' +
-  'the button you press goes to every item. To score items separately, press Forgot or Partially ' +
-  'Recalled once, tap the items it applies to, then press the score for the rest. If every item ' +
-  'gets the same score, they are all in trouble but share the main card\'s date, so nothing ' +
-  'changes; ⚠ marks only the items that really change what the card does.\n\n' +
+  'the button you press goes to every item, except the items you tick first, which count as Forgot. ' +
+  'So pressing Partially Recalled on a set card puts all its other items in trouble too, but those ' +
+  'share the main card\'s date, so that changes nothing by itself; ⚠ marks only the items that really ' +
+  'change what the card does.\n\n' +
   'It is shown here because it explains what you will see: an item leaves trouble only after two ' +
   'good answers in a row, and then stops bringing the card back early.';
 

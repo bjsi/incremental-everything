@@ -460,9 +460,9 @@ Below them, one row per item, with the items tested next first and then the weak
 **How items get separate scores:**
 
 *   **List card:** you rate each item as it is revealed.
-*   **Set card:** the button you press goes to every item. To score items separately, press **Forgot** or **Partially Recalled** once, tap the items it applies to, then press the score for the rest.
+*   **Set card:** the button you press goes to every item, except the items you tick first, which count as **Forgot**. You can't mark a single item as Partially Recalled.
 
-Pressing **Partially Recalled** twice on a set card scores every item the same. They are all in trouble, but they replay to the main card's date and are tested together, so nothing changes: the card doesn't come back early and the next showing is the full card. That is why ⚠ only marks items that really change what the card does.
+Pressing **Partially Recalled** on a set card with nothing ticked scores every item the same. They are all in trouble, but they replay to the main card's date and are tested together, so nothing changes: the card doesn't come back early and the next showing is the full card. That is why ⚠ only marks items that really change what the card does.
 
 **In the history table,** a full repetition shows one mark per item, with its name and score on hover. A [partial repetition](#partial-list-and-set-cards) is greyed, with a tag such as `Partial 1/3`.
 

@@ -40,12 +40,14 @@ From `finalRepetitionData` and `isFullMultiLineRep` in the queue component (bund
 
 | Situation | Saved `score` (main) | `subCardScores` |
 |---|---|---|
-| Set card, some items marked | The button pressed | Marked items `0` (or `0.5` if you pressed Partially Recalled first); the rest get the button pressed |
+| Set card, some items marked | The button pressed | Ticked items `0`; the rest get the button pressed |
 | List card | Derived from item scores (`Hd`, below) | One entry per item rated |
 | Forgot all | `0` | `[]`, which counts for all items |
 | Skip | Too Early | `[]` |
 
-On a Set card, pressing Forgot or Partially Recalled once doesn't save yet. The queue shows *Press "partially recalled" again to mark all as partially recalled. Or, tap the individual items that were hard*, then *Tap the score for the unrated items*. Nothing else on a Set card scores items separately, so a real rep with Good and Partial mixed comes from that flow or from a List card (7 such reps here; the data doesn't say which).
+On a Set card, ticking an item (`toggleWrongSubId`) marks it Forgot, and the button pressed then goes to the others; Forgot and Skip are disabled while only some are ticked, and only Forgot is enabled when all are. A button pressed with nothing ticked saves at once. An item can't be marked Partially Recalled.
+
+**Dead code, don't trust it:** the bundle also holds `pressedHardOnce`, `pressedForgotOnceSetCard` and the text *Press "partially recalled" again to mark all as partially recalled. Or, tap the individual items that were hard*. No code ever sets those two states (no assignment in any bundle of 1.29.1-beta), so that message can't appear. Screen recording on October 30, 2026: pressing Hard on a 3-item Set card moved straight to the next card. In this KB the `0.5` + `1` mixes (8 reps) therefore come from List cards, and `0` + `0.5` (54 reps) from a ticked item plus Partially Recalled.
 
 **Partially Recalled on a whole Set card:** every item gets `0.5`, so the code counts them all as troubled (`JN`). It has no visible effect when their histories match the main card's, because they replay to the same date (the main card wins the tie) and the selection covers every item, which means a full card. In this KB, 112 of the 113 repetitions following such a rep were full.
 
