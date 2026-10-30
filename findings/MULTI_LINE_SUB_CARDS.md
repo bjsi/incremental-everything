@@ -61,6 +61,44 @@ List card rule (`Hd`), where *r* counts Forgot + Partial and *a* counts all rate
 
 Items that have recovered are ignored, even if their own date is earlier.
 
+**Ties (`R`):** if the main card and an item have the same date, the result is credited to the main card. The date doesn't change. Only the explanation does: `multiLineDrivenBy: "main"` and "From the main card's schedule". Ties are common, because an item with the same scores as the main card replays to the same date.
+
+## How a forgotten item's schedule is built
+
+The item goes through ordinary FSRS, in three phases. Read from module `673402` (ts-fsrs) and run through it with this KB's weights.
+
+**1. The lapse.** A Forgot in the Review state does three things:
+
+- Stability falls to `min(w11 · D^-w12 · ((S+1)^w13 - 1) · e^((1-R)·w14), S / e^(w17·w18))`.
+- Difficulty rises.
+- The item enters Relearning at step 1.
+
+**2. Relearning.** The steps are the scheduler's `frs` setting: a comma-separated list in days, with one entry per step and no fixed count. This KB has one step of 0.0625 days (90 min). RemNote's default is 10 min. An empty list skips Relearning. The lengths are fixed and don't depend on the main interval, S or D.
+
+| Rating in Relearning | Next wait | State |
+|---|---|---|
+| Forgot | First step | Stays in Relearning |
+| Partially Recalled | One step: 1.5 × the step. Several: mean of the first two | Stays in Relearning |
+| Recalled With Effort | Next step if any. Otherwise graduates, with an interval from S | Review after the last step |
+| Easily Recalled | Graduates at once, with an interval from S | Review |
+
+A step of 1 day or more moves the item to Review with that fixed interval (`a >= 1440`).
+
+**3. Graduation and Review.** The interval is S adjusted for target retention (S itself at 90%), in whole days, with fuzz in the stored `n` and capped by the maximum interval. So the post-lapse interval comes from the item's stability, not from a ratio of the main interval. Lapsing when due at R = 90%, with this KB's weights:
+
+| S before | S after | Ratio |
+|---|---|---|
+| 43.3 | 9.4 | 22% |
+| 162.5 | 19.8 | 12% |
+| 488.7 | 35.7 | 7% |
+| 1243.2 | 58.2 | 5% |
+
+**Same-day reviews.** ts-fsrs counts elapsed time in whole UTC days. A review on the same UTC day uses the short-term formula, where Recalled With Effort leaves S unchanged and a second Forgot lowers it (19.78 → 5.69). On a later UTC day the normal formulas apply, so a Good after one day gave 19.78 → 23.69.
+
+**A troubled item isn't the same as a relearning item.** "Troubled" means Forgot or Partial in the last 2 scored repetitions. That window has nothing to do with `frs`. After graduating, an item stays troubled until two ratings in a row are Good or Easy, so its review date can still drive `n`.
+
+A Forgot on an item that has never been recalled, outside the Learning state, uses `fi` (Forgot Interval Minutes, default 1) instead of a step. Read from code, not observed.
+
 ## Partial or full?
 
 `Ae` runs when the card is displayed, using `today` = end of the current RemNote day:
@@ -91,7 +129,7 @@ All three items are candidates, and the forgotten one has the earliest date, so 
 Next steps predicted by the same replay (assumes a Good rating and no fuzz; not yet observed):
 
 1. **Now:** the main card isn't due. Sums of the last 2 scores are 1.5, 1 and 1.5, so a partial card tests only `OQlkEjf…`.
-2. **Good:** S stays 13.34, interval about 13 days. The last two are `0, 1`, still troubled, so it stays the driver. (Partially Recalled would give about 2h15, Forgot 90 min with S 3.94, Easy about 20 days.)
+2. **Good, on the same UTC day:** S stays 13.34, interval about 13 days. The last two are `0, 1`, still troubled, so it stays the driver. (Partially Recalled would give about 2h15, Forgot 90 min with S 3.94, Easy about 20 days.)
 3. **Good again, about Nov 12:** interval about 50 days and the item is cleared. The other two are still troubled but tied with the main card, so `n` = Dec 26 and the explanation reads "from the main card".
 4. **Dec 26:** full card, using the main card's S 56.6 and counting elapsed time from October 30.
 
@@ -108,8 +146,12 @@ Of the 923 cards in this KB with `subCardScores`, 148 have partial repetitions s
 ## For the plugin
 
 - `card.nextRepetitionTime` is the earliest date (`a`), **not** the main card's schedule. There is no SDK call for the main card's own date.
-- `repetitionHistory` is the raw `h` array passed through by the SDK's card object. `subCardScores` and `isFullMultiLineRep` aren't in the typings, and whether they arrive at runtime hasn't been tested.
-- No plugin code reads those fields. So `fsrs_calibration.ts`, `card_analytics.ts` and `CardForgettingCurve.tsx` replay partial repetitions as if they were main-card repetitions, which RemNote doesn't do. Their stability can differ from RemNote's on affected cards. Not changed so far.
+- `repetitionHistory` is the raw `h` array. The bridge's card mapper (`history: n[HISTORY]`, bundle `49950`) doesn't strip anything, so `subCardScores` and `isFullMultiLineRep` reach plugins even though they aren't in the typings. Read from code, not observed in a running plugin.
+- `countsForMainCard` in `src/lib/fsrs.ts` applies RemNote's rule. FSRS replay, the forgetting curve, calibration and the outcome stats in Card Analytics (retention, lapses, grade, predicted R) now leave partial repetitions out. Reps, time and cost still count them, because they are real work. Due and stale status keep following `n`.
+
+**Check against RemNote's FSRS:** on the 148 affected cards, the plugin's stability is within 5% of RemNote's on 132 cards, up from 47. The median error fell from 10.5% to 0.2%. The fix was tested on `remnote.db` data, with no change to RemNote.
+
+**Separate, not fixed:** `src/lib/fsrs.ts` chooses its formula by card state and uses fractional days, while ts-fsrs uses whole UTC days and the short-term formula for same-day reviews. Even ordinary cards differ (93.6% of 4,800 sampled are within 5%). The largest gap comes from a same-day Forgot: card `FKOqcYfR…` has S 83.75 in RemNote and 25.37 in the plugin.
 
 ## Method
 

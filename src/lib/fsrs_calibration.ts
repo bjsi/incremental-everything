@@ -17,7 +17,7 @@
  */
 
 import { RNPlugin, QueueInteractionScore } from '@remnote/plugin-sdk';
-import { computeFSRSStatesPerReview, forgettingCurve, resolveWeights } from './fsrs';
+import { computeFSRSStatesPerReview, countsForMainCard, forgettingCurve, resolveWeights } from './fsrs';
 import {
   S0Breakdown,
   S0GradeAcc,
@@ -205,7 +205,9 @@ export async function computeFSRSCalibrationBreakdown(
     const history = card.repetitionHistory ?? [];
     if (history.length === 0) continue;
 
-    const sorted = [...history].sort((a: any, b: any) => a.date - b.date);
+    // Partial multi-line reps test only some items, so they say nothing about the
+    // main card's predicted R.
+    const sorted = history.filter(countsForMainCard).sort((a: any, b: any) => a.date - b.date);
     let effective: any[] = sorted;
     if (ignorePreReset) {
       const lastResetIdx = sorted.map((h: any) => h.score).lastIndexOf(QueueInteractionScore.RESET);

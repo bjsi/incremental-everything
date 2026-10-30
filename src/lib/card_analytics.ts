@@ -15,6 +15,7 @@ import { CardPriorityInfo } from './card_priority/types';
 import {
   computeFSRSState,
   computeFSRSStatesPerReview,
+  countsForMainCard,
   forgettingCurve,
   resolveWeights,
 } from './fsrs';
@@ -54,7 +55,8 @@ export interface CardBucketStats {
   stalePct: number;       // staleCount / active
   // Throughput — all aggregates use gradeable reps (Again/Hard/Good/Easy)
   // over the full history, with each rep's responseTime capped at cardCapMs
-  // (matches study_dashboard / practiced_queues).
+  // (matches study_dashboard / practiced_queues). Partial multi-line reps count
+  // here because they are real work; the Outcome and FSRS stats below leave them out.
   totReps: number;        // total gradeable reps
   totTimeMs: number;      // total capped response time
   avgReps: number;        // totReps / cards
@@ -123,6 +125,8 @@ interface AccData {
   // Throughput aggregates (all over gradeable reps in the FULL history, capped responseTime)
   totGradeableReps: number;
   totTimeMs: number;
+  /** Gradeable reps that count for the main card — the denominator for retention. */
+  totMainReps: number;
   totAgains: number;
   // Outcome aggregates
   totLapses: number;
@@ -152,6 +156,8 @@ interface PerCardStats {
   gradeableReps: number;
   /** Sum of response time across gradeable reps, each capped at cardCapMs. */
   totalTimeMs: number;
+  /** Gradeable reps that count for the main card (no partial multi-line reps). */
+  mainReps: number;
   agains: number;
   lapses: number;
   cost: number | null;
@@ -182,6 +188,7 @@ function mergeAcc(a: AccData, b: AccData): AccData {
     staleCount: a.staleCount + b.staleCount,
     totGradeableReps: a.totGradeableReps + b.totGradeableReps,
     totTimeMs: a.totTimeMs + b.totTimeMs,
+    totMainReps: a.totMainReps + b.totMainReps,
     totAgains: a.totAgains + b.totAgains,
     totLapses: a.totLapses + b.totLapses,
     nonNewCards: a.nonNewCards + b.nonNewCards,
@@ -211,6 +218,7 @@ function makeAcc(): AccData {
     staleCount: 0,
     totGradeableReps: 0,
     totTimeMs: 0,
+    totMainReps: 0,
     totAgains: 0,
     totLapses: 0,
     nonNewCards: 0,
@@ -274,6 +282,7 @@ function computeCardStats(
   // ---- Period-filtered tallies (Reps, Time, Lapses, Retention, Grade) ----
   let gradeableReps = 0;
   let totalTimeMs = 0;
+  let mainReps = 0;
   let agains = 0;
   let sumGrade = 0;
   let gradeCount = 0;
@@ -284,6 +293,8 @@ function computeCardStats(
     gradeableReps++;
     const t = Math.min(Math.max(0, h.responseTime || 0), cardCapMs);
     totalTimeMs += t;
+    if (!countsForMainCard(h)) continue;
+    mainReps++;
     if (h.score === QueueInteractionScore.AGAIN) agains++;
     const g = gradeValue(h.score);
     if (g !== null) {
@@ -355,7 +366,9 @@ function computeCardStats(
 
   if (!isNew) {
     try {
-      const steps = computeFSRSStatesPerReview(effective, weights);
+      // Main-card reps only, so `steps` and the walk below index the same list.
+      const mainHistory = effective.filter(countsForMainCard);
+      const steps = computeFSRSStatesPerReview(mainHistory, weights);
       // FSRS leaves step.r null for learning/relearning state reps; we want
       // Avg pR's denominator to match Retention's (every gradeable rep except
       // the first of each FSRS "lifetime"), so we compute the forgetting-curve
@@ -365,8 +378,8 @@ function computeCardStats(
       const FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
 
       let lastGradeableIdx: number | null = null;
-      for (let i = 0; i < effective.length; i++) {
-        const h = effective[i];
+      for (let i = 0; i < mainHistory.length; i++) {
+        const h = mainHistory[i];
 
         // RESET ends the current "lifetime" — the next gradeable rep is
         // effectively a brand-new card and gets skipped just like the first
@@ -392,7 +405,7 @@ function computeCardStats(
             // Learning/relearning rep: replicate the FSRS forgetting curve
             // using the previous gradeable rep's stability.
             const prevS = steps[lastGradeableIdx]?.s ?? 0;
-            const prevDate = effective[lastGradeableIdx].date;
+            const prevDate = mainHistory[lastGradeableIdx].date;
             const elapsedDays = (h.date - prevDate) / (1000 * 60 * 60 * 24);
             if (prevS > 0 && elapsedDays >= 0) {
               r = forgettingCurve(elapsedDays, prevS, DECAY, FACTOR);
@@ -426,6 +439,7 @@ function computeCardStats(
     isPaused,
     gradeableReps,
     totalTimeMs,
+    mainReps,
     agains,
     lapses,
     cost,
@@ -464,6 +478,7 @@ function accumulate(acc: AccData, stats: PerCardStats, priority: number) {
 
   acc.totGradeableReps += stats.gradeableReps;
   acc.totTimeMs += stats.totalTimeMs;
+  acc.totMainReps += stats.mainReps;
   acc.totAgains += stats.agains;
 
   if (!stats.isNew) {
@@ -515,12 +530,12 @@ function finalize(acc: AccData, label: string): CardBucketStats {
   const avgCost = acc.cardsWithCost > 0 ? acc.sumCost / acc.cardsWithCost : 0;
   const avgLapses = acc.nonNewCards > 0 ? acc.totLapses / acc.nonNewCards : 0;
   const retention =
-    acc.totGradeableReps > 0
-      ? ((acc.totGradeableReps - acc.totAgains) / acc.totGradeableReps) * 100
+    acc.totMainReps > 0
+      ? ((acc.totMainReps - acc.totAgains) / acc.totMainReps) * 100
       : 0;
   const avgPredR = acc.predRCount > 0 ? (acc.sumPredR / acc.predRCount) * 100 : 0;
   // R-deviation only meaningful when both retention and predicted R have a basis.
-  const rDevPP = acc.totGradeableReps > 0 && acc.predRCount > 0 ? retention - avgPredR : 0;
+  const rDevPP = acc.totMainReps > 0 && acc.predRCount > 0 ? retention - avgPredR : 0;
   const avgGrade = acc.gradeCount > 0 ? acc.sumGrade / acc.gradeCount : 0;
   const avgD = acc.fsrsCount > 0 ? acc.sumD / acc.fsrsCount : 0;
   const avgS = acc.fsrsCount > 0 ? acc.sumS / acc.fsrsCount : 0;

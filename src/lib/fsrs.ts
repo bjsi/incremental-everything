@@ -126,6 +126,31 @@ function fsrsRatingFromScore(score: QueueInteractionScore): number | null {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-line (list / set) cards
+// ---------------------------------------------------------------------------
+/**
+ * Whether a repetition counts toward the main card's memory state.
+ *
+ * A partial list/set card tests only some items, and RemNote keeps those reps out
+ * of the main card's schedule, so replaying them as main reps inflates or crushes
+ * its stability. Same rule as RemNote: `isFullMultiLineRep` when present, otherwise
+ * a rep listing no item scores (which is every rep of an ordinary card). The two
+ * fields are missing from the SDK typings but do reach plugins, because the bridge
+ * passes the history array through untouched. A Reset always counts: it ends the
+ * lifetime whatever else it carries.
+ *
+ * See findings/MULTI_LINE_SUB_CARDS.md.
+ */
+export function countsForMainCard(rep: RepetitionStatusInterface): boolean {
+    if (rep.score === QueueInteractionScore.RESET) return true;
+    const { isFullMultiLineRep, subCardScores } = rep as RepetitionStatusInterface & {
+        isFullMultiLineRep?: boolean;
+        subCardScores?: unknown[];
+    };
+    return isFullMultiLineRep !== undefined ? isFullMultiLineRep : !subCardScores?.length;
+}
+
+// ---------------------------------------------------------------------------
 // Core FSRS math helpers
 // ---------------------------------------------------------------------------
 
@@ -281,7 +306,7 @@ export function computeFSRSState(
         }
 
         const rating = fsrsRatingFromScore(rep.score);
-        if (rating === null) continue;
+        if (rating === null || !countsForMainCard(rep)) continue;
 
         reviewCount++;
 
@@ -445,8 +470,8 @@ export function computeFSRSStatesPerReview(
         }
 
         const rating = fsrsRatingFromScore(rep.score);
-        if (rating === null) {
-            // Non-gradeable — pass through with null state
+        if (rating === null || !countsForMainCard(rep)) {
+            // Non-gradeable or partial multi-line — pass through with null state
             result.push({ d: d ?? 0, s: s ?? 0, r: null, state, sInc: null });
             continue;
         }

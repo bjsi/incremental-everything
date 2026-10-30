@@ -34,6 +34,7 @@ import {
     FSRSState,
     computeFSRSState,
     computeFSRSStatesPerReview,
+    countsForMainCard,
     forgettingCurve,
     intervalFactorForRetention,
     resolveWeights,
@@ -725,7 +726,7 @@ function buildEvents(
             previousS = null;
             return;
         }
-        if (!gradeable(rep.score)) return;
+        if (!gradeable(rep.score) || !countsForMainCard(rep)) return;
 
         const step = steps[i];
         if (!step) return;

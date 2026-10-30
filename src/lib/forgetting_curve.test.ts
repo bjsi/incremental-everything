@@ -17,6 +17,8 @@ import {
     DEFAULT_REQUESTED_RETENTION,
     FSRS_DEFAULT_WEIGHTS,
     computeFSRSState,
+    computeFSRSStatesPerReview,
+    countsForMainCard,
     forgettingCurve,
     intervalFactorForRetention,
 } from './fsrs';
@@ -726,5 +728,59 @@ describe('formatCurveDays', () => {
         assert.equal(formatCurveDays(400), '1.1y');
         // Years keep a decimal: this labels the right edge, wherever it lands.
         assert.equal(formatCurveDays(5337), '14.6y');
+    });
+});
+
+describe('partial multi-line reps', () => {
+    const partial = (daysAgo: number, score: QueueInteractionScore) =>
+        ({
+            ...rep(daysAgo, score),
+            isFullMultiLineRep: false,
+            subCardScores: [{ remId: 'item', score, responseTime: 1000 }],
+        } as RepetitionStatusInterface);
+
+    // A lapse on one item, 150 days after the last full rep.
+    const WITH_PARTIAL = [...HISTORY.slice(0, 5), partial(180, QueueInteractionScore.AGAIN), HISTORY[5]].sort(
+        (a, b) => a.date - b.date,
+    );
+
+    it('follows RemNote\'s rule for which reps count', () => {
+        const base = rep(1, QueueInteractionScore.GOOD);
+        const score = [{ remId: 'item', score: 1, responseTime: 1 }];
+        const counts = (over: object) => countsForMainCard({ ...base, ...over } as RepetitionStatusInterface);
+        assert.equal(counts({}), true);
+        assert.equal(counts({ subCardScores: [] }), true);
+        assert.equal(counts({ subCardScores: score }), false);
+        assert.equal(counts({ isFullMultiLineRep: true, subCardScores: score }), true);
+        assert.equal(counts({ isFullMultiLineRep: false }), false);
+        assert.equal(
+            counts({ score: QueueInteractionScore.RESET, isFullMultiLineRep: false, subCardScores: score }),
+            true,
+        );
+    });
+
+    it('leaves the memory state as if the rep had not happened', () => {
+        const withPartial = computeFSRSState(WITH_PARTIAL, null)!;
+        const without = computeFSRSState(HISTORY, null)!;
+        assert.equal(withPartial.s, without.s);
+        assert.equal(withPartial.d, without.d);
+        assert.equal(withPartial.reviewCount, without.reviewCount);
+    });
+
+    it('keeps one step per history entry and holds the state across a partial rep', () => {
+        const steps = computeFSRSStatesPerReview(WITH_PARTIAL, null);
+        assert.equal(steps.length, WITH_PARTIAL.length);
+        const i = WITH_PARTIAL.findIndex((r) => !countsForMainCard(r));
+        assert.equal(steps[i].s, steps[i - 1].s);
+        assert.equal(steps[i].d, steps[i - 1].d);
+        assert.equal(steps[i].r, null);
+        assert.equal(steps[i].sInc, null);
+    });
+
+    it('draws no marker or segment for a partial rep', () => {
+        const series = build(WITH_PARTIAL)!;
+        const plain = build(HISTORY)!;
+        assert.equal(series.reps.length, plain.reps.length);
+        assert.deepEqual(series.reps.map((r) => r.s), plain.reps.map((r) => r.s));
     });
 });
