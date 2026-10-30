@@ -70,8 +70,6 @@ function ImportSchedulerCards() {
   const [pending, setPending] = useState<SchedulerCardsExport | null>(null);
   const [plan, setPlan] = useState<FsrsSettingsPlan | null>(null);
   const [settingChanges, setSettingChanges] = useState<string[]>([]);
-  // The plugin's settings are shared by all knowledge bases, unlike the card list.
-  const [isMainKb, setIsMainKb] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(0);
@@ -81,7 +79,6 @@ function ImportSchedulerCards() {
     (async () => {
       const id = (await plugin.kb.getCurrentKnowledgeBaseData())?._id ?? null;
       setKbId(id);
-      setIsMainKb(await plugin.kb.isPrimaryKnowledgeBase());
       if (id) setCurrent(await getSchedulerManifest(plugin as any, id));
     })().catch((e) => setError(String(e)));
   }, [plugin]);
@@ -165,9 +162,9 @@ function ImportSchedulerCards() {
     : [
         ...(pending && settingChanges.length > 0
           ? [
-              { label: 'Import and update settings', primary: isMainKb, run: () => doImport(true) },
-              { label: 'Import list only', primary: !isMainKb, run: () => doImport(false) },
-            ].sort((a, b) => Number(b.primary) - Number(a.primary))
+              { label: 'Import and update settings', primary: true, run: () => doImport(true) },
+              { label: 'Import list only', run: () => doImport(false) },
+            ]
           : []),
         ...(pending && settingChanges.length === 0
           ? [{ label: 'Import', primary: true, run: () => doImport(false) }]
@@ -229,7 +226,7 @@ function ImportSchedulerCards() {
         <div className="text-sm">
           {settingChanges.length > 0 ? (
             <>
-              Plugin settings to update:
+              Plugin settings to update, for this knowledge base:
               <ul className="list-disc ml-5" style={{ overflowWrap: 'anywhere' }}>
                 {settingChanges.map((change) => (
                   <li key={change}>{change}</li>
@@ -239,12 +236,6 @@ function ImportSchedulerCards() {
           ) : (
             plan.weights !== null && 'The plugin\'s FSRS settings already match your Global Default Scheduler.'
           )}
-        </div>
-      )}
-      {pending && settingChanges.length > 0 && !isMainKb && (
-        <div className="text-sm" style={{ color: '#b45309' }}>
-          ⚠ This isn't your main knowledge base, and the plugin's FSRS settings are shared by all of them.
-          Updating them here also changes them for your main knowledge base.
         </div>
       )}
       {plan?.warnings.map((warning) => (

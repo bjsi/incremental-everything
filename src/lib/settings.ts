@@ -108,6 +108,7 @@ import {
   speedCalibrationMarginSecondsId,
   showQueueDashboardCurveId,
   ieSettingsValuesKey,
+  ieKbSettingsKeyPrefix,
 } from './consts';
 // Type-only: utils.ts imports getIESetting from this module, so a value import
 // here would close a runtime require cycle. `import type` is erased.
@@ -428,6 +429,8 @@ export const MORE_SETTINGS_POINTER =
 interface SettingSpecBase {
   title: string;
   description: string;
+  /** Saved separately for each knowledge base. See `readRawSetting`. */
+  perKnowledgeBase?: boolean;
   group: SettingGroupId;
   /** Takes effect only after RemNote is reloaded. Surfaced as a badge. */
   reloadRequired?: boolean;
@@ -961,10 +964,12 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     wide: true,
     placeholder: 'w0, w1, … w20 — leave blank for FSRS v6.1.1 defaults',
     title: 'FSRS Global Weights',
+    perKnowledgeBase: true,
     description:
       'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from RemNote Settings → ' +
       'Schedulers so the plugin computes the same D/S/R your scheduler does. Leave blank to use ' +
-      'the official defaults. Editing them here does not change your scheduler.',
+      'the official defaults. Editing them here does not change your scheduler. Saved for this ' +
+      'knowledge base only.',
   },
   [fsrsRequestedRetentionId]: {
     kind: 'number',
@@ -974,10 +979,11 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     unit: '%',
     helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
     title: 'Requested Retention',
+    perKnowledgeBase: true,
     description:
       'The recall probability your RemNote scheduler aims for at review time. Copy the value from ' +
       'RemNote Settings → Schedulers; setting it here does not change what your scheduler asks ' +
-      'for.\n\n' +
+      'for. Saved for this knowledge base only.\n\n' +
       'Stability is an interval only at the 90% default: a stricter retention schedules a card ' +
       'sooner than its stability, a looser one later. The card info bar uses this to show the ' +
       'interval you will actually get, and to compute the U-Factor from it.',
@@ -1380,12 +1386,43 @@ function coerce<K extends IESettingId>(id: K, raw: unknown): IESettings[K] {
   return raw as IESettings[K];
 }
 
+export function kbSettingsKey(kbId: string): string {
+  return `${ieKbSettingsKeyPrefix}_${kbId}`;
+}
+
+/**
+ * Which KB this session is in. Memoised because RemNote gives each KB its own
+ * plugin instance (see `currentKbId` in card_priority/slot_access.ts), and so a
+ * setting read costs one bridge call. Failures aren't kept.
+ */
+let kbScopeMemo: { kbId: string; isMain: boolean } | null = null;
+
+async function getKbScope(plugin: RNPlugin): Promise<{ kbId: string; isMain: boolean } | null> {
+  if (kbScopeMemo) return kbScopeMemo;
+  try {
+    const [kb, isMain] = await Promise.all([
+      plugin.kb.getCurrentKnowledgeBaseData(),
+      plugin.kb.isPrimaryKnowledgeBase(),
+    ]);
+    if (kb?._id) kbScopeMemo = { kbId: kb._id, isMain: !!isMain };
+    return kbScopeMemo;
+  } catch {
+    return null;
+  }
+}
+
+/** For tests, which change KB within one process. */
+export function resetKbScopeMemo(): void {
+  kbScopeMemo = null;
+}
+
 /**
  * The one place that talks to a settings backend.
  *
- * Reads hit the synced blob only. A missing key means "no opinion" and resolves
- * to the default, which is what lets a changed default still reach users who
- * never customised that setting.
+ * Reads hit the synced blob, or the KB's own key for a `perKnowledgeBase` setting
+ * (synced storage is shared by all of an account's KBs, so the blob can't hold
+ * them). A missing key means "no opinion" and resolves to the default, which is
+ * what lets a changed default still reach users who never customised that setting.
  *
  * RemNote's own registrations are deliberately NOT consulted, even during the
  * one session in which they still exist: the blob is authoritative from the
@@ -1393,6 +1430,17 @@ function coerce<K extends IESettingId>(id: K, raw: unknown): IESettings[K] {
  * override an edit made in the popup.
  */
 async function readRawSetting(plugin: RNPlugin, id: IESettingId): Promise<unknown> {
+  if (IE_SETTINGS_SCHEMA[id].perKnowledgeBase) {
+    const scope = await getKbScope(plugin);
+    if (scope) {
+      const own = await plugin.storage.getSynced<Partial<IESettings>>(kbSettingsKey(scope.kbId));
+      if (own && id in own) return own[id];
+      // The shared blob's value predates per-KB settings, and it is treated as the
+      // main KB's. A secondary KB that saved nothing of its own gets the default,
+      // not the main KB's weights.
+      if (!scope.isMain) return undefined;
+    }
+  }
   const values = await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey);
   return values ? values[id] : undefined;
 }
@@ -1432,13 +1480,33 @@ export async function getIESettings<K extends IESettingId>(
  *
  * A value equal to the default is *removed* rather than stored, so that editing
  * a default later still reaches everyone who has not deliberately diverged from
- * it.
+ * it. A `perKnowledgeBase` setting is written to this KB's key only.
  */
 export async function setIESetting<K extends IESettingId>(
   plugin: RNPlugin,
   id: K,
   value: IESettings[K]
 ): Promise<void> {
+  const scope = IE_SETTINGS_SCHEMA[id].perKnowledgeBase ? await getKbScope(plugin) : null;
+  if (scope) {
+    const key = kbSettingsKey(scope.kbId);
+    const own = { ...((await plugin.storage.getSynced<Partial<IESettings>>(key)) || {}) };
+    if (JSON.stringify(value) === JSON.stringify(IE_SETTINGS_DEFAULTS[id])) {
+      delete own[id];
+    } else {
+      own[id] = value;
+    }
+    await plugin.storage.setSynced(key, own);
+    if (!scope.isMain) return;
+    // Otherwise the old value in the blob would come back after a reset to default.
+    const shared = await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey);
+    if (shared && id in shared) {
+      const { [id]: _moved, ...rest } = shared;
+      await plugin.storage.setSynced(ieSettingsValuesKey, rest);
+    }
+    return;
+  }
+
   const values = {
     ...((await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey)) || {}),
   };

@@ -239,6 +239,7 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
         <span style={{ fontSize: 13, fontWeight: 600 }}>{spec.title}</span>
         {spec.helpPath && <HelpLink path={spec.helpPath} label={spec.title} />}
         {spec.reloadRequired && <Badge tone="neutral">needs reload</Badge>}
+        {spec.perKnowledgeBase && <Badge tone="neutral">this knowledge base</Badge>}
         {modified && <Badge tone="neutral">modified</Badge>}
       </div>
 

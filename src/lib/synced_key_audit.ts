@@ -14,6 +14,7 @@ import {
   cardShieldCleanupBackupIndexKey,
   debugHistoryBackupPrefix,
   noIncRemTimerKey,
+  ieKbSettingsKeyPrefix,
   lastDetectedOSKey,
   lastDetectedPlatformKey,
   GRAPH_DATA_KEY_PREFIX,
@@ -539,7 +540,16 @@ async function buildCandidates(
     keys: kbIds.map((kbId) => authoritativeShardKey(kbId)),
   });
 
-  // 3d. Other-scheduler cards list — a manifest and its shards, per KB.
+  // 3d. Settings saved per KB (the FSRS weights and retention).
+  families.push({
+    family: 'Settings (per KB)',
+    pattern: `${ieKbSettingsKeyPrefix}_{kbId}`,
+    coverage: 'partial',
+    note: 'Same kbId discovery limits as the sorting settings above.',
+    keys: kbIds.map((kbId) => `${ieKbSettingsKeyPrefix}_${kbId}`),
+  });
+
+  // 3e. Other-scheduler cards list — a manifest and its shards, per KB.
   families.push({
     family: 'Other-scheduler cards (per KB)',
     pattern: 'scheduler-cards_{kbId}[_{n}]',

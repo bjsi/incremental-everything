@@ -53,6 +53,8 @@ RemNote's built-in defaults are listed in [RemNote-Native-Shortcuts](../docs/Rem
 
 **Each desktop window is its own renderer with its own plugin instance.** "New Window" (1.28.19+) creates another Electron `BrowserWindow` on the same `app://js/index.html`, so every window activates a separate copy of the plugin. Session storage, module state, `window.getOpenPaneRemIds()`, focus and URL all answer for that window alone, and the SDK has no call that reaches another one. The plugin iframe is sandboxed, so `BroadcastChannel` is not a channel either.
 
+**`storage.setSynced` is per account, not per knowledge base.** Every plugin synced key lives in the main KB's `user_data` table, as `plugin|<pluginId>|<key>`; the other KBs' tables are empty (checked in `remnote.db` on 14 local KBs, October 30, 2026). A value that belongs to one KB needs the KB id in its key.
+
 **`storage.setLocal` is the cross-window channel.** The windows share one database and relay store writes to each other (`upsertDocsFromOtherWindow`); plugin local storage lives in one of those stores (`local_stored_data`, key `plugin|<id>|<key>`). A value written in one window is readable with `getLocal` in the others a second or two later. Verified Oct 2026 with Pin Source Quote. The `StorageLocalChange` event fires only in the writing window, and a closing window cannot clean up after itself, so shared state needs a heartbeat and a TTL. See `src/lib/window_sources.ts`.
 
 ## Theme variables in widget iframes

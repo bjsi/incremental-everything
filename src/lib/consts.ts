@@ -194,6 +194,8 @@ export const fsrsRequestedRetentionId = 'fsrs-requested-retention';
 // --- Plugin-owned settings store (see lib/settings_migration.ts) ---
 /** Synced blob holding the values of every popup-tier setting. */
 export const ieSettingsValuesKey = 'ie_settings_v1';
+// Settings marked `perKnowledgeBase`, one key per KB: `<prefix>_<kbId>`.
+export const ieKbSettingsKeyPrefix = 'ie_settings_kb_v1';
 /** Seed version that last completed; gates the legacy registrations. */
 export const ieSettingsMigratedKey = 'ie_settings_migrated';
 /** Durable per-setting record of the last migration run. */
