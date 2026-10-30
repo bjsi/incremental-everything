@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.178 - October 30th, 2026
+
+### ✨ New
+
+**Open in Another Window**: The Source viewer's new button shows the PDF or article in another RemNote window, at the highlight. If no other window is open, press `⌘⇧N` / `Ctrl+Shift+N` within a minute and the new window opens it. Desktop app only.
+
+📖 [Open in another window](Utilities-Finding-and-Navigating.md#open-in-another-window)
+
 ## v1.0.177 - October 30th, 2026
 
 ### 🐛 Fixed

@@ -177,6 +177,20 @@ Both variants are 80% of your display's height (at least 600 px, at most 1500 px
 
 For PDF/HTML **highlights**, the viewer auto-scrolls to the highlighted passage once the reader finishes mounting (the embedded PDF engine takes a few seconds to initialize, so the scroll is retried a few times). If you then scroll around the document and want to jump back, click the **🔖 Scroll to Highlight** button in the header to re-center on the highlight at any time.
 
+### Open in another window
+
+The **🪟 Open in Another Window** button in the header shows the source in another RemNote window, and scrolls to the highlight if you opened it from one. It's useful when several PDFs in one window get in each other's way: in a window of its own, a PDF has the sidebar's Highlights tab to itself. Desktop app only.
+
+1. Click the button. It changes to **⏳ Waiting**.
+2. If another window is open, it shows the source within a few seconds. If none is open, press **`⌘⇧N` / `Ctrl+Shift+N`** to open one, and the new window shows the source.
+3. The button changes to **✅ Opened in the other window**, and stays that way until you close the viewer. Click it to send the source again.
+
+While it's waiting, click the button again to cancel. The request also expires after a minute, so a window you open later won't pick it up.
+
+- **The other window's focused pane is replaced,** so the document it was showing, or a queue, gives way to the source.
+- **The other window doesn't come to the front by itself;** switch to it yourself.
+- **The viewer stays open** in the first window, so you can keep peeking at it.
+
 ### Floating window — interaction & closing
 
 The floating variant is designed so the source sits **beside** your card while you study, which is why it behaves a little differently from the modal:

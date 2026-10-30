@@ -10,7 +10,6 @@ import {
 import { getOperatingSystem } from '../lib/mobileUtils';
 
 const CLAIM_POLL_MS = 1000;
-const OPENED_LABEL_MS = 4000;
 
 type Status = 'idle' | 'waiting' | 'opened';
 
@@ -50,14 +49,7 @@ export function OpenInWindowButton({
     return () => clearInterval(timer);
   }, [status, plugin]);
 
-  useEffect(() => {
-    if (status !== 'opened') return;
-    const timer = setTimeout(() => setStatus('idle'), OPENED_LABEL_MS);
-    return () => clearTimeout(timer);
-  }, [status]);
-
   const onClick = useCallback(async () => {
-    if (status === 'opened') return;
     if (status === 'waiting') {
       setStatus('idle');
       if (requestId.current) await cancelOpenRequest(plugin, requestId.current);
@@ -79,11 +71,13 @@ export function OpenInWindowButton({
       ? `⏳ Waiting: ${newWindowKeys} for a new window`
       : status === 'opened'
         ? '✅ Opened in the other window'
-        : '🪟 Open in Window';
+        : '🪟 Open in Another Window';
   const title =
     status === 'waiting'
       ? `Another open RemNote window will show this source. If none is open, press ${newWindowKeys}. Click to cancel.`
-      : 'Show this source in another RemNote window';
+      : status === 'opened'
+        ? 'This source is open in another RemNote window. Click to send it again.'
+        : 'Show this source in another RemNote window';
 
   return (
     <button
@@ -97,7 +91,7 @@ export function OpenInWindowButton({
         color: 'var(--rn-clr-content-secondary)',
         border: '2px solid var(--rn-clr-content-tertiary, #6b7280)',
         borderRadius: '4px',
-        cursor: status === 'opened' ? 'default' : 'pointer',
+        cursor: 'pointer',
         whiteSpace: 'nowrap',
       }}
     >
