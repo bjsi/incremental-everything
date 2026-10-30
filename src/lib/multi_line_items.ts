@@ -291,6 +291,17 @@ export function describeMultiLineCard(
   return { reason, next };
 }
 
+/**
+ * Whether an item is changing what the card does. Pressing Partially Recalled on a
+ * whole set card puts every item in trouble, but they replay to the main card's own
+ * date and all get tested together, so being in trouble alone changes nothing.
+ */
+export function itemAffectsCard(item: MultiLineItem, summary: MultiLineSummary): boolean {
+  if (!item.troubled) return false;
+  if (summary.nextTest !== 'full' && summary.nextTest.includes(item.remId)) return true;
+  return item.nextDate !== null && summary.mainDate !== null && item.nextDate < summary.mainDate;
+}
+
 /** The "Next test" cell for one item. */
 export function nextTestLabel(item: MultiLineItem, summary: MultiLineSummary, now: number): string {
   if (summary.mainDue) return 'Next time';

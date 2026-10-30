@@ -47,6 +47,8 @@ From `finalRepetitionData` and `isFullMultiLineRep` in the queue component (bund
 
 On a Set card, pressing Forgot or Partially Recalled once doesn't save yet. The queue shows *Press "partially recalled" again to mark all as partially recalled. Or, tap the individual items that were hard*, then *Tap the score for the unrated items*. Nothing else on a Set card scores items separately, so a real rep with Good and Partial mixed comes from that flow or from a List card (7 such reps here; the data doesn't say which).
 
+**Partially Recalled on a whole Set card:** every item gets `0.5`, so the code counts them all as troubled (`JN`). It has no visible effect when their histories match the main card's, because they replay to the same date (the main card wins the tie) and the selection covers every item, which means a full card. In this KB, 112 of the 113 repetitions following such a rep were full.
+
 On a Set card, forgetting one item doesn't fail the main card. With Recalled With Effort as the button, the main card is scored `1` and its interval grows.
 
 List card rule (`Hd`), where *r* counts Forgot + Partial and *a* counts all rated items. The card fails if `a==1 ? r>0 : a<=4 ? r>=a-1 : r/a>=0.6`. A failure saves Forgot if there are more Forgots than Partials, otherwise Partial. A pass saves Easy if more than half are Easy, otherwise Good. As written, items all rated Forgot individually with no Partial compare `n > undefined`, so they save Partial rather than Forgot (read from code, not observed).

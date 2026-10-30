@@ -10,6 +10,7 @@ import { RepetitionStatusInterface } from '@remnote/plugin-sdk';
 import {
   describeMultiLineCard,
   endOfRemNoteDay,
+  itemAffectsCard,
   nextTestLabel,
   repItemMarks,
   summarizeMultiLineCard,
@@ -81,6 +82,11 @@ describe('a real set card after forgetting one item', () => {
     assert.deepEqual(summary.items[0].lastScores, [1, 0]);
   });
 
+  it('flags only the item that changes what the card does', () => {
+    const flagged = summary.items.filter((item) => itemAffectsCard(item, summary)).map((item) => item.remId);
+    assert.deepEqual(flagged, [B]);
+  });
+
   it('explains it in plain words', () => {
     const { reason, next } = describeMultiLineCard(summary, nameOf, AFTER);
     assert.match(reason!, /^Back early because you forgot "ou dão-se" on /);
@@ -144,9 +150,13 @@ describe('summarizeMultiLineCard', () => {
     assert.equal(describeMultiLineCard(summary, nameOf, T + 5000 * DAY).next, 'Due for the full card.');
   });
 
-  it('tests the full card when every item would be selected', () => {
+  it('changes nothing when Partially Recalled goes to the whole card', () => {
     const history = [rep(T, 1, all(1)), rep(T + 30 * DAY, 0.5, all(0.5))];
-    assert.equal(summarize(history, { now: T + 31 * DAY })!.nextTest, 'full');
+    const summary = summarize(history, { now: T + 31 * DAY })!;
+    assert.ok(summary.items.every((item) => item.troubled));
+    assert.equal(summary.nextTest, 'full');
+    assert.deepEqual(summary.driverIds, []);
+    assert.ok(summary.items.every((item) => !itemAffectsCard(item, summary)));
   });
 
   it('partial reps leave the main card alone', () => {

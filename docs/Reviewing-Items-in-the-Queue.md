@@ -450,7 +450,7 @@ Below them, one row per item, with the items tested next first and then the weak
 
 | Column | What it shows |
 |---|---|
-| **Item** | The item's text, with ⚠ while it is in trouble |
+| **Item** | The item's text, with ⚠ if it is changing what the card does |
 | **Last 2** | Its last two scores, oldest first: ✓ recalled, ~ partially recalled, ✗ forgot |
 | **Memory** | Its FSRS stability |
 | **Next test** | When you will next see it: *Next time*, *Full card, ~Dec 26*, or its own date |
@@ -462,7 +462,7 @@ Below them, one row per item, with the items tested next first and then the weak
 *   **List card:** you rate each item as it is revealed.
 *   **Set card:** the button you press goes to every item. To score items separately, press **Forgot** or **Partially Recalled** once, tap the items it applies to, then press the score for the rest.
 
-Pressing **Partially Recalled** twice on a set card scores every item the same. They are all in trouble, but they share the main card's date, so the card doesn't come back early.
+Pressing **Partially Recalled** twice on a set card scores every item the same. They are all in trouble, but they replay to the main card's date and are tested together, so nothing changes: the card doesn't come back early and the next showing is the full card. That is why ⚠ only marks items that really change what the card does.
 
 **In the history table,** a full repetition shows one mark per item, with its name and score on hover. A [partial repetition](#partial-list-and-set-cards) is greyed, with a tag such as `Partial 1/3`.
 
