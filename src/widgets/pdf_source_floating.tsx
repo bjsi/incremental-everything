@@ -3,6 +3,7 @@ import {
   usePlugin,
   WidgetLocation,
   ReactRNPlugin,
+  PluginRem,
   AppEvents,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
@@ -14,6 +15,19 @@ import {
   sourceFloatingPositionKey,
   sourceFloatingDefaultPosition,
 } from '../lib/consts';
+
+const NOTES_POLL_MS = 300;
+// Long enough to span a poll that lands between the key press and its event.
+const NOTES_RECENT_MS = 700;
+
+async function isInsideRem(rem: PluginRem, ancestorId: string): Promise<boolean> {
+  let cursor: PluginRem | undefined = rem;
+  while (cursor) {
+    if (cursor._id === ancestorId) return true;
+    cursor = await cursor.getParentRem();
+  }
+  return false;
+}
 
 /**
  * FLOATING variant of the Source popup — non-blocking, opens to the side so the
@@ -96,18 +110,58 @@ export function PdfSourceFloating() {
     // Per-widget `widget.*` events (like StealKeyEvent) are delivered keyed by
     // the floating widget id — an `undefined` listener key never matches, which
     // is why an app-focused Esc didn't reach us before.
-    const onStealKey = (e: any) => { if (isEsc(e)) close(); };
+    // Esc while typing in Notes does nothing rather than close the float under it:
+    // the steal keeps it from RemNote, and no API can close the Notes popup.
+    // A plugin can't see the Notes popup, only the cursor: its notes are Rems under
+    // the source, and its top field edits the highlight with no focused Rem, just a
+    // text selection. The cursor is already gone when the event arrives, so judge by
+    // the polls from before the key press.
+    let lastInNotesAt = 0;
+    let polling = false;
+    // Walking up from the focused Rem is the costly part; the answer only changes with the Rem.
+    let checkedRemId: string | undefined;
+    let checkedRemInSource = false;
+    const poll = async () => {
+      if (polling || !hostRemId) return;
+      polling = true;
+      try {
+        const focused = await plugin.focus.getFocusedRem();
+        let inNotes: boolean;
+        if (!focused) {
+          inNotes = !!(await plugin.editor.getSelectedText());
+        } else {
+          if (focused._id !== checkedRemId) {
+            checkedRemInSource = await isInsideRem(focused, hostRemId);
+            checkedRemId = focused._id;
+          }
+          inNotes = checkedRemInSource;
+        }
+        if (inNotes) lastInNotesAt = Date.now();
+      } catch {
+        // Next tick retries.
+      } finally {
+        polling = false;
+      }
+    };
+    const pollTimer = setInterval(poll, NOTES_POLL_MS);
+
+    const onStealKey = (e: any) => {
+      if (!isEsc(e)) return;
+      if (Date.now() - lastInNotesAt < NOTES_RECENT_MS) return;
+      close();
+    };
     plugin.event.addListener(AppEvents.StealKeyEvent, floatingWidgetId, onStealKey);
 
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKeyDown);
 
     return () => {
+      clearInterval(pollTimer);
       plugin.event.removeListener(AppEvents.StealKeyEvent, floatingWidgetId, onStealKey);
       document.removeEventListener('keydown', onKeyDown);
       plugin.window.releaseKeys(floatingWidgetId, ['Escape']).catch(() => {});
     };
-  }, [floatingWidgetId, plugin, close]);
+  }, [floatingWidgetId, hostRemId, plugin, close]);
 
   const onDragEnd = useCallback(
     (position: FloatingPosition) => {

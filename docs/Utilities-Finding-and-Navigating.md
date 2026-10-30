@@ -183,7 +183,7 @@ The floating variant is designed so the source sits **beside** your card while y
 
 - **Stays open while you use the PDF.** Unlike a modal, clicking into the reader to highlight, select text, or click existing highlights will **not** dismiss it. The highlight's Notes, Explain and other popups open on top of the window.
 - **Closes itself when you advance the card,** so a previous card's source never lingers over the next one.
-- **Esc closes it** — without closing the queue. The plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it; Esc closes the float instead. (When focus is inside the PDF itself, the browser handles Esc within the reader; use the `✕` button there.)
+- **Esc closes it** — without closing the queue. The plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it; Esc closes the float instead. (When focus is inside the PDF itself, the browser handles Esc within the reader; use the `✕` button there.) While you're typing in a highlight's Notes, the first Esc only takes the cursor out of the note and the second closes the window; to close just Notes, click outside it.
 - **Drag the header to move it.** Press anywhere on the header bar (except its buttons) and drag; it stays partly on screen at every edge. The next floating window opens where you last left it, until RemNote restarts. Highlights respond again a moment after you let go.
 - **Not user-resizable.** RemNote floating widgets have a fixed registered size; the window opens at 40% of the screen width on the right.
 

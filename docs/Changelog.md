@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.177 - October 30th, 2026
+
+### 🐛 Fixed
+
+**Floating Source Window**: Pressing `Esc` while typing in a highlight's Notes no longer closes the window; it takes a second `Esc`.
+
+📖 [Floating window](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing)
+
 ## v1.0.176 - October 30th, 2026
 
 ### 🐛 Fixed
