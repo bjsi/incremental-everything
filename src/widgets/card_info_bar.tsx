@@ -822,23 +822,26 @@ export function CardInfoBar() {
               {showFsrsDsr && fsrsState && fsrsTooltips && (
                 <>
                   <span style={{ opacity: 0.4 }}>|</span>
-                  <CardSchedulerLabel cardId={cardRepData?.cardId} />
-                  <span title={fsrsTooltips.dsr} style={{ cursor: 'help' }}>
-                    D: <strong>{fsrsState.d.toFixed(2)}</strong>
-                    {' · '}
-                    S: <strong>{formatStabilityDays(fsrsState.s)}</strong> ({formatStabilityDays(fsrsState.daysSinceLastReview)} passed)
-                    {' → '}
-                    <strong>{formatStabilityDays(fsrsState.nextS.good)}</strong>
-                    {/* Off the 90% default the stability is no longer the interval
-                        that gets scheduled, so the real one is spelled out. */}
-                    {usesCustomRetention && (
-                      <> (int. <strong>{formatStabilityDays(fsrsState.nextInterval.good)}</strong>)</>
-                    )}
-                    {' · '}
-                    R: <strong style={{ color: getRetrievabilityColor(fsrsState.r) }}>
-                      {(fsrsState.r * 100).toFixed(1)}%
-                    </strong>
-                  </span>
+                  {/* The label stacks over D·S·R, so the row only grows by this one small line. */}
+                  <div className="flex flex-col items-center" style={{ lineHeight: 1.25 }}>
+                    <CardSchedulerLabel cardId={cardRepData?.cardId} />
+                    <span title={fsrsTooltips.dsr} style={{ cursor: 'help' }}>
+                      D: <strong>{fsrsState.d.toFixed(2)}</strong>
+                      {' · '}
+                      S: <strong>{formatStabilityDays(fsrsState.s)}</strong> ({formatStabilityDays(fsrsState.daysSinceLastReview)} passed)
+                      {' → '}
+                      <strong>{formatStabilityDays(fsrsState.nextS.good)}</strong>
+                      {/* Off the 90% default the stability is no longer the interval
+                          that gets scheduled, so the real one is spelled out. */}
+                      {usesCustomRetention && (
+                        <> (int. <strong>{formatStabilityDays(fsrsState.nextInterval.good)}</strong>)</>
+                      )}
+                      {' · '}
+                      R: <strong style={{ color: getRetrievabilityColor(fsrsState.r) }}>
+                        {(fsrsState.r * 100).toFixed(1)}%
+                      </strong>
+                    </span>
+                  </div>
                   {' · '}
                   <span title={fsrsTooltips.sInc} style={{ cursor: 'help' }}>
                     SInc: <strong>{fsrsState.sInc.good.toFixed(2)}×</strong>

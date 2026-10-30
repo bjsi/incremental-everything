@@ -40,6 +40,8 @@ export interface CardForgettingCurveProps {
     height?: number;
     showStability?: boolean;
     title?: string;
+    /** Shown right below the title. */
+    subtitle?: React.ReactNode;
     /** Shown in place of the chart when there is no history to replay. Null hides it entirely. */
     emptyMessage?: string | null;
     headerRight?: React.ReactNode;
@@ -51,6 +53,7 @@ export function CardForgettingCurve({
     height = 220,
     showStability = true,
     title = 'Forgetting Curve',
+    subtitle,
     emptyMessage = 'No repetition history yet — there is no memory state to plot until this card is first practised.',
     headerRight,
 }: CardForgettingCurveProps) {
@@ -100,6 +103,7 @@ export function CardForgettingCurve({
                 <h3 className="text-sm font-bold uppercase rn-clr-content-tertiary tracking-wider mb-1">
                     {title}
                 </h3>
+                {subtitle}
                 <div className="text-xs rn-clr-content-tertiary">{emptyMessage}</div>
             </div>
         );
@@ -113,6 +117,7 @@ export function CardForgettingCurve({
             scale={series.scale}
             onScaleChange={setScale}
             title={title}
+            subtitle={subtitle}
             headerRight={headerRight}
         />
     );

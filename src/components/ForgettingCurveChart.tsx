@@ -266,6 +266,8 @@ export interface ForgettingCurveChartProps {
     /** Trailing controls for the header row (e.g. a close button). */
     headerRight?: React.ReactNode;
     title?: string;
+    /** Shown right below the title. */
+    subtitle?: React.ReactNode;
 }
 
 interface TooltipEntry {
@@ -505,6 +507,7 @@ export function ForgettingCurveChart({
     onScaleChange,
     headerRight,
     title = 'Forgetting Curve',
+    subtitle,
 }: ForgettingCurveChartProps) {
     // How wide the plot actually is, so the axis can earn more marks on a wide
     // chart than on a narrow one. The series ships ticks for an assumed width,
@@ -922,9 +925,12 @@ export function ForgettingCurveChart({
             title="Drag across the chart to zoom, scroll to zoom at the pointer, double-click to reset"
         >
             <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                <h3 className="text-sm font-bold uppercase rn-clr-content-tertiary tracking-wider">
-                    {title}
-                </h3>
+                <div className="flex flex-col items-start gap-0.5">
+                    <h3 className="text-sm font-bold uppercase rn-clr-content-tertiary tracking-wider">
+                        {title}
+                    </h3>
+                    {subtitle}
+                </div>
                 <div className="flex items-center gap-2">
                     {activeZoom && (
                         <button
