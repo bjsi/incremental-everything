@@ -1,6 +1,7 @@
 import { usePlugin, ReactRNPlugin, PDFWebReader } from '@remnote/plugin-sdk';
 import React, { useEffect, useRef, useState } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { OpenInWindowButton } from './OpenInWindowButton';
 
 export interface SourceReaderViewProps {
   /** Source-document rem to feed into PDFWebReader. */
@@ -162,6 +163,10 @@ export function SourceReaderView({
           )}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '0 0 auto' }}>
+          <OpenInWindowButton
+            remId={hostRemId}
+            highlightRemId={kind === 'highlight' ? hoveredRemId : null}
+          />
           {kind === 'highlight' && hoveredRemId && (
             <button
               onClick={async () => {

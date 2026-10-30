@@ -521,6 +521,10 @@ export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 export const incRemDisabledDeviceKey = 'inc-rem-disabled-device';
 // Local key: the sources open in each RemNote window (see lib/window_sources.ts).
 export const openSourcesByWindowKey = 'open-sources-by-window';
+// Local key: a source waiting for another window to open it (see lib/open_in_window.ts).
+export const openInWindowRequestKey = 'open-in-window-request';
+// Session key: this window's id for those requests.
+export const openInWindowOwnIdKey = 'open-in-window-own-id';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // Rem IDs whose cards exist but whose parent rem could not be found during the
