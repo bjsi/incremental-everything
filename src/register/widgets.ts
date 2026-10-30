@@ -405,7 +405,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: { height: 'auto', width: 620 },
   });
 
-  // Import the list written by scripts/export_scheduler_cards.py
+  // Import the file written by scripts/export_scheduler_cards.py
   plugin.app.registerWidget('import_scheduler_cards', WidgetLocation.Popup, {
     dimensions: { height: 'auto', width: 520 },
   });

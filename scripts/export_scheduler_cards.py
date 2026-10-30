@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-List the cards that RemNote schedules with something other than the Global
-Default Scheduler, as a JSON file for the plugin's "Import Other-Scheduler Cards
-List" command.
+Export what the plugin needs to know about RemNote's schedulers, as a JSON file
+for its "Import RemNote Scheduler Data" command:
+
+  - the Global Default Scheduler's type, FSRS weights and target retention;
+  - the cards that RemNote schedules with something other than that scheduler.
 
 The plugin cannot find this out by itself: the bridge sends neither a Rem's
 scheduler nor its settings. This script reads them straight from the local
@@ -18,7 +20,8 @@ How a card's scheduler is resolved (findings/MULTI_LINE_SUB_CARDS.md):
   - an id that no longer exists, or no `src` at all, means the Global Default.
 
 Only exceptions are listed, so the file stays small. Run it again after moving
-documents between schedulers, or after creating many cards under a non-Global one.
+documents between schedulers, after creating many cards under a non-Global one,
+or after changing the Global Default Scheduler's weights.
 """
 import argparse
 import json
@@ -30,6 +33,7 @@ from pathlib import Path
 REMNOTE_DIR = Path.home() / "remnote"
 GLOBAL_SCHEDULER_KEY = "spacedRepetitionSchedulerIdKb"
 MAX_ANCESTOR_DEPTH = 1000
+FSRS_6_WEIGHT_COUNT = 21
 
 
 def open_db(kb_dir):
@@ -91,6 +95,36 @@ def load_schedulers(db):
     return schedulers
 
 
+def load_global_scheduler(db, global_id):
+    row = db.execute(
+        "select json_extract(doc,'$.st'), json_extract(doc,'$.w'), json_extract(doc,'$.tr') "
+        "from spaced_repetition_scheduler where _id = ?",
+        (global_id,),
+    ).fetchone()
+    if not row:
+        sys.exit(f"The Global Default Scheduler ({global_id}) is not in the database.")
+    scheduler_type, weights, target_retention = row
+    return {
+        "id": global_id,
+        "type": scheduler_type or "unknown",
+        "weights": json.loads(weights) if weights else None,
+        "targetRetention": target_retention,
+    }
+
+
+def global_scheduler_warning(scheduler):
+    """Why the Global Default Scheduler isn't FSRS-6, or None. The plugin shows the same warnings."""
+    if scheduler["type"] != "fsrs":
+        return f"the Global Default Scheduler is {scheduler['type']}, not FSRS-6, so its settings can't be used."
+    weights = scheduler["weights"]
+    if weights is not None and len(weights) != FSRS_6_WEIGHT_COUNT:
+        return (
+            f"the Global Default Scheduler has {len(weights)} FSRS weights, "
+            f"not the {FSRS_6_WEIGHT_COUNT} of FSRS-6."
+        )
+    return None
+
+
 def make_resolver(db):
     """Returns remId -> the scheduler id of its nearest ancestor with `src`, or None."""
     parents = {}
@@ -130,6 +164,7 @@ def build_export(kb_id, kb_dir):
         if not global_id:
             sys.exit(f"Could not find the Global Default Scheduler in {kb_dir / 'remnote.db'}.")
         schedulers = load_schedulers(db)
+        global_scheduler = load_global_scheduler(db, global_id)
         resolve = make_resolver(db)
 
         cards_by_scheduler = {}
@@ -146,6 +181,7 @@ def build_export(kb_id, kb_dir):
         "kbId": kb_id,
         "generatedAt": int(time.time() * 1000),
         "totalCards": total,
+        "globalScheduler": global_scheduler,
         "schedulers": [
             {"id": scheduler_id, **schedulers[scheduler_id], "cards": sorted(cards)}
             for scheduler_id, cards in sorted(cards_by_scheduler.items(), key=lambda item: -len(item[1]))
@@ -184,8 +220,18 @@ def main():
     print(f"Knowledge base {kb_id}: {export['totalCards']:,} cards, {listed:,} on other schedulers.")
     for scheduler in export["schedulers"]:
         print(f"  {scheduler['name']} ({scheduler['type']}): {len(scheduler['cards']):,}")
+    global_scheduler = export["globalScheduler"]
+    if global_scheduler["type"] == "fsrs":
+        weights = global_scheduler["weights"]
+        print(
+            f"Global Default Scheduler: FSRS, {len(weights) if weights else 'default'} weights, "
+            f"target retention {global_scheduler['targetRetention'] or 0.9:.1%}."
+        )
+    warning = global_scheduler_warning(global_scheduler)
+    if warning:
+        print(f"WARNING: {warning}")
     print(f"Wrote {output}")
-    print('Next, in RemNote, run the command "Import Other-Scheduler Cards List" and pick this file.')
+    print('Next, in RemNote, run the command "Import RemNote Scheduler Data" and pick this file.')
 
 
 if __name__ == "__main__":

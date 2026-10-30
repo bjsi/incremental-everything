@@ -3,22 +3,50 @@ import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
 import '../rn_theme_vars.css';
+import { fsrsRequestedRetentionId, fsrsWeightsId } from '../lib/consts';
+import { parseWeightsString } from '../lib/fsrs';
 import {
+  FsrsSettingsPlan,
   SchedulerCardsExport,
   SchedulerCardsManifest,
   clearSchedulerCards,
   getSchedulerManifest,
+  planFsrsSettings,
   saveSchedulerCards,
   schedulerTypeLabel,
 } from '../lib/scheduler_cards';
+import { getIESetting, setIESetting } from '../lib/settings';
 
 /**
- * Import the list written by scripts/export_scheduler_cards.py: the cards RemNote
- * schedules with something other than the Global Default. See lib/scheduler_cards.ts.
+ * Import the file written by scripts/export_scheduler_cards.py: the Global Default
+ * Scheduler's settings, and the cards RemNote schedules with something else. See
+ * lib/scheduler_cards.ts.
  */
 
 /** The Enter that ran a command from the Omnibar can reach the popup; ignore Enter this soon after opening. */
 const ENTER_GRACE_MS = 300;
+
+/** Which plugin settings the import would change, as readable lines. */
+function describeSettingChanges(
+  plan: FsrsSettingsPlan,
+  current: { weights: string; retentionPercent: number },
+): string[] {
+  const changes: string[] = [];
+  if (
+    plan.weights !== null &&
+    JSON.stringify(parseWeightsString(plan.weights)) !== JSON.stringify(parseWeightsString(current.weights))
+  ) {
+    changes.push(
+      plan.weights === ''
+        ? "FSRS Global Weights: RemNote's default weights"
+        : `FSRS Global Weights: ${plan.weights}`,
+    );
+  }
+  if (plan.retentionPercent !== null && plan.retentionPercent !== current.retentionPercent) {
+    changes.push(`Requested Retention: ${current.retentionPercent}% → ${plan.retentionPercent}%`);
+  }
+  return changes;
+}
 
 function SchedulerList({ schedulers }: { schedulers: { name: string; type: string; count: number }[] }) {
   return (
@@ -40,6 +68,10 @@ function ImportSchedulerCards() {
   const [kbId, setKbId] = useState<string | null>(null);
   const [current, setCurrent] = useState<SchedulerCardsManifest | null>(null);
   const [pending, setPending] = useState<SchedulerCardsExport | null>(null);
+  const [plan, setPlan] = useState<FsrsSettingsPlan | null>(null);
+  const [settingChanges, setSettingChanges] = useState<string[]>([]);
+  // The plugin's settings are shared by all knowledge bases, unlike the card list.
+  const [isMainKb, setIsMainKb] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(0);
@@ -49,6 +81,7 @@ function ImportSchedulerCards() {
     (async () => {
       const id = (await plugin.kb.getCurrentKnowledgeBaseData())?._id ?? null;
       setKbId(id);
+      setIsMainKb(await plugin.kb.isPrimaryKnowledgeBase());
       if (id) setCurrent(await getSchedulerManifest(plugin as any, id));
     })().catch((e) => setError(String(e)));
   }, [plugin]);
@@ -59,6 +92,8 @@ function ImportSchedulerCards() {
     if (!file) return;
     setError(null);
     setPending(null);
+    setPlan(null);
+    setSettingChanges([]);
     setSelected(0);
     containerRef.current?.focus();
     let parsed;
@@ -76,6 +111,16 @@ function ImportSchedulerCards() {
           'Export it with --kb, or import it from the right knowledge base.',
       );
     } else {
+      const scheduler = parsed.data.globalScheduler;
+      const nextPlan = scheduler ? planFsrsSettings(scheduler) : null;
+      if (nextPlan) {
+        const [weights, retentionPercent] = await Promise.all([
+          getIESetting(plugin as any, fsrsWeightsId),
+          getIESetting(plugin as any, fsrsRequestedRetentionId),
+        ]);
+        setSettingChanges(describeSettingChanges(nextPlan, { weights, retentionPercent }));
+      }
+      setPlan(nextPlan);
       setPending(parsed.data);
     }
   };
@@ -94,10 +139,19 @@ function ImportSchedulerCards() {
     }
   };
 
-  const doImport = () =>
+  const doImport = (updateSettings: boolean) =>
     run(async () => {
       const manifest = await saveSchedulerCards(plugin as any, kbId!, pending!);
-      await plugin.app.toast(`✅ Stored ${manifest.cardCount.toLocaleString()} cards on other schedulers`);
+      if (updateSettings && plan) {
+        if (plan.weights !== null) await setIESetting(plugin as any, fsrsWeightsId, plan.weights);
+        if (plan.retentionPercent !== null) {
+          await setIESetting(plugin as any, fsrsRequestedRetentionId, plan.retentionPercent);
+        }
+      }
+      await plugin.app.toast(
+        `✅ Stored ${manifest.cardCount.toLocaleString()} cards on other schedulers` +
+          (updateSettings ? ' and updated the FSRS settings' : ''),
+      );
     });
 
   const doClear = () =>
@@ -109,7 +163,15 @@ function ImportSchedulerCards() {
   const buttons: { label: string; primary?: boolean; run: () => void }[] = busy
     ? []
     : [
-        ...(pending ? [{ label: 'Import', primary: true, run: doImport }] : []),
+        ...(pending && settingChanges.length > 0
+          ? [
+              { label: 'Import and update settings', primary: isMainKb, run: () => doImport(true) },
+              { label: 'Import list only', primary: !isMainKb, run: () => doImport(false) },
+            ].sort((a, b) => Number(b.primary) - Number(a.primary))
+          : []),
+        ...(pending && settingChanges.length === 0
+          ? [{ label: 'Import', primary: true, run: () => doImport(false) }]
+          : []),
         { label: pending ? 'Choose another file…' : 'Choose file…', primary: !pending, run: () => fileRef.current?.click() },
         ...(current ? [{ label: 'Remove list', run: doClear }] : []),
         { label: 'Cancel', run: close },
@@ -139,11 +201,11 @@ function ImportSchedulerCards() {
       className="flex flex-col gap-3 p-4"
       style={{ outline: 'none', color: 'var(--rn-clr-content-primary)' }}
     >
-      <div className="text-base font-semibold">Import Other-Scheduler Cards List</div>
+      <div className="text-base font-semibold">Import RemNote Scheduler Data</div>
       <div className="text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-        Labels the cards RemNote schedules with something other than the Global Default, and lets
-        Card Analytics and FSRS Calibration leave them out. Create the file on a computer with{' '}
-        <code>python3 scripts/export_scheduler_cards.py</code>.
+        Fills the plugin's FSRS settings from your Global Default Scheduler. It also labels the cards
+        RemNote schedules with something else, and lets Card Analytics and FSRS Calibration leave them
+        out. Create the file on a computer with <code>python3 scripts/export_scheduler_cards.py</code>.
       </div>
 
       {current && !pending && (
@@ -160,8 +222,36 @@ function ImportSchedulerCards() {
           <SchedulerList
             schedulers={pending.schedulers.map((s) => ({ name: s.name, type: s.type, count: s.cards.length }))}
           />
+          {pending.schedulers.length === 0 && <div>No cards on other schedulers.</div>}
         </div>
       )}
+      {pending && plan && (
+        <div className="text-sm">
+          {settingChanges.length > 0 ? (
+            <>
+              Plugin settings to update:
+              <ul className="list-disc ml-5" style={{ overflowWrap: 'anywhere' }}>
+                {settingChanges.map((change) => (
+                  <li key={change}>{change}</li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            plan.weights !== null && 'The plugin\'s FSRS settings already match your Global Default Scheduler.'
+          )}
+        </div>
+      )}
+      {pending && settingChanges.length > 0 && !isMainKb && (
+        <div className="text-sm" style={{ color: '#b45309' }}>
+          ⚠ This isn't your main knowledge base, and the plugin's FSRS settings are shared by all of them.
+          Updating them here also changes them for your main knowledge base.
+        </div>
+      )}
+      {plan?.warnings.map((warning) => (
+        <div key={warning} className="text-sm" style={{ color: '#b45309' }}>
+          ⚠ {warning}
+        </div>
+      ))}
       {error && (
         <div className="text-sm" style={{ color: '#ef4444' }}>
           {error}

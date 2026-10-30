@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeFSRSCalibrationBreakdown } from './fsrs_calibration';
 import { computeCardAnalyticsBreakdown } from './card_analytics';
+import { parseWeightsString } from './fsrs';
 import { PER_KEY_UTF16_LIMIT, utf16Bytes } from './history_shards';
 import {
   SCHEDULER_SHARD_UTF16_BUDGET,
@@ -14,6 +15,7 @@ import {
   clearSchedulerCards,
   findCardScheduler,
   getOtherSchedulerCardIds,
+  planFsrsSettings,
   saveSchedulerCards,
   schedulerManifestKey,
   schedulerShardKey,
@@ -78,6 +80,51 @@ describe('buildSchedulerStorage', () => {
         assert.ok(joined.split(' ').every((id) => id.startsWith(expected)));
       }
     }
+  });
+});
+
+describe('planFsrsSettings', () => {
+  const weights = (count: number) => Array.from({ length: count }, (_, i) => i + 0.5);
+  const fsrs = (over = {}) => ({ id: 'g', type: 'fsrs', weights: weights(21), targetRetention: 0.9, ...over });
+
+  it('fills both settings from an FSRS-6 scheduler, with no warning', () => {
+    const plan = planFsrsSettings(fsrs({ targetRetention: 0.875 }));
+    assert.equal(parseWeightsString(plan.weights)?.length, 21);
+    assert.equal(plan.retentionPercent, 87.5);
+    assert.deepEqual(plan.warnings, []);
+  });
+
+  it('warns about a scheduler that is not FSRS, and changes nothing', () => {
+    const plan = planFsrsSettings({ id: 'g', type: 'sm2', weights: null, targetRetention: null });
+    assert.equal(plan.weights, null);
+    assert.equal(plan.retentionPercent, null);
+    assert.match(plan.warnings[0], /Anki SM-2, not FSRS-6/);
+  });
+
+  it('uses the default weights and retention when the scheduler stores none', () => {
+    const plan = planFsrsSettings(fsrs({ weights: null, targetRetention: null }));
+    assert.equal(plan.weights, '');
+    assert.equal(plan.retentionPercent, 90);
+    assert.deepEqual(plan.warnings, []);
+  });
+
+  it('warns about FSRS-5 weights but still uses them, since the plugin can replay them', () => {
+    const plan = planFsrsSettings(fsrs({ weights: weights(19) }));
+    assert.equal(parseWeightsString(plan.weights)?.length, 19);
+    assert.match(plan.warnings[0], /FSRS-5/);
+  });
+
+  it('keeps the weights when their count is one the plugin cannot use', () => {
+    const plan = planFsrsSettings(fsrs({ weights: weights(17) }));
+    assert.equal(plan.weights, null);
+    assert.equal(plan.retentionPercent, 90);
+    assert.match(plan.warnings[0], /17 FSRS weights/);
+  });
+
+  it('keeps the retention when it is outside the setting\'s range', () => {
+    const plan = planFsrsSettings(fsrs({ targetRetention: 0.6 }));
+    assert.equal(plan.retentionPercent, null);
+    assert.match(plan.warnings[0], /outside/);
   });
 });
 

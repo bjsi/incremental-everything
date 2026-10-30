@@ -82,7 +82,7 @@ export function ExcludeOtherSchedulersToggle({
   disabled: boolean;
   onChange: (next: boolean) => void;
 }) {
-  if (!manifest) return null;
+  if (!manifest || manifest.cardCount === 0) return null;
   const parts = manifest.schedulers.map(
     (s) => `${s.name} (${schedulerTypeLabel(s.type)}): ${s.cardCount.toLocaleString()}`,
   );

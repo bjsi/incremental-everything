@@ -4,11 +4,13 @@ import { schedulerCardsKeyPrefix } from './consts';
 import { PER_KEY_UTF16_LIMIT, utf16Bytes } from './history_shards';
 
 // ---------------------------------------------------------------------------
-// Cards on a scheduler other than the Global Default
+// RemNote's schedulers, imported from the local database
 //
 // The bridge sends plugins neither a Rem's scheduler nor its settings, so
 // scripts/export_scheduler_cards.py reads them from the local database and the
-// user imports the result. Only the exceptions are stored.
+// user imports the result: the Global Default Scheduler's settings, which fill the
+// plugin's FSRS settings, and the cards on other schedulers. Only those exceptions
+// are stored.
 //
 // Storage: synced and per KB, so the list reaches the user's other devices and
 // other KBs don't pay for it. One small manifest key says what was imported, and
@@ -34,6 +36,14 @@ export const SchedulerCardsExport = z.object({
   kbId: z.string().min(1),
   generatedAt: z.number(),
   totalCards: z.number().optional(),
+  globalScheduler: z
+    .object({
+      id: z.string().min(1),
+      type: z.string(),
+      weights: z.array(z.number()).nullable(),
+      targetRetention: z.number().nullable(),
+    })
+    .optional(),
   schedulers: z.array(
     z.object({
       id: z.string().min(1),
@@ -79,6 +89,59 @@ export function schedulerTypeLabel(type: string): string {
   if (type === 'fsrs') return 'FSRS';
   if (type === 'plugin') return 'Plugin';
   return type;
+}
+
+const FSRS_6_WEIGHT_COUNT = 21;
+const FSRS_5_WEIGHT_COUNT = 19;
+const DEFAULT_TARGET_RETENTION = 0.9;
+/** The range of the plugin's Requested Retention setting. */
+const MIN_RETENTION_PERCENT = 70;
+const MAX_RETENTION_PERCENT = 99;
+
+export interface FsrsSettingsPlan {
+  /** New value of the FSRS Global Weights setting; '' means RemNote's defaults. Null keeps it. */
+  weights: string | null;
+  /** New value of the Requested Retention setting. Null keeps it. */
+  retentionPercent: number | null;
+  warnings: string[];
+}
+
+/** What the Global Default Scheduler means for the plugin's FSRS settings. */
+export function planFsrsSettings(
+  scheduler: NonNullable<SchedulerCardsExport['globalScheduler']>,
+): FsrsSettingsPlan {
+  if (scheduler.type !== 'fsrs') {
+    return {
+      weights: null,
+      retentionPercent: null,
+      warnings: [
+        `Your Global Default Scheduler is ${schedulerTypeLabel(scheduler.type)}, not FSRS-6, so the ` +
+          "plugin's FSRS figures only estimate your cards. The FSRS settings stay as they are.",
+      ],
+    };
+  }
+
+  const warnings: string[] = [];
+  let weights: string | null = '';
+  const count = scheduler.weights?.length;
+  if (count === FSRS_5_WEIGHT_COUNT) {
+    warnings.push(`Your Global Default Scheduler has ${count} FSRS-5 weights, not the 21 of FSRS-6.`);
+  } else if (count !== undefined && count !== FSRS_6_WEIGHT_COUNT) {
+    weights = null;
+    warnings.push(`Your Global Default Scheduler has ${count} FSRS weights, not the 21 of FSRS-6, so they weren't used.`);
+  }
+  if (weights !== null && scheduler.weights) weights = scheduler.weights.join(', ');
+
+  const retention = Math.round((scheduler.targetRetention ?? DEFAULT_TARGET_RETENTION) * 1000) / 10;
+  const usable = retention >= MIN_RETENTION_PERCENT && retention <= MAX_RETENTION_PERCENT;
+  if (!usable) {
+    warnings.push(
+      `Your target retention of ${retention}% is outside the plugin's ${MIN_RETENTION_PERCENT}–` +
+        `${MAX_RETENTION_PERCENT}% range, so Requested Retention stays as it is.`,
+    );
+  }
+
+  return { weights, retentionPercent: usable ? retention : null, warnings };
 }
 
 export function buildSchedulerStorage(

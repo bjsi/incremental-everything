@@ -571,7 +571,7 @@ You can give the plugin a list of those cards. It's optional, and needs a comput
 
     It only reads your local RemNote database, and writes a file to your `Downloads` folder.
 
-2.  In RemNote, run the command **Import Other-Scheduler Cards List** and choose that file.
+2.  In RemNote, run the command **Import RemNote Scheduler Data** and choose that file.
 
 The script uses your main knowledge base. For another one, run it with `--list` to see their ids, then with `--kb <id>`, and import the file while that knowledge base is open.
 

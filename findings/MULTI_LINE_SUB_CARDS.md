@@ -197,7 +197,7 @@ After the corrections, `src/lib/fsrs.ts` agrees with RemNote's library within 0.
 
 **Cost on this KB, if a plugin resolved it:** 45,708 Rems own cards, at median depth 7 (p99 12). A walk per Rem is 311,880 parent reads, or 55,782 with memoization. Reading `parent` and `src` for all 434,676 Rems straight from `remnote.db` took about 1 second.
 
-**In the plugin:** `scripts/export_scheduler_cards.py` writes the non-Global cards to a JSON file, and the "Import Other-Scheduler Cards List" command stores it (`src/lib/scheduler_cards.ts`). The Global scheduler's id is the `spacedRepetitionSchedulerIdKb` row in `knowledge_base_data`. This KB's list has 7,016 cards, including those not yet practised, and takes one key of 247 KB in UTF-16 (27.5% of the ceiling).
+**In the plugin:** `scripts/export_scheduler_cards.py` writes the non-Global cards to a JSON file, and the "Import RemNote Scheduler Data" command stores it (`src/lib/scheduler_cards.ts`). The Global scheduler's id is the `spacedRepetitionSchedulerIdKb` row in `knowledge_base_data`. This KB's list has 7,016 cards, including those not yet practised, and takes one key of 247 KB in UTF-16 (27.5% of the ceiling).
 
 ## Method
 
