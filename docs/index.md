@@ -239,7 +239,7 @@ Happy learning! 📚✨
           * [PDF Incremental Reading Workflow](PDF-Incremental-Reading-Workflow.md)
           * [Create Incremental Rem from PDF Highlights](Create-Incremental-Rem-from-PDF-Highlights.md)
         * **Incremental Reading** with web pages.
-        * **[Incremental Video](Incremental-Video.md)**: Watch YouTube videos incrementally, create timed extracts, and auto-transcribe segments.
+        * **[Incremental Video](Incremental-Video.md)**: Watch YouTube videos and video files from your computer incrementally, in the plugin's player or RemNote's, with timed extracts, transcripts and screenshots.
         * **[IncRem-List-and-Main-View](IncRem-List-and-Main-View.md)**: Browse, filter, and manage your Incremental Rems outside the queue. Includes the Review in Editor flow and the KB Priority Distribution Graph.
         * Tips for **Incremental Writing**.
         * How to use document/folder-specific queues for **Subset Review**.

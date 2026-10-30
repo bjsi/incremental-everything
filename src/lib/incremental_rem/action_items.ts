@@ -11,7 +11,10 @@ import {
   videoExtractUrlSlotCode,
   videoExtractStartSlotCode,
   videoExtractEndSlotCode,
+  localVideoPowerupCode,
 } from '../consts';
+import { localVideoUrl, parseLocalVideoUrl, readLocalVideo } from '../local_video_ref';
+import { findExtractVideoRem } from '../video_extract_tree';
 
 /**
  * Options for {@link remToActionItemType}.
@@ -59,9 +62,21 @@ export const remToActionItemType = async (
       const endTime = await rem.getPowerupProperty(videoExtractPowerupCode, videoExtractEndSlotCode);
 
       if (videoUrl && startTime != null && endTime != null) {
-        // Find the parent video Rem
-        const parentId = rem.parent;
-        const parentRem = parentId ? await plugin.rem.findOne(parentId) : null;
+        // The video Rem: the nearest ancestor holding the video (an extract can be cut from an extract).
+        const parentRem = await findExtractVideoRem(plugin, rem);
+
+        const file = parseLocalVideoUrl(String(videoUrl));
+        if (file) {
+          return {
+            type: 'local-video-highlight',
+            rem: parentRem || rem,
+            extract: rem,
+            file,
+            url: String(videoUrl),
+            startTime: Number(startTime),
+            endTime: Number(endTime),
+          };
+        }
 
         return {
           type: 'youtube-highlight',
@@ -70,6 +85,7 @@ export const remToActionItemType = async (
           url: String(videoUrl),
           startTime: Number(startTime),
           endTime: Number(endTime),
+          nativeAvailable: !!parentRem && (await parentRem.hasPowerup('vi')),
         };
       }
     } catch (error) {
@@ -113,9 +129,19 @@ export const remToActionItemType = async (
     } else {
       return { extract: rem, type: 'html-highlight', rem: htmlRem };
     }
+  } else if (await rem.hasPowerup(localVideoPowerupCode)) {
+    const file = await readLocalVideo(rem);
+    if (file) return { rem, type: 'local-video', file, url: localVideoUrl(file) };
+    return { rem, type: 'rem' };
   } else if (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
     return { rem, type: 'pdf' };
   } else if (await rem.hasPowerup('vi')) {
+    // A RemNote video Rem: its URL is the Video powerup's URL slot. With a
+    // YouTube URL the plugin's player can show it as well as RemNote's.
+    const url = await rem.getPowerupProperty('vi', 'u');
+    if (url && ['youtube', 'youtu.be'].some((x) => url.includes(x))) {
+      return { rem, type: 'youtube', url, nativeAvailable: true };
+    }
     return { rem, type: 'video' };
   } else if (
     (await rem.hasPowerup(BuiltInPowerupCodes.Link)) &&

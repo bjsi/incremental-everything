@@ -1545,7 +1545,11 @@ export const resolveSourcePopupTarget = async (
   if (!rem) return null;
 
   // 1. A PDF or HTML highlight → resolve its host document (+ page when paginated).
-  if (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) {
+  //    Text Reader highlights of a PDF are HTML highlights too, parented under the PDF.
+  if (
+    (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) ||
+    (await rem.hasPowerup(BuiltInPowerupCodes.HTMLHighlight))
+  ) {
     const { pdfRemId, pageIndex } = await getPdfInfoFromHighlight(plugin, rem);
     return pdfRemId
       ? { hostRemId: pdfRemId, pageIndex, hoveredRemId: remId, kind: 'highlight' }

@@ -1,8 +1,11 @@
 import { RNPlugin, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { localVideoUrl, readLocalVideo } from './local_video_ref';
+import { extractPositionKey } from './video_position';
 import {
   powerupCode,
   dismissedPowerupCode,
   videoExtractPowerupCode,
+  localVideoPowerupCode,
   videoExtractUrlSlotCode,
   priorityShieldHistoryKey,
   documentPriorityShieldHistoryKey,
@@ -11,6 +14,7 @@ import {
   cardShieldCleanupBackupIndexKey,
   debugHistoryBackupPrefix,
   noIncRemTimerKey,
+  ieKbSettingsKeyPrefix,
   lastDetectedOSKey,
   lastDetectedPlatformKey,
   GRAPH_DATA_KEY_PREFIX,
@@ -35,6 +39,7 @@ import {
   authoritativeShardKey,
 } from './authoritative_aggregates';
 import { flashcardHistorySpec, remHistorySpec, shardKey } from './history_shards';
+import { MAX_SCHEDULER_SHARDS, schedulerManifestKey, schedulerShardKey } from './scheduler_cards';
 
 // ---------------------------------------------------------------------------
 // Synced-storage key audit
@@ -535,6 +540,27 @@ async function buildCandidates(
     keys: kbIds.map((kbId) => authoritativeShardKey(kbId)),
   });
 
+  // 3d. Settings saved per KB (the FSRS weights and retention).
+  families.push({
+    family: 'Settings (per KB)',
+    pattern: `${ieKbSettingsKeyPrefix}_{kbId}`,
+    coverage: 'partial',
+    note: 'Same kbId discovery limits as the sorting settings above.',
+    keys: kbIds.map((kbId) => `${ieKbSettingsKeyPrefix}_${kbId}`),
+  });
+
+  // 3e. Other-scheduler cards list — a manifest and its shards, per KB.
+  families.push({
+    family: 'Other-scheduler cards (per KB)',
+    pattern: 'scheduler-cards_{kbId}[_{n}]',
+    coverage: 'partial',
+    note: 'Same kbId discovery limits as the sorting settings above.',
+    keys: kbIds.flatMap((kbId) => [
+      schedulerManifestKey(kbId),
+      ...Array.from({ length: MAX_SCHEDULER_SHARDS }, (_, i) => schedulerShardKey(kbId, i)),
+    ]),
+  });
+
   // 4. Rem universes.
   //
   // taggedRem() is only reliable for the plugin's OWN powerups — asking for the
@@ -696,12 +722,28 @@ async function buildCandidates(
       /* ignore */
     }
   }
+  // Local videos are keyed by their local-video:// URL.
+  for (const r of await taggedRems(plugin, localVideoPowerupCode)) {
+    try {
+      const file = await readLocalVideo(r);
+      if (file) videoUrls.add(localVideoUrl(file));
+    } catch {
+      /* ignore */
+    }
+  }
   families.push({
     family: 'Video position / playback rate',
     pattern: '{videoUrl}-position | {videoUrl}-playbackRate',
     coverage: 'partial',
     note: 'Keyed by URL, not rem id — a URL that changed or whose rem was deleted leaves an unnameable orphan.',
     keys: Array.from(videoUrls).flatMap((url) => [`${url}-position`, `${url}-playbackRate`]),
+  });
+  families.push({
+    family: 'Video extract position',
+    pattern: 'extract:{remId}-position',
+    coverage: 'partial',
+    note: 'Where each Video Extract was left. A deleted extract leaves an orphan.',
+    keys: videoExtracts.map((r) => extractPositionKey(r._id)),
   });
 
   // 8. Review-graph keys named by the synced index. Their rems are usually gone

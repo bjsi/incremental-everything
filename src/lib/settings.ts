@@ -61,6 +61,10 @@ import {
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
   IsolatedQueueMode,
+  defaultVideoPlayerId,
+  DefaultVideoPlayer,
+  tidyAutoCaptionsId,
+  titleVideoExtractsId,
   autoFocusQueueDashboardId,
   hideCardPriorityTagSettingId,
   showLeftBorderForIncRemsSettingId,
@@ -84,10 +88,13 @@ import {
   titleCaseAcronymsId,
   sourceHighlightColorId,
   pinOtherReaderViewOnCreateIncRemId,
+  imageSizeConfirmAboveId,
   HighlightColorName,
   enableMasteryDrillId,
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
+  masteryDrillHardIntervalPercentId,
+  masteryDrillHardMaxDaysId,
   disableFinalDrillNotificationId,
   masteryDrillModeId,
   MasteryDrillMode,
@@ -101,6 +108,7 @@ import {
   speedCalibrationMarginSecondsId,
   showQueueDashboardCurveId,
   ieSettingsValuesKey,
+  ieKbSettingsKeyPrefix,
 } from './consts';
 // Type-only: utils.ts imports getIESetting from this module, so a value import
 // here would close a runtime require cycle. `import type` is erased.
@@ -150,6 +158,9 @@ export interface IESettings {
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
+  [defaultVideoPlayerId]: DefaultVideoPlayer;
+  [tidyAutoCaptionsId]: boolean;
+  [titleVideoExtractsId]: boolean;
   [autoFocusQueueDashboardId]: boolean;
 
   // Editor indicators
@@ -181,11 +192,14 @@ export interface IESettings {
   [titleCaseAcronymsId]: string;
   [sourceHighlightColorId]: HighlightColorName;
   [pinOtherReaderViewOnCreateIncRemId]: boolean;
+  [imageSizeConfirmAboveId]: number;
 
   // Mastery Drill
   [enableMasteryDrillId]: boolean;
   [oldItemThresholdId]: number;
   [masteryDrillMinDelayMinutesId]: number;
+  [masteryDrillHardIntervalPercentId]: number;
+  [masteryDrillHardMaxDaysId]: number;
   [disableFinalDrillNotificationId]: boolean;
   [masteryDrillModeId]: MasteryDrillMode;
   [masteryDrillRevealDelayId]: number;
@@ -239,6 +253,9 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
+  [defaultVideoPlayerId]: 'plugin',
+  [tidyAutoCaptionsId]: true,
+  [titleVideoExtractsId]: true,
   [autoFocusQueueDashboardId]: false,
 
   [hideCardPriorityTagSettingId]: true,
@@ -266,10 +283,13 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [titleCaseAcronymsId]: '',
   [sourceHighlightColorId]: 'Orange',
   [pinOtherReaderViewOnCreateIncRemId]: false,
+  [imageSizeConfirmAboveId]: 5,
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
   [masteryDrillMinDelayMinutesId]: 180,
+  [masteryDrillHardIntervalPercentId]: 5,
+  [masteryDrillHardMaxDaysId]: 7,
   [disableFinalDrillNotificationId]: false,
   [masteryDrillModeId]: 'native',
   [masteryDrillRevealDelayId]: 500,
@@ -295,6 +315,7 @@ export type SettingGroupId =
   | 'scheduling'
   | 'priority'
   | 'queue'
+  | 'incrementalVideo'
   | 'priorityQueue'
   | 'editor'
   | 'fsrs'
@@ -314,6 +335,8 @@ export interface SettingGroupSpec {
    * otherwise have to be repeated on each of them.
    */
   warning?: string;
+  /** A docs link at the end of the warning box; `path` is relative to IE_DOCS_BASE_URL. */
+  warningLink?: { label: string; path: string };
   /**
    * Page on the docs site, relative to IE_DOCS_BASE_URL, for the feature the
    * whole group configures. Renders a "?" beside the group heading — better
@@ -344,6 +367,11 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     blurb: 'Defaults and editing behaviour for priority values.',
   },
   queue: { label: 'Queue Display', blurb: 'What the queue shows, and holds back, during review.' },
+  incrementalVideo: {
+    label: 'Incremental Video',
+    blurb: 'Which player a video opens in, and how its transcripts are written.',
+    helpPath: 'Incremental-Video/',
+  },
   priorityQueue: {
     label: 'Priority Queue',
     blurb:
@@ -361,7 +389,14 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
       'about a card — they do not schedule anything, and nothing here can move a due date. Your ' +
       'actual scheduling is RemNote\'s, and is configured in RemNote Settings → Schedulers. Set ' +
       'the values below to MATCH what you use there, so the plugin\'s figures describe your real ' +
-      'scheduler; changing them here alone only makes the readouts wrong.',
+      'scheduler; changing them here alone only makes the readouts wrong.\n\n' +
+      'You can fill the weights and retention automatically: run ' +
+      'scripts/export_scheduler_cards.py on your computer, then the command Import RemNote ' +
+      'Scheduler Data.',
+    warningLink: {
+      label: 'How to import your scheduler data',
+      path: 'Reviewing-Items-in-the-Queue/#import-scheduler-data',
+    },
   },
   masteryDrill: {
     label: 'Mastery Drill',
@@ -403,6 +438,8 @@ export const MORE_SETTINGS_POINTER =
 interface SettingSpecBase {
   title: string;
   description: string;
+  /** Saved separately for each knowledge base. See `readRawSetting`. */
+  perKnowledgeBase?: boolean;
   group: SettingGroupId;
   /** Takes effect only after RemNote is reloaded. Surfaced as a badge. */
   reloadRequired?: boolean;
@@ -808,6 +845,40 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'none', label: 'None' },
     ],
   },
+  [defaultVideoPlayerId]: {
+    kind: 'dropdown',
+    group: 'incrementalVideo',
+    title: 'Default Player for RemNote Videos',
+    description:
+      'Which player a video added through RemNote\'s Upload File › YouTube URL opens in, in the ' +
+      'queue. The plugin\'s player resumes where you stopped and has speed, extracts and ' +
+      'screenshots; RemNote\'s has its transcript, Highlight Moment, AI Tutor and Summary. A ' +
+      'button on the card switches between them. Videos saved with the RemNote Clipper always use ' +
+      'the plugin\'s player.',
+    options: [
+      { value: 'plugin', label: "The plugin's player" },
+      { value: 'remnote', label: "RemNote's player" },
+    ],
+  },
+  [tidyAutoCaptionsId]: {
+    kind: 'boolean',
+    group: 'incrementalVideo',
+    title: 'Tidy Automatic Captions with Claude',
+    description:
+      "When a video transcript comes from YouTube's automatic captions, Claude adds punctuation, " +
+      'fixes words the recognition clearly got wrong and puts key terms in bold, through the local ' +
+      "helper and your own Claude account. The raw text is written first and replaced as it's tidied. " +
+      'Captions by the uploader and transcripts made from the audio are left as they are.',
+  },
+  [titleVideoExtractsId]: {
+    kind: 'boolean',
+    group: 'incrementalVideo',
+    title: 'Title Video Extracts with Claude',
+    description:
+      'When a Video Extract gets its transcript, Claude reads it and adds a short title after the ' +
+      'time range, in the language of the video: "Video Extract [11:40 – 11:57] — …". Through the ' +
+      'local helper and your own Claude account. An extract you have renamed is left as it is.',
+  },
   [autoFocusQueueDashboardId]: {
     kind: 'boolean',
     group: 'queue',
@@ -902,10 +973,12 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     wide: true,
     placeholder: 'w0, w1, … w20 — leave blank for FSRS v6.1.1 defaults',
     title: 'FSRS Global Weights',
+    perKnowledgeBase: true,
     description:
       'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from RemNote Settings → ' +
       'Schedulers so the plugin computes the same D/S/R your scheduler does. Leave blank to use ' +
-      'the official defaults. Editing them here does not change your scheduler.',
+      'the official defaults. Editing them here does not change your scheduler. Saved for this ' +
+      'knowledge base only.',
   },
   [fsrsRequestedRetentionId]: {
     kind: 'number',
@@ -915,10 +988,11 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     unit: '%',
     helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
     title: 'Requested Retention',
+    perKnowledgeBase: true,
     description:
       'The recall probability your RemNote scheduler aims for at review time. Copy the value from ' +
       'RemNote Settings → Schedulers; setting it here does not change what your scheduler asks ' +
-      'for.\n\n' +
+      'for. Saved for this knowledge base only.\n\n' +
       'Stability is an interval only at the 90% default: a stricter retention schedules a card ' +
       'sooner than its stability, a looser one later. The card info bar uses this to show the ' +
       'interval you will actually get, and to compute the U-Factor from it.',
@@ -945,7 +1019,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     integer: true,
     unit: 'days',
     title: 'Old Items Threshold',
-    description: 'Items older than this trigger a warning in the Mastery Drill.',
+    description:
+      'Items that have been ready to drill for longer than this trigger a warning in the Mastery ' +
+      'Drill. Time spent waiting out a delay does not count.',
   },
   [masteryDrillMinDelayMinutesId]: {
     kind: 'number',
@@ -957,7 +1033,36 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     title: 'Mastery Drill Minimum Delay',
     description:
       'A card rated Again or Hard will not appear in the drill until this long after its last ' +
-      'review, so the same card is not repeated too soon.',
+      'review, so the same card is not repeated too soon. Hard cards with long intervals wait ' +
+      'longer (see the two settings below).',
+  },
+  [masteryDrillHardIntervalPercentId]: {
+    kind: 'number',
+    group: 'masteryDrill',
+    showWhen: { id: enableMasteryDrillId, equals: true },
+    min: 0,
+    max: 100,
+    unit: '% of interval',
+    title: 'Hard Cards: Share of the Interval',
+    description:
+      'A card rated Hard waits for this share of the new interval the rating gave it before it ' +
+      'returns to the drill, so you recall it from long-term memory rather than from the review ' +
+      'you just did. Never shorter than the Minimum Delay, never longer than the maximum below. ' +
+      '5% means a card sent 60 days out waits 3 days. Cards rated Again always use the Minimum ' +
+      'Delay. 0 gives Hard cards the Minimum Delay too.',
+  },
+  [masteryDrillHardMaxDaysId]: {
+    kind: 'number',
+    group: 'masteryDrill',
+    showWhen: { id: enableMasteryDrillId, equals: true },
+    min: 0,
+    max: 365,
+    integer: true,
+    unit: 'days',
+    title: 'Hard Cards: Maximum Delay',
+    description:
+      'The longest a card rated Hard waits before it returns to the drill, however long its ' +
+      'interval. A 1-year card at 5% would wait 18 days; the default 7 days caps it.',
   },
   [disableFinalDrillNotificationId]: {
     kind: 'boolean',
@@ -1230,6 +1335,17 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Needs the local AI helper running. If it is not, or the passage cannot be found in the other ' +
       'view, the Rem is created as usual with its single pin.',
   },
+  [imageSizeConfirmAboveId]: {
+    kind: 'number',
+    group: 'misc',
+    min: 0,
+    integer: true,
+    unit: 'images',
+    title: 'Cycle Image Size: Ask Above',
+    description:
+      'Cycle Image Size shows its confirmation before resizing more images than this at once. ' +
+      '0 asks every time. It always asks before changing images you have sized yourself.',
+  },
 };
 
 /** Ids in a stable display order: by group, in `IE_SETTING_GROUPS` order. */
@@ -1279,12 +1395,43 @@ function coerce<K extends IESettingId>(id: K, raw: unknown): IESettings[K] {
   return raw as IESettings[K];
 }
 
+export function kbSettingsKey(kbId: string): string {
+  return `${ieKbSettingsKeyPrefix}_${kbId}`;
+}
+
+/**
+ * Which KB this session is in. Memoised because RemNote gives each KB its own
+ * plugin instance (see `currentKbId` in card_priority/slot_access.ts), and so a
+ * setting read costs one bridge call. Failures aren't kept.
+ */
+let kbScopeMemo: { kbId: string; isMain: boolean } | null = null;
+
+async function getKbScope(plugin: RNPlugin): Promise<{ kbId: string; isMain: boolean } | null> {
+  if (kbScopeMemo) return kbScopeMemo;
+  try {
+    const [kb, isMain] = await Promise.all([
+      plugin.kb.getCurrentKnowledgeBaseData(),
+      plugin.kb.isPrimaryKnowledgeBase(),
+    ]);
+    if (kb?._id) kbScopeMemo = { kbId: kb._id, isMain: !!isMain };
+    return kbScopeMemo;
+  } catch {
+    return null;
+  }
+}
+
+/** For tests, which change KB within one process. */
+export function resetKbScopeMemo(): void {
+  kbScopeMemo = null;
+}
+
 /**
  * The one place that talks to a settings backend.
  *
- * Reads hit the synced blob only. A missing key means "no opinion" and resolves
- * to the default, which is what lets a changed default still reach users who
- * never customised that setting.
+ * Reads hit the synced blob, or the KB's own key for a `perKnowledgeBase` setting
+ * (synced storage is shared by all of an account's KBs, so the blob can't hold
+ * them). A missing key means "no opinion" and resolves to the default, which is
+ * what lets a changed default still reach users who never customised that setting.
  *
  * RemNote's own registrations are deliberately NOT consulted, even during the
  * one session in which they still exist: the blob is authoritative from the
@@ -1292,6 +1439,17 @@ function coerce<K extends IESettingId>(id: K, raw: unknown): IESettings[K] {
  * override an edit made in the popup.
  */
 async function readRawSetting(plugin: RNPlugin, id: IESettingId): Promise<unknown> {
+  if (IE_SETTINGS_SCHEMA[id].perKnowledgeBase) {
+    const scope = await getKbScope(plugin);
+    if (scope) {
+      const own = await plugin.storage.getSynced<Partial<IESettings>>(kbSettingsKey(scope.kbId));
+      if (own && id in own) return own[id];
+      // The shared blob's value predates per-KB settings, and it is treated as the
+      // main KB's. A secondary KB that saved nothing of its own gets the default,
+      // not the main KB's weights.
+      if (!scope.isMain) return undefined;
+    }
+  }
   const values = await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey);
   return values ? values[id] : undefined;
 }
@@ -1331,13 +1489,33 @@ export async function getIESettings<K extends IESettingId>(
  *
  * A value equal to the default is *removed* rather than stored, so that editing
  * a default later still reaches everyone who has not deliberately diverged from
- * it.
+ * it. A `perKnowledgeBase` setting is written to this KB's key only.
  */
 export async function setIESetting<K extends IESettingId>(
   plugin: RNPlugin,
   id: K,
   value: IESettings[K]
 ): Promise<void> {
+  const scope = IE_SETTINGS_SCHEMA[id].perKnowledgeBase ? await getKbScope(plugin) : null;
+  if (scope) {
+    const key = kbSettingsKey(scope.kbId);
+    const own = { ...((await plugin.storage.getSynced<Partial<IESettings>>(key)) || {}) };
+    if (JSON.stringify(value) === JSON.stringify(IE_SETTINGS_DEFAULTS[id])) {
+      delete own[id];
+    } else {
+      own[id] = value;
+    }
+    await plugin.storage.setSynced(key, own);
+    if (!scope.isMain) return;
+    // Otherwise the old value in the blob would come back after a reset to default.
+    const shared = await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey);
+    if (shared && id in shared) {
+      const { [id]: _moved, ...rest } = shared;
+      await plugin.storage.setSynced(ieSettingsValuesKey, rest);
+    }
+    return;
+  }
+
   const values = {
     ...((await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey)) || {}),
   };

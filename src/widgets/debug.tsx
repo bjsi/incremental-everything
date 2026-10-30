@@ -86,6 +86,7 @@ import {
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
+import { parseRefIdMap, parseRefIdPlan, repointPlan, repointRemReferences } from '../lib/repoint_references';
 import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode, prioritySlotCode, schedulerSlotCode,
   priorityShieldHistoryKey, documentPriorityShieldHistoryKey,
   cardPriorityShieldHistoryKey, documentCardPriorityShieldHistoryKey,
@@ -594,6 +595,9 @@ function Debug() {
   const [isComparing, setIsComparing] = useState(false);
   const [isPdfDebugging, setIsPdfDebugging] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
+  const [refMapDraft, setRefMapDraft] = useState('');
+  const [refRepointResult, setRefRepointResult] = useState<string | null>(null);
+  const [isRepointing, setIsRepointing] = useState(false);
   const [isDumpingHistory, setIsDumpingHistory] = useState(false);
   const [isCleaningInflation, setIsCleaningInflation] = useState(false);
   const [isGlobalCleaning, setIsGlobalCleaning] = useState(false);
@@ -1407,6 +1411,69 @@ function Debug() {
       await plugin.app.toast(`PDF Debug: ${nodes.length} nodes logged to console. Open DevTools to inspect.`);
     } finally {
       setIsPdfDebugging(false);
+    }
+  };
+
+  // Swap the target of references that render as "Loading" (their id was never
+  // created) for the real Rem, keeping pin/content/alias on each reference.
+  const handleRepointReferences = async () => {
+    if (!remId) return;
+    setIsRepointing(true);
+    setRefRepointResult(null);
+    try {
+      const map = parseRefIdMap(refMapDraft);
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) {
+        setRefRepointResult('No rem found.');
+        return;
+      }
+      const report = await repointRemReferences(rem, map, (id) => plugin.rem.findOne(id));
+      console.log('[RepointReferences]', remId, map, report);
+      setRefRepointResult(
+        report.unresolved.length
+          ? `Nothing written: these new targets do not exist: ${report.unresolved.join(', ')}`
+          : `Repointed ${report.front} on the front and ${report.back} on the back.`
+      );
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setRefRepointResult(`Failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsRepointing(false);
+    }
+  };
+
+  // Batch form: a `{ remId: { oldId: newId } }` plan applied across the KB.
+  const handleRepointPlan = async () => {
+    setRefRepointResult(null);
+    let plan;
+    try {
+      plan = parseRefIdPlan(refMapDraft);
+    } catch (e) {
+      setRefRepointResult(`Failed: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    const remCount = Object.keys(plan).length;
+    if (!confirm(`Repoint references in ${remCount} Rems across the KB?`)) return;
+    setIsRepointing(true);
+    try {
+      setRefRepointResult('Checking the new targets…');
+      const report = await repointPlan(plugin, plan, (done, total) =>
+        setRefRepointResult(`Repointing… ${done}/${total}`)
+      );
+      console.log('[RepointReferences] batch', report);
+      setRefRepointResult(
+        report.unresolved.length
+          ? `Nothing written: ${report.unresolved.length} new targets do not exist: ${report.unresolved.join(', ')}`
+          : `Repointed ${report.references} references in ${report.rems} Rems. ` +
+            `Unchanged: ${report.unchanged.length}. Rems gone: ${report.missingRems.length}. ` +
+            `Failed: ${report.failed.length}.` +
+            (report.unchanged.length + report.missingRems.length + report.failed.length ? ' Details in the console.' : '')
+      );
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setRefRepointResult(`Failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsRepointing(false);
     }
   };
 
@@ -4904,6 +4971,41 @@ function Debug() {
         <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)' }}>
           Opens the focused rem's full descendant tree in the console — remIDs, powerups, tags, and highlight data. Run on a working PDF and a broken one to compare structures.
         </div>
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Repoint references
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {([
+              { label: 'Repoint', onClick: handleRepointReferences },
+              { label: 'Repoint across KB', onClick: handleRepointPlan },
+            ] as const).map(({ label, onClick }) => (
+              <button
+                key={label}
+                onClick={onClick}
+                disabled={isRepointing || !refMapDraft.trim()}
+                style={{ ...smallBtnStyle, backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', border: '1px solid var(--rn-clr-border-warning)', cursor: isRepointing ? 'wait' : 'pointer' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </h2>
+        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+          Fixes references that show "Loading" because their target id was never created. <strong>Repoint</strong>:
+          paste <code>{'{ "oldId": "newId" }'}</code> and every reference or inline link on the focused rem's front
+          and back that points at an old id is moved to the new one, keeping pin, content and alias.{' '}
+          <strong>Repoint across KB</strong>: paste <code>{'{ "remId": { "oldId": "newId" } }'}</code> to do the
+          same on every Rem listed. Nothing is written unless every new id exists.
+        </div>
+        <textarea
+          value={refMapDraft}
+          onChange={(e) => setRefMapDraft(e.target.value)}
+          placeholder='{ "oldId": "newId" }'
+          style={{ width: '100%', minHeight: '54px', fontSize: '11px', fontFamily: 'monospace', padding: '6px', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box' }}
+        />
+        {refRepointResult && <div style={{ fontSize: '12px', marginTop: '4px' }}>{refRepointResult}</div>}
       </div>
 
       <div style={{ marginTop: '16px' }}>

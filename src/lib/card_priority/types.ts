@@ -197,6 +197,39 @@ export function calculateCardRemPercentilesFromCards(
   return out;
 }
 
+/**
+ * Where `remId` would rank if its priority were `priority`, in the same per-card
+ * universe and units as {@link calculateCardRemPercentilesFromCards}, without
+ * re-ranking the whole cache. For a display that holds a newer priority than the
+ * cache's `kbPercentile` was computed from — the window between a popup save and
+ * the tracker's cache write — so its colour moves with the number.
+ *
+ * One pass, no sort: counts the other Rems' cards below and at `priority` and
+ * places this Rem's cards at the midpoint of that tie band. The real calculation
+ * can land elsewhere inside the band (tie order), so this is an estimate.
+ */
+export function estimateCardRemPercentile(
+  infos: CardPriorityInfo[],
+  remId: string,
+  priority: number,
+): number | undefined {
+  let below = 0;
+  let equal = 0;
+  let own = 0;
+  let total = 0;
+  for (const item of expandCardInfosToCards(infos)) {
+    total++;
+    if (item.remId === remId) own++;
+    else if (item.priority < priority) below++;
+    else if (item.priority === priority) equal++;
+  }
+  if (total === 0) return undefined;
+  // 1-based midpoint of ranks below+1 … below+equal+own. With own === 0 this is
+  // the inheritance-only placement used above.
+  const rank = below + (equal + own + 1) / 2;
+  return Math.round((rank / total) * 1000) / 10;
+}
+
 // Count of elements strictly less than `target` in an ascending-sorted array.
 function lowerBoundIdx(arr: number[], target: number): number {
   let lo = 0;

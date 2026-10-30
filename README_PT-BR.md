@@ -13,7 +13,7 @@ O Incremental RemNote permite que você intercale suas revisões de flashcards c
 ### O Ciclo Principal
 - **Leitura Incremental**: Leia e revise milhares de notas, livros e sites em paralelo. [Saiba mais](https://www.youtube.com/watch?v=oNCLLNZEtz0).
 - **Escrita Incremental**: Escreva seus ensaios e postagens de blog de forma incremental para maximizar a criatividade. [Saiba mais](https://www.youtube.com/watch?v=LLS_8Y744lk).
-- **Vídeo Incremental**: Assista e faça anotações da sua lista de vídeos do YouTube pendentes.
+- **Vídeo Incremental**: Assista aos seus vídeos do YouTube pendentes e aos seus próprios arquivos de vídeo aos poucos, com extrações cronometradas e transcrições. [Saiba mais](https://hugomarins.github.io/incremental-remnote/Incremental-Video/).
 - **Tarefas Incrementais**: Limpe sua lista de tarefas entre as revisões de flashcards.
 
 ### 🧠 Priorização Avançada
@@ -137,14 +137,17 @@ O plugin agora possui **Modo Leve Automático**.
 
 ### Vídeo Incremental
 
-- Você pode marcar vídeos do YouTube com a etiqueta `Incremental` para assisti-los incrementalmente.
-- Funcionará se você marcar o Rem do link em si, ou um Rem com o link do YouTube como fonte.
-- **Extrações de Vídeo**: Crie subtrechos precisos com marcações de início e fim, cada um com seu próprio agendamento e prioridade.
-- **Transcrição Automática**: Busque automaticamente as transcrições do YouTube para os intervalos extraídos, deixando o conteúdo pesquisável e pronto para clozes. [P.S.: atualmente fora do ar após as recentes medidas anti-bot do YouTube]
-- O plugin salvará automaticamente seu progresso e velocidade de reprodução.
-- Você pode abrir a seção de notas redimensionável à esquerda para fazer anotações enquanto assiste.
+- Torne Incremental um vídeo do YouTube — adicionado pelo **Upload File › Paste YouTube URL** do RemNote, ou salvo com o RemNote Clipper — e assista a ele aos poucos.
+- **Dois players**: o do plugin (retomada, velocidade, ±30 s, notas ao lado do vídeo, extrações que param no fim) ou o próprio do RemNote (transcrição, Highlight Moment, AI Tutor), com um botão para alternar.
+- **Extrações de Vídeo**: Marque trechos com início e fim exatos, cada um com seu próprio agendamento e prioridade. Elas retomam de onde a última revisão parou, e as longas podem ser cortadas de novo.
+- **Transcrições e títulos**: Por meio de um pequeno auxiliar local, a partir das legendas do vídeo ou do seu áudio (Whisper, no seu computador), revisadas pelo Claude — e cada nova extração ganha um título a partir da sua transcrição.
+- **Capturas de tela**: Salve o quadro exato e transcreva o que aparece na tela.
+- **Vídeos locais**: Importe uma pasta de arquivos de vídeo do seu computador ou de um disco externo como Rems Incrementais, introduzidos um por dia se quiser (desktop, macOS).
+- **Revisar no Editor** mantém um player ao lado das suas notas.
 
-![Vídeo Incremental](https://hugomarins.github.io/incremental-remnote/assets/YT-extract-mode.png)
+📖 [Vídeo Incremental no Manual do Usuário](https://hugomarins.github.io/incremental-remnote/Incremental-Video/)
+
+![Vídeo Incremental](https://hugomarins.github.io/incremental-remnote/assets/YT-plugin-player.png)
 
 ### Matemática Incremental
 

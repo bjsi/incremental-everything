@@ -26,10 +26,14 @@ import {
     QueueInteractionScore,
 } from '@remnote/plugin-sdk';
 import React, { useMemo, useEffect, useState } from 'react';
-import { computeFSRSStatesPerReview, computeFSRSState, parseWeightsString } from '../lib/fsrs';
+import { computeFSRSStatesPerReview, computeFSRSState, countsForMainCard, parseWeightsString } from '../lib/fsrs';
+import { CardSchedulerLabel } from '../components/OtherSchedulers';
+import { MultiLineItemsPanel, RepItemMarks } from '../components/MultiLineItemsPanel';
+import { summarizeMultiLineCard } from '../lib/multi_line_items';
+import { findCardScheduler } from '../lib/scheduler_cards';
 import { formatStabilityDays, formatTimeAgo, getRetrievabilityColor, screenFittedHeight } from '../lib/utils';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
-import { displayFsrsDsrId, fsrsWeightsId, powerupCode, dismissedPowerupCode } from '../lib/consts';
+import { displayFsrsDsrId, fsrsRequestedRetentionId, fsrsWeightsId, powerupCode, dismissedPowerupCode } from '../lib/consts';
 import { useIESetting } from '../lib/settings';
 import { buildCardLabels, CardLabel } from '../lib/card_labels';
 import { CardForgettingCurve } from '../components/CardForgettingCurve';
@@ -767,6 +771,7 @@ function FlashcardRepetitionHistory() {
 
     const showFsrsDsr = useIESetting(displayFsrsDsrId);
     const fsrsWeightsRaw = useIESetting(fsrsWeightsId);
+    const requestedRetentionPct = useIESetting(fsrsRequestedRetentionId);
 
     // Bumped after a repetition is recorded. The tracker does not reliably
     // re-run on a card's repetitionHistory changing — it is not a Rem edit —
@@ -818,12 +823,42 @@ function FlashcardRepetitionHistory() {
             if (card) cards = [card];
         }
 
+        // Multi-line cards only: their items' names, and whether the plugin's FSRS
+        // settings describe them. Ordinary cards pay for nothing here.
+        const multiLineCards = cards.filter((c: any) =>
+            (c.repetitionHistory || []).some((rep: any) => rep.subCardScores?.length),
+        );
+        const itemNames: Record<string, string> = {};
+        const otherSchedulerCardIds: string[] = [];
+        if (multiLineCards.length > 0) {
+            const itemIds = new Set<string>();
+            for (const c of multiLineCards) {
+                for (const rep of c.repetitionHistory) {
+                    for (const scored of rep.subCardScores ?? []) itemIds.add(scored.remId);
+                }
+            }
+            const itemRems = (await rp.rem.findMany([...itemIds])) ?? [];
+            await Promise.all(
+                itemRems.map(async (item) => {
+                    itemNames[item._id] = await resolveRemTextForBreadcrumb(rp, item.text);
+                }),
+            );
+            const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())?._id;
+            if (kbId) {
+                for (const c of multiLineCards) {
+                    if (await findCardScheduler(rp as any, kbId, c._id)) otherSchedulerCardIds.push(c._id);
+                }
+            }
+        }
+
         return {
             cardId,
             remId: rem?._id ?? remId,
             remName,
             priorityHistory,
             hasIncrementalHistory,
+            itemNames,
+            otherSchedulerCardIds,
             cards: cards.map((c: any) => ({
                 _id: c._id,
                 type: c.type,
@@ -863,6 +898,24 @@ function FlashcardRepetitionHistory() {
             finalState: computeFSRSState(card.history, weights),
         }));
     }, [data, fsrsWeightsRaw]);
+
+    // The items of each list or set card, in the same order as data.cards.
+    const multiLineData = useMemo(() => {
+        if (!data) return null;
+        const weights = parseWeightsString(fsrsWeightsRaw);
+        const now = Date.now();
+        return data.cards.map((card) => ({
+            now,
+            summary: summarizeMultiLineCard({
+                history: card.history,
+                weights,
+                retention: requestedRetentionPct / 100,
+                nextRepetitionTime: card.nextRepetitionTime,
+                now,
+                useModel: !data.otherSchedulerCardIds.includes(card._id),
+            }),
+        }));
+    }, [data, fsrsWeightsRaw, requestedRetentionPct]);
 
     // Keyboard driving, the same contract every popup in this plugin honours:
     // ↑/↓ walk the card sections, Enter/Space opens or closes the selected one,
@@ -973,6 +1026,14 @@ function FlashcardRepetitionHistory() {
             {data.cards.map((card, ci) => {
                 const fsrs = fsrsData?.[ci];
                 const stats = statsByCard[ci];
+                const multiLine = multiLineData?.[ci];
+                // Position in the card's own list, so two unnamed items stay distinct.
+                const itemName = (remId: string) => {
+                    const known = data.itemNames[remId]?.trim();
+                    if (known) return known;
+                    const position = multiLine?.summary?.items.findIndex((item) => item.remId === remId) ?? 0;
+                    return `Item ${position + 1}`;
+                };
                 const isOpen = !!expanded?.[card._id];
                 const label = card.label;
                 const headerName = label?.typeName
@@ -1203,6 +1264,8 @@ function FlashcardRepetitionHistory() {
                                         fontSize: 11,
                                         color: 'var(--rn-clr-content-secondary)',
                                     }}>
+                                        <CardSchedulerLabel cardId={card._id} />
+                                        {' '}
                                         <strong>D:</strong> {fsrs.finalState.d.toFixed(2)}
                                         {' · '}
                                         <strong>S:</strong> {fsrs.finalState.s.toFixed(1)}d{formatStabilityDays(fsrs.finalState.s) !== `${fsrs.finalState.s.toFixed(2)}d` ? ` (${formatStabilityDays(fsrs.finalState.s)})` : ''}
@@ -1223,6 +1286,15 @@ function FlashcardRepetitionHistory() {
                                         {' · '}
                                         Next: {card.nextRepetitionTime ? new Date(card.nextRepetitionTime).toLocaleDateString() : '—'}
                                     </div>
+                                )}
+
+                                {multiLine?.summary && (
+                                    <MultiLineItemsPanel
+                                        summary={multiLine.summary}
+                                        nameOf={itemName}
+                                        showMemory={showFsrsDsr}
+                                        now={multiLine.now}
+                                    />
                                 )}
 
                                 {/* Forgetting curve. Gated on the same setting as the
@@ -1342,16 +1414,24 @@ function FlashcardRepetitionHistory() {
                                                 }
 
                                                 const isLast = ri === stats.sortedHistory.length - 1;
+                                                const isPartial = !countsForMainCard(rep);
 
                                                 return (
                                                     <tr key={ri} style={{
                                                         borderBottom: '1px solid var(--rn-clr-border-primary)',
-                                                        opacity: isLast ? 1 : 0.9,
+                                                        opacity: isPartial ? 0.55 : isLast ? 1 : 0.9,
                                                         backgroundColor: isLast ? 'var(--rn-clr-background-secondary)' : 'transparent',
                                                     }}>
                                                         <td style={cellStyle}>{ri + 1}</td>
                                                         <td style={{ ...cellStyle, color: scoreColor(rep.score), fontWeight: 600 }}>
                                                             {scoreLabel(rep.score)}
+                                                            {multiLine?.summary && (
+                                                                <RepItemMarks
+                                                                    rep={rep}
+                                                                    summary={multiLine.summary}
+                                                                    nameOf={itemName}
+                                                                />
+                                                            )}
                                                         </td>
                                                         <td style={{ ...cellStyle, textAlign: 'right' }}>
                                                             {rep.responseTime != null ? `${(rep.responseTime / 1000).toFixed(0)}s` : '—'}

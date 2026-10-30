@@ -56,6 +56,8 @@ Unlike the *Card Info Bar*, which in the Compact queue lives at the bottom of fl
 
 In RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) the badge sits in the **top-right corner of the card**, in the blank space above the breadcrumbs, rather than in the top bar — the card layout itself is unchanged. The *No Inc Rem* countdown moves there with it. Switching back to *Compact* returns both to the toolbar.
 
+The corner area is only as wide as what it shows: the badge, or the badge and the countdown while a *No Inc Rem* timer runs. Clicks beside it reach the card, and the [regular-queue Mastery Drill's bar](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill) keeps its buttons clear of it.
+
 
 ### 1.3. Answer Buttons Info Bar
 *(Incremental Rems only)*
@@ -99,6 +101,8 @@ A compact PDF dropdown that appears in the Reader's top bar, just to the right o
 A detailed popup covering **every card of one Rem**, enriched with FSRS analytics. Open it via the 🔬 button on the [Card Info Bar](#11-card-info-bar), or press `Ctrl+Shift+H` on the Rem — in the queue *or* in the editor. Press `Esc` to close.
 
 ![Flashcard Repetition History Popup](assets/flashcard-rep-history-2.png){ width="900" }
+
+On a list or set card, the section also has an [Items panel](Reviewing-Items-in-the-Queue.md#multi-line-items-panel) explaining why the card is due and what it tests next.
 
 Each card's section also carries its [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) — the card's history replayed into the retrievability FSRS predicts, with a forecast per answer button and the stability each repetition bought. It follows the **Display FSRS DSR Stats** setting.
 
@@ -509,6 +513,7 @@ A **floating** picker (it doesn't cover the editor like a popup) that finds Rems
 - **Cloze-aware insertion:** a reference inserted while the cursor/selection is inside a cloze stays *inside* the cloze instead of breaking it.
 - **Accent-insensitive** (`navegacao interior` → `Navegação Interior`) and **selection-aware** (selected text seeds the box and is replaced by the reference on insert, like native `[[`).
 - Each result row shows a **type badge**, the Rem's **back text**, and a short **`root / … / parent` breadcrumb**; a **Concepts only** toggle narrows the list.
+- **Movable:** drag the title row to move the box; it opens at the cursor again next time.
 
 📖 **Full documentation:** [Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open) · root-cause explainer: [Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)
 
@@ -522,21 +527,24 @@ A centered **modal** popup that renders the **PDF or web article behind a hovere
 - **Source-aware:** only opens for **PDF/HTML highlights**, **PDF source documents**, and **HTML article sources**. Hovering a plain Rem and pressing the key does nothing (just a toast), so it's always safe to trigger.
 - **Auto-scroll to highlight:** for highlights, the embedded reader scrolls to the highlighted passage once it mounts (retried a few times while the PDF engine initializes).
 - **🔖 Scroll to Highlight button** in the header re-centers on the highlight after you've scrolled around the document.
+- **🪟 Open in Another Window button** in the header shows the source in another RemNote window ([details](Utilities-Finding-and-Navigating.md#open-in-another-window)). Desktop app only.
 - **Queue-safe:** uses a modal overlay (not a pane), so the queue, your position, and the rating buttons stay intact underneath.
+- **Screen-fitted height:** 80% of the display's height (600–1500 px), measured when the plugin loads.
 
 📖 **Full documentation:** [Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup)
 
 ### 6.6. Source Popup (floating, non-blocking)
 **Trigger:** **Hover** a reference pin → press `Opt+Shift+O` / `Alt+Shift+O` (command: `Open Hovered Source in Floating Window`)
 
-The **non-blocking** sibling of 6.5: the *same* reader, but opened as a **floating window on the right portion of the screen (≈48% width)** instead of a centered modal. Because it has no backdrop, the **card/editor stays visible beside it** — built for the case where you want to glance back and forth between the source and the card without the close/reopen churn a modal forces.
+The **non-blocking** sibling of 6.5: the *same* reader, but opened as a **floating window on the right portion of the screen (40% width)** instead of a centered modal. Because it has no backdrop, the **card/editor stays visible beside it** — built for the case where you want to glance back and forth between the source and the card without the close/reopen churn a modal forces.
 
 **Differences from the modal (6.5):**
 
 - **Stays open while you use the PDF:** clicking into the reader to **highlight, select text, or click existing highlights** does **not** dismiss it (the click-outside-to-close behavior is disabled — clicks land in the reader's iframe).
 - **Auto-closes on card advance:** when the queue loads the next card, the floating window closes itself so a previous source never lingers.
 - **Esc closes it without closing the queue:** the plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it. (When focus is inside the PDF iframe, the reader handles Esc itself; use `✕` there.)
-- **Fixed size:** RemNote floating widgets aren't user-resizable; the window opens at ≈48% viewport width, anchored top-right.
+- **Movable:** drag the header (not its buttons) to move the window; the next one opens at the last position, for the rest of the session.
+- **Fixed size:** RemNote floating widgets aren't user-resizable; the window opens at 40% viewport width and 80% of the display's height, anchored top-right.
 
 Shares the source-detection and 🔖 Scroll to Highlight behaviors with 6.5.
 
@@ -674,6 +682,14 @@ The front door to the persistent review document, one per scope.
 
 📖 **Full documentation:** [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup)
 
+### 6.15. Cycle Image Size Confirmation and Size Bar
+**Trigger:** `Opt+Shift+G` / `Alt+Shift+G` (command: `Cycle Image Size`, quick code `cis`).
+
+- **Confirmation popup:** appears before a press that would change images you have sized, or more images than the *Cycle Image Size: Ask Above* setting. It shows thumbnails of the images with their current sizes.
+- **Size bar:** a floating bar at the bottom-right showing the size just set, the number of images changed and any skipped. Click a size to go straight to it. It hides 4 seconds after the last press.
+
+📖 **Full documentation:** [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size)
+
 ## 7. Mastery Drill
 
 ### 7.1. Mastery Drill Popup
@@ -687,6 +703,7 @@ A focused sub-queue of flashcards rated *Forgot* or *Hard*, designed for deliber
 - **Old Items Warning**: cards lingering past the configured threshold (default 7 days) are flagged; clear them with a single click.
 - **Clear Queue**: empty the entire drill at any time.
 - **List Cards**: lists every card in the drill with a status saying whether RemNote can still show it, and removes the ones it cannot. See [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list).
+- **In the regular queue**, the drill bar under the queue's top bar carries the same queue tools (counts, List Cards, Clear Queue, Clear Low Priority, Clear Old, Remove from Drill), without the per-card editing buttons. See [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill).
 
 📖 **Full documentation:** [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
 

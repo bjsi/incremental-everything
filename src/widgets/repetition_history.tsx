@@ -25,6 +25,7 @@ import { getRemSchedulerInfo } from '../lib/scheduler_choice';
 import { describeScheduler } from '../lib/scheduler_core';
 import { MAX_NOTE_LENGTH } from '../lib/history_notes';
 import { priorityEventIcon, priorityEventLabel } from '../lib/priority_history';
+import { formatVideoContext } from '../lib/video_position';
 
 interface PdfPageInfo {
     pdfName: string;
@@ -121,11 +122,8 @@ function formatRepContext(ctx: NonNullable<IncrementalRep['context']>): string {
     } else if (ctx.rangeStart !== undefined) {
         parts.push(`pp.${ctx.rangeStart}–${ctx.rangeEnd ?? '∞'}`);
     }
-    if (ctx.videoTime !== undefined) {
-        const m = Math.floor(ctx.videoTime / 60);
-        const s = Math.floor(ctx.videoTime % 60).toString().padStart(2, '0');
-        parts.push(`▶ ${m}:${s}`);
-    }
+    const video = formatVideoContext(ctx);
+    if (video) parts.push(video);
     if (ctx.pdfName) parts.push(ctx.pdfName);
     if (ctx.bookmark) parts.push(`🔖 “${ctx.bookmark}”`);
     // Imported-from-flashcard provenance (eventType 'importedRep').

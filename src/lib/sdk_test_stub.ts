@@ -17,3 +17,8 @@ export enum QueueInteractionScore {
     MANUAL_DATE = 4,
     MANUAL_EASE = 5,
 }
+
+/** The SDK's built-in powerup codes the lib modules check at runtime. */
+export enum BuiltInPowerupCodes {
+    Link = 'b',
+}

@@ -11,21 +11,42 @@ write back as rich text.
 It also locates quotes in a PDF (`/locate`), so the plugin can pin a passage's
 source highlight without the user selecting it.
 
+For YouTube videos it grabs the exact frame at a given time (`/video-frame`,
+with yt-dlp and ffmpeg: the plugin's player can't be captured from inside
+RemNote) and transcribes a grabbed frame into an outline (`/video-transcribe`).
+It also fetches a video's captions (`/video-transcript`, with yt-dlp), which
+the plugin turns into transcript Rems for a whole video or an extract. When a
+video has no captions, or on request, it transcribes the audio itself with
+whisper.cpp, on this Mac. YouTube's automatic captions can be tidied up by
+Claude (`/transcript-tidy`): punctuation, sentences, key terms in bold. And
+Claude names a Video Extract from its transcript (`/extract-title`).
+
     python3 scripts/ai_ocr_helper.py          # listens on 127.0.0.1:3457
 
-Requires PyMuPDF (`pip install pymupdf`) and a logged-in `claude` CLI.
+Requires PyMuPDF (`pip install pymupdf`) and a logged-in `claude` CLI; video
+frames also need `brew install yt-dlp ffmpeg`. Transcribing audio needs
+`brew install whisper-cpp` and a model in ~/.incremental-remnote/ai-ocr/whisper/
+(see WHISPER_MODEL below).
 
 Environment:
     IR_AI_PORT      port (default 3457)
     IR_AI_MODEL     claude model alias (default sonnet)
     IR_AI_ORIGINS   comma-separated allowed Origin headers; unset = allow all
                     (and log each Origin so it can be pinned)
+    IR_WHISPER_MODEL  path of the whisper.cpp model (default whisper/ggml-large-v3-turbo-q5_0.bin)
 
 Files live in ~/.incremental-remnote/ai-ocr/:
     prompt.md       the transcription instructions — edit freely, re-read per request
+    video-prompt.md the same for video frames
+    transcript-prompt.md  how Claude tidies YouTube's automatic captions
+    extract-title-prompt.md  how Claude names a Video Extract from its transcript
+    video-transcripts/    fetched captions and audio transcripts, per video
+    video-audio/          downloaded audio, kept for a week
+    whisper/        the whisper.cpp model, and the optional VAD model that skips silence
     requests.log    one JSON line per request (includes the raw highlight Data)
     crops/          the last image sent for each highlight
     pdf-cache/      downloaded PDFs
+    video-frames/   grabbed video frames
 """
 import base64
 import difflib
@@ -37,6 +58,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unicodedata
@@ -56,6 +78,20 @@ PDF_CACHE = HOME / 'pdf-cache'
 CROPS = HOME / 'crops'
 LOG = HOME / 'requests.log'
 PROMPT_FILE = HOME / 'prompt.md'
+VIDEO_PROMPT_FILE = HOME / 'video-prompt.md'
+VIDEO_FRAMES = HOME / 'video-frames'
+VIDEO_TRANSCRIPTS = HOME / 'video-transcripts'
+VIDEO_AUDIO = HOME / 'video-audio'
+TRANSCRIPT_PROMPT_FILE = HOME / 'transcript-prompt.md'
+EXTRACT_TITLE_PROMPT_FILE = HOME / 'extract-title-prompt.md'
+WHISPER_DIR = HOME / 'whisper'
+# large-v3-turbo, 5-bit: 574 MB, close to large-v3's accuracy at several times
+# its speed. https://huggingface.co/ggerganov/whisper.cpp
+WHISPER_MODEL = Path(os.environ.get('IR_WHISPER_MODEL') or WHISPER_DIR / 'ggml-large-v3-turbo-q5_0.bin')
+# Silero voice activity detection: skips silence and music, where Whisper
+# otherwise makes words up, and halves the time. Used when present.
+# https://huggingface.co/ggml-org/whisper-vad
+WHISPER_VAD_MODEL = WHISPER_DIR / 'ggml-silero-v5.1.2.bin'
 
 DPI = 220
 # PDF points of margin around the highlight box. Vertical is larger: a line's
@@ -87,6 +123,56 @@ If part of the image is illegible, transcribe what you can and mark the gap inli
 """
 
 
+DEFAULT_VIDEO_PROMPT = r"""Extract the text shown in a frame of a video: a lecture slide, a document or screen being shown, a whiteboard, a diagram. Do not acknowledge the request, do not comment, and do not ask questions: output the outline described below and nothing else.
+
+The output becomes a RemNote outline, one rem per line:
+- Start every line with "- ".
+- Nest a line under the one it belongs to by indenting it two spaces per level: a slide's title at the top level, its bullets one level down, their sub-bullets one more. Follow the structure the frame shows; do not invent hierarchy.
+- One line per paragraph or list item; never break a line inside a sentence.
+- Keep the frame's own numbering and lettering (1., a), …) as part of the line's text.
+- Tables: a line naming the table, then one nested line per row, cells separated by " | ".
+- Diagrams and charts: transcribe their labels; when the labels alone would not make sense, add one line in *italics* saying what the figure shows.
+
+Leave out what is not content: logos, watermarks, the video player's controls, subtitles burnt into the picture.
+
+Formulae, in KaTeX:
+- inline: $x$
+- a formula set on its own line in the frame: its own outline line, written $$x$$
+- numbered equations use \tag with the number shown, and are always written as $$...$$
+- words inside formulae are enclosed in \text{}.
+
+Emphasis, since the reader skims these rems later:
+- Put the key terms and concepts in **bold**, even when the frame does not emphasise them: one to three per line at most, each a word or a short phrase, never a whole sentence.
+- Keep the frame's own emphasis: italics as *italic*, bold as **bold**.
+- Never put ** or * inside a formula's $...$.
+
+Use no other markup: no headings, no code, no links.
+
+If part of the frame is illegible, transcribe what you can and mark the gap as [illegible]. If the frame shows no text at all, output exactly: [no text]
+"""
+
+
+DEFAULT_TRANSCRIPT_PROMPT = r"""Clean up passages of a speech transcript made by YouTube's automatic speech recognition. The input is a JSON array of consecutive passages. Do not acknowledge the request, do not comment, and do not ask questions: output a JSON array of strings and nothing else.
+
+- Return exactly as many strings as you received, in the same order: the cleaned version of each passage at the same position. Never merge, split, move or drop passages, even when a sentence runs on from one passage into the next.
+- Add punctuation and capitalisation, and split run-on speech into sentences.
+- Correct a word only when the recognition clearly got it wrong and the context makes the intended word certain (names, technical terms). Otherwise keep the speaker's own words, in their language: never translate, summarise or rephrase.
+- Drop filler sounds that carry no meaning.
+- Keep a time marker at the start of a passage, such as [12:34], exactly as it is.
+- Each passage stays one paragraph: no line breaks. Where YouTube marks a change of speaker with ">>", start the new speaker's words with an em dash (—) instead.
+- Put the passage's key terms and concepts in **bold**: one to three per passage at most, each a word or a short phrase, never a whole sentence. Use no other markup.
+"""
+
+DEFAULT_EXTRACT_TITLE_PROMPT = r"""Give a title to an excerpt of a video, from its transcript. Do not acknowledge the request, do not comment, and do not ask questions: output the title and nothing else, on one line.
+
+- Write it in the transcript's language, never translated.
+- Say what this excerpt is about specifically: its topic, claim or example, as a reader skimming a list of excerpts of the same video would need to tell them apart. Never a generic label such as "Introduction" or "Continuation".
+- At most 10 words. No quotation marks, no final full stop, no markup, and no phrasing such as "In this excerpt" or "The speaker".
+- The video's title, when given, is context only: don't repeat it.
+- The transcript may come from speech recognition and contain errors; rely on what is clear.
+"""
+
+
 def log(entry):
     with open(LOG, 'a') as f:
         f.write(json.dumps(entry, ensure_ascii=False) + '\n')
@@ -96,6 +182,32 @@ def prompt():
     if not PROMPT_FILE.exists():
         PROMPT_FILE.write_text(DEFAULT_PROMPT)
     return PROMPT_FILE.read_text()
+
+
+def extract_title_prompt():
+    if not EXTRACT_TITLE_PROMPT_FILE.exists():
+        EXTRACT_TITLE_PROMPT_FILE.write_text(DEFAULT_EXTRACT_TITLE_PROMPT)
+    return EXTRACT_TITLE_PROMPT_FILE.read_text()
+
+
+def video_prompt():
+    if not VIDEO_PROMPT_FILE.exists():
+        VIDEO_PROMPT_FILE.write_text(DEFAULT_VIDEO_PROMPT)
+    return VIDEO_PROMPT_FILE.read_text()
+
+
+def transcript_prompt():
+    if not TRANSCRIPT_PROMPT_FILE.exists():
+        TRANSCRIPT_PROMPT_FILE.write_text(DEFAULT_TRANSCRIPT_PROMPT)
+    return TRANSCRIPT_PROMPT_FILE.read_text()
+
+
+def find_tool(name):
+    # launchd and GUI launches carry a minimal PATH, so check Homebrew's spots too.
+    for candidate in [shutil.which(name), f'/opt/homebrew/bin/{name}', f'/usr/local/bin/{name}']:
+        if candidate and Path(candidate).exists():
+            return str(candidate)
+    return None
 
 
 def find_claude():
@@ -249,6 +361,13 @@ def transcribe(images, raw_text, extend=None):
     else:
         instruction = 'Transcribe the image.'
     content.append({'type': 'text', 'text': instruction})
+    markup, model = run_claude(content, prompt())
+    return bullets_to_markers(markup), model
+
+
+def run_claude(content, system_prompt):
+    """One `claude -p` turn on `content` (message content blocks); returns the
+    reply text and the model that answered."""
     message = json.dumps({'type': 'user', 'message': {'role': 'user', 'content': content}})
 
     claude = find_claude()
@@ -259,7 +378,7 @@ def transcribe(images, raw_text, extend=None):
     # settings files (and so hooks) and session persistence.
     cmd = [claude, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
            '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence',
-           '--model', MODEL, '--system-prompt', prompt()]
+           '--model', MODEL, '--system-prompt', system_prompt]
     proc = subprocess.run(cmd, input=message + '\n', capture_output=True, text=True, timeout=240, cwd=HOME)
     model = None  # the model the CLI actually resolved the alias to, reported in its init event
     for line in proc.stdout.splitlines():
@@ -272,7 +391,7 @@ def transcribe(images, raw_text, extend=None):
         if event.get('type') == 'result':
             if event.get('is_error'):
                 raise RuntimeError(event.get('result') or 'claude reported an error')
-            return bullets_to_markers(event.get('result', '').strip()), model
+            return event.get('result', '').strip(), model
     raise RuntimeError(f'claude exited {proc.returncode}: {proc.stderr.strip()[-400:]}')
 
 
@@ -495,7 +614,545 @@ def handle_match(req, entry):
     return {'results': results}
 
 
-ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match}
+# ---------------------------------------------------------------------------
+# /video-frame, /video-transcribe — YouTube frames
+# ---------------------------------------------------------------------------
+
+VIDEO_ID = re.compile(r'^[A-Za-z0-9_-]{11}$')
+FRAME_ID = re.compile(r'^[A-Za-z0-9_-]{11}-\d+\.jpg$')
+# The best stream up to 1080p, H.264 first: every ffmpeg build decodes it.
+VIDEO_FORMAT = 'bv*[height<=1080][vcodec^=avc1]/bv*[height<=1080]/b[height<=1080]/b'
+STREAM_TTL = 3600     # googlevideo URLs last ~6 h; refetch well before that
+_streams = {}         # video id -> (fetched at, stream URL)
+
+
+def stream_url(video_id, fresh=False):
+    cached = _streams.get(video_id)
+    if cached and not fresh and time.time() - cached[0] < STREAM_TTL:
+        return cached[1]
+    ytdlp = find_tool('yt-dlp')
+    if not ytdlp:
+        raise RuntimeError('yt-dlp not found (brew install yt-dlp)')
+    proc = subprocess.run([ytdlp, '-g', '--no-playlist', '--no-warnings', '-f', VIDEO_FORMAT,
+                           f'https://www.youtube.com/watch?v={video_id}'],
+                          capture_output=True, text=True, timeout=90)
+    url = next((line for line in proc.stdout.splitlines() if line.startswith('http')), None)
+    if not url:
+        raise RuntimeError(f'yt-dlp found no stream: {proc.stderr.strip()[-400:]}')
+    _streams[video_id] = (time.time(), url)
+    return url
+
+
+def grab_frame(video_id, seconds, file=None):
+    """The frame at `seconds`, as a JPEG file. Seeking before -i jumps to the
+    keyframe and decodes forward from there, so the frame is exact. `file` is a
+    local video, which `video_id` (its local_key) then only names."""
+    ffmpeg = find_tool('ffmpeg')
+    if not ffmpeg:
+        raise RuntimeError('ffmpeg not found (brew install ffmpeg)')
+    path = VIDEO_FRAMES / f'{video_id}-{int(round(seconds * 1000))}.jpg'
+    if path.exists():
+        return path
+    # A cached stream URL may have expired, so a YouTube grab gets a second try.
+    inputs = [lambda: str(file)] if file else [lambda: stream_url(video_id), lambda: stream_url(video_id, True)]
+    for source in inputs:
+        cmd = [ffmpeg, '-hide_banner', '-loglevel', 'error', '-ss', f'{seconds:.3f}',
+               '-i', source(), '-frames:v', '1', '-q:v', '2', '-y', str(path)]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        if proc.returncode == 0 and path.exists() and path.stat().st_size:
+            return path
+    raise RuntimeError(f'ffmpeg could not grab the frame: {proc.stderr.strip()[-400:]}')
+
+
+def handle_video_frame(req, entry):
+    """A YouTube video by `videoId`, or a local one by `file: {library, path}`."""
+    seconds = req.get('seconds')
+    if not isinstance(seconds, (int, float)) or seconds < 0:
+        raise RuntimeError('need seconds >= 0')
+    file = local_video_file(req['file']) if req.get('file') else None
+    video_id = local_key(file) if file else req.get('videoId') or ''
+    if not VIDEO_ID.match(video_id):
+        raise RuntimeError('need a YouTube videoId or a local file')
+    entry.update(videoId=video_id, file=str(file) if file else None, seconds=seconds)
+    path = grab_frame(video_id, float(seconds), file)
+    return {'frameId': path.name, 'mime': 'image/jpeg',
+            'image': base64.b64encode(path.read_bytes()).decode()}
+
+
+def handle_video_transcribe(req, entry):
+    frame_id = req.get('frameId') or ''
+    if not FRAME_ID.match(frame_id) or not (VIDEO_FRAMES / frame_id).exists():
+        raise RuntimeError('unknown frame; grab it with /video-frame first')
+    entry['frameId'] = frame_id
+    content = [
+        {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/jpeg',
+                                     'data': base64.b64encode((VIDEO_FRAMES / frame_id).read_bytes()).decode()}},
+        {'type': 'text', 'text': 'Transcribe this video frame.'},
+    ]
+    markup, model = run_claude(content, video_prompt())
+    entry.update(model=model, markup=markup)
+    return {'markup': markup}
+
+
+# ---------------------------------------------------------------------------
+# /video-transcript — a YouTube video's captions
+# ---------------------------------------------------------------------------
+#
+# YouTube refuses the old Innertube ANDROID request the plugin's first proxy
+# (yt-local-proxy.js) made, with 400 FAILED_PRECONDITION. yt-dlp keeps up with
+# YouTube's changes, so it lists the caption tracks here. See
+# findings/VIDEO_PLAYBACK.md, "Transcripts".
+
+TRANSCRIPT_TTL = 30 * 24 * 3600   # captions rarely change; refetch now and then
+
+
+def caption_track(info):
+    """The track to use: hand-made captions in the video's language, else
+    YouTube's automatic captions of the spoken language (`<lang>-orig`), else
+    any hand-made track. Never an automatic translation: YouTube answers those
+    with 429 Too Many Requests."""
+    def json3(formats):
+        return next((f.get('url') for f in formats or [] if f.get('ext') == 'json3'), None)
+
+    def base(code):
+        return code.split('-')[0].lower()
+
+    language = info.get('language') or ''
+    manual = {code: fmts for code, fmts in (info.get('subtitles') or {}).items() if code != 'live_chat'}
+    auto = info.get('automatic_captions') or {}
+    if language:
+        for code, fmts in manual.items():
+            if base(code) == base(language) and json3(fmts):
+                return code, 'manual', json3(fmts)
+    for code, fmts in auto.items():
+        if code.endswith('-orig') and json3(fmts):
+            return code[:-len('-orig')], 'auto', json3(fmts)
+    for code, fmts in manual.items():
+        if json3(fmts):
+            return code, 'manual', json3(fmts)
+    return None
+
+
+def parse_json3(body):
+    """Caption lines as {offset, duration, text}, in seconds."""
+    segments = []
+    for event in json.loads(body).get('events') or []:
+        text = ''.join(seg.get('utf8', '') for seg in event.get('segs') or []).replace('\n', ' ').strip()
+        if text:
+            segments.append({'offset': event.get('tStartMs', 0) / 1000,
+                             'duration': event.get('dDurationMs', 0) / 1000,
+                             'text': text})
+    return segments
+
+
+class NoCaptions(RuntimeError):
+    pass
+
+
+def caption_transcript(video_id, refresh=False):
+    path = VIDEO_TRANSCRIPTS / f'{video_id}.json'
+    if path.exists() and not refresh and time.time() - path.stat().st_mtime < TRANSCRIPT_TTL:
+        return {**json.loads(path.read_text()), 'cached': True}
+    ytdlp = find_tool('yt-dlp')
+    if not ytdlp:
+        raise RuntimeError('yt-dlp not found (brew install yt-dlp)')
+    proc = subprocess.run([ytdlp, '-J', '--skip-download', '--no-playlist', '--no-warnings',
+                           f'https://www.youtube.com/watch?v={video_id}'],
+                          capture_output=True, text=True, timeout=120)
+    if proc.returncode != 0:
+        raise RuntimeError(f'yt-dlp could not read the video: {proc.stderr.strip()[-400:]}')
+    track = caption_track(json.loads(proc.stdout))
+    if not track:
+        raise NoCaptions('this video has no captions in its own language')
+    language, kind, url = track
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=60, context=ssl_context()) as resp:
+        segments = parse_json3(resp.read())
+    if not segments:
+        raise NoCaptions(f'the {language} captions came back empty')
+    result = {'videoId': video_id, 'language': language, 'kind': kind, 'segments': segments}
+    path.write_text(json.dumps(result))
+    return {**result, 'cached': False}
+
+
+# --- the audio, transcribed here by whisper.cpp ------------------------------
+
+AUDIO_TTL = 7 * 24 * 3600
+WHISPER_LOCK = threading.Lock()  # one transcription at a time: they share the GPU
+
+
+def whisper_ready():
+    return bool(find_tool('whisper-cli') and find_tool('ffmpeg') and WHISPER_MODEL.exists())
+
+
+def video_audio(video_id):
+    """The video's audio, downloaded whole once: yt-dlp fetches it in chunks in
+    seconds, while cutting a range straight from YouTube's stream is throttled
+    to near real time. Ranges are then cut locally."""
+    for path in VIDEO_AUDIO.glob(f'{video_id}.*'):
+        if path.suffix != '.part' and time.time() - path.stat().st_mtime < AUDIO_TTL:
+            return path
+    ytdlp = find_tool('yt-dlp')
+    if not ytdlp:
+        raise RuntimeError('yt-dlp not found (brew install yt-dlp)')
+    proc = subprocess.run([ytdlp, '-f', 'bestaudio[ext=m4a]/bestaudio', '--no-playlist', '--no-warnings',
+                           '--no-progress', '-o', str(VIDEO_AUDIO / f'{video_id}.%(ext)s'),
+                           f'https://www.youtube.com/watch?v={video_id}'],
+                          capture_output=True, text=True, timeout=900)
+    found = [p for p in VIDEO_AUDIO.glob(f'{video_id}.*') if p.suffix != '.part']
+    if proc.returncode != 0 or not found:
+        raise RuntimeError(f'yt-dlp could not download the audio: {proc.stderr.strip()[-400:]}')
+    return found[0]
+
+
+def transcribe_audio(path, start=None, end=None):
+    """Whisper on the audio file between `start` and `end` (seconds; the whole
+    file without them). Returns (language, segments), offsets in the file's time.
+    Takes a local file, so a local video can use it as it is."""
+    if not whisper_ready():
+        raise RuntimeError('Whisper is not set up: brew install whisper-cpp, and put the model at '
+                           f'{WHISPER_MODEL}')
+    with tempfile.TemporaryDirectory(dir=VIDEO_AUDIO) as tmp:
+        wav, out = Path(tmp) / 'clip.wav', Path(tmp) / 'out'
+        cmd = [find_tool('ffmpeg'), '-hide_banner', '-loglevel', 'error']
+        if start:
+            cmd += ['-ss', f'{start:.3f}']
+        if end is not None:
+            cmd += ['-to', f'{end:.3f}']
+        cmd += ['-i', str(path), '-ac', '1', '-ar', '16000', '-y', str(wav)]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if proc.returncode != 0:
+            raise RuntimeError(f'ffmpeg could not cut the audio: {proc.stderr.strip()[-400:]}')
+        cmd = [find_tool('whisper-cli'), '-m', str(WHISPER_MODEL), '-f', str(wav), '-l', 'auto',
+               '-sns', '-t', str(min(8, os.cpu_count() or 4)), '-oj', '-of', str(out), '-np']
+        if WHISPER_VAD_MODEL.exists():
+            cmd += ['--vad', '-vm', str(WHISPER_VAD_MODEL)]
+        with WHISPER_LOCK:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3 * 3600)
+        result = Path(f'{out}.json')
+        if proc.returncode != 0 or not result.exists():
+            raise RuntimeError(f'whisper failed: {proc.stderr.strip()[-400:]}')
+        data = json.loads(result.read_text(errors='replace'))
+    offset = start or 0
+    segments = []
+    for line in data.get('transcription') or []:
+        text = (line.get('text') or '').strip()
+        if text:
+            begin, finish = line['offsets']['from'] / 1000, line['offsets']['to'] / 1000
+            segments.append({'offset': offset + begin, 'duration': finish - begin, 'text': text})
+    return (data.get('result') or {}).get('language') or '', segments
+
+
+def audio_transcript(video_id, start=None, end=None, refresh=False, file=None):
+    """The audio's transcript: the whole video's is cached, and a range is cut
+    from it when there is one; otherwise only the range is transcribed. `file`
+    is a local video, read as it is; `video_id` (its local_key) then names the cache."""
+    path = VIDEO_TRANSCRIPTS / f'{video_id}.audio.json'
+    whole = start is None and end is None
+    if path.exists() and not refresh:
+        result = json.loads(path.read_text())
+        if not whole:
+            result['segments'] = [s for s in result['segments']
+                                  if s['offset'] + s['duration'] > (start or 0)
+                                  and (end is None or s['offset'] < end)]
+        return {**result, 'cached': True}
+    language, segments = transcribe_audio(file or video_audio(video_id), start, end)
+    if not segments:
+        raise RuntimeError('Whisper heard no speech' + ('' if whole else ' in this range'))
+    result = {'videoId': video_id, 'language': language, 'kind': 'whisper', 'segments': segments}
+    if whole:
+        path.write_text(json.dumps(result))
+    return {**result, 'cached': False}
+
+
+def handle_video_transcript(req, entry):
+    """source: 'captions' (the default), 'audio' (Whisper), or 'auto' (captions,
+    else Whisper when it is set up). start / end (seconds) limit what Whisper
+    transcribes; captions always come whole, cached, for the plugin to cut."""
+    start, end = req.get('start'), req.get('end')
+    for value in (start, end):
+        if value is not None and (not isinstance(value, (int, float)) or value < 0):
+            raise RuntimeError('start and end are seconds >= 0')
+    refresh = bool(req.get('refresh'))
+    source = req.get('source') or 'captions'
+    if req.get('file'):
+        # A local video has no captions: always its audio.
+        file = local_video_file(req['file'])
+        result = audio_transcript(local_key(file), start, end, refresh, file)
+        entry.update(file=str(file), language=result['language'], segments=len(result['segments']),
+                     cached=result['cached'])
+        return result
+    video_id = req.get('videoId') or ''
+    if not VIDEO_ID.match(video_id):
+        raise RuntimeError('need a YouTube videoId or a local file')
+    if source == 'audio':
+        result = audio_transcript(video_id, start, end, refresh)
+    else:
+        try:
+            result = caption_transcript(video_id, refresh)
+        except NoCaptions as e:
+            if source != 'auto':
+                raise
+            if not whisper_ready():
+                raise NoCaptions(f'{e}, and Whisper is not set up to transcribe its audio') from e
+            result = audio_transcript(video_id, start, end, refresh)
+    # The segments themselves would swamp the request log.
+    entry.update(videoId=video_id, source=source, language=result['language'], kind=result['kind'],
+                 segments=len(result['segments']), cached=result['cached'])
+    return result
+
+
+# ---------------------------------------------------------------------------
+# /transcript-tidy — Claude cleans up automatic captions
+# ---------------------------------------------------------------------------
+
+MAX_TIDY_BLOCKS = 40
+MAX_TIDY_CHARS = 30000
+
+
+def handle_transcript_tidy(req, entry):
+    """Blocks of YouTube's automatic captions in, the same blocks cleaned up out:
+    punctuation, sentences, key terms in bold. The reply must keep the count,
+    so each block goes back to its own Rem."""
+    blocks = req.get('blocks')
+    if (not isinstance(blocks, list) or not blocks or len(blocks) > MAX_TIDY_BLOCKS
+            or not all(isinstance(b, str) for b in blocks) or sum(map(len, blocks)) > MAX_TIDY_CHARS):
+        raise RuntimeError(f'need 1 to {MAX_TIDY_BLOCKS} text blocks, {MAX_TIDY_CHARS} characters at most')
+    language = req.get('language') or 'unknown'
+    content = [{'type': 'text', 'text': f'Language: {language}\n\n' + json.dumps(blocks, ensure_ascii=False)}]
+    reply, model = run_claude(content, transcript_prompt())
+    try:
+        tidied = json.loads(reply[reply.index('['):reply.rindex(']') + 1])
+    except ValueError:
+        raise RuntimeError('Claude did not answer with a list of passages')
+    if not isinstance(tidied, list) or len(tidied) != len(blocks) or not all(isinstance(b, str) for b in tidied):
+        raise RuntimeError(f'Claude returned {len(tidied) if isinstance(tidied, list) else "no"} passages '
+                           f'for {len(blocks)}')
+    # Each block is one Rem's text: line breaks (Claude likes one before each
+    # speaker's dash, whatever the prompt says) become spaces.
+    tidied = [re.sub(r'\s*\n\s*', ' ', block).strip() for block in tidied]
+    entry.update(model=model, blocks=len(blocks))
+    return {'blocks': tidied}
+
+
+# ---------------------------------------------------------------------------
+# /extract-title — Claude names a Video Extract from its transcript
+# ---------------------------------------------------------------------------
+
+MAX_TITLE_INPUT_CHARS = 30000
+MAX_TITLE_CHARS = 120
+
+
+def handle_extract_title(req, entry):
+    """An extract's transcript in, a short title for it out, in its language."""
+    text = req.get('text')
+    if not isinstance(text, str) or not text.strip() or len(text) > MAX_TITLE_INPUT_CHARS:
+        raise RuntimeError(f'need the transcript text, {MAX_TITLE_INPUT_CHARS} characters at most')
+    lines = [f"Language: {req.get('language') or 'unknown'}"]
+    if isinstance(req.get('video'), str) and req['video'].strip():
+        lines.append(f"Video: {req['video'].strip()}")
+    content = [{'type': 'text', 'text': '\n'.join(lines) + '\n\nTranscript:\n' + text.strip()}]
+    reply, model = run_claude(content, extract_title_prompt())
+    # One line, without the quotes, markup or full stop Claude may add anyway.
+    title = next((line.strip() for line in reply.splitlines() if line.strip()), '')
+    title = re.sub(r'[*_`#]', '', title).strip().strip('"“”«»\'').rstrip('.').strip()
+    if not title:
+        raise RuntimeError('Claude returned no title')
+    title = title[:MAX_TITLE_CHARS]
+    entry.update(model=model, title=title)
+    return {'title': title}
+
+
+# ---------------------------------------------------------------------------
+# Local videos: libraries, the macOS file dialogs, scanning, serving
+# ---------------------------------------------------------------------------
+#
+# A library is a named folder the user picked in a dialog. A Rem stores its
+# video as library name + path relative to the library, so a folder that moves
+# (an external disk mounted elsewhere) is fixed once, by re-pointing the
+# library. Only video files inside libraries are ever served or read.
+
+VIDEO_LIBRARIES_FILE = HOME / 'video-libraries.json'
+VIDEO_TYPES = {'.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm'}
+LIBRARY_LOCK = threading.Lock()
+DIALOG_LOCK = threading.Lock()  # one file dialog at a time
+
+
+def load_libraries():
+    try:
+        return json.loads(VIDEO_LIBRARIES_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def save_libraries(libraries):
+    VIDEO_LIBRARIES_FILE.write_text(json.dumps(libraries, indent=2, ensure_ascii=False))
+
+
+def is_video(path):
+    return path.suffix.lower() in VIDEO_TYPES and not path.name.startswith('.')
+
+
+def library_for(path):
+    """(library name, path relative to it) for a picked file or folder: the
+    innermost library holding it, else a new library at the folder itself (or
+    the file's folder), named after it."""
+    path = path.resolve()
+    with LIBRARY_LOCK:
+        libraries = load_libraries()
+        holders = [(name, Path(root)) for name, root in libraries.items()
+                   if path == Path(root) or Path(root) in path.parents]
+        if holders:
+            name, root = max(holders, key=lambda h: len(str(h[1])))
+            return name, '' if path == root else path.relative_to(root).as_posix()
+        root = path if path.is_dir() else path.parent
+        name, n = root.name or 'Videos', 2
+        while name in libraries:
+            name, n = f'{root.name} {n}', n + 1
+        libraries[name] = str(root)
+        save_libraries(libraries)
+        return name, '' if path == root else path.relative_to(root).as_posix()
+
+
+def library_root(name):
+    root = load_libraries().get(name)
+    if not root:
+        raise RuntimeError(f'unknown video library "{name}"')
+    root = Path(root)
+    if not root.is_dir():
+        raise RuntimeError(f'the folder of the video library "{name}" is not available: {root} '
+                           '(an external disk not connected?)')
+    return root
+
+
+def local_path(library, rel):
+    """A path inside a library; never outside it, whatever `rel` says."""
+    root = library_root(library).resolve()
+    path = (root / rel).resolve() if rel else root
+    if path != root and root not in path.parents:
+        raise RuntimeError('path outside the library')
+    return path
+
+
+def local_video_file(spec):
+    if not isinstance(spec, dict) or not spec.get('library') or not spec.get('path'):
+        raise RuntimeError('need file: {library, path}')
+    path = local_path(spec['library'], spec['path'])
+    if not is_video(path) or not path.is_file():
+        raise RuntimeError(f'video not found: {spec["path"]} in the library "{spec["library"]}"')
+    return path
+
+
+def local_key(path):
+    """An 11-character id for a local file, in the YouTube id's place (frame and
+    transcript caches); it changes when the file does."""
+    stat = path.stat()
+    return hashlib.sha1(f'{path}|{stat.st_size}|{stat.st_mtime_ns}'.encode()).hexdigest()[:11]
+
+
+def choose_in_dialog(kind, prompt):
+    """The macOS folder or file dialog, in front of RemNote. None if cancelled."""
+    prompt = prompt.replace('"', "'")
+    picker = (f'choose folder with prompt "{prompt}"' if kind == 'folder'
+              else f'choose file with prompt "{prompt}" of type {{"public.movie"}}')
+    with DIALOG_LOCK:
+        proc = subprocess.run(['osascript', '-e', 'activate', '-e', f'POSIX path of ({picker})'],
+                              capture_output=True, text=True, timeout=900)
+    if proc.returncode != 0:
+        if '-128' in proc.stderr:  # User canceled.
+            return None
+        raise RuntimeError(f'the file dialog failed: {proc.stderr.strip()[-300:]}')
+    return Path(proc.stdout.strip())
+
+
+def handle_video_choose(req, entry):
+    """kind 'folder' or 'file': the user picks one; it is placed in a library."""
+    kind = 'file' if req.get('kind') == 'file' else 'folder'
+    picked = choose_in_dialog(kind, req.get('prompt') or
+                              ('Choose a folder of videos' if kind == 'folder' else 'Choose a video'))
+    if not picked:
+        return {'cancelled': True}
+    if kind == 'file' and not is_video(picked):
+        raise RuntimeError(f'not a video the player can open (mp4, m4v, mov, webm): {picked.name}')
+    library, rel = library_for(picked)
+    entry.update(kind=kind, library=library, path=rel)
+    return {'cancelled': False, 'library': library, 'root': load_libraries()[library], 'path': rel}
+
+
+def handle_video_libraries(req, entry):
+    return {'libraries': [{'name': name, 'root': root, 'available': Path(root).is_dir()}
+                          for name, root in load_libraries().items()]}
+
+
+def handle_video_library_relink(req, entry):
+    """Points a library at another folder (the disk mounted elsewhere, the
+    folder moved), chosen in the dialog."""
+    name = req.get('library') or ''
+    with LIBRARY_LOCK:
+        if name not in load_libraries():
+            raise RuntimeError(f'unknown video library "{name}"')
+    picked = choose_in_dialog('folder', f'Where is the video library "{name}" now?')
+    if not picked:
+        return {'cancelled': True}
+    with LIBRARY_LOCK:
+        libraries = load_libraries()
+        libraries[name] = str(picked.resolve())
+        save_libraries(libraries)
+    entry.update(library=name, root=libraries[name])
+    return {'cancelled': False, 'library': name, 'root': libraries[name]}
+
+
+def natural_key(name):
+    """'Aula 2' before 'Aula 10'."""
+    return [(0, int(part), '') if part.isdigit() else (1, 0, part.lower())
+            for part in re.split(r'(\d+)', name)]
+
+
+def scan_folder(root, path):
+    folder = {'name': path.name, 'path': path.relative_to(root).as_posix() if path != root else '',
+              'videos': [], 'folders': []}
+    try:
+        entries = sorted(path.iterdir(), key=lambda p: natural_key(p.name))
+    except OSError:
+        return folder
+    for child in entries:
+        if child.name.startswith('.'):
+            continue
+        if child.is_dir():
+            sub = scan_folder(root, child)
+            if sub['videos'] or sub['folders']:
+                folder['folders'].append(sub)
+        elif is_video(child):
+            folder['videos'].append({'name': child.stem, 'path': child.relative_to(root).as_posix()})
+    return folder
+
+
+def handle_video_scan(req, entry):
+    """The videos under a library folder, in natural order, nested by subfolder."""
+    library = req.get('library') or ''
+    root = library_root(library).resolve()
+    tree = scan_folder(root, local_path(library, req.get('path') or ''))
+    entry.update(library=library, path=req.get('path') or '')
+    return {'library': library, 'tree': tree}
+
+
+def handle_video_file(req, entry):
+    """Whether a library's video is there, for a player that couldn't load it
+    (the media route answers without CORS, so the plugin can't read its errors)."""
+    path = local_video_file(req.get('file'))
+    return {'size': path.stat().st_size}
+
+
+MEDIA_PREFIX = '/media/'
+MEDIA_CHUNK = 1 << 20
+
+ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/source': handle_source, '/match': handle_match,
+          '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
+          '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy,
+          '/extract-title': handle_extract_title,
+          '/video-choose': handle_video_choose, '/video-libraries': handle_video_libraries,
+          '/video-library-relink': handle_video_library_relink, '/video-scan': handle_video_scan,
+          '/video-file': handle_video_file}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -517,8 +1174,62 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == '/':
-            return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL})
+            return self.send_json(200, {'ok': True, 'claude': find_claude(), 'model': MODEL,
+                                        'ytDlp': find_tool('yt-dlp'), 'ffmpeg': find_tool('ffmpeg'),
+                                        'transcripts': True, 'whisper': whisper_ready(), 'localVideo': True,
+                                        'extractTitles': True})
+        if self.path.startswith(MEDIA_PREFIX):
+            return self.send_media()
         self.send_json(404, {'ok': False, 'error': 'POST /ocr or /locate'})
+
+    def send_media(self):
+        """GET /media/<library>/<path>: a library's video file, with Range, for
+        a <video> element. No CORS header: playing needs none, and without it
+        no page can read the files through the helper."""
+        try:
+            library, _, rel = urllib.parse.unquote(self.path[len(MEDIA_PREFIX):].split('?')[0]).partition('/')
+            path = local_video_file({'library': library, 'path': rel})
+        except RuntimeError as e:
+            self.send_response(404)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(str(e).encode())
+            return
+        size = path.stat().st_size
+        start, end = 0, size - 1
+        match = re.match(r'bytes=(\d*)-(\d*)', self.headers.get('Range') or '')
+        if match and (match.group(1) or match.group(2)):
+            if match.group(1):
+                start = int(match.group(1))
+                end = min(int(match.group(2)), size - 1) if match.group(2) else size - 1
+            else:  # the last N bytes
+                start = max(0, size - int(match.group(2)))
+            if start > end or start >= size:
+                self.send_response(416)
+                self.send_header('Content-Range', f'bytes */{size}')
+                self.end_headers()
+                return
+            self.send_response(206)
+            self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+        else:
+            self.send_response(200)
+        self.send_header('Content-Type', VIDEO_TYPES[path.suffix.lower()])
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Content-Length', str(end - start + 1))
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        try:
+            with open(path, 'rb') as f:
+                f.seek(start)
+                left = end - start + 1
+                while left > 0:
+                    chunk = f.read(min(MEDIA_CHUNK, left))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    left -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the player seeks by dropping a request and starting another
 
     def do_POST(self):
         route = ROUTES.get(self.path)
@@ -553,9 +1264,15 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    for d in (HOME, PDF_CACHE, CROPS):
+    for d in (HOME, PDF_CACHE, CROPS, VIDEO_FRAMES, VIDEO_TRANSCRIPTS, VIDEO_AUDIO, WHISPER_DIR):
         d.mkdir(parents=True, exist_ok=True)
     prompt()
+    video_prompt()
+    transcript_prompt()
+    # Downloaded audio is only a cache: clear what's past its week.
+    for old in VIDEO_AUDIO.glob('*'):
+        if old.is_file() and time.time() - old.stat().st_mtime > AUDIO_TTL:
+            old.unlink(missing_ok=True)
     print(f'AI OCR helper on http://127.0.0.1:{PORT}  (claude: {find_claude()}, model: {MODEL})', flush=True)
     print(f'Prompt: {PROMPT_FILE}', flush=True)
     ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()

@@ -72,6 +72,12 @@ There are several ways to set priorities in Incremental RemNote, each designed f
 *   **Priority Editor Widget:** An always-on visual control in the editor or queue.
 *   **Batch Tools:** Advanced tables for managing priorities en masse for documents or tags.
 
+### After You Save a Priority { #after-you-save-a-priority }
+
+Both priority popups close as soon as you save; the plugin finishes writing the new value in the background. The [Card Info Bar](Plugin-Widgets-Reference.md#11-card-info-bar), the [queue's priority badge](Plugin-Widgets-Reference.md#12-queue-toolbar-priority) and the Priority Editor widget show the new number almost at once.
+
+For the few seconds the background work takes, the badge **colour** and the Card Info Bar's **"% KB"** figure are an estimate of where the new priority ranks. They then settle on the exact value, which can differ by a fraction of a percent when other items share the same priority.
+
 ---
 
 ### Main Priority Popup
@@ -583,11 +589,13 @@ When both Incremental Rems and Cards groups are present, the wide popup exposes 
 
 `Avg pR` is the average FSRS-predicted retrievability at the moment of every gradeable rep in the period, except the first rep of each card / each post-RESET lifetime (the model has no prior state to predict from). For learning and relearning reps where FSRS leaves *r* undefined, the forgetting curve is computed locally from the previous gradeable rep's stability — so `Avg pR` and `Retention` share the same denominator and `R-dev` is meaningful.
 
-To stay aligned with the [Study Dashboard](Study-Dashboard.md) and Practiced Queues conventions: each rep's `responseTime` is capped at the user's `flashcard_response_time_limit` setting (default 180s), only gradeable scores (Again / Hard / Good / Easy) are counted, and the full history is iterated unless the user opts in to the toggle described below.
+To stay aligned with the [Study Dashboard](Study-Dashboard.md) and Practiced Queues conventions: each rep's `responseTime` is capped at the user's `flashcard_response_time_limit` setting (default 180s), only gradeable scores (Again / Hard / Good / Easy) are counted, and the full history is iterated unless the user opts in to the toggle described below. [Partial repetitions](Reviewing-Items-in-the-Queue.md#partial-list-and-set-cards) of list and set cards count toward Reps, Time and Cost, but not toward Retention, Lapses, Avg Grade, Avg pR or the FSRS columns.
 
 **Time-period filter (default: This Year)** — a row of preset buttons (Today, Yesterday, Last 7d, This Week, Last Week, Last 30d, This Month, Last Month, Last 365d, This Year, Last Year, **All**, **Since…**, **Custom**) lives just above the table. Custom accepts flexible date input (DD/MM/YYYY, YYYY-MM-DD, DDMMYYYY, DDMMYY, plus a calendar picker). The current selection persists in device-local storage and is restored on next open. The same persistence and **Since…** preset were also added to the [Study Dashboard](Study-Dashboard.md) for parity.
 
 **Ignore reps before last RESET toggle** — a checkbox in the status bar that, when enabled, drops every repetition up to and including the last RESET on each card. Useful after importing documents whose foreign repetition history would otherwise skew retention, time, and CPM. The same toggle was added to the [Study Dashboard](Study-Dashboard.md).
+
+**Exclude other schedulers** — a checkbox in the status bar that leaves out the cards RemNote schedules with something other than the Global Default, whose FSRS figures are only the plugin's estimate. They also leave the percentile ranking and the CSV export, and the status bar shows how many were excluded. It only appears after you [import the list of those cards](Reviewing-Items-in-the-Queue.md#cards-on-other-schedulers).
 
 Results are session-cached so reopening the popup in the same session is instant; flipping the toggle or the period re-runs the aggregation (typically a few seconds for tens of thousands of cards) and updates the cache. A "Computed N seconds ago over X cards — Recompute" pill at the top of the tab lets you force a fresh run.
 
@@ -634,6 +642,8 @@ Three grids compare observed retention against predicted retrievability:
 *   **C — Previous grade × the stability that existed before it.** Does pressing Hard or Easy move the next outcome the way FSRS predicts?
 
 Each cell reports `n` reps, observed **Retention**, average **pR**, and **R-dev = Retention − pR** in percentage points — negative (red) means FSRS over-predicted, positive (blue) means you recall better than expected. Grids A and B exclude the ≤ 1 month prior-stability column, where short-term learning reps would otherwise swamp every total. Their predicted-R rows run high to low and stop at **60–65%**; everything below is folded into a single **0–60%** row, because a scheduler aiming at 90% almost never lets a card fall that far and five rows of dashes cost more than they tell you. The fold is a fixed cut, not "hide whatever is empty today", so the row layout stays comparable when you change the period — and if reps ever do land down there, the merged row shows them rather than hiding them.
+
+[Partial repetitions](Reviewing-Items-in-the-Queue.md#partial-list-and-set-cards) of list and set cards are left out, since they don't test the main card. The **Exclude other schedulers** checkbox works as in [Card Analytics](#card-memory-analytics); this tab remembers its own setting.
 
 ##### D — Initial stability (w0–w3) { #initial-stability }
 

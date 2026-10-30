@@ -858,7 +858,7 @@ export async function expandToLastDestination(
 
   while (currentRem && currentRem.parent && iterations < maxIterations) {
     iterations++;
-    const parentId = currentRem.parent;
+    const parentId: RemId = currentRem.parent;
 
     // console.log('[ParentSelector:TreeHelpers]   Checking parent:', parentId);
 
@@ -872,7 +872,7 @@ export async function expandToLastDestination(
     // Not a root candidate, add to path and continue up
     pathFromDestToRoot.push(parentId);
 
-    const parentRem = await plugin.rem.findOne(parentId);
+    const parentRem: PluginRem | undefined = await plugin.rem.findOne(parentId);
     if (!parentRem) {
       // console.log('[ParentSelector:TreeHelpers]   Parent rem not found, stopping');
       break;

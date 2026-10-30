@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { resolveRemTextForBreadcrumb, buildAncestorBreadcrumb } from '../lib/richTextRemRefs';
 import { sanitizeRichTextForSetText, isHintNode } from '../lib/richTextSanitize';
 import { remHasImage } from '../lib/image_scan';
+import { useFloatingWidgetDrag, FloatingPosition } from '../lib/floating_widget_drag';
 
 // Report each step of the alias-id resolution as a toast. Off by default: the
 // picker's console lives in its own widget iframe, so toasts are the only
@@ -153,6 +154,10 @@ function ReferenceFinder() {
   // side (below/above the caret) we open on, so a long list scrolls instead of
   // spilling off-screen. Set during positioning; 320 is the default cap.
   const [listMaxHeight, setListMaxHeight] = useState(320);
+  // Our current host position, kept in step with every placement below so the
+  // header can drag us from wherever we settled. Null until first measured.
+  const positionRef = useRef<FloatingPosition | null>(null);
+  const onHeaderPointerDown = useFloatingWidgetDrag(plugin, floatingWidgetId, positionRef);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Candidate[]>([]);
@@ -284,6 +289,7 @@ function ReferenceFinder() {
         const caretBottom = caret?.bottom ?? (placed.top - GAP);
         const caretTop = caret?.top ?? (caretBottom - 24);
         orig = { top: Math.round(placed.top), left: Math.round(anchorLeft) };
+        positionRef.current = orig;
 
         // Measure the viewport by pinning our right+bottom edges to it, then
         // reading back: rect.right / rect.bottom equal the true viewport size.
@@ -319,7 +325,9 @@ function ReferenceFinder() {
           if (!cancelled) setListMaxHeight(listMax);
         }
 
-        await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { left: Math.round(left), ...vertical });
+        const settled = { left: Math.round(left), ...vertical };
+        await plugin.window.setFloatingWidgetPosition(floatingWidgetId, settled);
+        positionRef.current = settled;
       } catch (e) {
         // Something failed after we may have pinned to the right edge — restore
         // the original placement so we never reveal stuck off to the side.
@@ -953,7 +961,18 @@ function ReferenceFinder() {
         visibility: positioned ? 'visible' : 'hidden',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+      <div
+        onPointerDown={onHeaderPointerDown}
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '8px',
+          cursor: 'move',
+          userSelect: 'none',
+          touchAction: 'none',
+        }}
+      >
         <div style={{ fontWeight: 700, fontSize: '13px' }}>Find Rem — Reference or Open</div>
         <label style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
           <input type="checkbox" checked={conceptsOnly} onChange={(e) => setConceptsOnly(e.target.checked)} />

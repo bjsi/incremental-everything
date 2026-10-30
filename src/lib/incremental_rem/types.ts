@@ -1,11 +1,14 @@
 import { z } from 'zod';
 import { PluginRem } from '@remnote/plugin-sdk';
+import type { LocalVideoFile } from '../local_video_ref';
 
 export type ActionItemType =
   | 'pdf'
   | 'html'
   | 'youtube'
   | 'youtube-highlight'
+  | 'local-video'
+  | 'local-video-highlight'
   | 'video'
   | 'rem'
   | 'pdf-highlight'
@@ -15,7 +18,13 @@ export type ActionItemType =
 
 export type PDFActionItem = { type: 'pdf'; rem: PluginRem };
 export type HTMLActionItem = { type: 'html'; rem: PluginRem };
-export type YoutubeActionItem = { type: 'youtube'; rem: PluginRem; url: string };
+export type YoutubeActionItem = {
+  type: 'youtube';
+  rem: PluginRem;
+  url: string;
+  /** A RemNote video Rem (Upload File › YouTube URL): RemNote's own player can show it too. */
+  nativeAvailable?: boolean;
+};
 export type VideoActionItem = { type: 'video'; rem: PluginRem };
 export type RemActionItem = { type: 'rem'; rem: PluginRem };
 export type PDFHighlightActionItem = { type: 'pdf-highlight'; rem: PluginRem; extract: PluginRem };
@@ -27,6 +36,26 @@ export type YoutubeHighlightActionItem = {
   url: string;
   startTime: number;    // seconds
   endTime: number;      // seconds
+  /** The parent is a RemNote video Rem, so RemNote's player can show the extract too. */
+  nativeAvailable?: boolean;
+};
+
+/** A video file on this computer (the Local Video powerup); `url` is its local-video:// URL. */
+export type LocalVideoActionItem = {
+  type: 'local-video';
+  rem: PluginRem;
+  file: LocalVideoFile;
+  url: string;
+};
+/** An extract of a local video: a VideoExtract whose URL is local-video://. */
+export type LocalVideoHighlightActionItem = {
+  type: 'local-video-highlight';
+  rem: PluginRem;       // parent video Rem (the extract itself when it has no parent)
+  extract: PluginRem;
+  file: LocalVideoFile;
+  url: string;
+  startTime: number;    // seconds
+  endTime: number;      // seconds
 };
 
 export type RemAndType =
@@ -34,6 +63,8 @@ export type RemAndType =
   | HTMLActionItem
   | YoutubeActionItem
   | YoutubeHighlightActionItem
+  | LocalVideoActionItem
+  | LocalVideoHighlightActionItem
   | VideoActionItem
   | RemActionItem
   | PDFHighlightActionItem
@@ -176,8 +207,19 @@ export const IncrementalRep = z.object({
       pdfName: z.string().optional(),
       /** Text of the last bookmark/highlight rem from this session, if any. */
       bookmark: z.string().optional(),
-      /** Playback position in seconds (YouTube / video extracts). */
+      /**
+       * Playback position in seconds, where the video was left (any video
+       * IncRem: RemNote video, local video, YouTube link, Video Extract). For an
+       * extract it is a time in the whole video, between videoStart and videoEnd.
+       */
       videoTime: z.number().optional(),
+      /** A Video Extract's segment, in seconds of the whole video. Omitted for whole videos. */
+      videoStart: z.number().optional(),
+      videoEnd: z.number().optional(),
+      /** The whole video's length in seconds, when known (only RemNote's player records it). */
+      videoDuration: z.number().optional(),
+      /** Playback speed in the plugin's player; omitted at 1×. */
+      videoRate: z.number().optional(),
       /**
        * Name of the source flashcard, when this rep was imported from a card
        * removed by 'Preserve history & remove' (eventType 'importedRep').

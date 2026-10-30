@@ -239,6 +239,7 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
         <span style={{ fontSize: 13, fontWeight: 600 }}>{spec.title}</span>
         {spec.helpPath && <HelpLink path={spec.helpPath} label={spec.title} />}
         {spec.reloadRequired && <Badge tone="neutral">needs reload</Badge>}
+        {spec.perKnowledgeBase && <Badge tone="neutral">this knowledge base</Badge>}
         {modified && <Badge tone="neutral">modified</Badge>}
       </div>
 
@@ -580,10 +581,30 @@ export function IESettingsWidget() {
                       border: '1px solid rgba(245, 158, 11, 0.45)',
                       backgroundColor: 'rgba(245, 158, 11, 0.10)',
                       color: 'var(--rn-clr-content-primary, #0f172a)',
+                      whiteSpace: 'pre-line',
                     }}
                   >
                     <strong>⚠️ </strong>
                     {IE_SETTING_GROUPS[group].warning}
+                    {IE_SETTING_GROUPS[group].warningLink && (
+                      <>
+                        {' '}
+                        <button
+                          onClick={() => openDocs(IE_SETTING_GROUPS[group].warningLink!.path)}
+                          style={{
+                            padding: 0,
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--rn-clr-content-accent, #2563eb)',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            font: 'inherit',
+                          }}
+                        >
+                          {IE_SETTING_GROUPS[group].warningLink!.label}
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
                 {ids.filter(matches).map((id) => (

@@ -819,6 +819,8 @@ function BatchPriority() {
       'html': 'HTML',
       'youtube': 'YouTube',
       'youtube-highlight': 'Youtube Extract',
+      'local-video': 'Local Video',
+      'local-video-highlight': 'Local Video Extract',
       'video': 'Video',
       'rem': 'Extract',
       'pdf-highlight': 'PDF Highlight',

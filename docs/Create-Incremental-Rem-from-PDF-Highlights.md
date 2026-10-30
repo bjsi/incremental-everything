@@ -152,7 +152,7 @@ It **moves** the data rather than recreating it:
 
 The source Rem simply stops being an Incremental Rem — its **text, children, flashcards and references are untouched** — and the parent takes its place in your queue. A **🔀 Transferred from …** marker closes the moved history, naming the Rem the reviews were actually done on, so the record stays honest about where the study happened. It is a marker, not a review: it counts for neither your statistics nor the scheduler.
 
-The command works in the **editor** (on the focused Rem) and in the **queue** (on the item under review, which is advanced past afterwards). A confirmation dialog names both Rems and counts what will move — history entries, reviews and time, the priority, the reading state — before anything happens.
+The command works in the **editor** (on the focused Rem) and in the **queue** (on the item under review, which is advanced past afterwards). A confirmation dialog names both Rems and counts what will move — history entries, reviews and time, the priority, the reading state — before anything happens. It also warns when the parent will use a **different scheduler**: a scheduler set by the Rem's type (video, PDF, plain Rem…) stays with the type and does not move with the data, so change it in the [Reschedule popup](IncRem-Scheduler.md) (`Ctrl+J`) on the parent afterwards if needed.
 
 **Two cases it refuses, and what to do instead:**
 
@@ -160,3 +160,8 @@ The command works in the **editor** (on the focused Rem) and in the **queue** (o
 - **The Rem has no parent** (it is top-level), so there is nowhere to transfer to.
 
 Afterwards, [flashcard priorities](Priorities-for-Flashcards.md) in the subtree are re-derived in the background: cards that were inheriting from the extract now inherit from the heading, which is the new nearest Incremental ancestor.
+
+### Finishing an interrupted transfer { #finish-interrupted-transfer }
+
+If a transfer was interrupted after the parent received the data but before the source let go of it, both Rems show the same history. Run `ttp` again on the **source**: the plugin recognises its own unfinished transfer and offers to **finish** it, removing the duplicate from the source only. It checks first that every entry on the source is already on the parent, and refuses if the source has a review the parent lacks.
+

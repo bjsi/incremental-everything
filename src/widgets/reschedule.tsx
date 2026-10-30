@@ -6,11 +6,10 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef } from 'react';
-import { getIncrementalRemFromRem, requestQueueDashboardRefocus, setIncRemPriority } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
-import { powerupCode, prioritySlotCode, incremReviewStartTimeKey } from '../lib/consts';
-import { IncrementalRep, IncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
+import { captureQueueReviewSeconds, enqueueReviewJob, newReviewJobId } from '../lib/incremental_rem/review_jobs';
+import { getNextSpacingDateForRem } from '../lib/scheduler';
+import { incremReviewStartTimeKey } from '../lib/consts';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
@@ -24,14 +23,13 @@ import {
   pickerValueToChoice,
   schedulerHint,
 } from '../components';
-import { applySchedulerChoice } from '../lib/scheduler_choice';
 import {
   previewMultiplierIntervals,
   ResolvedScheduler,
   SchedulerChoice,
 } from '../lib/scheduler_core';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
-import { stampNoteAndContext, MAX_NOTE_LENGTH } from '../lib/history_notes';
+import { MAX_NOTE_LENGTH } from '../lib/history_notes';
 
 async function handleRescheduleAndPriorityUpdate(
   plugin: RNPlugin,
@@ -43,96 +41,35 @@ async function handleRescheduleAndPriorityUpdate(
   // Only passed when the user changed the scheduler in the popup.
   schedulerChoice?: SchedulerChoice
 ) {
-  // Suppress GlobalRemChanged
-  await plugin.storage.setSession('plugin_operation_active', true);
+  // The writes (priority, scheduler, history entry, schedule, cache, cascade)
+  // run in the tracker (lib/incremental_rem/review_jobs.ts); the popup only
+  // captures what it alone knows at this moment and gets out of the way.
+  const reviewTimeSeconds = context === 'queue' ? await captureQueueReviewSeconds(plugin) : null;
+  await enqueueReviewJob(plugin, {
+    id: newReviewJobId(remId),
+    kind: 'reschedule',
+    remId,
+    intervalDays,
+    newPriority,
+    context,
+    reviewTimeSeconds,
+    note,
+    schedulerChoice,
+    confirmedAt: Date.now(),
+  });
 
-  let triggeredCascade = false;
-  try {
-    const rem = await plugin.rem.findOne(remId);
-    if (!rem) return;
-
-    const incRem = await getIncrementalRemFromRem(plugin, rem);
-    if (!incRem) return;
-
-    // recordHistory: false — the reschedule entry appended below already carries
-    // this priority, and it is written from a snapshot taken before this call.
-    await setIncRemPriority(plugin, rem, newPriority, { recordHistory: false });
-
-    if (schedulerChoice) {
-      await applySchedulerChoice(plugin, rem, schedulerChoice);
-    }
-
-    const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
-
-    // Calculate early/late status
-    const scheduledDate = incRem.nextRepDate;
-    const actualDate = Date.now();
-    const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-    const wasEarly = daysDifference < 0;
-    const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-
-    // Calculate review time only for queue context (editor reschedule doesn't imply actual review)
-    let reviewTimeSeconds: number | undefined;
-    if (context === 'queue') {
-      const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-      reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
-    }
-
-    // Determine event type based on context
-    const eventType = context === 'queue' ? 'rescheduledInQueue' : 'rescheduledInEditor';
-
-    const rescheduleEntry: IncrementalRep = {
-      date: actualDate,
-      scheduled: scheduledDate,
-      interval: intervalDays,
-      wasEarly: wasEarly,
-      daysEarlyOrLate: daysEarlyOrLate,
-      reviewTimeSeconds: reviewTimeSeconds,
-      priority: newPriority, // Record the NEW priority set during reschedule
-      eventType: eventType as 'rescheduledInQueue' | 'rescheduledInEditor',
-    };
-
-    // Attach the user's reason (if typed) + a reading-state snapshot to the entry.
-    await stampNoteAndContext(plugin, rem, rescheduleEntry, note);
-
-    const newHistory: IncrementalRep[] = [...(incRem.history || []), rescheduleEntry];
-
-    await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
-
-    // Manually construct the patched object to bypass the SDK's local read-cache delay.
-    // Re-reading via getIncrementalRemFromRem() here may return stale data before the
-    // remote DB confirms the write, causing the queue injector to see the old nextRepDate.
-    // Priority must be included explicitly since setPowerupProperty() updated it above.
-    const updatedIncRem: IncrementalRem = {
-      ...incRem,
-      nextRepDate: newNextRepDate,
-      history: newHistory,
-      priority: newPriority,
-    };
-    await updateIncrementalRemCache(plugin, updatedIncRem);
-
-    // Clear the start time (only relevant for queue context)
-    if (context === 'queue') {
-      await plugin.storage.setSession(incremReviewStartTimeKey, null);
-      // Flag the Practiced Queues refocus BEFORE advancing — same mechanism as
-      // Next/Dismiss. removeCurrentCardFromQueue tears down this popup sandbox,
-      // so the actual refocus is performed by the QueueLoadCard listener in
-      // register/events.ts once the next card loads.
-      await requestQueueDashboardRefocus(plugin, 'reschedule');
-      await plugin.queue.removeCurrentCardFromQueue();
-    }
-
-    plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
-    triggeredCascade = true;
-
-    await plugin.widget.closePopup();
-  } finally {
-    // Only clear the flag if no cascade was triggered.
-    // If cascade IS pending, leave the flag up — the cascade tracker will clear it.
-    if (!triggeredCascade) {
-      await plugin.storage.setSession('plugin_operation_active', false);
-    }
+  if (context === 'queue') {
+    // The turn is over: nothing may inherit this clock.
+    await plugin.storage.setSession(incremReviewStartTimeKey, null);
+    // Flag the Practiced Queues refocus BEFORE advancing — same mechanism as
+    // Next/Dismiss. removeCurrentCardFromQueue tears down this popup sandbox,
+    // so the actual refocus is performed by the QueueLoadCard listener in
+    // register/events.ts once the next card loads.
+    await requestQueueDashboardRefocus(plugin, 'reschedule');
+    await plugin.queue.removeCurrentCardFromQueue();
   }
+
+  await plugin.widget.closePopup();
 }
 
 

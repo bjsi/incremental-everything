@@ -35,6 +35,7 @@ import {
 } from "../lib/authoritative_aggregates";
 import { computeMonthlyShieldCatchUp, MonthlyShieldCatchUp } from "../lib/shield_history";
 import { CardForgettingCurve } from "../components/CardForgettingCurve";
+import { CardSchedulerLabel } from "../components/OtherSchedulers";
 import { practicedQueuesVisibleKey, showQueueDashboardCurveId } from "../lib/consts";
 import {
     CALIBRATION_PERIOD_LABELS,
@@ -808,6 +809,11 @@ function PracticedQueues() {
                         <CardForgettingCurve
                             cardId={showPreviousCurve ? activeSession.prevCardId : activeSession.currentCardId}
                             title={`${showPreviousCurve ? 'Previous' : 'Current'} Card — Forgetting Curve`}
+                            subtitle={
+                                <CardSchedulerLabel
+                                    cardId={showPreviousCurve ? activeSession.prevCardId : activeSession.currentCardId}
+                                />
+                            }
                             height={220}
                             headerRight={
                                 canShowPreviousCurve && (

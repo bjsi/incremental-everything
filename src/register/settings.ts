@@ -153,6 +153,24 @@ const COLLAPSE_TOP_BAR_CSS = `
   }
 `;
 
+const PREVIEW_BREADCRUMBS_CSS = `
+  /* Rem Preview popup breadcrumbs. RemNote cuts each crumb's text in JS to
+     floor((W*0.85 - 24 - 24n) / 9 / n) characters, W being the measured width of
+     the crumb row. On desktop the row's wrapper is a bare min-w-[300px] flex item,
+     so W stays at 300 and every crumb shows ~5 characters ("AN1 P ...").
+     1. Let the wrapper take the header's free width; W is re-measured on resize.
+     2. The formula assumes 9px per character (real text is ~7px), so make the
+        measured row wider than the visible wrapper and clip the overflow. */
+  .rn-popup .flex.justify-between:has([data-test="Rem Preview Popup Open Rem Button"]) > [class~="min-w-[300px]"] {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .rn-popup .flex.justify-between:has([data-test="Rem Preview Popup Open Rem Button"]) > [class~="min-w-[300px]"] > div {
+    width: 130% !important;
+  }
+`;
+
 /**
  * Renders a schema entry's prose for RemNote's settings panel, which takes a
  * single plain-text string: warning first, then the description, then the docs
@@ -264,6 +282,9 @@ export async function registerPluginSettings(
   // Unconditional: the band tags are an implementation detail, so their tag-bar
   // chips stay hidden even when the badges themselves are switched off.
   await plugin.app.registerCSS('priority-band-tag-hide', PRIORITY_BAND_TAG_HIDE_CSS);
+
+  // Unconditional: a fix to RemNote's own preview popup, not a plugin feature.
+  await plugin.app.registerCSS('preview-breadcrumbs', PREVIEW_BREADCRUMBS_CSS);
 
   // The table-cell badge stylesheet itself (gated on showPriorityBandsInTables)
   // is registered by registerTableBandBadgeCSS from index.tsx, which re-runs

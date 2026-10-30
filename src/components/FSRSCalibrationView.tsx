@@ -11,6 +11,8 @@
 
 import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
+import { ExcludeOtherSchedulersToggle, useSchedulerManifest } from './OtherSchedulers';
+import { SchedulerCardsManifest, getOtherSchedulerCardIds } from '../lib/scheduler_cards';
 import {
   CellStats,
   FSRSCalibrationBreakdown,
@@ -283,12 +285,18 @@ function StatusBar({
   breakdown,
   ignorePreReset,
   onToggleIgnorePreReset,
+  schedulerManifest,
+  excludeOtherSchedulers,
+  onToggleExcludeOtherSchedulers,
   onRecompute,
   disabled,
 }: {
   breakdown: FSRSCalibrationBreakdown;
   ignorePreReset: boolean;
   onToggleIgnorePreReset: (next: boolean) => void;
+  schedulerManifest: SchedulerCardsManifest | null;
+  excludeOtherSchedulers: boolean;
+  onToggleExcludeOtherSchedulers: (next: boolean) => void;
   onRecompute: () => void;
   disabled: boolean;
 }) {
@@ -309,6 +317,11 @@ function StatusBar({
     >
       <div style={{ color: 'var(--rn-clr-content-secondary)' }}>
         Replayed FSRS over <strong>{breakdown.totalCards.toLocaleString()}</strong> cards.
+        {breakdown.excludedOtherSchedulerCards > 0 && (
+          <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '6px' }}>
+            · {breakdown.excludedOtherSchedulerCards.toLocaleString()} on other schedulers excluded
+          </span>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <label
@@ -331,6 +344,12 @@ function StatusBar({
           />
           Ignore reps before last RESET
         </label>
+        <ExcludeOtherSchedulersToggle
+          manifest={schedulerManifest}
+          checked={excludeOtherSchedulers}
+          disabled={disabled}
+          onChange={onToggleExcludeOtherSchedulers}
+        />
         <button
           type="button"
           onClick={onRecompute}
@@ -403,6 +422,10 @@ export function FSRSCalibrationView() {
   const [period, setPeriod] = React.useState<Period>('thisYear');
   const [customStart, setCustomStart] = React.useState<string>('');
   const [customEnd, setCustomEnd] = React.useState<string>('');
+  const schedulerManifest = useSchedulerManifest();
+  const [excludeOtherSchedulers, setExcludeOtherSchedulers] = React.useState<boolean>(false);
+  // Read by compute, whose signature every period and RESET handler already shares.
+  const excludeOtherSchedulersRef = React.useRef(false);
 
   const compute = React.useCallback(
     async (flag: boolean, p: Period, cs: string, ce: string) => {
@@ -419,6 +442,7 @@ export function FSRSCalibrationView() {
           flag,
           { id: p, startMs, endMs, customStart: cs, customEnd: ce },
           (done, total) => setProgress({ done, total }),
+          excludeOtherSchedulersRef.current ? await getOtherSchedulerCardIds(plugin as any) : null,
         );
         plugin.storage
           .setLocal(fsrsCalibrationLastPeriodKey, {
@@ -426,6 +450,7 @@ export function FSRSCalibrationView() {
             customStart: cs,
             customEnd: ce,
             ignorePreReset: flag,
+            excludeOtherSchedulers: excludeOtherSchedulersRef.current,
           })
           .catch(() => {});
         setData(breakdown);
@@ -447,6 +472,7 @@ export function FSRSCalibrationView() {
         customStart?: string;
         customEnd?: string;
         ignorePreReset?: boolean;
+        excludeOtherSchedulers?: boolean;
       } | null>(fsrsCalibrationLastPeriodKey)
       .then((saved) => {
         if (cancelled) return;
@@ -458,6 +484,8 @@ export function FSRSCalibrationView() {
         setCustomStart(cs);
         setCustomEnd(ce);
         setIgnorePreReset(flag);
+        excludeOtherSchedulersRef.current = saved?.excludeOtherSchedulers ?? false;
+        setExcludeOtherSchedulers(excludeOtherSchedulersRef.current);
         const hasUsableStart = !!cs;
         if ((p === 'custom' || p === 'since') && !hasUsableStart) {
           setState('idle');
@@ -476,6 +504,11 @@ export function FSRSCalibrationView() {
   const handleToggleIgnorePreReset = (next: boolean) => {
     setIgnorePreReset(next);
     compute(next, period, customStart, customEnd);
+  };
+  const handleToggleExcludeOtherSchedulers = (next: boolean) => {
+    excludeOtherSchedulersRef.current = next;
+    setExcludeOtherSchedulers(next);
+    compute(ignorePreReset, period, customStart, customEnd);
   };
   const handlePeriodChange = (p: Period) => {
     setPeriod(p);
@@ -591,6 +624,9 @@ export function FSRSCalibrationView() {
             breakdown={data}
             ignorePreReset={ignorePreReset}
             onToggleIgnorePreReset={handleToggleIgnorePreReset}
+            schedulerManifest={schedulerManifest}
+            excludeOtherSchedulers={excludeOtherSchedulers}
+            onToggleExcludeOtherSchedulers={handleToggleExcludeOtherSchedulers}
             onRecompute={() => compute(ignorePreReset, period, customStart, customEnd)}
             disabled={state !== 'ready'}
           />

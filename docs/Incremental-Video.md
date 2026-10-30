@@ -19,166 +19,225 @@ In [SuperMemo's terminology](https://help.supermemo.org/wiki/Incremental_video),
 
 ---
 
-## How It Works
+## What you can watch { #what-you-can-watch }
 
-### Two Ways to Watch: Native Mode vs. Extract Mode
+| Video | How it gets into RemNote | Players |
+|---|---|---|
+| **A RemNote video** | **Create › Upload File › Paste YouTube URL**, RemNote's own way of adding a YouTube video | The plugin's player **and** RemNote's player, with a button to switch |
+| **A video saved with the Clipper** | The [RemNote Clipper](https://chromewebstore.google.com/detail/remnote-clipper/lpnnhhkdbmobjiheokoonjlmaffljcng) browser extension, which saves the YouTube link | The plugin's player |
+| **A video file on your computer** | [Import Local Videos](#local-videos) or [Link Local Video](#link-local-video) (desktop, with the [helper](#setup)) | The plugin's player for local files |
 
-There are two ways a YouTube video Incremental Rem can be displayed in the queue, each with different capabilities:
-
-#### Native Mode (Default)
-
-When you paste a YouTube URL directly into RemNote and make the Rem incremental, the plugin uses RemNote's **built-in video player** (NativeVideoViewer). This happens because RemNote processes the YouTube URL internally in a way that prevents the plugin from retrieving it.
-
-**Benefits:**
-
-- All of RemNote's native YouTube features: **highlight moments**, **AI Summary**, **AI Tutor**
-- Familiar RemNote experience
-
-**Limitations:**
-
-- ❌ **No Video Extracts** — the Extract button is not available
-- ❌ **No session-level position tracking** — RemNote saves your last playback position, but if you open the video outside an Incremental Session (e.g., in the editor), its position resets. Your next Incremental Session will start from that point, not from where the last session left off.
-- ❌ **No automatic transcription**
-
-![Youtube Video in the Native Mode](assets/YT-native-mode.png)
-
-#### Extract Mode (via RemNote Clipper)
-
-To enable **Video Extracts and automatic transcription**, import the video using the [RemNote Clipper browser extension](https://chromewebstore.google.com/detail/remnote-clipper/lpnnhhkdbmobjiheokoonjlmaffljcng) for Chrome. The Clipper stores the YouTube URL as a normal link that the plugin can capture and use with its own custom video player.
-
-![Making a Video Incremental for Extract Mode](assets/YT-make-incremental-Extract-Mode.png)
-
-**Benefits:**
-
-- ✅ **Video Extracts** (1) — mark specific passages with start/end times
-- ✅ **Session-level position tracking** — resume where you left off in each Incremental Session
-- ✅ **Automatic transcription** (macOS, with local proxy)
-- ✅ Adjustable playback speed (4)
-- ✅ Side-by-side notes panel (2)(3)
-
-![Youtube Video in Extract Mode](assets/YT-extract-mode.png)
-
-
-**Limitations:**
-
-- Does not have RemNote's built-in YouTube features (highlight moments, AI Summary, AI Tutor)
-
-> **Which should I use?** If you plan to create extracts from the video (recommended for lectures and long content), use the **RemNote Clipper**. If you just want to watch and take notes with RemNote's AI tools, paste the URL directly.
-
-### The Video Component (Extract Mode)
-
-When reviewing a video imported via the Clipper, the plugin displays its custom embedded video player with:
-
-- **Playback controls**: Play/pause, seek, and playback speed adjustment
-- **Position tracking**: Your playback position is saved automatically between Incremental Sessions, so you resume where you left off
-- **A notes panel** (📝 button): Toggle the editor side-by-side with the video to take notes while watching
-- **Extract controls**: Create Video Extracts from specific passages (see below)
-
-### Creating Video Extracts
-
-Video Extracts let you mark a specific segment of a video as a new Incremental Rem — with its own schedule, priority, and child notes.
-
-#### Step-by-step:
-
-1. **Start watching** the video in your queue
-2. Click **✂️ Extract** at the point where the important passage begins
-   - The current timestamp is recorded as the **start time**
-   - A green indicator shows `▶ Start: MM:SS` and tracks the current position
-3. **Continue watching** until the passage ends
-4. Click **Set End** to finalize the extract
-   - The video **pauses automatically** so you can set a priority without distraction
-   - The Priority popup appears for you to assign a priority
-5. The extract is created as a child Rem with the label `Video Extract [MM:SS – MM:SS]`
-
-The extract becomes a new Incremental Rem in your queue. When you review it later, it opens the video **directly at the start time** of the passage — no need to search through the video again.
-
-> **Tip:** You can create multiple extracts from the same video. Each one keeps its own start/end time, priority, and schedule. This is perfect for lectures where only certain sections are relevant.
-
-[![Making Video Extracts](https://img.youtube.com/vi/o5I-UL9SG0E/maxresdefault.jpg)](https://youtu.be/o5I-UL9SG0E)
-
+Make the Rem Incremental as any other (`Alt+X`), and it comes up in the queue with its player.
 
 ---
 
-## Automatic Transcription (macOS)
+## Two players { #two-players }
 
-> [!NOTE]
-> Currently down after YouTube recent anti-bot measures
+### The plugin's player { #plugin-player }
 
-When creating a Video Extract, the plugin can automatically fetch the YouTube transcript for that segment and save it as a child Rem under the extract. This makes the spoken content searchable and reviewable as text, and makes it much easier to process the content (create flashcards, summarize, etc).
+Built for incremental watching:
 
-### How It Works
+- **Resumes where you stopped.** Each video remembers its position across sessions; the **⏮ Resumed at 12:34** chip takes you back there if you wander off.
+- **Controls**: −30 s, play/pause, +30 s, and speed in steps of 0.25× (click the speed for 1×). Each video remembers its speed.
+- **✂️ [Video Extracts](#video-extracts)** with an exact start and end, which **pause by themselves at their end**.
+- **📸 [Screenshots](#screenshots)** and **📜 [transcripts](#transcripts)**.
+- **Notes beside the video** (📝 shows or hides them). Drag the divider to resize, or focus it and use `←` `→`; the split is remembered on each device. For a RemNote video, the notes are the Rem's children under its name.
 
-Transcript fetching uses a small local proxy server that runs on your machine. This is necessary because YouTube's transcript API requires requests from a residential IP address — cloud-hosted proxies (like Cloudflare Workers) are blocked by YouTube.
+![A RemNote video in the queue, in the plugin's player: the top bar with From the start, the RemNote player switch, −30s, pause, +30s, the time, speed, screenshots, transcript and Extract; the notes on the left and the video on the right](assets/YT-plugin-player.png){ width="900" }
 
-The proxy:
+To show a YouTube video, the plugin keeps one document in your knowledge base, **▶️ Incremental RemNote video player**. Leave it there; if it is deleted, it is made again the next time a video plays.
 
-- Uses **zero external dependencies** — runs with Node.js built-in modules only
-- Listens on `http://localhost:3456`
-- Fetches YouTube caption data through YouTube's internal API
-- Parses captions and returns clean text segments
-- Stays running in the background, using virtually no resources when idle
+### RemNote's player { #remnote-player }
 
-### Setup Instructions
+RemNote's video page, with its **transcript, Highlight Moment, AI Tutor and Summary**. It is offered for RemNote videos only. The plugin can follow where it is playing, about every 3 seconds, but can't move or pause it. In its top bar the plugin adds:
 
-#### Prerequisites
-- **Node.js** installed (check with `node --version` in Terminal)
+- **✂️ Extract**, which takes its times from RemNote's player, with −5 / +5 s nudges because the position lags by up to 3 seconds;
+- **📜** for the transcript.
 
-#### Option A: Auto-start on Login (Recommended)
+The plugin's position is offered to RemNote's player as its **"Resume watching at…"** button, and whatever RemNote's player plays is copied back. So both players resume from the same place. (RemNote shows that button once it has played the video at least once.)
 
-This installs the proxy as a macOS LaunchAgent — it starts automatically when you log in and restarts if it crashes.
+### Switching { #switching }
 
-1. In Terminal, copy the LaunchAgent plist:
-   ```bash
-   cp ~/incremental-everything/com.incrementaleverything.yt-transcript-proxy.plist ~/Library/LaunchAgents/
-   ```
+On a RemNote video, each player has a button in its top bar to switch to the other: **🎬 RemNote player** / **▶️ Plugin player**. The switch applies to that card only. Which one opens first is the setting **Default Player for RemNote Videos** (default: the plugin's player). An extract always opens in the plugin's player first, because only it stops at the extract's end.
 
-2. Load the agent (replace `501` with your user ID — run `id -u` to check):
-   ```bash
-   launchctl bootstrap gui/501 ~/Library/LaunchAgents/com.incrementaleverything.yt-transcript-proxy.plist
-   ```
+---
 
-3. Verify it's running:
-   ```bash
-   curl http://localhost:3456/
-   ```
-   You should see: `{"status":"ok","message":"YouTube Transcript Proxy running"}`
+## Video Extracts { #video-extracts }
 
-**To stop the proxy:**
-```bash
-launchctl bootout gui/501/com.incrementaleverything.yt-transcript-proxy
-```
+A Video Extract is a passage of a video, with its own priority, schedule and notes. It is an Incremental Rem placed under the video, named after its range: `Video Extract [11:40 – 11:57]`.
 
-#### Option B: Manual Start
+### Making an extract { #making-an-extract }
 
-Run the proxy manually whenever you want transcripts:
+**In the plugin's player:**
 
-```bash
-node ~/incremental-everything/yt-local-proxy.js
-```
+1. Click **✂️ Extract** where the passage begins: `▶ Start: 11:40 → now: 11:52` follows the video.
+2. Click **Set End** where it ends. The video pauses, and the extract is created.
 
-You'll see:
-```
-🎬 YouTube Transcript Proxy running on http://localhost:3456
-```
+**In RemNote's player:**
 
-Keep this terminal window open while using the plugin. Press `Ctrl+C` to stop.
+1. Click **✂️ Extract**: the start is where RemNote's player is now. Adjust it with **−5 / +5**.
+2. Click **■ Set End** where it ends, adjust it the same way, then **✓ Create**.
 
-### What You Get
+Either way, the extract gets its **transcript** under it when the [helper](#setup) can fetch it, then a **title** from that transcript ([below](#extract-titles)), and the priority popup opens.
 
-When you create a Video Extract with the proxy running, the transcript for that time range is automatically fetched and saved as child Rems under the extract. The text is consolidated into readable blocks (~300 characters each) rather than individual word-level segments.
+[![Making Video Extracts](https://img.youtube.com/vi/o5I-UL9SG0E/maxresdefault.jpg)](https://youtu.be/o5I-UL9SG0E)
 
-If the proxy is not running or the video has no captions available, the extract is still created normally — transcription is a best-effort enhancement that fails silently.
+*Recorded with an earlier version of the player.*
 
-### Notes
+### Reviewing an extract { #reviewing-an-extract }
 
-- **Language**: The proxy attempts to fetch English captions by default. Auto-generated captions (ASR) are supported.
-- **Availability**: Not all YouTube videos have captions. Videos with captions disabled or private videos will not return transcripts.
-- **Proxy logs**: If something isn't working, check the Terminal running the proxy for `[Proxy]` log messages, or check `/tmp/yt-transcript-proxy.log` if using the LaunchAgent.
+- In the plugin's player, the extract plays its range and **pauses at its end** (*✓ end of extract reached*). **🔄 Replay** starts it over.
+- In RemNote's player, the bar shows *ends at 11:57 · now 11:50*, then *✓ end of extract reached*: RemNote's player can't be stopped there.
+- **An extract resumes where its last review stopped**, with a **⏮ Resumed at** chip. Once a review gets to the end (or to its last 5 seconds), the next one starts from the beginning again. Going **In Editor** from the queue continues from where you are.
+
+### Extracts of extracts { #extracts-of-extracts }
+
+An extract of **1.5 minutes or more** shows **✂️ Extract** itself, in every player, so a long passage can be cut down further. The new extract goes under the one it was cut from. Its marks aren't held inside the parent's range.
+
+### Titles from the transcript { #extract-titles }
+
+Once an extract has its transcript, Claude reads it and adds a short title after the range, in the language of the video:
+
+`Video Extract [11:40 – 11:57] — Questão 28 polêmica do RIPEAM: erro entre Master Heads e Mast Heads`
+
+So a list of extracts of one video says what each is about. The title arrives a few seconds after the transcript, behind the priority popup. An extract you have renamed is never retitled, even if you rename it while Claude is answering. It needs the [helper](#setup) with Claude Code; turn it off with **Title Video Extracts with Claude**.
+
+---
+
+## Reviewing in the Editor { #review-in-editor }
+
+**In Editor** (`Ctrl+Shift+J`) works for videos too, with the [Editor Review Timer](Reviewing-Items-in-the-Editor.md):
+
+- **A RemNote video** opens on RemNote's video page, offered your position to resume at. Its timer controls come in a **floating bar** at the bottom right, since the timer bar can't show on that page: the time, where the player is (🎬), **✂️ Extract**, **📜**, **⏸**, **Next**, **End & Back**, **End** and **Dismiss**.
+- **An extract of a RemNote video** opens with the video's page beside it, offered the extract's own resume point. The floating bar shows the extract's range and when its end is reached. An extract cut from another extract opens as its own page, and the video's page opens in a pane to its right.
+- **A local video, or an extract of one,** opens as its own page with the [plugin's player](#plugin-player) under its title; the document is the notes. It starts playing when you're reviewing it, and stays paused when you just open the Rem.
+- A video saved with the Clipper opens as RemNote shows its link; the plugin's player for it is in the queue.
+
+---
+
+## Where you stopped, in the history { #history }
+
+Each review records where the video was left in the [Repetition History](Repetition-History-and-Statistics.md#notes-and-where-you-stopped) (`Ctrl+Shift+H`), on the line under the review's row, as PDF reviews record the page:
+
+| Line | Meaning |
+|------|---------|
+| `▶ 1:42 of 1:26–2:04` | An extract, stopped at 1:42 within its range |
+| `▶ 2:01 of 1:26–2:04 · ✓ end` | An extract watched to its end (or its last 5 seconds) |
+| `▶ 12:34 / 45:00 (28%)` | A whole video, with its length |
+| `▶ 12:34 · 1.5×` | A whole video whose length isn't known, played at 1.5× |
+
+- The time is the one the next review resumes from, so the rows show how far each session got.
+- The **length** is known only for RemNote videos that RemNote's player has opened. YouTube links and local videos show the time alone.
+- The **speed** is the plugin's player's, shown when it isn't 1×. A session in RemNote's player at another speed still shows the plugin's.
+- In the queue, the position is saved at once when you pause and every 5 seconds while playing. Pressing **Next** while it plays can record a time a few seconds behind; pause first for the exact one.
+
+---
+
+## Screenshots { #screenshots }
+
+In the plugin's player, **📸** saves the current frame under the Incremental Rem, in a Rem named after the time (`📸 12:34`). **📸✨** also transcribes the frame — slide text, formulas, diagrams' labels — into an outline under it, with Claude. Screenshots are taken by the [helper](#setup) from the video itself, at the exact time.
+
+---
+
+## Transcripts { #transcripts }
+
+**📜** in any player, the floating bar, or the commands **Add Video Transcript** (`avt`) and **Add Video Transcript from Audio** (`avta`) writes the transcript of what you're watching:
+
+- **A whole video**: a **📜 Transcript** Rem with blocks of about 600 characters, each starting with its time.
+- **An extract**: blocks of about 300 characters of its range, under the extract. New extracts get theirs automatically.
+
+The commands work on the queue item, the focused Rem, the Rem under review or an open pane's Rem, and from a note inside a video or extract.
+
+Where the text comes from:
+
+1. **The uploader's captions** in the video's own language.
+2. Else **YouTube's automatic captions** in that language, never a translation. Claude tidies them — punctuation, sentences, words the recognition clearly got wrong, key terms in **bold** — with **Tidy Automatic Captions with Claude**. The raw text is written first and replaced as it is tidied.
+3. Else, or with `avta`, **the audio, transcribed by Whisper on your computer**. A local video is always transcribed this way. On an Apple M4 Pro, a minute of audio takes about 4 seconds, and a 43-minute lecture about 2 minutes, download included.
+
+---
+
+## Local videos { #local-videos }
+
+Video files on your computer or an external disk — a course you downloaded, recorded classes — play in the plugin's player with everything above: resume, speed, extracts, screenshots and transcripts from the audio. **Desktop app on macOS, with the [helper](#setup).**
+
+### Importing a folder { #import-local-videos }
+
+Run **Import Local Videos** (`ilv`) and pick a folder in the dialog. The popup shows how many videos it holds, its subfolders and how many are already in RemNote, and asks:
+
+- **Where**: inside the focused Rem, or as a new top-level document.
+- **Make them Incremental Rems**, with which **priority**.
+- **When they're due**: all today, or the first today and **one more every N days**, in file order — a course becomes a lesson a day.
+
+It creates a document named after the folder, a Rem per subfolder and one per video, in natural order (*Aula 2* before *Aula 10*). Importing the folder again adds only the videos that are new.
+
+### Linking one file { #link-local-video }
+
+**Link Local Video** (`llv`) picks one file for the focused Rem, names the Rem after the file if it is empty, and makes it Incremental.
+
+### Libraries, disks and formats { #libraries }
+
+- Each folder you pick becomes a **library**, and each video remembers its library and its path inside it. Videos can live in several places.
+- **If a disk isn't connected**, the player says so. If the folder has moved, click **📁 show where it is now** once, and every video in that library plays again.
+- If the helper isn't running, or the file is gone, the player says that too.
+- Formats: **MP4, M4V, MOV and WebM** in the codecs RemNote's browser engine plays — H.264 and HEVC both work on macOS.
+- The helper only ever reads video files inside your libraries, and web pages can't read them through it.
+
+---
+
+## Setting up the helper for video { #setup }
+
+Screenshots, transcripts, titles and local videos run through the **local helper** that also does [AI Transcription of PDF Highlights](AI-Transcription-of-PDF-Highlights.md). The players themselves, extracts and resuming need nothing.
+
+1. **Set up the helper** as described in [Setup](AI-Transcription-of-PDF-Highlights.md#setup), with [start at login](AI-Transcription-of-PDF-Highlights.md#run-at-login) on macOS. Claude Code is needed for 📸✨, tidying and titles.
+2. **For YouTube screenshots and transcripts**, and for local videos:
+
+    ```bash
+    brew install yt-dlp ffmpeg
+    ```
+
+3. **For transcripts from the audio** (videos without captions, `avta`, local videos):
+
+    ```bash
+    brew install whisper-cpp
+    mkdir -p ~/.incremental-remnote/ai-ocr/whisper
+    cd ~/.incremental-remnote/ai-ocr/whisper
+    curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin
+    curl -LO https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin
+    ```
+
+    The first file is the speech model (574 MB). The second (under 1 MB) skips silence and music, where Whisper would otherwise invent words, and halves the time.
+
+4. **Restart the helper** (`launchctl kickstart -k gui/$(id -u)/com.incrementalremnote.ai-ocr-helper`, or stop and start it in its terminal).
+
+Open <http://127.0.0.1:3457/> to check: `ytDlp`, `ffmpeg` and `whisper` say where each was found, and `localVideo` is `true`.
+
+!!! note "If you set up the old transcript proxy"
+    Earlier versions fetched transcripts through a separate proxy (`yt-local-proxy.js`, port 3456), which YouTube now refuses. The helper replaces it. Remove the proxy's login item:
+
+    ```bash
+    launchctl bootout gui/$(id -u)/com.incrementaleverything.yt-transcript-proxy
+    rm ~/Library/LaunchAgents/com.incrementaleverything.yt-transcript-proxy.plist
+    ```
+
+The instructions Claude follows are files you can edit, next to the PDF one: `transcript-prompt.md` (tidying captions) and `extract-title-prompt.md` (titles), in `~/.incremental-remnote/ai-ocr/`.
+
+---
+
+## Settings { #settings }
+
+In the plugin settings, group **Incremental Video**:
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Default Player for RemNote Videos** | The plugin's player | Which player a RemNote video opens in, in the queue. The card's switch overrides it for that card. |
+| **Tidy Automatic Captions with Claude** | On | Claude tidies transcripts that come from YouTube's automatic captions. |
+| **Title Video Extracts with Claude** | On | Claude adds a title to each extract from its transcript. |
 
 ---
 
 **See also:**
 
 - [What is Incrementalism?](What-is-Incrementalism%3F.md)
-- [PDF Incremental Reading Workflow](PDF-Incremental-Reading-Workflow.md)
 - [Reviewing Items in the Queue](Reviewing-Items-in-the-Queue.md)
+- [Reviewing Items in the Editor](Reviewing-Items-in-the-Editor.md)
+- [PDF Incremental Reading Workflow](PDF-Incremental-Reading-Workflow.md)

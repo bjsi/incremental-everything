@@ -28,6 +28,9 @@ import {
   videoExtractUrlSlotCode,
   videoExtractStartSlotCode,
   videoExtractEndSlotCode,
+  localVideoPowerupCode,
+  localVideoLibrarySlotCode,
+  localVideoPathSlotCode,
   hasImagePowerupCode,
   hasImagePowerupName,
   pdfAreaHighlightPowerupCode,
@@ -359,6 +362,31 @@ export async function registerPluginPowerups(
           code: videoExtractEndSlotCode,
           name: 'End Time',
           propertyType: PropertyType.NUMBER,
+          hidden: true,
+        },
+      ],
+    },
+  });
+
+  // Local Video Powerup - a video file on this computer, in one of the helper's
+  // video libraries (lib/local_video.ts). Its extracts are VideoExtracts whose
+  // URL is the file's local-video:// URL.
+  await plugin.app.registerPowerup({
+    name: 'Local Video',
+    code: localVideoPowerupCode,
+    description: 'A video file on this computer, played by Incremental RemNote through its local helper',
+    options: {
+      slots: [
+        {
+          code: localVideoLibrarySlotCode,
+          name: 'Library',
+          propertyType: PropertyType.TEXT,
+          hidden: true,
+        },
+        {
+          code: localVideoPathSlotCode,
+          name: 'Path',
+          propertyType: PropertyType.TEXT,
           hidden: true,
         },
       ],

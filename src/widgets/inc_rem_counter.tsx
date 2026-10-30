@@ -1,10 +1,11 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
-import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
-import { IncrementalRem } from '../lib/incremental_rem';
+import { allIncrementalRemSlimKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
+import type { SlimIncRem } from '../lib/incremental_rem/cache';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { generateAndStoreGraphData } from '../lib/priority_graph_data';
 import { PriorityDistributionGraphComponent } from './priority_distribution_graph';
+import { LocalVideoEditorPlayer } from '../components/LocalVideoEditorPlayer';
 import '../style.css';
 import '../App.css';
 
@@ -21,7 +22,9 @@ function IncRemCounter() {
         const ctx = await rp.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
         const documentId = ctx?.documentId;
 
-        const allIncRems = (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+        // Slim projection: counting needs only remId + nextRepDate, and this
+        // re-runs on every IncRem cache write (the full key is ~8MB).
+        const allIncRems = (await rp.storage.getSession<SlimIncRem[]>(allIncrementalRemSlimKey)) || [];
 
         if (!documentId) {
           const now = Date.now();
@@ -55,9 +58,10 @@ function IncRemCounter() {
 
 
 
-  if (!counterData || counterData.total === 0) {
-    return null;
-  }
+  // The local video player sits below the counter on every document, rendered
+  // whether or not the counter shows: this is the one widget mounted under
+  // every document's title (see components/LocalVideoEditorPlayer).
+  const showCounter = !!counterData && counterData.total > 0;
 
   const handleClick = async () => {
     const ctx = await plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
@@ -74,7 +78,7 @@ function IncRemCounter() {
 
   const handleGraphClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!counterData.documentId || isGenerating) return;
+    if (!counterData?.documentId || isGenerating) return;
 
     // Toggle visibility
     if (showGraph) {
@@ -100,74 +104,79 @@ function IncRemCounter() {
 
 
   return (
-    <div style={{ padding: '8px 12px' }}>
-      <div
-        className="flex items-center justify-between px-3 py-2 rounded-lg"
-        style={{
-          backgroundColor: 'var(--rn-clr-background-secondary)',
-          border: '1px solid var(--rn-clr-border-primary)',
-        }}
-      >
-        <div
-          onClick={handleClick}
-          className="flex items-center gap-2 cursor-pointer flex-1"
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-        >
-          <span className="text-base">📚</span>
-          <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>
-            Inc Rems
-          </span>
-          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-            <span style={{ color: '#f97316' }}>{counterData.due}</span>
-            {' / '}
-            <span style={{ color: '#3b82f6' }}>{counterData.total}</span>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {/* Priority Graph toggle button */}
-          <button
-            onClick={handleGraphClick}
-            className="px-2 py-1 text-xs rounded transition-colors"
+    <>
+      {showCounter && counterData && (
+        <div style={{ padding: '8px 12px' }}>
+          <div
+            className="flex items-center justify-between px-3 py-2 rounded-lg"
             style={{
-              backgroundColor: showGraph ? 'var(--rn-clr-background-tertiary)' : 'var(--rn-clr-background-primary)',
-              color: 'var(--rn-clr-content-tertiary)',
-              opacity: isGenerating ? 0.5 : 1,
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              border: '1px solid var(--rn-clr-border-primary)',
             }}
-            onMouseEnter={(e) => { if (!isGenerating) e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
-            onMouseLeave={(e) => { if (!showGraph) e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)'; }}
-            title={showGraph ? 'Hide Priority Distribution Graph' : 'Show Priority Distribution Graph'}
-            disabled={isGenerating}
           >
-            {isGenerating ? '⏳' : '📊'}
-          </button>
+            <div
+              onClick={handleClick}
+              className="flex items-center gap-2 cursor-pointer flex-1"
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            >
+              <span className="text-base">📚</span>
+              <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                Inc Rems
+              </span>
+              <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                <span style={{ color: '#f97316' }}>{counterData.due}</span>
+                {' / '}
+                <span style={{ color: '#3b82f6' }}>{counterData.total}</span>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {/* Priority Graph toggle button */}
+              <button
+                onClick={handleGraphClick}
+                className="px-2 py-1 text-xs rounded transition-colors"
+                style={{
+                  backgroundColor: showGraph ? 'var(--rn-clr-background-tertiary)' : 'var(--rn-clr-background-primary)',
+                  color: 'var(--rn-clr-content-tertiary)',
+                  opacity: isGenerating ? 0.5 : 1,
+                }}
+                onMouseEnter={(e) => { if (!isGenerating) e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+                onMouseLeave={(e) => { if (!showGraph) e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)'; }}
+                title={showGraph ? 'Hide Priority Distribution Graph' : 'Show Priority Distribution Graph'}
+                disabled={isGenerating}
+              >
+                {isGenerating ? '⏳' : '📊'}
+              </button>
 
 
-          {/* View All button */}
-          <button
-            onClick={handleMainViewClick}
-            className="px-2 py-1 text-xs rounded transition-colors"
-            style={{
-              backgroundColor: 'var(--rn-clr-background-primary)',
-              color: 'var(--rn-clr-content-tertiary)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)'; }}
-            title="View All (Opt+Shift+I)"
-          >
-            View All
-          </button>
-        </div>
-      </div>
+              {/* View All button */}
+              <button
+                onClick={handleMainViewClick}
+                className="px-2 py-1 text-xs rounded transition-colors"
+                style={{
+                  backgroundColor: 'var(--rn-clr-background-primary)',
+                  color: 'var(--rn-clr-content-tertiary)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)'; }}
+                title="View All (Opt+Shift+I)"
+              >
+                View All
+              </button>
+            </div>
+          </div>
 
-      {/* Inline Graph Container */}
-      {showGraph && counterData.documentId && (
-        <div className="mt-2 w-full border-t border-gray-200 pt-2">
-          <PriorityDistributionGraphComponent documentId={counterData.documentId} />
+          {/* Inline Graph Container */}
+          {showGraph && counterData.documentId && (
+            <div className="mt-2 w-full border-t border-gray-200 pt-2">
+              <PriorityDistributionGraphComponent documentId={counterData.documentId} />
+            </div>
+          )}
         </div>
       )}
-    </div>
+      <LocalVideoEditorPlayer />
+    </>
   );
 }
 

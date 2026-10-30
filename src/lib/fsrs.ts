@@ -7,8 +7,10 @@
  * This module does NOT schedule cards; it only replays a card's repetition history
  * to derive the current memory state (D, S, R).
  *
- * Uses an explicit state machine (New → Learning → Review ↔ Relearning) for accuracy,
- * matching the ts-fsrs reference implementation used by RemNote.
+ * Uses an explicit state machine (New → Learning → Review ↔ Relearning), but the formula
+ * for a review follows ts-fsrs, the implementation RemNote uses: it depends on the whole
+ * UTC days elapsed, not on the state. Checked against RemNote's own copy of the library
+ * on real histories (findings/MULTI_LINE_SUB_CARDS.md).
  */
 
 import { QueueInteractionScore, RepetitionStatusInterface } from '@remnote/plugin-sdk';
@@ -44,6 +46,8 @@ export const FSRS_DEFAULT_WEIGHTS: number[] = [
 // FSRS rating constants (1-based)
 // ---------------------------------------------------------------------------
 const RATINGS = { again: 1, hard: 2, good: 3, easy: 4 } as const;
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 /**
  * The retention FSRS's stability is *defined* against: at 90%, the scheduled
@@ -126,6 +130,31 @@ function fsrsRatingFromScore(score: QueueInteractionScore): number | null {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-line (list / set) cards
+// ---------------------------------------------------------------------------
+/**
+ * Whether a repetition counts toward the main card's memory state.
+ *
+ * A partial list/set card tests only some items, and RemNote keeps those reps out
+ * of the main card's schedule, so replaying them as main reps inflates or crushes
+ * its stability. Same rule as RemNote: `isFullMultiLineRep` when present, otherwise
+ * a rep listing no item scores (which is every rep of an ordinary card). The two
+ * fields are missing from the SDK typings but do reach plugins, because the bridge
+ * passes the history array through untouched. A Reset always counts: it ends the
+ * lifetime whatever else it carries.
+ *
+ * See findings/MULTI_LINE_SUB_CARDS.md.
+ */
+export function countsForMainCard(rep: RepetitionStatusInterface): boolean {
+    if (rep.score === QueueInteractionScore.RESET) return true;
+    const { isFullMultiLineRep, subCardScores } = rep as RepetitionStatusInterface & {
+        isFullMultiLineRep?: boolean;
+        subCardScores?: unknown[];
+    };
+    return isFullMultiLineRep !== undefined ? isFullMultiLineRep : !subCardScores?.length;
+}
+
+// ---------------------------------------------------------------------------
 // Core FSRS math helpers
 // ---------------------------------------------------------------------------
 
@@ -133,8 +162,12 @@ function constrainDifficulty(difficulty: number): number {
     return Math.min(Math.max(difficulty, 1), 10);
 }
 
+function rawInitDifficulty(w: number[], rating: number): number {
+    return w[4] - Math.exp(w[5] * (rating - 1)) + 1;
+}
+
 function initDifficulty(w: number[], rating: number): number {
-    return constrainDifficulty(w[4] - Math.exp(w[5] * (rating - 1)) + 1);
+    return constrainDifficulty(rawInitDifficulty(w, rating));
 }
 
 function initStability(w: number[], rating: number): number {
@@ -152,7 +185,9 @@ function meanReversion(w: number[], init: number, current: number): number {
 function nextDifficulty(w: number[], d: number, rating: number): number {
     const deltaD = -w[6] * (rating - 3);
     const nextD = d + linearDamping(deltaD, d);
-    return constrainDifficulty(meanReversion(w, initDifficulty(w, RATINGS.easy), nextD));
+    // The reversion target is deliberately unclamped, as in ts-fsrs. It only differs
+    // when w4/w5 put Easy's initial difficulty below 1, as the default weights do.
+    return constrainDifficulty(meanReversion(w, rawInitDifficulty(w, RATINGS.easy), nextD));
 }
 
 export function forgettingCurve(elapsedDays: number, stability: number, decay: number, factor: number): number {
@@ -205,7 +240,7 @@ function nextShortTermStability(w: number[], s: number, rating: number, is21w: b
     if (is21w) {
         // FSRS v6 (21 weights): includes s^(-w19) and clamping
         let sinc = Math.exp(w[17] * (rating - 3 + w[18])) * Math.pow(s, -w[19]);
-        if (rating >= 3) {
+        if (rating >= RATINGS.hard) {
             sinc = Math.max(sinc, 1);
         }
         return s * sinc;
@@ -213,6 +248,33 @@ function nextShortTermStability(w: number[], s: number, rating: number, is21w: b
         // FSRS v5 (19 weights): simpler formula
         return Math.max(s * Math.exp(w[17] * (rating - 3 + w[18])), 0.01);
     }
+}
+
+/** Whole UTC days between two times, which is how ts-fsrs measures elapsed time. */
+function utcDaysBetween(fromMs: number, toMs: number): number {
+    return Math.floor(toMs / MS_PER_DAY) - Math.floor(fromMs / MS_PER_DAY);
+}
+
+/**
+ * Stability after a review `elapsedDays` whole UTC days after the previous one.
+ * A review on the same UTC day always takes the short-term formula, and a later
+ * one always takes the long-term formulas, even if the card is still relearning.
+ */
+function nextStability(
+    w: number[],
+    is21w: boolean,
+    d: number,
+    s: number,
+    elapsedDays: number,
+    rating: number,
+): number {
+    if (elapsedDays === 0) return nextShortTermStability(w, s, rating, is21w);
+    const decay = -w[20];
+    const factor = Math.pow(0.9, 1 / decay) - 1;
+    const r = forgettingCurve(elapsedDays, s, decay, factor);
+    return rating === RATINGS.again
+        ? nextForgetStability(w, d, s, r)
+        : nextRecallStability(w, d, s, r, rating);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,8 +321,6 @@ export function computeFSRSState(
     requestedRetention: number = DEFAULT_REQUESTED_RETENTION,
 ): FSRSState | null {
     const { w, is21w } = resolveWeights(weights);
-    const DECAY = -w[20];
-    const FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
 
     const sorted = [...history].sort((a, b) => a.date - b.date);
 
@@ -281,7 +341,7 @@ export function computeFSRSState(
         }
 
         const rating = fsrsRatingFromScore(rep.score);
-        if (rating === null) continue;
+        if (rating === null || !countsForMainCard(rep)) continue;
 
         reviewCount++;
 
@@ -293,23 +353,11 @@ export function computeFSRSState(
             continue;
         }
 
-        const elapsedDays = (rep.date - lastReviewDate!) / (1000 * 60 * 60 * 24);
         const oldD = d!;
         const oldS = s!;
 
-        if (state === 'learning' || state === 'relearning') {
-            d = nextDifficulty(w, oldD, rating);
-            s = nextShortTermStability(w, oldS, rating, is21w);
-        } else {
-            // review state
-            const r = forgettingCurve(elapsedDays, oldS, DECAY, FACTOR);
-            d = nextDifficulty(w, oldD, rating);
-            if (rating === RATINGS.again) {
-                s = nextForgetStability(w, oldD, oldS, r);
-            } else {
-                s = nextRecallStability(w, oldD, oldS, r, rating);
-            }
-        }
+        d = nextDifficulty(w, oldD, rating);
+        s = nextStability(w, is21w, oldD, oldS, utcDaysBetween(lastReviewDate!, rep.date), rating);
 
         state = nextState(state, rating);
         lastReviewDate = rep.date;
@@ -327,19 +375,18 @@ export function computeFSRSState(
     const finalS = s;
     const finalLastReviewDate = lastReviewDate;
 
-    const daysSinceLastReview = (Date.now() - finalLastReviewDate) / (1000 * 60 * 60 * 24);
+    const daysSinceLastReview = (Date.now() - finalLastReviewDate) / MS_PER_DAY;
     const DECAY_VAL = -w[20];
     const FACTOR_VAL = Math.pow(0.9, 1 / DECAY_VAL) - 1;
     const r = forgettingCurve(daysSinceLastReview, finalS, DECAY_VAL, FACTOR_VAL);
 
+    // What each grade would do if answered now, by the same rule as the replay.
+    const utcDaysNow = utcDaysBetween(finalLastReviewDate, Date.now());
+    const stabilityIfGraded = (rating: number): number =>
+        nextStability(w, is21w, finalD, finalS, utcDaysNow, rating);
+
     // Compute SInc (Stability Increase) for each recall grade
-    const computeSInc = (rating: number): number => {
-        if (state === 'learning' || state === 'relearning') {
-            return nextShortTermStability(w, finalS, rating, is21w) / finalS;
-        }
-        // review state: use recall stability
-        return nextRecallStability(w, finalD, finalS, r, rating) / finalS;
-    };
+    const computeSInc = (rating: number): number => stabilityIfGraded(rating) / finalS;
 
     const sInc = {
         hard: computeSInc(RATINGS.hard),
@@ -349,12 +396,8 @@ export function computeFSRSState(
 
     // Again is computed directly rather than as a multiple of finalS: a lapse
     // takes the post-FORGET path, which is not a ratio applied to the current
-    // stability (that is what `sInc` is, and why Again has none). In the
-    // short-term states the same short-term formula covers all four ratings.
-    const nextSAgain =
-        state === 'learning' || state === 'relearning'
-            ? nextShortTermStability(w, finalS, RATINGS.again, is21w)
-            : nextForgetStability(w, finalD, finalS, r);
+    // stability (that is what `sInc` is, and why Again has none).
+    const nextSAgain = stabilityIfGraded(RATINGS.again);
 
     const nextS = {
         again: nextSAgain,
@@ -445,8 +488,8 @@ export function computeFSRSStatesPerReview(
         }
 
         const rating = fsrsRatingFromScore(rep.score);
-        if (rating === null) {
-            // Non-gradeable — pass through with null state
+        if (rating === null || !countsForMainCard(rep)) {
+            // Non-gradeable or partial multi-line — pass through with null state
             result.push({ d: d ?? 0, s: s ?? 0, r: null, state, sInc: null });
             continue;
         }
@@ -460,23 +503,17 @@ export function computeFSRSStatesPerReview(
             continue;
         }
 
-        const elapsedDays = (rep.date - lastReviewDate!) / (1000 * 60 * 60 * 24);
         const oldD = d!;
         const oldS = s!;
-        let r: number | null = null;
+        // Reported with real elapsed time, so it sits on the curve the chart draws
+        // and calibration measures. The next stability uses whole days instead.
+        const r =
+            state === 'review'
+                ? forgettingCurve((rep.date - lastReviewDate!) / MS_PER_DAY, oldS, DECAY, FACTOR)
+                : null;
 
-        if (state === 'learning' || state === 'relearning') {
-            d = nextDifficulty(w, oldD, rating);
-            s = nextShortTermStability(w, oldS, rating, is21w);
-        } else {
-            r = forgettingCurve(elapsedDays, oldS, DECAY, FACTOR);
-            d = nextDifficulty(w, oldD, rating);
-            if (rating === RATINGS.again) {
-                s = nextForgetStability(w, oldD, oldS, r);
-            } else {
-                s = nextRecallStability(w, oldD, oldS, r, rating);
-            }
-        }
+        d = nextDifficulty(w, oldD, rating);
+        s = nextStability(w, is21w, oldD, oldS, utcDaysBetween(lastReviewDate!, rep.date), rating);
 
         state = nextState(state, rating);
         lastReviewDate = rep.date;

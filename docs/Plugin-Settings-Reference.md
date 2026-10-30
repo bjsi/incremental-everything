@@ -91,6 +91,14 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 
 ---
 
+## Incremental Video { #incremental-video }
+
+| Setting | Type | Default | Description |
+| --- | --- | --- | --- |
+| **Default Player for RemNote Videos** | Dropdown | `The plugin's player` | Which player a video added with RemNote's **Upload File › YouTube URL** opens in, in the queue: the plugin's (resume, speed, extracts that stop at their end, screenshots) or RemNote's (transcript, Highlight Moment, AI Tutor, Summary). The card's switch overrides it for that card. Videos saved with the Clipper always use the plugin's player. 📖 [Two players](Incremental-Video.md#two-players). |
+| **Tidy Automatic Captions with Claude** | Boolean | `true` | When a transcript comes from YouTube's automatic captions, Claude adds punctuation, fixes words the recognition clearly got wrong and puts key terms in bold, through the local helper. The raw text is written first and replaced as it is tidied. 📖 [Transcripts](Incremental-Video.md#transcripts). |
+| **Title Video Extracts with Claude** | Boolean | `true` | When a Video Extract gets its transcript, Claude adds a short title after its range, in the language of the video. An extract you have renamed is left as it is. 📖 [Titles from the transcript](Incremental-Video.md#extract-titles). |
+
 ## Priority Queue
 
 *In the IE Settings popup, under **Priority Queue**.* How the [Priority Queue](Priority-Review-Document.md) document refreshes, and how long [cooling](Priority-Review-Document.md#cooling-spoiler-protection-across-sessions) keeps a spoiled Rem out of it.
@@ -130,6 +138,8 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 !!! warning "Display and statistics only — these do not schedule anything"
     Nothing in this group can move a due date. Your scheduling is **RemNote's**, and is configured in **RemNote Settings → Schedulers**. These settings tell the plugin *what your scheduler is doing*, so that the numbers it shows you describe your real reviews — set them to **match** what you use there. Changing them here alone does not change your scheduling; it only makes the readouts wrong.
 
+**FSRS Global Weights** and **Requested Retention** are saved for each knowledge base, and show a *this knowledge base* badge in the popup. You can [fill them with a script](Reviewing-Items-in-the-Queue.md#import-scheduler-data).
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | **Display FSRS DSR Stats (Flashcards)** | Boolean | `true` | Shows calculated FSRS Difficulty (D), Stability (S), and Retrievability (R) for flashcards in the [Card Info Bar](Plugin-Widgets-Reference.md#11-card-info-bar) widget. Requires FSRS v6 scheduler. 📖 [Card Stats & FSRS Integration](Reviewing-Items-in-the-Queue.md#card-stats-fsrs-integration). |
@@ -145,8 +155,10 @@ Open the popup with the command **`Incremental RemNote: Settings`** (quick code 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | **Enable Mastery Drill** | Boolean | `false` | Master switch for the [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill). Off by default: while it is on, the plugin watches every flashcard rating and keeps a list of the ones to drill, and registers the drill popup, its command and the sidebar notification. Leave it off if you do not use the workflow and none of that work happens. Flashcard and Practiced Queue history are unaffected either way. Requires a reload. *(Replaces the former "Skip Mastery Drill", whose value is inverted and carried over automatically.)* |
-| **Old Items Threshold** | Number | `7` days | Number of days after which a card lingering in the Mastery Drill queue is flagged as stale. A warning appears in the widget and you can clear these items with a single click. |
-| **Mastery Drill Minimum Delay** | Number | `180` min | Cooldown after a card is rated *Again* or *Hard* before it appears in the drill, so the initial repetition has time to consolidate. 📖 [Minimum Delay](History-Queue-Dashboard-and-Mastery-Drill.md#minimum-delay). |
+| **Old Items Threshold** | Number | `7` days | Number of days a card can stay ready to drill before it is flagged as stale; time spent cooling does not count. A warning appears in the widget and you can clear these items with a single click. |
+| **Mastery Drill Minimum Delay** | Number | `180` min | Cooldown after a card is rated *Again* or *Hard* before it appears in the drill, so the initial repetition has time to consolidate. The whole wait for *Again*; the floor for *Hard*. 📖 [Minimum Delay](History-Queue-Dashboard-and-Mastery-Drill.md#minimum-delay). |
+| **Hard Cards: Share of the Interval** | Number | `5` % | A card rated *Hard* waits this share of the new interval the rating gave it before returning to the drill, between the Minimum Delay and the maximum below; 5% means a card sent 60 days out waits 3 days. `0` gives Hard cards the Minimum Delay. 📖 [Why Hard cards wait longer](History-Queue-Dashboard-and-Mastery-Drill.md#hard-card-delay). |
+| **Hard Cards: Maximum Delay** | Number | `7` days | The longest a card rated *Hard* waits before returning to the drill, however long its interval. |
 | **Disable Mastery Drill Notifications** | Boolean | `false` | Hides the periodic Left Sidebar notification widget that appears when ≥ 10 cards are pending in the Mastery Drill queue. |
 | **Where the Drill Runs** | Dropdown | `Regular queue` | *Regular queue*: RemNote's own queue, with the card info bar and every other plugin's widgets; the other cards of a drill Rem are skipped. *Popup*: the drill's own window with an embedded queue, where RemNote shows no plugin widgets. 📖 [Where the Drill Runs](History-Queue-Dashboard-and-Mastery-Drill.md#where-the-drill-runs). |
 | **Reveal Delay (regular-queue drill)** | Number | `500` ms | Shown only for the regular-queue drill. How long each card stays hidden before it fades in, so a card the plugin skips is not seen. Longer hides more skips but delays every card; `0` turns it off. |
@@ -197,3 +209,4 @@ In calibrated mode the section also shows the measured average itself — in bot
 | **Title Case Acronyms** | Text | *(empty)* | Extra acronyms the [Text Case Converter](Utilities-Text-and-Lists.md#acronyms-and-initialisms) keeps fully uppercase when it applies Title Case, so `arqueação bruta (ab)` becomes `Arqueação Bruta (AB)`. Separate them with commas or spaces. Common maritime, institutional and technical acronyms are built in, Roman numerals used as numbering (`Seção II`) are detected, and words already written in capitals are preserved without being listed — the list is what restores them after a pass through lowercase. Entries win over the article/preposition rules, so a two-letter entry that is also a word (`SE`, `NO`) will capitalise every occurrence of it. 📖 [Acronyms and initialisms](Utilities-Text-and-Lists.md#acronyms-and-initialisms). |
 | **Source Highlight Colour** | Dropdown | `Orange` | Colour of the highlights the plugin creates when it pins the source of a passage (Pin Source Quote, and Create IncRem's other-view pin) — in a PDF, a saved web article or a PDF's Text Reader view. A passage that already has a highlight is pinned to that highlight, which keeps its own colour. 📖 [Source Pins](Source-Pins.md#reusing-highlights) |
 | **Create IncRem: Also Pin the Other PDF View** | Boolean | `false` | When a PDF also has a Text Reader version, Create Incremental Rem pins the passage in both views — the Text Reader for a PDF-page highlight, the PDF page for a Text Reader highlight — reusing or creating that view's highlight and marking it as extracted. Needs the local helper; without it the Rem keeps its single pin. 📖 [Pinning both views on Create IncRem](Source-Pins.md#create-increm-both-views) |
+| **Cycle Image Size: Ask Above** | Number | `5` images | Cycle Image Size shows its confirmation before resizing more images than this at once; 0 asks every time. It always asks before changing images you have sized. 📖 [When it asks first](Utilities-Cleaning-Up.md#when-it-asks-first) |

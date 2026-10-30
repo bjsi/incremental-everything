@@ -1,7 +1,16 @@
 import { AppEvents, PluginRem, QueueInteractionScore, QueueItemType, RemId, RNPlugin } from '@remnote/plugin-sdk';
-import { masteryDrillMinDelayMinutesId, masteryDrillRevealDelayId } from './consts';
+import { masteryDrillRevealDelayId } from './consts';
 import { getIESetting } from './settings';
-import { FinalDrillEntry, finalDrillIdsKey } from './mastery_drill_status';
+import {
+  DrillCooling,
+  FinalDrillEntry,
+  buildDrillEntry,
+  drillReadyAt,
+  finalDrillIdsKey,
+  formatDrillWait,
+  getDrillCooling,
+  ratingReturnsAtOnce,
+} from './mastery_drill_status';
 import { showMessageDialog } from './message_dialog';
 import { NativeDrillState, nativeDrillStartRequestKey, nativeDrillStateKey } from './mastery_drill_launch';
 
@@ -66,6 +75,7 @@ const CLUSTER_VISIBLE_CARD_KEY = 'clusterVisibleCardId';
  * the line right under them.
  */
 const BURY_CSS_ID = 'mastery-drill-native-bury-screen';
+
 const buryScreenCss = (hiddenDrillCards: number) => `
 .queue-message--daily-target-checkpoint [data-test="Queue Checkpoint Abort Button"] {
   background: var(--rn-clr-background-accent, #3b82f6) !important;
@@ -102,14 +112,14 @@ let session: Session | null = null;
 interface BuildInfo {
   readyCardIds: Set<string>;
   remIds: Set<RemId>;
-  minDelayMinutes: number;
+  cooling: DrillCooling;
 }
 
 interface Session {
   docId: RemId;
   kbId: string | null;
   startedAt: number;
-  minDelayMinutes: number;
+  cooling: DrillCooling;
   /** Drill cards the queue has put on screen: the ones whose history is read back. */
   watch: Set<string>;
   /** Per card, the time up to which its ratings are already accounted for. */
@@ -127,6 +137,8 @@ interface Session {
   /** Times the drill pressed Keep Practicing itself this session. */
   keepPracticingPresses: number;
   tripped: boolean;
+  /** The drill card on screen, for the bar (NativeDrillState). */
+  currentCardId?: string;
 }
 
 /** True when `subQueueId` is the regular-queue drill's document. Synchronous. */
@@ -160,12 +172,13 @@ const isAgainOrHard = (score: QueueInteractionScore) =>
 const entryCardId = (item: FinalDrillEntry) => (typeof item === 'string' ? item : item.cardId);
 
 async function readReadyCards(plugin: RNPlugin, kbId: string, isPrimary: boolean) {
-  const minDelayMinutes = Number(await getIESetting(plugin, masteryDrillMinDelayMinutesId)) || 0;
+  const cooling = await getDrillCooling(plugin);
   const items = ((await plugin.storage.getSynced(finalDrillIdsKey)) as FinalDrillEntry[]) || [];
   const now = Date.now();
   const readyCardIds = new Set<string>();
   const remIds = new Set<RemId>();
-  let cooling = 0;
+  let coolingCount = 0;
+  let firstReadyAt = Infinity;
   // Cards rated Good/Easy after they entered the drill, whose rating no event reported
   // (Card Cluster members, in any queue). They leave the list here.
   const ratedOut = new Set<string>();
@@ -173,8 +186,10 @@ async function readReadyCards(plugin: RNPlugin, kbId: string, isPrimary: boolean
     const inKb = typeof item === 'string' ? isPrimary : item.kbId === kbId;
     if (!inKb) continue;
     const addedAt = typeof item === 'string' ? undefined : item.addedAt;
-    if (addedAt && now - addedAt < minDelayMinutes * 60_000) {
-      cooling++;
+    const readyAt = drillReadyAt(item, cooling);
+    if (readyAt > now) {
+      coolingCount++;
+      firstReadyAt = Math.min(firstReadyAt, readyAt);
       continue;
     }
     const cardId = typeof item === 'string' ? item : item.cardId;
@@ -195,7 +210,7 @@ async function readReadyCards(plugin: RNPlugin, kbId: string, isPrimary: boolean
     );
     console.log(`${LOG} removed ${ratedOut.size} cards already rated Good or Easy: ${[...ratedOut].join(', ')}`);
   }
-  return { readyCardIds, remIds, cooling, minDelayMinutes };
+  return { readyCardIds, remIds, cooling, coolingCount, firstReadyAt };
 }
 
 async function deleteStoredDoc(plugin: RNPlugin, kbId: string): Promise<void> {
@@ -233,8 +248,8 @@ export async function startNativeDrill(plugin: RNPlugin): Promise<void> {
       await showMessageDialog(plugin, {
         title: 'Mastery Drill',
         message: 'No drill card is ready yet.',
-        detail: ready.cooling
-          ? `${ready.cooling} card${ready.cooling === 1 ? ' is' : 's are'} still inside the minimum delay (${ready.minDelayMinutes} min).`
+        detail: ready.coolingCount
+          ? `${ready.coolingCount} card${ready.coolingCount === 1 ? ' is' : 's are'} still cooling; the first is ready in ${formatDrillWait(ready.firstReadyAt - Date.now())}.`
           : undefined,
         tone: 'info',
       });
@@ -244,8 +259,8 @@ export async function startNativeDrill(plugin: RNPlugin): Promise<void> {
     const doc = await createDrillDoc(plugin, kb._id, ready.remIds);
     drillDocId = doc._id;
     drillKbId = kb._id;
-    build = { readyCardIds: ready.readyCardIds, remIds: ready.remIds, minDelayMinutes: ready.minDelayMinutes };
-    console.log(`${LOG} ${ready.readyCardIds.size} ready cards on ${ready.remIds.size} Rems (${ready.cooling} cooling) in ${doc._id}`);
+    build = { readyCardIds: ready.readyCardIds, remIds: ready.remIds, cooling: ready.cooling };
+    console.log(`${LOG} ${ready.readyCardIds.size} ready cards on ${ready.remIds.size} Rems (${ready.coolingCount} cooling) in ${doc._id}`);
     await plugin.window.setURL(`/flashcards/${doc._id}/all`);
   } catch (e) {
     console.error(`${LOG} start failed:`, e);
@@ -255,6 +270,16 @@ export async function startNativeDrill(plugin: RNPlugin): Promise<void> {
 
 const publishState = (plugin: RNPlugin, state: NativeDrillState) =>
   plugin.storage.setSession(nativeDrillStateKey, state);
+
+const publishSession = (plugin: RNPlugin, s: Session) =>
+  publishState(plugin, { active: true, buried: s.buried, currentCardId: s.currentCardId });
+
+/** A drill card came on screen. Published only for drill cards, so it never races a skip. */
+function showCard(plugin: RNPlugin, s: Session, cardId: string) {
+  if (s.currentCardId === cardId) return;
+  s.currentCardId = cardId;
+  void publishSession(plugin, s);
+}
 
 /**
  * Applies the ratings no QueueCompleteCard reported (Card Cluster members) to the drill list:
@@ -277,8 +302,8 @@ async function reconcileRatings(plugin: RNPlugin, s: Session): Promise<void> {
     for (const { cardId, rep } of rated) {
       const restartsCooling = isAgainOrHard(rep.score);
       items = items.filter((item) => entryCardId(item) !== cardId);
-      if (restartsCooling) items.push({ cardId, kbId: s.kbId ?? undefined, addedAt: rep.date });
-      if (!(restartsCooling && s.minDelayMinutes <= 0)) {
+      if (restartsCooling) items.push(await buildDrillEntry(plugin, cardId, s.kbId ?? undefined, rep.score, rep.date));
+      if (!(restartsCooling && ratingReturnsAtOnce(rep.score, s.cooling))) {
         s.allowed.delete(cardId);
         s.watch.delete(cardId);
       }
@@ -377,7 +402,7 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
       docId: data.subQueueId,
       kbId: drillKbId,
       startedAt: Date.now(),
-      minDelayMinutes: build.minDelayMinutes,
+      cooling: build.cooling,
       watch: new Set(),
       settled: new Map(),
       allowed: new Set(build.readyCardIds),
@@ -427,7 +452,7 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
         void plugin.app.registerCSS(BURY_CSS_ID, buryScreenCss(hidden));
         if (!s.buried) {
           s.buried = true;
-          void publishState(plugin, { active: true, buried: true });
+          void publishSession(plugin, s);
         }
         void plugin.app.toast(
           `Mastery Drill: RemNote hid ${hidden > 0 ? hidden : 'some'} drill card${hidden === 1 ? '' : 's'}. Press Keep Practicing (or Esc) to drill ${hidden === 1 ? 'it' : 'them'}.`
@@ -452,6 +477,7 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     if (s.allowed.has(cardId)) {
       s.shown++;
       s.watch.add(cardId);
+      showCard(plugin, s, cardId);
       return;
     }
     if (s.tripped) return;
@@ -477,10 +503,10 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     // The QueueCompleteCard handler in register/events.ts updates the list for this one.
     s.settled.set(cardId, Date.now());
     // A rated card leaves the session: Good/Easy took it out of the drill, Again/Hard restarted
-    // its cooling. With no minimum delay a card rated Again/Hard may come straight back.
+    // its cooling. With no delay at all a card rated Again/Hard may come straight back.
     const score: QueueInteractionScore | undefined = data?.score;
     const restartsCooling = score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD;
-    if (!(restartsCooling && build.minDelayMinutes <= 0)) s.allowed.delete(cardId);
+    if (!(restartsCooling && ratingReturnsAtOnce(score, build.cooling))) s.allowed.delete(cardId);
   });
 
   // A card taken out of the drill elsewhere (the card list, another device) stops being served.
@@ -501,6 +527,7 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     const visible = await plugin.storage.getSession<string>(CLUSTER_VISIBLE_CARD_KEY);
     if (session !== s || !visible || !s.allowed.has(visible)) return;
     s.watch.add(visible);
+    showCard(plugin, s, visible);
     scheduleReconcile(plugin, s);
   });
 

@@ -6,12 +6,13 @@ import {
 } from '@remnote/plugin-sdk';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
-import { getCardPriority, CardPriorityInfo } from '../lib/card_priority';
-import { allIncrementalRemKey, allCardPriorityInfoKey, pageRangeWidgetId, pendingPriorityDeltaQueueKey, priorityEditorDisplayModeId } from '../lib/consts';
+import { getCardPriority, CardPriorityInfo, estimateCardRemPercentile } from '../lib/card_priority';
+import { allIncrementalRemSlimKey, allCardPriorityInfoKey, pageRangeWidgetId, pendingPriorityDeltaQueueKey, priorityEditorDisplayModeId } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
 import { PriorityDeltaEntry } from '../lib/quick_priority';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { calculateRelativePercentile, formatDuration } from '../lib/utils';
+import type { SlimIncRem } from '../lib/incremental_rem/cache';
+import { calculateRelativePercentileAt, formatDuration } from '../lib/utils';
 import { PriorityBadge, ReadPointIcon } from '../components';
 import {
   getActivePdfForIncRem,
@@ -171,10 +172,11 @@ export function PriorityEditor() {
     await plugin.app.toast('Active PDF updated');
   }, [plugin, remId, viewedPdfRemId, activePdfId]);
 
-  // SUPER OPTIMIZED: Combine priority queries into a single hook.
-  // Host range/history/stats are fetched in a separate tracker below so that
-  // priority cache flushes (during inheritance cascades) don't trigger refetches
-  // of unrelated host data.
+  // SUPER OPTIMIZED: Combine the Rem's own priority queries into a single hook.
+  // The priority caches are read in a separate tracker below, and host
+  // range/history/stats in another, so that cache flushes (during inheritance
+  // cascades) don't refetch the Rem, and a priority write doesn't wait on — or
+  // re-read — the ~8MB card cache before the new value can show.
   const remData = useTrackerPlugin(
     async (plugin) => {
       if (!remId) return null;
@@ -183,13 +185,11 @@ export function PriorityEditor() {
       if (!rem) return null;
 
       // Execute priority queries in parallel for maximum performance.
-      const [incRemInfo, cardInfo, cards, hasPowerup, allIncRems, allPrioritizedCardInfo, displayMode] = await Promise.all([
+      const [incRemInfo, cardInfo, cards, hasPowerup, displayMode] = await Promise.all([
         getIncrementalRemFromRem(plugin, rem),
         getCardPriority(plugin, rem),
         rem.getCards(),
         rem.hasPowerup('cardPriority'),
-        plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
-        plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
         getIESetting(plugin, priorityEditorDisplayModeId),
       ]);
 
@@ -199,27 +199,31 @@ export function PriorityEditor() {
       // round-trips this widget already makes per Rem.
       const hasReadPoint = incRemInfo ? await hasRemReadPoint(rem) : false;
 
-      // Calculate relative priorities inline
-      const incRemRelativePriority = (incRemInfo && allIncRems && allIncRems.length > 0)
-        ? calculateRelativePercentile(allIncRems, rem._id)
-        : 50;
-
-      // Calculate card relative priority inline using pre-calculated kbPercentile
-      const cardPriorityInfo = allPrioritizedCardInfo?.find(info => info.remId === rem._id);
-      const cardRelativePriority = cardPriorityInfo?.kbPercentile ?? null;
-
       return {
         rem,
         incRemInfo,
         cardInfo,
         hasCards: cards && cards.length > 0,
         hasPowerup,
-        incRemRelativePriority,
-        cardRelativePriority,
         hasReadPoint,
-        allPrioritizedCardInfo: allPrioritizedCardInfo || [],
         displayMode: displayMode || 'all',
       };
+    },
+    [remId]
+  );
+
+  // The ranking universes, for the badge colours. The slim IncRem projection,
+  // not the full cache: the percentile needs only remId + priority, and this
+  // tracker runs once per visible row and re-runs on every cache write — the
+  // full key is ~8MB on a large KB.
+  const cacheData = useTrackerPlugin(
+    async (plugin) => {
+      if (!remId) return null;
+      const [allIncRems, allPrioritizedCardInfo] = await Promise.all([
+        plugin.storage.getSession<SlimIncRem[]>(allIncrementalRemSlimKey),
+        plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
+      ]);
+      return { allIncRems: allIncRems || [], allPrioritizedCardInfo: allPrioritizedCardInfo || [] };
     },
     [remId]
   );
@@ -256,11 +260,27 @@ export function PriorityEditor() {
   const cardInfo = remData?.cardInfo ?? null;
   const hasCards = remData?.hasCards ?? false;
   const hasCardPriorityPowerup = remData?.hasPowerup ?? false;
-  const incRemRelativePriority = remData?.incRemRelativePriority ?? null;
-  const cardRelativePriority = remData?.cardRelativePriority ?? null;
   const hasReadPoint = remData?.hasReadPoint ?? false;
-  const allPrioritizedCardInfo = remData?.allPrioritizedCardInfo ?? [];
   const displayMode = remData?.displayMode ?? 'all';
+
+  // Relative priorities, ranked at the values read from the Rem. After a save the
+  // tracker writes the slots first and rewrites the caches seconds later, so in
+  // between the cached ranks belong to the old value; ranking the new one in the
+  // cached universe keeps the colour in step with the number.
+  const incRemRelativePriority = useMemo(() => {
+    const allIncRems = cacheData?.allIncRems;
+    if (!incRemInfo || !allIncRems || allIncRems.length === 0) return incRemInfo ? 50 : null;
+    return calculateRelativePercentileAt(allIncRems, incRemInfo.remId, incRemInfo.priority);
+  }, [incRemInfo, cacheData?.allIncRems]);
+
+  const cardRelativePriority = useMemo(() => {
+    const allPrioritizedCardInfo = cacheData?.allPrioritizedCardInfo;
+    if (!remId || !cardInfo || !allPrioritizedCardInfo) return null;
+    const cached = allPrioritizedCardInfo.find((info) => info.remId === remId);
+    if (!cached) return null;
+    if (cached.priority === cardInfo.priority) return cached.kbPercentile ?? null;
+    return estimateCardRemPercentile(allPrioritizedCardInfo, remId, cardInfo.priority) ?? null;
+  }, [remId, cardInfo, cacheData?.allPrioritizedCardInfo]);
 
   // Read point (the reading position of a rem-type outline), resolved in full:
   // the path down to it, and the text of every rem along the way. That costs a

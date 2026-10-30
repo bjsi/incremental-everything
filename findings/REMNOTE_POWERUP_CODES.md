@@ -49,7 +49,7 @@ Legend: ✅ same in both · ⚠️ in both, but disagreeing · ❌ not in the SD
 | ❌ | FloatingDiscussion | `fd` | — | not in the SDK |
 | ✅ | Header | `r` | Size `s` |  |
 | ✅ | Highlight | `h` | Color `c` |  |
-| ❌ | InProgress | `ip` | — | not in the SDK |
+| ❌ | InProgress | `ip` | LastWatchedTime `l`, TotalDuration `d`, DesiredCardsState `s`, VideoPlayerSettings `v` (bundle 1.28.56; see VIDEO_PLAYBACK.md) | not in the SDK |
 | ⚠️ | Link | `b` | URL `u`, ShouldOpenInTextReader `s`, Title `t`, ReadPercent `r`, LastReadDate `d`, FileURL `f`, HasAIComputedTitle `ait`, Theme `h`, FontFamily `ff`, FontSize `fs`, LineHeight `lh` | slots not in the SDK: ShouldOpenInTextReader `s`, HasAIComputedTitle `ait`, Theme `h`, FontFamily `ff`, FontSize `fs`, LineHeight `lh` |
 | ✅ | List | `i` | — |  |
 | ✅ | MultipleChoice | `mc` | — |  |
@@ -122,7 +122,7 @@ Legend: ✅ same in both · ⚠️ in both, but disagreeing · ❌ not in the SD
 | DrawingItems | `dr` | — |
 | LearnPDFContent | `lpc` | — |
 | FloatingDiscussion | `fd` | — |
-| InProgress | `ip` | — |
+| InProgress | `ip` | LastWatchedTime `l`, TotalDuration `d`, DesiredCardsState `s`, VideoPlayerSettings `v` |
 | PDFHighlightSection | `phs` | — |
 | Quiz | `qz` | — |
 | SavedSharedArticleStudy | `ssa` | ArticleId `i`, ArticleTitle `t` |

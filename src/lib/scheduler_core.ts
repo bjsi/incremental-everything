@@ -73,11 +73,13 @@ export function schedulerTypeGroup(type: ActionItemType | null | undefined): Sch
     case 'html':
       return 'documents';
     case 'youtube':
+    case 'local-video':
     case 'video':
       return 'videos';
     case 'pdf-highlight':
     case 'html-highlight':
     case 'youtube-highlight':
+    case 'local-video-highlight':
       return 'highlights';
     default:
       return 'rems';

@@ -23,15 +23,16 @@
  */
 export const IMAGE_FIT_MAX_WIDTH = 680;
 
-export type ImageSizeStep = 'fit' | 'large' | 'medium' | 'original';
+export type ImageSizeStep = 'fit' | 'large' | 'medium' | 'small' | 'original';
 
 /** The order one command press after another walks through. */
-export const IMAGE_SIZE_CYCLE: ImageSizeStep[] = ['fit', 'large', 'medium', 'original'];
+export const IMAGE_SIZE_CYCLE: ImageSizeStep[] = ['fit', 'large', 'medium', 'small', 'original'];
 
 export const IMAGE_SIZE_STEP_LABEL: Record<ImageSizeStep, string> = {
   fit: 'Fit',
   large: 'Large',
   medium: 'Medium',
+  small: 'Small',
   original: 'Original',
 };
 
@@ -84,6 +85,34 @@ export const isUnsizedImage = (element: unknown, natural: NaturalSize | undefine
   return Math.abs(el.width - natural.width) < 1 && Math.abs(el.height - natural.height) < 1;
 };
 
+/** The names RemNote's image menu gives its `percent` values. */
+const PERCENT_LABEL: Record<number, string> = { 25: 'Small', 50: 'Medium', 100: 'Large' };
+
+/**
+ * How an image is sized right now, in words. `step` is what an earlier press of
+ * the command left on it, which tells a Fit apart from a drag-resize.
+ */
+export const describeImageSize = (
+  element: unknown,
+  natural: NaturalSize | undefined,
+  step?: ImageSizeStep
+): string => {
+  if (step && step !== 'original') return IMAGE_SIZE_STEP_LABEL[step];
+  if (isUnsizedImage(element, natural)) return 'Not sized';
+  const el = element as any;
+  if (el.percent !== undefined) return PERCENT_LABEL[el.percent] ?? `${el.percent}%`;
+  return `Custom ${Math.round(el.width)}×${Math.round(el.height)}`;
+};
+
+/**
+ * Whether a press has to ask first: it would change sizes the user chose, or
+ * more images than they are happy to change unasked.
+ */
+export const needsImageSizeConfirmation = (
+  counts: { total: number; userSized: number },
+  askAbove: number
+): boolean => counts.userSized > 0 || counts.total > askAbove;
+
 /** The three fields a step writes, for telling "ours" from a later manual resize. */
 export const sizeSignature = (element: unknown): string => {
   const el = element as any;
@@ -109,5 +138,6 @@ export const applyImageSizeStep = <T extends object>(
   const sized = { ...rest, width, height };
   if (step === 'large') sized.percent = 100;
   if (step === 'medium') sized.percent = 50;
+  if (step === 'small') sized.percent = 25;
   return sized as T;
 };

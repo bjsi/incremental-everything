@@ -20,9 +20,13 @@ import { editorReviewTimerHeadersCssId, editorReviewTimerHeightsKey } from './co
    The widget's context carries a documentId but no pane id, so the rule cannot be
    written per pane. The heights are kept per document and the tallest one wins:
    in a split view with panes of different widths the narrower timer wraps to more
-   rows, and a gap under the shorter one is better than a header over the taller. */
+   rows, and a gap under the shorter one is better than a header over the taller.
 
-const IFRAME = 'iframe[data-plugin-id="incremental-everything"][src*="widgetName=editor_review_timer&"]';
+   Only one pane shows the timer (lib/editor_review_timer_primary); the others
+   keep an empty iframe, which the host sizes to an inline `height: 0px`. Those
+   panes are left out, or their headers would make room for a bar that isn't there. */
+
+const IFRAME = 'iframe[data-plugin-id="incremental-everything"][src*="widgetName=editor_review_timer&"]:not([style*="height: 0px"])';
 
 type TimerHeights = Record<string, number>;
 

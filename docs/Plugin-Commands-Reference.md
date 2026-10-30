@@ -42,7 +42,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   Equivalent to clicking the "[Dismiss](Reviewing-Items-in-the-Queue.md#dismiss)" button. Removes the Incremental and transfers its history to the Dismissed powerup.
 
 - **[Transfer Incremental Data to Parent Rem](Create-Incremental-Rem-from-PDF-Highlights.md#transfer-to-parent)** — `quick: ttp`
-  Hands everything that makes this Rem incremental to its **parent**: priority, next-repetition date, the date it was first made incremental, the **whole repetition history** and the PDF/read-point reading state. The data is *moved*, not recreated, so the interval progression continues instead of restarting; the source Rem stops being incremental and its text, children and flashcards are left alone. Use it when an extract ended up under the outline heading that should have been the incremental item. A **🔀 Transferred from …** marker closes the moved history, naming where it came from. Works in the editor (focused Rem) and in the queue (item under review), and asks for confirmation first, naming both Rems and counting what moves. It refuses when the parent is **already** an Incremental Rem — dismiss it first (`Ctrl+D`), and the transfer will revive and keep that dismissed history — or when the Rem is top-level.
+  Hands everything that makes this Rem incremental to its **parent**: priority, next-repetition date, the date it was first made incremental, the **whole repetition history** and the PDF/read-point reading state. The data is *moved*, not recreated, so the interval progression continues instead of restarting; the source Rem stops being incremental and its text, children and flashcards are left alone. Use it when an extract ended up under the outline heading that should have been the incremental item. A **🔀 Transferred from …** marker closes the moved history, naming where it came from. Works in the editor (focused Rem) and in the queue (item under review), and asks for confirmation first, naming both Rems and counting what moves. It refuses when the parent is **already** an Incremental Rem — dismiss it first (`Ctrl+D`), and the transfer will revive and keep that dismissed history — or when the Rem is top-level. Run on the source of an [interrupted transfer](Create-Incremental-Rem-from-PDF-Highlights.md#finish-interrupted-transfer), it finishes that transfer instead.
 
 - **[Open Repetition History](Repetition-History-and-Statistics.md)** (`Ctrl+Shift+H`) — `quick: his` — [routes](Plugin-Widgets-Reference.md#how-ctrlshifth-routes) to the IncRem, flashcard or aggregated view
   Displays a comprehensive history popup. For Incremental Rems, opens the [IncRem Repetition History](Repetition-History-and-Statistics.md). For regular flashcards, opens the [Flashcard Repetition History](Reviewing-Items-in-the-Queue.md#flashcard-repetition-history).
@@ -162,6 +162,20 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   ![Queue in Mobile showing No Inc Rem in this Device indicator](assets/queue-mobile-devicenoincrem-indicator.png){ width="400" }
 
 
+### Video Commands { #video-commands }
+
+- **[Add Video Transcript](Incremental-Video.md#transcripts)** — `quick: avt`
+  Writes the transcript of a YouTube video, or of a Video Extract's range, from the video's captions — from its audio when it has none and Whisper is set up. Works on the queue item, the focused Rem, the Rem under review or an open pane's Rem, and from a note inside a video or extract. Needs the [helper](Incremental-Video.md#setup).
+
+- **[Add Video Transcript from Audio](Incremental-Video.md#transcripts)** — `quick: avta`
+  The same, transcribed from the audio with Whisper on your computer even when the video has captions.
+
+- **[Import Local Videos](Incremental-Video.md#import-local-videos)** — `quick: ilv`
+  Pick a folder of videos on your computer and import it as a document of Incremental Rems, one per video, all due today or one more every N days. Desktop on macOS, with the [helper](Incremental-Video.md#setup).
+
+- **[Link Local Video](Incremental-Video.md#link-local-video)** — `quick: llv`
+  Pick one video file for the focused Rem and make the Rem Incremental.
+
 ---
 
 ## Utilities
@@ -203,9 +217,9 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **Store linked images & audio in RemNote (with descendants)**
   The same, over the focused or selected Rems and their whole subtree — point it at a document to store everything it links to.
 
-- <a id="cycle-image-size"></a>**Cycle Image Size (Fit / Large / Medium / Original)** (`Opt+Shift+G` / `Alt+Shift+G`) — `quick: cis`
-  Sizes the images that were never sized in RemNote — typically those of imported cards, which the queue can show zoomed in and cut off. Each press moves them one step along **Fit → Large → Medium → Original**.
-  Acts on the current queue card (or the Rem selected in the previewer), or on the focused or selected Rems in the editor, and three levels below. Images you have resized, Image Occlusions and highlight images are left alone.
+- <a id="cycle-image-size"></a>**Cycle Image Size (Fit / Large / Medium / Small / Original)** (`Opt+Shift+G` / `Alt+Shift+G`) — `quick: cis`
+  Resizes the images of a card or Rem, including imported ones the queue can show zoomed in and cut off. Each press moves them one step along **Fit → Large → Medium → Small → Original**, and a small bar shows the size set.
+  Acts on the current queue card (or the Rem selected in the previewer), or on the focused or selected Rems in the editor, and three levels below. It asks first before changing images you have sized, or more than 5 images. Image Occlusions and highlight images are left alone.
   📖 See [Utilities → Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size).
 
 ### Queue Display Commands
@@ -389,7 +403,7 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   📖 See [Utilities → Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup).
 
 - **Open Hovered Source in Floating Window** (`Opt+Shift+O` / `Alt+Shift+O`)
-  Same source viewer as above, but opened as a **non-blocking floating window on the right (~48% width)** instead of a centered modal — so the **card/editor stays visible beside it** for peeking back and forth without close/reopen. **Hover** the pin, then press the shortcut.
+  Same source viewer as above, but opened as a **non-blocking floating window on the right (40% width)** instead of a centered modal — so the **card/editor stays visible beside it** for peeking back and forth without close/reopen. **Hover** the pin, then press the shortcut.
 
   - **Stays open while you use the PDF:** highlighting, selecting, or clicking highlights in the reader does **not** dismiss it (outside-click-to-close is disabled).
   - **Auto-closes on card advance**, so a previous card's source never lingers over the next.
@@ -435,6 +449,9 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 
 - **Incremental RemNote: Settings** (`is`)
   Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
+
+- **Import RemNote Scheduler Data**
+  Imports a file created by `scripts/export_scheduler_cards.py`. It can fill **FSRS Global Weights** and **Requested Retention** for this knowledge base from your Global Default Scheduler, and it stores the list of cards on other schedulers. That list labels those cards and adds an **Exclude other schedulers** checkbox to Card Analytics and FSRS Calibration. The popup shows what would change and warns you if your Global Default Scheduler isn't FSRS-6. It also shows the current list and can remove it. See [Import your scheduler data](Reviewing-Items-in-the-Queue.md#import-scheduler-data).
 
 - **Import Incremental Rems with History**
   Bulk-imports Incremental Rems from a **JSON payload** — including each rem's **full repetition history**, priority and next-repetition date. Built for migrating an external study log (e.g. a spreadsheet with years of study sessions) into the plugin's native history format.
@@ -565,8 +582,8 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 - **Cancel No Inc Rem Timer**
   Stops system checks when queues are temporarily empty.
 
-- **Debug Incremental RemNote** / **Debug Video Detection**
-  Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
+- **Debug Incremental RemNote**
+  Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search, and **[Repoint references](Utilities-Cleaning-Up.md#repair-broken-references)** for repairing references that show "Loading".
 
 - **Toggle Priority Band Colour Logging**
   Prints the band → percentile → colour mapping each priority badge stylesheet is built from, to your developer console. Off by default; the setting is per device and survives a reload, so the mapping can be inspected on the next start. Use it if a badge's colour looks out of step with the **[Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget)** for the same Rem.

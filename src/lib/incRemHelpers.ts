@@ -2,7 +2,8 @@ import { BuiltInPowerupCodes, RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { ActionItemType, IncrementalRem } from './incremental_rem/types';
 import { remToActionItemType, ActionItemTypeOptions } from './incremental_rem/action_items';
 import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
-import { creationFoldRemIdsKey } from './consts';
+import { creationFoldRemIdsKey, pendingVideoPaneKey } from './consts';
+import { nativeVideoOfExtract, primeNativeVideoPosition } from './video_position';
 
 /**
  * Extract plain text from RemNote rich text format.
@@ -58,6 +59,41 @@ export async function determineIncRemType(
     return type;
   } catch {
     return 'unknown';
+  }
+}
+
+/** Opened as their own page: a note under a PDF, and local videos, whose player is under the page title. */
+const OPEN_AS_PAGE = new Set<ActionItemType>(['pdf-note', 'local-video', 'local-video-highlight']);
+
+/**
+ * Opens an IncRem in the editor for a review: a note under a PDF as its own
+ * page (not the PDF viewer), a local video or its extract as its own page (a
+ * Rem that isn't a document would otherwise open inside its parent's, with no
+ * player), an extract cut from another extract of a RemNote video as its own
+ * page with the video's page beside it, anything else as RemNote opens it. A
+ * RemNote video Rem opens on
+ * RemNote's video page, which is first offered the plugin's position to
+ * resume at.
+ */
+export async function openIncRemForReview(plugin: RNPlugin, rem: PluginRem): Promise<void> {
+  await primeNativeVideoPosition(plugin, rem);
+  // RemNote opens an extract with its video's page beside it only when the
+  // video is its parent. One cut from another extract opens as its own page,
+  // and the index widget then opens the video's page to its right.
+  const nativeVideo = await nativeVideoOfExtract(plugin, rem);
+  if (nativeVideo && rem.parent !== nativeVideo.video._id) {
+    await plugin.storage.setSession(pendingVideoPaneKey, {
+      remId: rem._id,
+      videoId: nativeVideo.video._id,
+      at: Date.now(),
+    });
+    await rem.openRemAsPage();
+    return;
+  }
+  if (OPEN_AS_PAGE.has(await determineIncRemType(plugin, rem))) {
+    await rem.openRemAsPage();
+  } else {
+    await plugin.window.openRem(rem);
   }
 }
 

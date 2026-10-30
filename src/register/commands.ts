@@ -15,6 +15,16 @@ import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote } from '../lib/pdf_source_pins';
 import { localizeMediaInRems } from '../lib/localize_media';
 import { showMessageDialog } from '../lib/message_dialog';
+import {
+  addVideoTranscript,
+  describeTranscript,
+  shouldTidy,
+  tidyTranscript,
+  transcriptTargetForRem,
+  TranscriptTarget,
+} from '../lib/video_transcript';
+import { TranscriptSource } from '../lib/youtube_transcript';
+import { chooseLocalVideo, localVideoTitle, setLocalVideo } from '../lib/local_video';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import { isHintNode } from '../lib/richTextSanitize';
 import {
@@ -47,6 +57,8 @@ import {
   priorityCalcScopeRemIdsKey,
   sourceFloatingTargetKey,
   sourceFloatingActiveIdKey,
+  sourceFloatingPositionKey,
+  sourceFloatingDefaultPosition,
   preservedHistoryPowerupCode,
   priorityBandColorsReloadKey,
   priorityBandVerboseLogsKey,
@@ -76,17 +88,18 @@ import { CardPriorityInfo, expandCardInfosToCards, isPerCardDue } from '../lib/c
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { initIncrementalRem } from './powerups';
-import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
-import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { IncrementalRep } from '../lib/incremental_rem/types';
-import { safeRemTextToString, getIncrementalReadingPosition, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
+import { getIncrementalRemFromRem, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
+import {
+  queueNextRepetition,
+  captureQueueReviewSeconds,
+  enqueueReviewJob,
+  enqueueReviewJobs,
+  newReviewJobId,
+} from '../lib/incremental_rem/review_jobs';
+import { safeRemTextToString, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
 import { getHoveredReference } from './events';
 import { practicePriorityQueue, findPriorityQueueDoc, isQueueOpen } from '../lib/priority_review_document/queue_doc';
 import { flashcardHistorySpec, clearHistoryShard } from '../lib/history_shards';
-import { transferToDismissed } from '../lib/dismissed';
-import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
-import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
-import dayjs from 'dayjs';
 import {
   getOperatingSystem,
   getPlatform,
@@ -126,8 +139,7 @@ import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 import { resolveQueueCommandTarget } from '../lib/queue_target';
 import { getQueueVisibleCard } from '../lib/queue_visible_card';
-import { cycleImageSizes, resolveImageSizeTargets } from '../lib/image_size_cycle';
-import { IMAGE_SIZE_STEP_LABEL } from '../lib/image_sizing';
+import { pressCycleImageSize } from '../lib/image_size_session';
 import {
   setRemReadPoint,
   isDescendantOf,
@@ -507,7 +519,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       const timeStr = formatDuration(Math.round(outcome.totalReviewSeconds)) || '0s';
       const ok = confirm(
-        `🔀 Transfer Incremental data to parent\n\n` +
+        outcome.mode === 'finish'
+          ? `🔀 Finish an interrupted transfer\n\n` +
+              `From: "${outcome.sourceName}"\n` +
+              `To:   "${outcome.destinationName}"\n\n` +
+              `An earlier transfer already moved this Rem's data onto the parent but stopped ` +
+              `before removing it from here, so both Rems carry the same history ` +
+              `(${outcome.history.length} entr(ies)). All of them are on the parent.\n\n` +
+              `"${outcome.sourceName}" stops being an Incremental Rem. Its text and children are untouched.\n\nContinue?`
+          : `🔀 Transfer Incremental data to parent\n\n` +
           `From: "${outcome.sourceName}"\n` +
           `To:   "${outcome.destinationName}"\n\n` +
           `• ${outcome.history.length} history entr(ies) move across` +
@@ -519,6 +539,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           (outcome.hasReadingState ? `• Reading state (pages / read points) moves too\n` : '') +
           (outcome.destinationDismissedReps > 0
             ? `• ${outcome.destinationDismissedReps} dismissed entr(ies) already on the parent are revived and kept\n`
+            : '') +
+          (outcome.schedulerChange
+            ? `\n⚠️ The scheduler changes: this Rem uses ${outcome.schedulerChange.from}, ` +
+              `the parent will use ${outcome.schedulerChange.to}. The scheduler comes from the ` +
+              `Rem's type and does not move with the data — change it in the Reschedule popup ` +
+              `(Ctrl+J) on the parent afterwards if needed.\n`
             : '') +
           `\n"${outcome.sourceName}" stops being an Incremental Rem. Its text and children are untouched.\n\nContinue?`
       );
@@ -538,9 +564,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       try {
         await executeTransferIncRemToParent(plugin, outcome, { advanceQueue });
-        await plugin.app.toast(
-          `✅ Incremental data moved to "${outcome.destinationName}".`
-        );
+        const doneMessage =
+          outcome.mode === 'finish'
+            ? `✅ Interrupted transfer finished — "${outcome.sourceName}" is no longer Incremental.`
+            : `✅ Incremental data moved to "${outcome.destinationName}".`;
+        console.log(`[TransferIncRem] ${doneMessage}`);
+        await plugin.app.toast(doneMessage);
       } catch (e) {
         console.error('[TransferIncRem] Error:', e);
         await plugin.app.toast('❌ Error during the transfer — see console.');
@@ -1180,15 +1209,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         pageIndex: target.pageIndex,
       });
 
-      // Anchor to the top-right portion of the screen (size is set in the widget
-      // registration). The 4th arg `closeWhenClickOutside: false` is essential:
+      // Anchor to the top-right portion of the screen, or wherever the user last
+      // dragged it (size is set in the widget registration). The 4th arg `closeWhenClickOutside: false` is essential:
       // PDFWebReader renders in a sandboxed iframe, so clicking inside it counts
       // as a click "outside" the widget and would otherwise close the float —
       // preventing highlighting / selecting / clicking highlights in the PDF.
       // The float is closed instead via its ✕ button or the QueueLoadCard listener.
+      const position =
+        (await plugin.storage.getSession<{ top: number; right: number }>(sourceFloatingPositionKey)) ||
+        sourceFloatingDefaultPosition;
       const id = await plugin.window.openFloatingWidget(
         'pdf_source_floating',
-        { top: 48, right: 24 },
+        position,
         undefined,
         false
       );
@@ -1967,6 +1999,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Import the Global Default Scheduler's settings and the cards on other schedulers,
+  // from a JSON file written by scripts/export_scheduler_cards.py
+  plugin.app.registerCommand({
+    id: 'import-scheduler-cards',
+    name: 'Import RemNote Scheduler Data',
+    description:
+      "Fill the plugin's FSRS settings from your Global Default Scheduler, and label the cards on other schedulers so Card Analytics and FSRS Calibration can leave them out.",
+    action: async () => {
+      await plugin.widget.openPopup('import_scheduler_cards');
+    },
+  });
+
   // Command to jump to rem by ID using a popup widget
   plugin.app.registerCommand({
     id: 'jump-to-rem-by-id',
@@ -2235,18 +2279,149 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // The transcript of a whole YouTube video or a Video Extract
+  // (lib/video_transcript.ts): the queue item, else the focused Rem, else the
+  // Rem under an Editor Review (RemNote's video page has no focused Rem), else
+  // a Rem open in a pane. A note under a video or an extract counts as that
+  // video or extract.
+  const addTranscriptCommand = async (source: TranscriptSource) => {
+    const candidates: string[] = [];
+    if ((await plugin.window.getURL()).includes('/flashcards')) {
+      const queueTarget = (await resolveQueueCommandTarget(plugin)).remId;
+      if (queueTarget) candidates.push(queueTarget);
+    } else {
+      const focused = await plugin.focus.getFocusedRem();
+      if (focused) candidates.push(focused._id);
+      const reviewed = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
+      if (reviewed) candidates.push(reviewed);
+      candidates.push(...(await plugin.window.getOpenPaneRemIds()));
+    }
+
+    let target: TranscriptTarget | null = null;
+    for (const id of candidates) {
+      const rem = await plugin.rem.findOne(id);
+      target = rem ? await transcriptTargetForRem(plugin, rem) : null;
+      if (target) break;
+    }
+    if (!target) {
+      await showMessageDialog(plugin, {
+        title: 'No video here',
+        message: 'Add Video Transcript works on a YouTube video or a Video Extract, or a note inside one.',
+        detail: 'Focus the video or extract (or a note under it), or run the command on it in the queue.',
+        tone: 'info',
+      });
+      return;
+    }
+
+    const what = target.range ? "the extract's transcript" : 'the transcript';
+    await plugin.app.toast(
+      source === 'audio'
+        ? `🎙️ Transcribing the audio for ${what}${target.range ? '' : ' (can take minutes)'}…`
+        : `📜 Fetching ${what}…`
+    );
+    try {
+      const written = await addVideoTranscript(plugin, target, source);
+      const blocks = written.remIds.length;
+      let tidied = '';
+      if (await shouldTidy(plugin, written)) {
+        await plugin.app.toast(`✨ Tidying ${blocks} block${blocks > 1 ? 's' : ''} with Claude…`);
+        try {
+          await tidyTranscript(plugin, written);
+          tidied = ', tidied';
+        } catch (e) {
+          console.warn('[VideoTranscript] Could not tidy:', e);
+          tidied = ', not tidied';
+        }
+      }
+      await plugin.app.toast(
+        `✓ 📜 Added ${blocks} block${blocks > 1 ? 's' : ''} (${describeTranscript(written.transcript)}${tidied})`
+      );
+    } catch (e) {
+      console.error('[VideoTranscript]', e);
+      await showMessageDialog(plugin, {
+        title: 'Transcript failed',
+        message: e instanceof Error ? e.message : String(e),
+        tone: 'error',
+      });
+    }
+  };
+
   plugin.app.registerCommand({
-    id: 'debug-video',
-    name: 'Debug Video Detection',
+    id: 'add-video-transcript',
+    name: 'Add Video Transcript',
+    description:
+      "Add the transcript of a YouTube video, or of a Video Extract's range, from the video's captions " +
+      '(from its audio when it has none and Whisper is set up)',
+    quickCode: 'avt',
+    action: () => addTranscriptCommand('auto'),
+  });
+
+  plugin.app.registerCommand({
+    id: 'add-video-transcript-audio',
+    name: 'Add Video Transcript from Audio',
+    description:
+      "Transcribe a YouTube video's audio, or a Video Extract's range of it, with Whisper on this computer, " +
+      'even when the video has captions',
+    quickCode: 'avta',
+    action: () => addTranscriptCommand('audio'),
+  });
+
+  // Local videos (lib/local_video.ts): the helper's macOS dialog picks a folder
+  // or a file, which it places in a video library.
+  const localVideoFailure = (e: unknown) =>
+    showMessageDialog(plugin, {
+      title: 'Local video',
+      message: e instanceof Error ? e.message : String(e),
+      tone: 'error',
+    });
+
+  plugin.app.registerCommand({
+    id: 'import-local-videos',
+    name: 'Import Local Videos',
+    description:
+      'Pick a folder of videos on this computer and import it as a document of Incremental Rems, one per video',
+    quickCode: 'ilv',
+    action: async () => {
+      try {
+        const focused = await plugin.focus.getFocusedRem();
+        await plugin.app.toast('📂 Choose the folder in the dialog…');
+        const picked = await chooseLocalVideo('folder', 'Choose a folder of videos to import');
+        if (!picked) return;
+        await plugin.widget.openPopup('local_video_import', {
+          ...picked,
+          parentId: focused?._id,
+          parentName: focused ? await safeRemTextToString(plugin, focused.text) : undefined,
+        });
+      } catch (e) {
+        await localVideoFailure(e);
+      }
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'link-local-video',
+    name: 'Link Local Video',
+    description: 'Pick a video file on this computer for the focused Rem, and make the Rem Incremental',
+    quickCode: 'llv',
     action: async () => {
       const rem = await plugin.focus.getFocusedRem();
       if (!rem) {
-        await plugin.app.toast('Please focus on a rem first');
+        await plugin.app.toast('Focus the Rem the video belongs to first.');
         return;
       }
-      await plugin.widget.openPopup('video_debug', {
-        remId: rem._id,
-      });
+      try {
+        await plugin.app.toast('🎞️ Choose the video in the dialog…');
+        const file = await chooseLocalVideo('file', 'Choose a video for this Rem');
+        if (!file) return;
+        await setLocalVideo(rem, file);
+        const name = localVideoTitle(file.path);
+        if (!rem.text?.length) await rem.setText([name]);
+        const wasIncremental = await rem.hasPowerup(powerupCode);
+        if (!wasIncremental) await initIncrementalRem(plugin, rem);
+        await plugin.app.toast(`🎞️ Linked “${name}”${wasIncremental ? '' : ', and made it Incremental'}`);
+      } catch (e) {
+        await localVideoFailure(e);
+      }
     },
   });
 
@@ -3045,7 +3220,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const isQueue = url && url.includes('/flashcards');
 
       let rem;
-      let incRemInfo;
 
       if (isQueue) {
         // Queue context: an explicit selection (previewer, sidebar, …) wins over
@@ -3070,76 +3244,45 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
-        incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-        if (!incRemInfo) {
-          await plugin.app.toast('Could not retrieve Incremental Rem information.');
-          return;
-        }
-
         // Was the queue actually reviewing THIS rem as an IncRem when Ctrl+D was
         // pressed? Only then did a review happen that deserves a 'rep' entry.
         // Dismissing a rem opened in the previewer (or selected anywhere else)
         // during a flashcard turn is a pure lifecycle change, exactly like the
         // editor branch below.
-        const isActiveIncRemTurn = target.isActiveIncRemTurn;
-
-        // Replicate the Dismiss button logic from answer_buttons.tsx
-        // 1. Handle card priority inheritance
-        await handleCardPriorityInheritance(plugin, rem, incRemInfo);
-
-        // 2/3. Record the review that is ending — ONLY on a real IncRem turn.
+        //
         // `incremReviewStartTimeKey` is stamped when the queue injects an IncRem
         // and is never cleared afterwards, so on any other turn it still points
-        // at an earlier item; using it here fabricated a rep whose duration was
-        // the time since some unrelated IncRem was shown.
-        const updatedHistory = [...(incRemInfo.history || [])];
+        // at an earlier item; reading it there would fabricate a rep whose
+        // duration was the time since some unrelated IncRem was shown.
+        const isActiveIncRemTurn = target.isActiveIncRemTurn;
+        const reviewTimeSeconds = isActiveIncRemTurn ? (await captureQueueReviewSeconds(plugin)) ?? 0 : 0;
 
-        if (isActiveIncRemTurn) {
-          const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-          const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
+        // Same as the Dismiss button: card priority, the move to Dismissed and
+        // the powerup removal run in the tracker (lib/incremental_rem/review_jobs.ts).
+        await enqueueReviewJob(plugin, {
+          id: newReviewJobId(rem._id),
+          kind: 'dismiss',
+          remId: rem._id,
+          rep: isActiveIncRemTurn ? { reviewTimeSeconds } : undefined,
+          cardPriorityInheritance: true,
+          confirmedAt: Date.now(),
+        });
 
-          const currentRep: IncrementalRep = {
-            date: Date.now(),
-            scheduled: incRemInfo.nextRepDate,
-            reviewTimeSeconds: reviewTimeSeconds,
-            eventType: 'rep',
-            priority: incRemInfo.priority,
-          };
-
-          updatedHistory.push(currentRep);
-        }
-
-        // 4. Transfer history to dismissed powerup
-        await transferToDismissed(plugin, rem, updatedHistory);
-
-        // 4b. Record the dismissal in the Incremental History widget
-        await addToIncrementalHistory(plugin, rem._id, { dismissed: true });
-
-        // 5. Remove from session cache
-        await removeIncrementalRemCache(plugin, rem._id);
-
-        // 6. Remove incremental powerup AND conditionally advance queue simultaneously.
-        // removePowerup destroys the widget sandbox on the next microtask,
-        // so both IPC messages must be sent in the same tick if targeting queue.
         // Only a real IncRem turn is advanced: on a flashcard turn the card on
         // screen is a different item that is still due, so dropping it would
         // silently eat a scheduled review.
         if (isActiveIncRemTurn) {
           // Like "Next", dismissing the queue card means we've left the rem —
-          // restore the dashboard. Flag BEFORE the destructive call (consumed by
-          // the persistent QueueLoadCard listener once the next card loads).
+          // restore the dashboard. Flag BEFORE advancing (consumed by the
+          // persistent QueueLoadCard listener once the next card loads).
           await requestQueueDashboardRefocus(plugin, 'dismiss-command');
-          await Promise.allSettled([
-            rem.removePowerup(powerupCode),
-            plugin.queue.removeCurrentCardFromQueue(true),
-          ]);
+          await plugin.queue.removeCurrentCardFromQueue(true);
         } else {
-          await rem.removePowerup(powerupCode);
           // No queue advance here, so nothing on screen changes — confirm which
-          // rem was actually dismissed.
+          // rem was dismissed.
           const name = await safeRemTextToString(plugin, rem.text);
           const short = name.length > 40 ? name.slice(0, 40) + '…' : name;
-          await plugin.app.toast(
+          void plugin.app.toast(
             short ? `Incremental Rem dismissed: "${short}"` : 'Incremental Rem dismissed.'
           );
         }
@@ -3179,22 +3322,23 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
-        for (const r of remsToDissmiss) {
-          incRemInfo = await getIncrementalRemFromRem(plugin, r);
-          if (incRemInfo) {
-            // Transfer existing history to dismissed (no new rep entry needed)
-            await transferToDismissed(plugin, r, incRemInfo.history || []);
-          }
-          // Log a standalone dismissal in the Incremental History widget
-          await addDismissalToIncrementalHistory(plugin, r._id);
-          // Remove from session cache
-          await removeIncrementalRemCache(plugin, r._id);
-          // Remove incremental powerup
-          await r.removePowerup(powerupCode);
-        }
+        // No review is ending here, so no rep entry: the history moves to
+        // Dismissed as it is. One job per rem, drained by the tracker with a
+        // single cache write for the whole selection.
+        const confirmedAt = Date.now();
+        await enqueueReviewJobs(
+          plugin,
+          remsToDissmiss.map((r) => ({
+            id: newReviewJobId(r._id),
+            kind: 'dismiss' as const,
+            remId: r._id,
+            cardPriorityInheritance: false,
+            confirmedAt,
+          }))
+        );
 
         const count = remsToDissmiss.length;
-        await plugin.app.toast(
+        void plugin.app.toast(
           count === 1
             ? 'Incremental Rem dismissed.'
             : `${count} Incremental Rems dismissed.`
@@ -3244,26 +3388,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-      if (!incRemInfo) {
-        await plugin.app.toast('Could not retrieve Incremental Rem information.');
-        return;
-      }
-
-      // Handle PDF page history (same as handleNextClick in answer_buttons.tsx)
+      // Same as the Next button: the writes (reading time, schedule, history)
+      // run in the tracker and the queue advances at once.
       const remType = await plugin.storage.getSession<string | null>(currentIncrementalRemTypeKey);
-      if (remType === 'pdf') {
-        const pdfRem = await getActivePdfForIncRem(plugin, rem);
-        if (pdfRem) {
-          const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRem._id);
-          if (currentPage) {
-            await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
-          }
-        }
-      }
-
-      // Advance the queue (updates SRS data + removes current card)
-      await handleNextRepetitionClick(plugin, incRemInfo);
+      await queueNextRepetition(plugin, rem._id, { syncPdfPage: remType === 'pdf' });
     },
   });
 
@@ -4144,47 +4272,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   // Imported images keep the size they arrived with, which the queue's image
-  // canvas can show as a zoomed crop. Each press moves the unsized images of the
-  // target Rem and three levels below it one step along Fit, Large, Medium and
-  // back to Original; images the user has sized are never touched.
+  // canvas can show as a zoomed crop, and a size chosen in the editor is not
+  // always the one wanted in the queue. Each press moves the images of the target
+  // Rem and three levels below it one step along Fit, Large, Medium, Small and
+  // back to Original; lib/image_size_session.ts asks first when that would change
+  // sizes the user chose, or more images than the Ask Above setting.
   plugin.app.registerCommand({
     id: 'cycle-image-size',
-    name: 'Cycle Image Size (Fit / Large / Medium / Original)',
+    name: 'Cycle Image Size (Fit / Large / Medium / Small / Original)',
     description:
-      'Sizes the images of the focused Rem (or the current card) and three levels below it that were never sized in RemNote. Press again to move to the next size.',
+      'Sizes the images of the focused Rem (or the current card) and three levels below it. Press again to move to the next size; Original puts back the sizes they had. Asks first before changing images you have sized.',
     keyboardShortcut: 'opt+shift+g',
     quickCode: 'cis',
-    action: async () => {
-      try {
-        const targets = await resolveImageSizeTargets(plugin);
-        if (targets.length === 0) {
-          await plugin.app.toast('No Rem focused and no card on screen.');
-          return;
-        }
-        const result = await cycleImageSizes(plugin, targets);
-        const notes = [
-          result.userSized > 0 ? `${result.userSized} already sized by you` : '',
-          result.protectedImages > 0 ? `${result.protectedImages} occlusion/highlight` : '',
-          result.unmeasurable > 0 ? `${result.unmeasurable} could not be measured` : '',
-          result.failed > 0 ? `${result.failed} Rem(s) failed` : '',
-        ].filter(Boolean);
-        const skipped = notes.length > 0 ? ` Skipped: ${notes.join(', ')}.` : '';
-        if (!result.step) {
-          await plugin.app.toast(`No unsized images found here.${skipped}`);
-          return;
-        }
-        await plugin.app.toast(
-          `Images → ${IMAGE_SIZE_STEP_LABEL[result.step]} (${result.changed} changed).${skipped}`
-        );
-      } catch (error) {
-        console.error('[ImageSize] command failed', error);
-        await showMessageDialog(plugin, {
-          title: 'Could not resize the images',
-          message: error instanceof Error ? error.message : String(error),
-          tone: 'error',
-        });
-      }
-    },
+    action: () => pressCycleImageSize(plugin),
   });
 
 }

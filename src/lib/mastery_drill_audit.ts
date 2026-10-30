@@ -26,8 +26,9 @@ import { AncestorChainCache, formatBreadcrumb } from './card_enablement/scan';
 import { clozeIdOfCard, collectClozeIds, directionEnabled } from './card_analytics_export';
 import { getCardPriority } from './card_priority';
 import { CardPriorityInfo } from './card_priority/types';
+import type { FinalDrillEntry } from './mastery_drill_cooling';
 
-export type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+export type FinalDrillItem = FinalDrillEntry;
 
 export const drillItemCardId = (item: FinalDrillItem): string =>
   typeof item === 'string' ? item : item.cardId;

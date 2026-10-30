@@ -111,7 +111,7 @@ Sequential Review solves this by creating a dedicated, queue-like experience tha
 
 Once you click the button, you are transported to the editor for the first item in the list, and the **Editor Review Timer** widget appears at the bottom of your screen. 
 
-The timer provides a range of powerful controls to manage your session without the risk of overlapping text in smaller windows.
+The timer provides a range of powerful controls to manage your session without the risk of overlapping text in smaller windows. **Next**, **Dismiss** and **End Review** act instantly: the repetition is saved in the background a moment later, and a dialog tells you if it could not be (for example, the Rem was deleted meanwhile).
 
 1.  **Review your material**: Read, edit, extract highlights, or create flashcards using the full power of the editor.
 2.  **Pause if needed**: If you need to step away mid-review, click the **⏸ Pause** button to freeze the timer. Click **▶ Resume** to continue. Only active (non-paused) time is recorded when the repetition is saved.
@@ -120,7 +120,7 @@ The timer provides a range of powerful controls to manage your session without t
     * *What happens under the hood*: Just like the "Dismiss" button in the queue, this records your final review time, transfers your history to the **Dismissed** powerup, and **removes the Incremental status** from the Rem, effectively clearing it from your active learning universe. It also stamps the Rem's priority onto its `cardPriority` tag, so the value outlives the Incremental powerup and anchors every flashcard created under that Rem afterwards — see [Priority Sources](Priorities-for-Flashcards.md#priority-sources). The dismissal also appears in the [Incremental Rem History](Plugin-Widgets-Reference.md#221-incremental-rem-history) sidebar with a 🔴 **Dismissed** badge.
     * *When there are no further items queued* (e.g. single-item flows via `Ctrl+Shift+J`), Dismiss finalizes the item and ends the timer in place. When a queueList is present (Sequential Review), it dismisses the current item and advances to the next one.
 4.  **Move to the next item**: When you are finished with the current review but want the item to remain incremental for future sessions, click the **Next (N) →** button on the timer widget.
-    * *What happens under the hood*: The plugin instantly records your repetition (logging the time spent and pushing the Next Rep Date forward), saves this reading history to the Incremental Tracker, and instantly teleports you to the editor of the *next* item in your sorted list.
+    * *What happens under the hood*: The plugin records your repetition in the background (logging the time spent and pushing the Next Rep Date forward), saves this reading history to the Incremental Tracker, and instantly teleports you to the editor of the *next* item in your sorted list, with a fresh, unpaused timer.
 5.  **Finish the session**: If you want to stop reviewing before the list is empty, simply click **"End Review"** on the green primary button. The destination sub-label ("and Back to IncRem List") confirms where you will land.
 6.  **Cancel Timer**: Discard the current item's timer and stay in the editor.
 
@@ -142,9 +142,11 @@ The timer widget is designed to be fully responsive. If used in a narrow sidebar
 
 #### Always in view { #timer-stays-in-view }
 
-The timer stays pinned to the top of the pane while you scroll, so **Next**, **Dismiss** and **End Review** are always within reach, however long the document is. Each pane showing the document has its own pinned bar.
+The timer stays pinned to the top of the pane while you scroll, so **Next**, **Dismiss** and **End Review** are always within reach, however long the document is.
 
-RemNote's **sticky headers** (the parent Rems that stay visible while you scroll their descendants) are moved down to sit just below the timer, and return to the top of the pane when the review ends. In a split view with panes of different widths, the pane whose timer is shorter shows a small gap above its sticky headers: one offset is used for all panes, sized for the tallest timer.
+In a split view, only **one pane** shows the timer: the top-most one, or the left-most of the panes on the same row. It stays there while you move through items with **Next**. If you close that pane, the timer moves to the next pane in that order within a couple of seconds. Panes in other RemNote tabs don't count.
+
+RemNote's **sticky headers** (the parent Rems that stay visible while you scroll their descendants) are moved down to sit just below the timer, and return to the top of the pane when the review ends. Panes without the timer keep their sticky headers at the top.
 
 RemNote does not show this bar inside the PDF viewer itself: press **Notes** to open the Rem that holds the PDF, and the timer is there.
 

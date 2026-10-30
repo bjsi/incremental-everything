@@ -1,16 +1,22 @@
-import { DocumentViewer, usePlugin } from '@remnote/plugin-sdk';
+import { DocumentViewer, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
-import ReactPlayer from 'react-player/youtube';
-import { Resizable } from 're-resizable';
-import { useSyncedStorageState } from '@remnote/plugin-sdk';
 import { YoutubeHighlightActionItem } from '../lib/incremental_rem/types';
+import { extractVideoId } from '../lib/youtube_transcript';
+import { PluginYouTubePlayerFrame, useYouTubeBridge } from './PluginYouTubePlayer';
+import { VideoNotesSplit } from './VideoNotesSplit';
+import { PlayerControls } from './PlayerControls';
+import { VideoSnapshotButtons } from './VideoSnapshotButtons';
+import { VideoTranscriptButton } from './VideoTranscriptButton';
+import { useExtractResume, useVideoPositionSaver } from './useVideoPosition';
+import { extractPositionKey } from '../lib/video_position';
+import { allowsSubExtracts } from '../lib/video_extract_tree';
+import { PluginExtractButtons } from './PluginExtractButtons';
 
 interface VideoExtractViewerProps {
     actionItem: YoutubeHighlightActionItem;
+    /** Shown for extracts of RemNote video Rems: switches the card to RemNote's player. */
+    onSwitchPlayer?: () => void;
 }
-
-const getBoundedWidth = (width: number, minWidth: number, maxWidth: number) =>
-    Math.min(Math.max(width, minWidth), maxWidth);
 
 /** Format seconds to MM:SS */
 const formatTime = (seconds: number): string => {
@@ -22,61 +28,51 @@ const formatTime = (seconds: number): string => {
 export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => {
     const { url, startTime, endTime, extract } = props.actionItem;
     const plugin = usePlugin();
-    const [width, setWidthInner] = React.useState<number>();
+    const [notesOpen, setNotesOpen] = React.useState(true);
 
-    const startWidth = React.useRef<number>();
-    const containerRef = React.useRef<HTMLDivElement>(null);
-
-    const setWidth = (w: number, minW: number, maxW: number) => {
-        setWidthInner(getBoundedWidth(w, minW, maxW));
-    };
-
-    const [playing, setPlaying] = React.useState(true);
-
+    const videoId = extractVideoId(url);
     const playbackRateStorageKey = `${url}-playbackRate`;
-    const [playbackRate, setPlaybackRate] = useSyncedStorageState<number>(
-        playbackRateStorageKey,
-        1.0
+    const savedRate = useRunAsync(
+        async () => (await plugin.storage.getSynced<number>(playbackRateStorageKey)) ?? 1,
+        [playbackRateStorageKey]
     );
 
-    const player = React.useRef<ReactPlayer>(null);
-    const didInitialSeek = React.useRef(false);
+    // Where the last review of this extract stopped, or its start.
+    const resume = useExtractResume(extract._id, { start: startTime, end: endTime });
+    const ready = savedRate !== undefined && !!resume;
 
-    // Seek to startTime on mount
+    const { info, connected, send } = useYouTubeBridge(ready ? videoId : null, {
+        start: resume?.start ?? startTime,
+        playbackRate: savedRate,
+        onRateChange: (rate) => plugin.storage.setSynced(playbackRateStorageKey, rate),
+    });
+    useVideoPositionSaver(extractPositionKey(extract._id), info, resume?.start);
+
+    // Pause at endTime. The auto-pause arms only once the player reports a time
+    // inside the segment: until the start seek lands, the time it reports is
+    // the old position, often already past the end.
+    const [armed, setArmed] = React.useState<'waiting' | 'inside' | 'done'>('waiting');
     React.useEffect(() => {
-        if (player.current && !didInitialSeek.current) {
-            didInitialSeek.current = true;
-            player.current.seekTo(startTime, 'seconds');
+        const t = info.currentTime;
+        if (t === undefined) return;
+        if (armed === 'waiting' && t >= startTime - 1 && t < endTime) setArmed('inside');
+        if (armed === 'inside' && t >= endTime) {
+            send({ command: 'pause' });
+            setArmed('done');
         }
-    }, [player?.current, startTime]);
-
-    // Pause when reaching endTime
-    const handleProgress = (state: { playedSeconds: number }) => {
-        if (state.playedSeconds >= endTime) {
-            setPlaying(false);
-        }
-    };
+    }, [info.currentTime, armed]);
 
     // Allow replaying the segment
     const handleReplay = () => {
-        if (player.current) {
-            player.current.seekTo(startTime, 'seconds');
-            setPlaying(true);
-        }
+        send({ command: 'seekTo', seconds: startTime });
+        send({ command: 'play' });
+        setArmed('waiting');
     };
 
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div className="top-bar" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
-                <button
-                    onClick={() => {
-                        if (width === 0) {
-                            setWidthInner(containerRef.current!.clientWidth / 2);
-                        } else {
-                            setWidthInner(0);
-                        }
-                    }}
-                >
+            <div className="top-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                <button onClick={() => setNotesOpen((open) => !open)} title="Show or hide the notes">
                     📝
                 </button>
 
@@ -109,56 +105,87 @@ export const VideoExtractViewer: React.FC<VideoExtractViewerProps> = (props) => 
                 >
                     🔄 Replay
                 </button>
-            </div>
-            <div ref={containerRef} className="flex video-container w-[100%]" style={{ flex: 1, minHeight: 0 }}>
-                {width !== 0 && (
-                    <Resizable
-                        minWidth="30%"
-                        maxWidth="70%"
-                        enable={{ right: true }}
-                        size={{ width: width || `50%`, height: '100%' }}
-                        handleClasses={{ right: '!w-[15px] !right-[-15px] z-[3]' }}
-                        onResizeStart={() => {
-                            startWidth.current = width;
+
+                {resume?.resumed && (
+                    <button
+                        onClick={() => {
+                            send({ command: 'seekTo', seconds: resume.start });
+                            send({ command: 'play' });
                         }}
-                        onResize={(___, __, _, delta) => {
-                            const containerRefCurrent = containerRef.current;
-                            if (!startWidth.current || !containerRefCurrent) return;
-                            const newWidth = startWidth.current + delta.width;
-                            setWidth(
-                                newWidth || containerRefCurrent.clientWidth * 0.5,
-                                containerRefCurrent.clientWidth * 0.3,
-                                containerRefCurrent.clientWidth * 0.7
-                            );
-                        }}
-                        onResizeStop={(___, __, _, delta) => {
-                            const containerRefCurrent = containerRef.current;
-                            if (!startWidth.current || !containerRefCurrent) return;
-                            const newWidth = startWidth.current + delta.width;
-                            setWidth(
-                                newWidth || containerRefCurrent.clientWidth * 0.5,
-                                containerRefCurrent.clientWidth * 0.3,
-                                containerRefCurrent.clientWidth * 0.7
-                            );
+                        title="Where the last review of this extract stopped. Click to go back there."
+                        style={{
+                            cursor: 'pointer',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            border: '1px solid #d1d5db',
+                            backgroundColor: '#f3f4f6',
+                            fontSize: 12,
                         }}
                     >
-                        <DocumentViewer width={'100%'} height={'100%'} documentId={extract._id} />
-                    </Resizable>
+                        ⏮ Resumed at {formatTime(resume.start)}
+                    </button>
                 )}
-                <ReactPlayer
-                    controls
-                    playing={playing}
-                    playbackRate={playbackRate}
-                    ref={player}
-                    url={url}
-                    width="100%"
-                    height="100%"
-                    onProgress={handleProgress}
-                    onPlaybackRateChange={(speed: any) => {
-                        setPlaybackRate(parseFloat(speed));
-                    }}
-                />
+
+                {props.onSwitchPlayer && (
+                    <button
+                        onClick={() => {
+                            send({ command: 'pause' });
+                            props.onSwitchPlayer?.();
+                        }}
+                        title="Watch the extract in RemNote's player: transcript, Highlight Moment, AI Tutor and Summary. It offers to resume at the extract's start, but can't stop at its end."
+                        style={{
+                            cursor: 'pointer',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            border: '1px solid #d1d5db',
+                            backgroundColor: '#f3f4f6',
+                            fontSize: 12,
+                        }}
+                    >
+                        🎬 RemNote player
+                    </button>
+                )}
+
+                {videoId && <PlayerControls info={info} connected={connected} send={send} />}
+                {videoId && allowsSubExtracts({ start: startTime, end: endTime }) && (
+                    <PluginExtractButtons
+                        position={info.currentTime ?? resume?.start ?? startTime}
+                        pause={() => send({ command: 'pause' })}
+                        parentId={extract._id}
+                        url={url}
+                    />
+                )}
+                {videoId && (
+                    <VideoSnapshotButtons source={{ videoId }} time={info.currentTime} parentId={extract._id} />
+                )}
+                {videoId && (
+                    <VideoTranscriptButton
+                        target={{ parentId: extract._id, url, range: { start: startTime, end: endTime } }}
+                    />
+                )}
+
+                {armed === 'done' && (
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>✓ end of extract reached</span>
+                )}
+                {videoId && !connected && (
+                    <span
+                        style={{ fontSize: 12, color: '#6b7280' }}
+                        title="Waiting for the player. In a browser, click play on the video once."
+                    >
+                        ⏳ connecting to the player…
+                    </span>
+                )}
             </div>
+            <VideoNotesSplit
+                notes={<DocumentViewer width={'100%'} height={'100%'} documentId={extract._id} />}
+                notesOpen={notesOpen}
+            >
+                {!videoId ? (
+                    <div className="p-4">Not a YouTube video URL: {url}</div>
+                ) : ready ? (
+                    <PluginYouTubePlayerFrame videoId={videoId} start={resume!.start} />
+                ) : null}
+            </VideoNotesSplit>
         </div>
     );
 };

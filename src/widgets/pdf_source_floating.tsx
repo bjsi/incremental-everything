@@ -3,11 +3,31 @@ import {
   usePlugin,
   WidgetLocation,
   ReactRNPlugin,
+  PluginRem,
   AppEvents,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SourceReaderView } from '../components/SourceReaderView';
-import { sourceFloatingTargetKey, sourceFloatingActiveIdKey } from '../lib/consts';
+import { useFloatingWidgetDrag, FloatingPosition } from '../lib/floating_widget_drag';
+import {
+  sourceFloatingTargetKey,
+  sourceFloatingActiveIdKey,
+  sourceFloatingPositionKey,
+  sourceFloatingDefaultPosition,
+} from '../lib/consts';
+
+const NOTES_POLL_MS = 300;
+// Long enough to span a poll that lands between the key press and its event.
+const NOTES_RECENT_MS = 700;
+
+async function isInsideRem(rem: PluginRem, ancestorId: string): Promise<boolean> {
+  let cursor: PluginRem | undefined = rem;
+  while (cursor) {
+    if (cursor._id === ancestorId) return true;
+    cursor = await cursor.getParentRem();
+  }
+  return false;
+}
 
 /**
  * FLOATING variant of the Source popup — non-blocking, opens to the side so the
@@ -16,7 +36,8 @@ import { sourceFloatingTargetKey, sourceFloatingActiveIdKey } from '../lib/const
  * openFloatingWidget has no contextData param, so the resolved target is handed
  * off via session storage (sourceFloatingTargetKey) by the
  * `open-source-in-floating` command. The widget reads its own floatingWidgetId
- * from the widget context to close itself.
+ * from the widget context to close itself, and to move itself when its header
+ * is dragged.
  */
 export function PdfSourceFloating() {
   const plugin = usePlugin() as ReactRNPlugin;
@@ -25,12 +46,17 @@ export function PdfSourceFloating() {
   const [kind, setKind] = useState<string | null>(null);
   const [floatingWidgetId, setFloatingWidgetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [moveCount, setMoveCount] = useState(0);
+  const positionRef = useRef<FloatingPosition | null>(sourceFloatingDefaultPosition);
 
   useEffect(() => {
     const init = async () => {
       try {
         const ctx = await plugin.widget.getWidgetContext<WidgetLocation.FloatingWidget>();
         setFloatingWidgetId(ctx?.floatingWidgetId ?? null);
+        positionRef.current =
+          (await plugin.storage.getSession<FloatingPosition>(sourceFloatingPositionKey)) ||
+          sourceFloatingDefaultPosition;
 
         const data =
           (await plugin.storage.getSession<{
@@ -84,18 +110,67 @@ export function PdfSourceFloating() {
     // Per-widget `widget.*` events (like StealKeyEvent) are delivered keyed by
     // the floating widget id — an `undefined` listener key never matches, which
     // is why an app-focused Esc didn't reach us before.
-    const onStealKey = (e: any) => { if (isEsc(e)) close(); };
+    // Esc while typing in Notes does nothing rather than close the float under it:
+    // the steal keeps it from RemNote, and no API can close the Notes popup.
+    // A plugin can't see the Notes popup, only the cursor: its notes are Rems under
+    // the source, and its top field edits the highlight with no focused Rem, just a
+    // text selection. The cursor is already gone when the event arrives, so judge by
+    // the polls from before the key press.
+    let lastInNotesAt = 0;
+    let polling = false;
+    // Walking up from the focused Rem is the costly part; the answer only changes with the Rem.
+    let checkedRemId: string | undefined;
+    let checkedRemInSource = false;
+    const poll = async () => {
+      if (polling || !hostRemId) return;
+      polling = true;
+      try {
+        const focused = await plugin.focus.getFocusedRem();
+        let inNotes: boolean;
+        if (!focused) {
+          inNotes = !!(await plugin.editor.getSelectedText());
+        } else {
+          if (focused._id !== checkedRemId) {
+            checkedRemInSource = await isInsideRem(focused, hostRemId);
+            checkedRemId = focused._id;
+          }
+          inNotes = checkedRemInSource;
+        }
+        if (inNotes) lastInNotesAt = Date.now();
+      } catch {
+        // Next tick retries.
+      } finally {
+        polling = false;
+      }
+    };
+    const pollTimer = setInterval(poll, NOTES_POLL_MS);
+
+    const onStealKey = (e: any) => {
+      if (!isEsc(e)) return;
+      if (Date.now() - lastInNotesAt < NOTES_RECENT_MS) return;
+      close();
+    };
     plugin.event.addListener(AppEvents.StealKeyEvent, floatingWidgetId, onStealKey);
 
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKeyDown);
 
     return () => {
+      clearInterval(pollTimer);
       plugin.event.removeListener(AppEvents.StealKeyEvent, floatingWidgetId, onStealKey);
       document.removeEventListener('keydown', onKeyDown);
       plugin.window.releaseKeys(floatingWidgetId, ['Escape']).catch(() => {});
     };
-  }, [floatingWidgetId, plugin, close]);
+  }, [floatingWidgetId, hostRemId, plugin, close]);
+
+  const onDragEnd = useCallback(
+    (position: FloatingPosition) => {
+      plugin.storage.setSession(sourceFloatingPositionKey, position).catch(() => {});
+      setMoveCount((n) => n + 1);
+    },
+    [plugin]
+  );
+  const onHeaderPointerDown = useFloatingWidgetDrag(plugin, floatingWidgetId, positionRef, onDragEnd);
 
   if (loading) {
     return <div style={{ padding: '16px' }}>Loading source…</div>;
@@ -115,6 +190,8 @@ export function PdfSourceFloating() {
       hoveredRemId={hoveredRemId}
       kind={kind}
       onClose={close}
+      onHeaderPointerDown={onHeaderPointerDown}
+      moveCount={moveCount}
     />
   );
 }

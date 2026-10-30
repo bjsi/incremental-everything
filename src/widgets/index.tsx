@@ -29,8 +29,9 @@ import {
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey, editorReviewTimerHeightsKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey, queueBeautifulBarWidthKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
+import { registerQueueBeautifulBarFitCss } from '../lib/queue_beautiful_bar_fit';
 import { registerEditorReviewTimerHeadersCss } from '../lib/editor_review_timer_sticky';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
@@ -38,6 +39,9 @@ import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerLogosBridge } from '../lib/logos_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
+import { registerOpenInWindowListener } from '../lib/open_in_window';
+import { registerVideoReviewBar } from '../lib/video_review_bar';
+import { registerImageSizeSession } from '../lib/image_size_session';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
@@ -137,7 +141,13 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Publishes this window's open PDFs/articles so a command run in another
   // RemNote window can find them.
   registerWindowSourcesPresence(plugin);
+  // Opens a source another window asks this one to show.
+  void registerOpenInWindowListener(plugin);
   await registerWidgets(plugin);
+  // The review timer's floating bar over RemNote's video page.
+  registerVideoReviewBar(plugin);
+  // Runs Cycle Image Size's presses, and what its popup and floating widget ask for.
+  registerImageSizeSession(plugin);
 
   // Register CSS rules
   // PDF highlight CSS is (re)registered reactively: the "peek" toggle (command +
@@ -160,6 +170,13 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     const barHeight = await rp.storage.getSession<number>(cardInfoBarHeightKey);
     await registerCardInfoBarDockCss(plugin, barHeight);
+  });
+
+  // The Beautiful queue's top-right strip fits queue_beautiful_bar's content, which the
+  // widget reports (lib/queue_beautiful_bar_fit). Also runs at activation with the default.
+  plugin.track(async (rp) => {
+    const width = await rp.storage.getSession<number>(queueBeautifulBarWidthKey);
+    await registerQueueBeautifulBarFitCss(plugin, width);
   });
 
   // The pinned Editor Review Timer sits where RemNote draws its sticky headers, so

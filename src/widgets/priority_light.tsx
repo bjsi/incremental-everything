@@ -21,8 +21,7 @@ import {
     setCardPriority,
     getCardPriorityValue,
 } from '../lib/card_priority';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { updateCardPriorityCache } from '../lib/card_priority/cache';
+import { publishPendingCardPriority } from '../lib/card_priority/pending_priority';
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { initIncrementalRem } from '../lib/incremental_rem';
@@ -260,10 +259,12 @@ function PriorityLight() {
             return;
         }
 
-        // --- Optimistic UI updates (sync session writes — safe in popup context) ---
-        if (incChanged) {
-            updateIncrementalRemCache(plugin, { remId: data.rem._id, priority: effectiveInc! } as any);
-        }
+        // --- Optimistic UI update ---
+        // No cache patch here: patching means reading the ~8MB cache and writing
+        // it back, and the read's reply arrives after the popup's iframe is gone.
+        // The caches are left to the tracker; the displays show the new card value
+        // from the pending key (one setSession, which survives the teardown) until
+        // the tracker's cache write lands.
         if (cardChanged) {
             // Signal events.ts to allow this update even if in queue
             plugin.storage.getSession<string[]>('manual_priority_pending_rems').then(manualRems => {
@@ -274,17 +275,7 @@ function PriorityLight() {
                 }
             }).catch(console.error);
 
-            // Lightweight in-memory optimistic override (5s TTL) — read by getPendingCacheUpdate
-            updateCardPriorityCache(plugin, data.rem._id, true, {
-                remId: data.rem._id,
-                priority: effectiveCard!,
-                source: 'manual',
-                cardCount: data.cardCount,
-                dueCards: data.dueCards,
-            } as any);
-
-            // Signal listeners (e.g. display widget) to refresh immediately
-            plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
+            publishPendingCardPriority(plugin, data.rem._id, effectiveCard!, 'manual');
         }
 
         // --- Write the DB job to session storage for tracker.ts to execute ---
@@ -302,7 +293,7 @@ function PriorityLight() {
             }).catch(console.error);
         }
 
-        // ⚡ Close immediately — optimistic cache is already in place, DB writes happen in tracker.ts
+        // ⚡ Close immediately — the pending key is already posted, DB and cache writes happen in tracker.ts
         console.log(`[PriorityLight] handleSave total before closePopup: ${Math.round(performance.now() - tSave)}ms`);
         plugin.widget.closePopup();
     }, [data, incVal, cardVal, plugin, isBatchMode, batchRemIds, batchScan]);

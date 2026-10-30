@@ -5,7 +5,7 @@ import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { buildDocumentScope } from '../lib/scope_helpers';
-import { extractText, determineIncRemType, getTotalTimeSpent, getBreadcrumbText } from '../lib/incRemHelpers';
+import { extractText, determineIncRemType, openIncRemForReview, getTotalTimeSpent, getBreadcrumbText } from '../lib/incRemHelpers';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
 import { getSortingRandomness } from '../lib/sorting';
@@ -248,12 +248,7 @@ export function IncRemList() {
     await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
 
     // Open the rem in the editor
-    const incRemType = await determineIncRemType(plugin, rem);
-    if (incRemType === 'pdf-note') {
-      await rem.openRemAsPage();
-    } else {
-      await plugin.window.openRem(rem);
-    }
+    await openIncRemForReview(plugin, rem);
 
     await plugin.widget.closePopup();
   };
