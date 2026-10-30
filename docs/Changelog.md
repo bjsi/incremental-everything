@@ -10,6 +10,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Cards on other schedulers](Reviewing-Items-in-the-Queue.md#cards-on-other-schedulers)
 
+**Flashcard Repetition History**: List and set cards now show why the card is due, what it will test next, and how each item is doing, and their history rows show each item's score.
+
+📖 [The Items panel](Reviewing-Items-in-the-Queue.md#multi-line-items-panel)
+
 ### ⚡ Improved
 
 **FSRS Settings**: FSRS Global Weights and Requested Retention are now saved for each knowledge base, and a script can fill them from your Global Default Scheduler. A secondary knowledge base now uses the FSRS defaults until you set its own values, so if you pasted weights while working in one, enter them there again.

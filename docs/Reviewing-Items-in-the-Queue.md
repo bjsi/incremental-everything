@@ -428,7 +428,7 @@ Clicking the 🔬 button (or pressing `Ctrl+Shift+H`) opens a detailed popup sho
 
 **Each row contains:**
 
-*   **Rating:** The score given (Again, Hard, Good, Easy), color-coded.
+*   **Rating:** The score given (Again, Hard, Good, Easy), color-coded. On a list or set card it is followed by [each item's score](#multi-line-items-panel).
 *   **Response Time:** How long you spent answering.
 *   **Target Date:** When the review was originally scheduled.
 *   **Practice Date:** When you actually reviewed it.
@@ -439,6 +439,36 @@ Clicking the 🔬 button (or pressing `Ctrl+Shift+H`) opens a detailed popup sho
 *   **pluginData:** Any data recorded by plugins during that review (historical; only present for reviews performed via the plugin's custom scheduler).
 
 The heading summary also shows the current **SInc** for all three recall grades, color-coded: 🟠 Hard / 🟢 Good / 🔵 Easy. Hover for a tooltip with projected stability values.
+
+#### The Items panel { #multi-line-items-panel }
+
+On a list or set card, the popup adds an **Items** panel above the Forgetting Curve. It answers three questions: why the card is due when it is, what it will test next, and which items are weak.
+
+Two sentences at the top say why the card is due and what comes next. For example: *Back early because you forgot "ou dão-se…" on Oct 30. Next time it tests only "ou dão-se…". The full card returns around Dec 26.*
+
+Below them, one row per item, with the items tested next first and then the weakest:
+
+| Column | What it shows |
+|---|---|
+| **Item** | The item's text, with ⚠ while it is in trouble |
+| **Last 2** | Its last two scores, oldest first: ✓ recalled, ~ partially recalled, ✗ forgot |
+| **Memory** | Its FSRS stability |
+| **Next test** | When you will next see it: *Next time*, *Full card, ~Dec 26*, or its own date |
+
+**What "in trouble" means.** RemNote treats an item as in trouble while either of its last two scores is a Forgot or a Partially Recalled. Only an item in trouble can bring the card back before its normal date, and the lowest recent scores decide which items the next partial card tests. An item leaves trouble after two good answers in a row.
+
+**How items get separate scores:**
+
+*   **List card:** you rate each item as it is revealed.
+*   **Set card:** the button you press goes to every item. To score items separately, press **Forgot** or **Partially Recalled** once, tap the items it applies to, then press the score for the rest.
+
+Pressing **Partially Recalled** twice on a set card scores every item the same. They are all in trouble, but they share the main card's date, so the card doesn't come back early.
+
+**In the history table,** a full repetition shows one mark per item, with its name and score on hover. A [partial repetition](#partial-list-and-set-cards) is greyed, with a tag such as `Partial 1/3`.
+
+**How far to trust it.** The scores and the "in trouble" status are exact. The rest is calculated by the plugin the way RemNote does it, so dates are marked with `~`: RemNote adds a small random variation to them, and the plugin can't read your relearning steps. On a real knowledge base, the prediction of what the card tests next matched what RemNote showed 97% of the time, and 85% of the time when it predicted a partial card.
+
+On a card [on another scheduler](#cards-on-other-schedulers), the panel leaves out **Memory**, dates and the reason the card is due, and shows only what the scores decide.
 
 ### Forgetting Curve
 
@@ -593,7 +623,7 @@ When RemNote shows only some items of a list or set card, that repetition is **p
 *   **FSRS Calibration** leaves them out.
 *   **Card Analytics** leaves them out of Retention, Lapses, Avg Grade and Avg pR, but still counts them in Reps, Time and Cost, because they are real study time.
 
-The due date works differently: the date the card shows is the earliest of the main card's date and the dates of items you recently forgot or partially recalled. So a list card can come back much sooner than its Stability suggests.
+The due date works differently: the date the card shows is the earliest of the main card's date and the dates of items you recently forgot or partially recalled. So a list card can come back much sooner than its Stability suggests. The [Items panel](#multi-line-items-panel) shows which item is responsible.
 
 #### Cards on other schedulers { #cards-on-other-schedulers }
 

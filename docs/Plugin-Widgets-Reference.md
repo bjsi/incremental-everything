@@ -102,6 +102,8 @@ A detailed popup covering **every card of one Rem**, enriched with FSRS analytic
 
 ![Flashcard Repetition History Popup](assets/flashcard-rep-history-2.png){ width="900" }
 
+On a list or set card, the section also has an [Items panel](Reviewing-Items-in-the-Queue.md#multi-line-items-panel) explaining why the card is due and what it tests next.
+
 Each card's section also carries its [Forgetting Curve](Reviewing-Items-in-the-Queue.md#forgetting-curve) — the card's history replayed into the retrievability FSRS predicts, with a forecast per answer button and the stability each repetition bought. It follows the **Display FSRS DSR Stats** setting.
 
 **Rem-wide totals** *(header)* — four tiles summing every card: **Cards** (with how many are new, or stale — overdue by more than twice their last interval), **Repetitions** (with total lapses in red parentheses), **Time Spent**, and **Retention** in the [Practiced Queues colours](Colour-Coding-Reference.md#retention). Retention is pooled — remembered ÷ graded across all cards — not an average of the per-card figures, so a two-answer card cannot swing it as hard as a forty-answer one.

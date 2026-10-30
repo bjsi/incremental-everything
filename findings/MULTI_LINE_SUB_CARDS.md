@@ -45,6 +45,8 @@ From `finalRepetitionData` and `isFullMultiLineRep` in the queue component (bund
 | Forgot all | `0` | `[]`, which counts for all items |
 | Skip | Too Early | `[]` |
 
+On a Set card, pressing Forgot or Partially Recalled once doesn't save yet. The queue shows *Press "partially recalled" again to mark all as partially recalled. Or, tap the individual items that were hard*, then *Tap the score for the unrated items*. Nothing else on a Set card scores items separately, so a real rep with Good and Partial mixed comes from that flow or from a List card (7 such reps here; the data doesn't say which).
+
 On a Set card, forgetting one item doesn't fail the main card. With Recalled With Effort as the button, the main card is scored `1` and its interval grows.
 
 List card rule (`Hd`), where *r* counts Forgot + Partial and *a* counts all rated items. The card fails if `a==1 ? r>0 : a<=4 ? r>=a-1 : r/a>=0.6`. A failure saves Forgot if there are more Forgots than Partials, otherwise Partial. A pass saves Easy if more than half are Easy, otherwise Good. As written, items all rated Forgot individually with no Partial compare `n > undefined`, so they save Partial rather than Forgot (read from code, not observed).
@@ -152,6 +154,18 @@ Of the 923 cards in this KB with `subCardScores`, 148 have partial repetitions s
 **Check against RemNote's FSRS:** on the 148 affected cards, the plugin's stability is within 5% of RemNote's on 132 cards, up from 47. The median error fell from 10.5% to 0.2%. The fix was tested on `remnote.db` data, with no change to RemNote.
 
 `src/lib/fsrs.ts` has since been corrected to match RemNote's FSRS exactly. See [Scheduler assignment and replay accuracy](#scheduler-assignment-and-replay-accuracy).
+
+**Items panel (`src/lib/multi_line_items.ts`):** the Flashcard Repetition History applies these rules to explain a card. Replayed on this KB's 906 multi-line cards on Global:
+
+| Check | Agreement |
+|---|---|
+| Which candidate sets the due date, against stored `ne.multiLineDrivenBy` | 165 of 166 |
+| Next showing, for all 2,282 repetitions, against what was actually shown | 2,217 (97.2%) |
+| When a full card was predicted | 1,928 of 1,942 (99.3%) |
+| When a partial card was predicted | 289 of 340 (85%) |
+| Main card's date, against stored `n`, intervals over 3 days | 123 of 153 within 15%, 80 within 5% |
+
+Of the 340, 31 were shown full, and 16 of the other 20 misses were partial repetitions recording no item scores, so the prediction can't be judged there. The date gap includes fuzz and weights that changed after a card's last rating. `isCram` is true on most repetitions in this KB, so it doesn't identify cram sessions.
 
 ## Scheduler assignment and replay accuracy
 
