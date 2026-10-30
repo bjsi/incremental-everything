@@ -335,6 +335,8 @@ export interface SettingGroupSpec {
    * otherwise have to be repeated on each of them.
    */
   warning?: string;
+  /** A docs link at the end of the warning box; `path` is relative to IE_DOCS_BASE_URL. */
+  warningLink?: { label: string; path: string };
   /**
    * Page on the docs site, relative to IE_DOCS_BASE_URL, for the feature the
    * whole group configures. Renders a "?" beside the group heading — better
@@ -387,7 +389,14 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
       'about a card — they do not schedule anything, and nothing here can move a due date. Your ' +
       'actual scheduling is RemNote\'s, and is configured in RemNote Settings → Schedulers. Set ' +
       'the values below to MATCH what you use there, so the plugin\'s figures describe your real ' +
-      'scheduler; changing them here alone only makes the readouts wrong.',
+      'scheduler; changing them here alone only makes the readouts wrong.\n\n' +
+      'You can fill the weights and retention automatically: run ' +
+      'scripts/export_scheduler_cards.py on your computer, then the command Import RemNote ' +
+      'Scheduler Data.',
+    warningLink: {
+      label: 'How to import your scheduler data',
+      path: 'Reviewing-Items-in-the-Queue/#import-scheduler-data',
+    },
   },
   masteryDrill: {
     label: 'Mastery Drill',

@@ -581,10 +581,30 @@ export function IESettingsWidget() {
                       border: '1px solid rgba(245, 158, 11, 0.45)',
                       backgroundColor: 'rgba(245, 158, 11, 0.10)',
                       color: 'var(--rn-clr-content-primary, #0f172a)',
+                      whiteSpace: 'pre-line',
                     }}
                   >
                     <strong>⚠️ </strong>
                     {IE_SETTING_GROUPS[group].warning}
+                    {IE_SETTING_GROUPS[group].warningLink && (
+                      <>
+                        {' '}
+                        <button
+                          onClick={() => openDocs(IE_SETTING_GROUPS[group].warningLink!.path)}
+                          style={{
+                            padding: 0,
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--rn-clr-content-accent, #2563eb)',
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            font: 'inherit',
+                          }}
+                        >
+                          {IE_SETTING_GROUPS[group].warningLink!.label}
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
                 {ids.filter(matches).map((id) => (
