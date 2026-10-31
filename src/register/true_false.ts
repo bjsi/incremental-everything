@@ -2,7 +2,7 @@ import { AppEvents, PluginRem, ReactRNPlugin, SelectionType } from '@remnote/plu
 import { getEffectiveSelection } from '../lib/editor_selection';
 import { getQueueVisibleCard } from '../lib/queue_visible_card';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { backTextWithVerdict, referencedRemIds, Verdict, VERDICT_MARK } from '../lib/true_false';
+import { backTextWithVerdict, isBareVerdictBack, referencedRemIds, Verdict, VERDICT_MARK } from '../lib/true_false';
 
 /* True/False cards: a statement whose answer is "true" or "false".
 
@@ -92,7 +92,45 @@ ${editorRow(slug)} .hierarchy-editor__tag-bar__tag {
 
 const ANY_QUEUE_CARD = `:is(${queueCard('tft')}, ${queueCard('tff')})`;
 
+/* The back keeps its ✅ / ❌: that is what states the verdict in the editor and
+   wherever this plugin is not installed. In the queue the verdict bar says the
+   same, so the mark is hidden there, and only there. It shares a text node with
+   the observation that follows, so no selector can reach it; instead the answer's
+   font stack starts with a font holding nothing but those two characters, as empty
+   zero-width glyphs (scripts/make_true_false_mark_font.py). A mark in the middle
+   of the back goes too, and text never does, whatever the back starts with. */
+const MARK_HIDING_FONT = 'True False Mark Hide';
+const MARK_HIDING_FONT_DATA =
+  'd09GRgABAAAAAAJkAAoAAAAAApQAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAABPUy8yAAABWAAAADEAAABg6+VHq2NtYXAAAAGYAAAANAAAAEQnYSV+Z2x5ZgAAAdgAAAABAAAAAQAAAABoZWFkAAAA9AAAADYAAAA2LS6H9GhoZWEAAAEsAAAAFwAAACQDIf86aG10eAAAAYwAAAAKAAAACgAAAABsb2NhAAABzAAAAAoAAAAKAAAAAG1heHAAAAFEAAAAFAAAACAABQACbmFtZQAAAdwAAABdAAAAb/fUSD5wb3N0AAACPAAAACYAAAA7VnkWtgABAAAAAQAAgcX13F8PPPUAAwPoAAAAAOcMI4oAAAAA5wwjigAAAAAAAAAAAAAAAwACAAAAAAAAeJxjYGRgYFb4b8GAAIwMqIARACjTAV4AeJxjYGRgYGBhgAEmBjQAAADNAAh4nGNgZmBgnMDAysDCQBRoYOCAsuyBgIFBnfUfP7PCfwsGBmYFhhNoihUYGADPngXAAAAAAAAAAAAAAAAAAAAAeJxjYGBgYmBgYAZiESDJCKZZGAyANAcQAuXUWdV9/vH//49g3fhzYxvjF7BaMAAAAjEMJAAAAAAAAAAAAAAAAAAAAAB4nC2JsQqAIABEnxZEEC0tje7tfYK4uIg/ICQhOgn9fxod3PHuDhg5EXQJli+7JFNrA2Kc27Kz/SxZObxWNtSsTLqii/dTQsWjUVgCldzIkLiIuOabh9KfF/j0DkoAAAB4nGNgYsAPWBgYGJkYmRlZWJMzUpOzWZOL8ouLWcqKDc0AM3cFmQAA';
+
+/* The answer is an observation or a quotation, often long, and the verdict is
+   already on the card: it reads as a note under the statement, not as a headline. */
+const answerCss = (answer: string) => `
+${answer} {
+  display: block;
+  margin-top: 10px;
+  font-family: "${MARK_HIDING_FONT}", Georgia, "Times New Roman", serif;
+  font-size: 0.9em;
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--rn-clr-content-secondary);
+  /* Takes back the space after the hidden mark, or the first line sits a little
+     to the right of the statement. RemNote's text item can be an inline-block,
+     which would apply the indent a second time. */
+  text-indent: -0.24em;
+}
+${answer} * {
+  text-indent: 0;
+}
+`;
+
 const TRUE_FALSE_CSS = `
+@font-face {
+  font-family: "${MARK_HIDING_FONT}";
+  src: url("data:font/woff;base64,${MARK_HIDING_FONT_DATA}") format("woff");
+  unicode-range: U+2705, U+274C, U+FE0F;
+  font-display: block;
+}
 /* Queue, both sides. The block has its final box on the front already, so
    nothing moves when the answer is revealed. The left padding clears the
    bullet, which hangs 24px to the left of the text. */
@@ -108,14 +146,16 @@ const TRUE_FALSE_CSS = `
   margin: 4px 0 14px;
   background: ${QUESTION_BADGE} center / contain no-repeat;
 }
-/* The answer, on its own line and large. Both variants render it as the
-   revealed fill-in-the-blank inside the question Rem (confirmed 2026-10-03). */
-.rn-queue__content--answer-revealed ${ANY_QUEUE_CARD} .rn-fill-in-blank--revealed {
-  display: block;
-  margin-top: 8px;
-  font-size: 1.6em;
-  line-height: 1.3;
-  font-weight: 700;
+/* The answer, on its own line. Both variants render it as the revealed
+   fill-in-the-blank inside the question Rem (confirmed 2026-10-03). */
+${answerCss(`.rn-queue__content--answer-revealed ${ANY_QUEUE_CARD} .rn-fill-in-blank--revealed`)}
+/* The delimiter would point at nothing now that the answer has its own line.
+   Beautiful's precedes the answer wrapper, Compact's is a bare span. */
+.rn-queue__content--answer-revealed ${ANY_QUEUE_CARD} :is(
+  span:has(+ [data-test="Beautiful Queue Basic Card Answer Line"]),
+  span:not([class]):has(+ .rn-fill-in-blank--revealed)
+) {
+  display: none;
 }
 ${verdictCss('tft', GREEN, '22, 163, 74', CHECK_PATH)}
 ${verdictCss('tff', RED, '220, 38, 38', CROSS_PATH)}
@@ -136,6 +176,8 @@ const CLUSTER_CSS_ID = 'true-false-cluster-card';
 const CLUSTER_VISIBLE_REM_KEY = 'clusterVisibleRemId';
 const CLUSTER_ROW =
   '.cluster-answer-container:not(.cluster-answer-container .cluster-answer-container) > :is(.min-w-0.items-start, .justify-between)';
+const CLUSTER_ANSWER = ':is(.mx-2 ~ .RichTextViewer, .rn-fill-in-blank--revealed)';
+const CLUSTER_DELIMITER = ':is(span.mx-2:has(~ .RichTextViewer), span:not([class]):has(+ .rn-fill-in-blank--revealed))';
 
 const VERDICT_STYLE: Record<Verdict, { color: string; tint: string; path: string }> = {
   true: { color: GREEN, tint: '22, 163, 74', path: CHECK_PATH },
@@ -176,20 +218,34 @@ const clusterCss = ({ color, tint, path }: { color: string; tint: string; path: 
 }
 /* The answer: Beautiful prints it as the viewer after the "→" delimiter,
    Compact as the revealed fill-in-the-blank. */
-.rn-queue__content--answer-revealed ${CLUSTER_ROW} :is(.mx-2 ~ .RichTextViewer, .rn-fill-in-blank--revealed) {
-  display: block;
-  margin-top: 8px;
-  font-size: 1.6em;
-  line-height: 1.3;
-  font-weight: 700;
+${answerCss(`.rn-queue__content--answer-revealed ${CLUSTER_ROW} ${CLUSTER_ANSWER}`)}
+.rn-queue__content--answer-revealed ${CLUSTER_ROW} ${CLUSTER_DELIMITER} {
+  display: none;
+}
+`;
+
+/* A back holding only the mark. Hiding the glyph still leaves its empty line above
+   the verdict bar, and text content is out of CSS's sight, so the plugin says when
+   there is no answer to show. If this sheet is late the card just has that gap.
+   !important: the order of plugin stylesheets is not guaranteed. */
+const BARE_ANSWER_CSS_ID = 'true-false-bare-answer';
+const BARE_ANSWER_CSS = `
+.rn-queue__content--answer-revealed ${ANY_QUEUE_CARD} .rn-fill-in-blank--revealed,
+.rn-queue__content--answer-revealed ${CLUSTER_ROW} ${CLUSTER_ANSWER} {
+  display: none !important;
 }
 `;
 
 // What is registered now, so a card with the same verdict (or none, the usual
 // case) costs no registerCSS call.
 let clusterCssVerdict: Verdict | null = null;
+let bareAnswerCss = false;
 
-async function setClusterCardCss(plugin: ReactRNPlugin, verdict: Verdict | null) {
+async function setClusterCardCss(plugin: ReactRNPlugin, verdict: Verdict | null, bareAnswer: boolean) {
+  if (bareAnswer !== bareAnswerCss) {
+    bareAnswerCss = bareAnswer;
+    await plugin.app.registerCSS(BARE_ANSWER_CSS_ID, bareAnswer ? BARE_ANSWER_CSS : '');
+  }
   if (verdict === clusterCssVerdict) return;
   clusterCssVerdict = verdict;
   await plugin.app.registerCSS(CLUSTER_CSS_ID, verdict ? clusterCss(VERDICT_STYLE[verdict]) : '');
@@ -197,16 +253,18 @@ async function setClusterCardCss(plugin: ReactRNPlugin, verdict: Verdict | null)
 
 async function applyClusterCardCss(plugin: ReactRNPlugin, remId: string | undefined) {
   let verdict: Verdict | null = null;
+  let bareAnswer = false;
   try {
     const rem = remId ? await plugin.rem.findOne(remId) : undefined;
     if (rem) {
       if (await rem.hasPowerup(TRUE_FALSE_TRUE_POWERUP_CODE)) verdict = 'true';
       else if (await rem.hasPowerup(TRUE_FALSE_FALSE_POWERUP_CODE)) verdict = 'false';
+      if (verdict) bareAnswer = isBareVerdictBack(rem.backText, await backReferenceText(plugin, rem));
     }
   } catch {
     /* unreadable Rem: clear */
   }
-  await setClusterCardCss(plugin, verdict);
+  await setClusterCardCss(plugin, verdict, bareAnswer);
 }
 
 /* Index-only (registerCSS no-ops from other iframes).
@@ -227,14 +285,14 @@ export function registerTrueFalseClusterTracker(plugin: ReactRNPlugin) {
     const card = await plugin.queue.getCurrentCard().catch(() => undefined);
     await applyClusterCardCss(plugin, card?.remId);
   });
-  plugin.event.addListener(AppEvents.QueueExit, undefined, () => setClusterCardCss(plugin, null));
+  plugin.event.addListener(AppEvents.QueueExit, undefined, () => setClusterCardCss(plugin, null, false));
   // Leaving by navigation fires no QueueExit. Only while something is registered
   // is the URL read at all; entering a queue also fires URLChange, hence the check.
   plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
     if (!clusterCssVerdict) return;
     const url = await plugin.window.getURL();
     if (!url.includes('/flashcards') && !url.startsWith('/need_to_learn')) {
-      await setClusterCardCss(plugin, null);
+      await setClusterCardCss(plugin, null, false);
     }
   });
 }
@@ -279,15 +337,18 @@ async function targetRems(plugin: ReactRNPlugin): Promise<{ rems: PluginRem[]; i
   return { rems: focused ? [focused] : [], inQueue: false };
 }
 
-async function markVerdict(plugin: ReactRNPlugin, rem: PluginRem, verdict: Verdict) {
-  const back = rem.backText as any[] | undefined;
+async function backReferenceText(plugin: ReactRNPlugin, rem: PluginRem): Promise<Record<string, string>> {
   const refText: Record<string, string> = {};
-  for (const id of referencedRemIds(back)) {
+  for (const id of referencedRemIds(rem.backText)) {
     const target = await plugin.rem.findOne(id);
     if (target) refText[id] = await safeRemTextToString(plugin, target.text);
   }
+  return refText;
+}
 
-  const next = backTextWithVerdict(back, verdict, refText);
+async function markVerdict(plugin: ReactRNPlugin, rem: PluginRem, verdict: Verdict) {
+  const back = rem.backText as any[] | undefined;
+  const next = backTextWithVerdict(back, verdict, await backReferenceText(plugin, rem));
   if (next) {
     const hadBack = !!back && back.length > 0;
     await rem.setBackText(next);

@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.180 - October 31st, 2026
+
+### ⚡ Improved
+
+**True or False Cards**: Answers in the queue no longer repeat the verdict with a ✅ / ❌ and now appear in a smaller, quieter type suited to long observations and quotations.
+
+📖 [What a True/False card looks like](Utilities-True-or-False-Cards.md#what-it-looks-like)
+
 ## v1.0.179 - October 31st, 2026
 
 ### 🐛 Fixed
