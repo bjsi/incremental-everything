@@ -565,10 +565,11 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
         await applyIncRemEngagementEnd(plugin, now);
       }
 
-      // Staleness defense: clear cluster signals at the start of each new card load so a
-      // value left over from the previous card can't leak in if the widget fails to mount.
-      // Inside a cluster, QueueLoadCard does not fire per sibling, so the widget's writes
-      // for subsequent siblings are preserved (only overwritten, not cleared, between them).
+      // Staleness defense: clear the on-screen card broadcast at the start of each new card load,
+      // so its readers (the sibling poll above, lib/queue_visible_card) can't act on the previous
+      // card if the widget fails to mount. Inside a cluster, QueueLoadCard does not fire per
+      // sibling, so the widget's writes for later siblings are only overwritten, not cleared.
+      // lib/cluster_rating_readback keeps its own list, so this cannot lose a rating.
       await plugin.storage.setSession('clusterVisibleCardId', undefined);
 
       // Lazy session init (mobile fix: QueueEnter sometimes doesn't fire on iOS)
