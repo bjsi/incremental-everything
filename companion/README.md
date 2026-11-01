@@ -6,7 +6,8 @@ A Chrome extension for incremental reading of web pages. It works with the Incre
 
 A bar stays at the bottom right of every page, whether the panel is open or not:
 
-- **Add Extract** (`Opt+X`, when text is selected): the selection becomes an Incremental Rem under its section, and turns blue. With **Set priority** ticked, the plugin's priority popup opens in the panel. `Opt+Shift+X` always opens it.
+- **Add Extract** (`Opt+X`, when text is selected): the selection becomes an Incremental Rem under its section, and turns blue.
+- **Priority:** `Opt+Shift+X`, or Add Extract with **Set priority** ticked, first asks for the extract's priority in a small field beside the selection. Type a number and press Enter; leave it empty for the inherited priority. Esc cancels the extract, and Shift+Enter opens the plugin's full popup in the panel instead, for the interval and scheduler.
 - **Set read point / Go to read point:** remembers the top of the window, and scrolls back to it.
 - **Import headings:** creates the page's sections in its document.
 
@@ -25,6 +26,10 @@ Plugin development from `localhost` does not load in the panel, so the plugin si
 1. In `chrome://extensions`, turn on Developer mode, and **Load unpacked** this folder.
 2. Reload open pages, and close the RemNote Clipper's panel.
 3. Click the toolbar icon. **Copy diagnostics** in the panel gives the connection details and timings.
+
+## Icons
+
+`icons/` has a drawing per size range, in the colours of the plugin's globe (`public/logo.png`): full detail for 48 and 128 px, simplified for 32 px, and drawn on the pixel grid for 16 px. `python3 companion/icons/make_icons.py` writes the SVGs and renders the PNGs.
 
 ## Tests
 

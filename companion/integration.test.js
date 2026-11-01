@@ -101,9 +101,29 @@ function openPage(b, url, html, id = 1) {
   const dom = new JSDOM(html, { url, runScripts: 'outside-only', pretendToBeVisual: true });
   const tab = { id, url, title: 'A page', listeners: [], dom };
   b.tabs.set(id, tab);
+  // Keeps the real closed shadow root, which behaves differently from an open one
+  // for event paths, and only remembers it so these tests can reach into the bar.
+  const attachShadow = dom.window.Element.prototype.attachShadow;
+  dom.window.Element.prototype.attachShadow = function (options) {
+    dom.shadowForTests = attachShadow.call(this, options);
+    return dom.shadowForTests;
+  };
   run(dom, b.chromeFor({ tab: { id, windowId: 7 }, listeners: tab.listeners }), ['anchors.js', 'content.js']);
   return dom;
 }
+
+const shadow = (dom) => dom.shadowForTests;
+const priorityInput = (dom) => shadow(dom).getElementById('priorityInput');
+const promptIsOpen = (dom) => !shadow(dom).getElementById('prompt').hidden;
+
+function typeInField(dom, text, key = 'Enter', shiftKey = false) {
+  priorityInput(dom).value = text;
+  priorityInput(dom).dispatchEvent(
+    new dom.window.KeyboardEvent('keydown', { key, shiftKey, bubbles: true, composed: true, cancelable: true })
+  );
+}
+
+const queued = (b) => Object.values(b.stored).filter((value) => value?.op === 'addExtract');
 
 function selectParagraph(dom, selector) {
   const { document, getSelection } = dom.window;
@@ -187,7 +207,8 @@ describe('Add Extract', () => {
     assert.equal(data.markdown, 'Some **bold** text to extract from this page.');
     assert.deepEqual(data.chain.map((c) => c.text), ['A section']);
     assert.equal(data.docId, 'doc1');
-    assert.equal(data.withPriority, false);
+    assert.equal(data.withPriority, undefined);
+    assert.equal(data.priority, undefined);
     assert.ok(panel.calls.includes('getOrCreatePageDocument'));
     assert.deepEqual(Object.keys(b.stored).filter((k) => k.startsWith('op:')), []);
   });
@@ -209,19 +230,7 @@ describe('Add Extract', () => {
     assert.deepEqual(Object.keys(b.stored).filter((k) => k.startsWith('op:')), []);
   });
 
-  it('Opt+Shift+X asks for the priority popup and opens the panel', async () => {
-    const b = browser();
-    const page = openPage(b, URL_A, PAGE);
-    await settle();
-    selectParagraph(page, '#p');
-    pressOptX(page, true);
-    await settle();
-    const [op] = Object.values(b.stored).filter((value) => value?.op === 'addExtract');
-    assert.equal(op.data.withPriority, true);
-    assert.equal(b.opened.length, 1);
-  });
-
-  it('The Set priority setting persists and applies to the shortcut', async () => {
+  it('The Set priority setting persists and asks on Opt+X too', async () => {
     const b = browser();
     b.stored.setPriority = true;
     const page = openPage(b, URL_A, PAGE);
@@ -229,8 +238,8 @@ describe('Add Extract', () => {
     selectParagraph(page, '#p');
     pressOptX(page);
     await settle();
-    const [op] = Object.values(b.stored).filter((value) => value?.op === 'addExtract');
-    assert.equal(op.data.withPriority, true);
+    assert.equal(promptIsOpen(page), true);
+    assert.equal(shadow(page).getElementById('priority').checked, true);
   });
 
   it('Leaves Opt+X alone without a selection, or inside a text box', async () => {
@@ -258,6 +267,109 @@ describe('Add Extract', () => {
     pressOptX(page);
     await settle(100);
     assert.deepEqual(Object.keys(b.stored).filter((k) => k.startsWith('op:')), []);
+  });
+});
+
+describe('The priority field', () => {
+  async function asked() {
+    const b = browser();
+    const page = openPage(b, URL_A, PAGE);
+    await settle();
+    selectParagraph(page, '#p');
+    pressOptX(page, true);
+    await settle();
+    return { b, page };
+  }
+
+  it('Opt+Shift+X asks first and writes nothing yet, and needs no panel', async () => {
+    const { b, page } = await asked();
+    assert.equal(promptIsOpen(page), true);
+    assert.equal(page.window.document.activeElement, page.window.document.querySelector('[data-ie-companion]'));
+    assert.equal(shadow(page).activeElement, priorityInput(page));
+    assert.equal(queued(b).length, 0);
+    assert.equal(b.opened.length, 0);
+  });
+
+  it('Enter adds the extract with that priority, for this extract only', async () => {
+    const { b, page } = await asked();
+    typeInField(page, '35');
+    await settle();
+    assert.equal(promptIsOpen(page), false);
+    const [op] = queued(b);
+    assert.equal(op.data.priority, 35);
+    assert.equal(op.data.withPriority, undefined);
+    assert.equal(op.data.text, 'Some bold text to extract from this page.');
+    assert.equal(b.opened.length, 0);
+
+    selectParagraph(page, '#q');
+    pressOptX(page);
+    await settle();
+    const second = queued(b).find((candidate) => candidate.data.text === 'Another paragraph.');
+    assert.equal(second.data.priority, undefined);
+  });
+
+  it('Enter on an empty field keeps the inherited priority', async () => {
+    const { b, page } = await asked();
+    typeInField(page, '');
+    await settle();
+    assert.equal(queued(b)[0].data.priority, undefined);
+  });
+
+  it('Accepts 0 and 100, and stays open on anything else', async () => {
+    for (const bad of ['101', 'abc', '-1', '1.5']) {
+      const { b, page } = await asked();
+      typeInField(page, bad);
+      await settle();
+      assert.equal(promptIsOpen(page), true, bad);
+      assert.equal(queued(b).length, 0, bad);
+    }
+    for (const [good, value] of [['0', 0], ['100', 100]]) {
+      const { b, page } = await asked();
+      typeInField(page, good);
+      await settle();
+      assert.equal(queued(b)[0].data.priority, value);
+    }
+  });
+
+  it('Esc adds nothing and gives the selection back', async () => {
+    const { b, page } = await asked();
+    typeInField(page, '20', 'Escape');
+    await settle();
+    assert.equal(promptIsOpen(page), false);
+    assert.equal(queued(b).length, 0);
+    assert.ok(page.window.getSelection().toString().includes('Some bold text'));
+  });
+
+  it('Shift+Enter opens the full popup in the panel instead', async () => {
+    const { b, page } = await asked();
+    typeInField(page, '', 'Enter', true);
+    await settle();
+    assert.equal(queued(b)[0].data.withPriority, true);
+    assert.equal(b.opened.length, 1);
+  });
+
+  it('Arrow keys step the number, within 0 to 100', async () => {
+    const { page } = await asked();
+    typeInField(page, '100', 'ArrowUp');
+    assert.equal(priorityInput(page).value, '100');
+    typeInField(page, '10', 'ArrowDown');
+    assert.equal(priorityInput(page).value, '9');
+  });
+
+  it("The page's own key handlers do not see what is typed in the field", async () => {
+    const { page } = await asked();
+    let seen = 0;
+    page.window.document.addEventListener('keydown', () => seen++);
+    typeInField(page, '3', '3');
+    assert.equal(seen, 0);
+  });
+
+  it('A second Opt+Shift+X while it is open changes nothing', async () => {
+    const { b, page } = await asked();
+    pressOptX(page, true);
+    await settle();
+    assert.equal(promptIsOpen(page), true);
+    assert.equal(queued(b).length, 0);
   });
 });
 

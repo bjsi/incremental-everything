@@ -78,8 +78,19 @@ function runInPage() {
       #extract { background: #3b82f6; }
       label { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 6px; background: #1f2937; color: white; font: 12px system-ui, sans-serif; cursor: pointer; }
       input { margin: 0; }
+      #prompt { position: fixed; padding: 8px 10px; border-radius: 8px; background: #111827; color: white; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
+      #prompt[hidden] { display: none; }
+      #priorityField { padding: 0; background: none; cursor: default; font-weight: 600; }
+      #priorityInput { width: 72px; padding: 3px 6px; border: 1px solid #4b5563; border-radius: 4px; background: #1f2937; color: white; font: 13px system-ui, sans-serif; outline: none; }
+      #priorityInput:focus { border-color: #3b82f6; }
+      #priorityInput.invalid { border-color: #ef4444; }
+      #promptHint { margin-top: 4px; font-size: 11px; color: #9ca3af; }
       #banner { margin-bottom: 6px; padding: 8px 10px; border-radius: 6px; background: #111827; color: white; max-width: 340px; overflow-wrap: anywhere; }
     </style>
+    <div id="prompt" hidden>
+      <label id="priorityField">Priority <input id="priorityInput" inputmode="numeric" maxlength="3" placeholder="inherited" autocomplete="off" /></label>
+      <div id="promptHint">Enter add · Esc cancel · Shift+Enter more options</div>
+    </div>
     <div id="banner" hidden></div>
     <div id="bar">
       <label id="priorityLabel"><input id="priority" type="checkbox" />Set priority</label>
@@ -216,52 +227,154 @@ function runInPage() {
     return !!element?.closest('input,textarea,select,[contenteditable=""],[contenteditable=true]');
   }
 
-  async function addExtract(withPriority) {
+  /** What is about to be extracted, read while the selection still exists. */
+  function captureSelection() {
     const selection = window.getSelection();
-    if (!selection?.rangeCount || !selection.toString().trim()) return;
+    if (!selection?.rangeCount || !selection.toString().trim()) return null;
     const range = selection.getRangeAt(0).cloneRange();
     const index = A.buildIndex(document);
     const anchor = A.describeRange(index, range);
-    if (!anchor) return show('Nothing to extract in that selection.');
+    if (!anchor) {
+      show('Nothing to extract in that selection.');
+      return null;
+    }
     const outline = A.readOutline(document);
-    const started = performance.now();
-
-    // The priority popup lives in the panel, so that needs it open. Before any
-    // await: Chrome allows opening it only as a direct response to the key or click.
-    if (withPriority) send({ ie: 'openPanel' });
-
-    const extract = { anchor };
-    extracts.push(extract);
-    selection.removeAllRanges();
-    paint('this extract');
-
-    const id = await enqueue(
-      'addExtract',
-      {
+    return {
+      range,
+      anchor,
+      started: performance.now(),
+      payload: {
         text: anchor.exact,
         markdown: A.rangeToMarkdown(range),
         anchor,
         chain: chainFor(A.sectionOf(outline, range), outline, index),
-        withPriority,
       },
-      (message) => {
-        if (!message.ok) {
-          extracts = extracts.filter((candidate) => candidate !== extract);
-          saveCache();
-          paint('a failed extract');
-          logLine(`Extract failed: ${message.error}`);
-          return show(`❌ ${message.error}`);
-        }
-        extract.remId = message.result.remId;
+    };
+  }
+
+  async function commitExtract({ anchor, started, payload }, options = {}) {
+    const extract = { anchor };
+    extracts.push(extract);
+    window.getSelection()?.removeAllRanges();
+    paint('this extract');
+
+    const id = await enqueue('addExtract', { ...payload, ...options }, (message) => {
+      if (!message.ok) {
+        extracts = extracts.filter((candidate) => candidate !== extract);
         saveCache();
-        const r = message.result;
-        logLine(`Extract ${Math.round(performance.now() - started)} ms in all: ${JSON.stringify(r)}`);
-        show(`✅ Extract added${r.section ? ` to “${r.section}”` : ''}`, 3500);
+        paint('a failed extract');
+        logLine(`Extract failed: ${message.error}`);
+        return show(`❌ ${message.error}`);
       }
-    );
+      extract.remId = message.result.remId;
+      saveCache();
+      const r = message.result;
+      logLine(`Extract ${Math.round(performance.now() - started)} ms in all: ${JSON.stringify(r)}`);
+      const priorityText = r.priority === undefined ? '' : `, priority ${r.priority}`;
+      show(`✅ Extract added${r.section ? ` to “${r.section}”` : ''}${priorityText}`, 3500);
+    });
     extract.opId = id;
     saveCache();
     warnIfWaiting(id);
+  }
+
+  // ---- The priority field, per extract ----
+
+  let promptFor = null;
+
+  function setPendingHighlight(range) {
+    if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') return;
+    if (range) CSS.highlights.set('ie-pending', new Highlight(range));
+    else CSS.highlights.delete('ie-pending');
+  }
+
+  function closePrompt() {
+    promptFor = null;
+    $('prompt').hidden = true;
+    $('priorityInput').value = '';
+    $('priorityInput').classList.remove('invalid');
+    setPendingHighlight(null);
+  }
+
+  function openPrompt(captured) {
+    promptFor = captured;
+    // Focusing the field takes the page's selection away, so this keeps it visible.
+    setPendingHighlight(captured.range);
+    const rect = captured.range.getBoundingClientRect?.();
+    const prompt = $('prompt');
+    prompt.hidden = false;
+    const width = prompt.offsetWidth || 300;
+    const height = prompt.offsetHeight || 60;
+    const inView = rect && rect.bottom > 0 && rect.bottom < innerHeight;
+    prompt.style.left = `${Math.max(8, Math.min(innerWidth - width - 8, inView ? rect.left : (innerWidth - width) / 2))}px`;
+    prompt.style.top = `${inView ? Math.max(8, Math.min(innerHeight - height - 8, rect.bottom + 6)) : (innerHeight - height) / 2}px`;
+    const input = $('priorityInput');
+    input.focus();
+    // Some pages take the focus back after a selection settles.
+    setTimeout(() => promptFor === captured && input.focus(), 50);
+  }
+
+  function cancelPrompt() {
+    const captured = promptFor;
+    closePrompt();
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(captured.range);
+  }
+
+  /** Enter: a whole number from 0 to 100, or nothing for the inherited priority. */
+  function confirmPrompt(moreOptions) {
+    const input = $('priorityInput');
+    const text = input.value.trim();
+    const priority = Number(text);
+    if (!moreOptions && text && (!/^\d+$/.test(text) || priority > 100)) {
+      input.classList.add('invalid');
+      return;
+    }
+    const captured = promptFor;
+    closePrompt();
+    if (moreOptions) {
+      // The full popup lives in the panel. Before any await: Chrome opens it only as
+      // a direct response to the key.
+      send({ ie: 'openPanel' });
+      commitExtract(captured, { withPriority: true });
+    } else {
+      commitExtract(captured, text ? { priority } : {});
+    }
+  }
+
+  function stepPrompt(delta) {
+    const input = $('priorityInput');
+    const current = Number(input.value);
+    const base = input.value.trim() && Number.isFinite(current) ? current : delta > 0 ? -1 : 101;
+    input.value = String(Math.max(0, Math.min(100, base + delta)));
+    input.classList.remove('invalid');
+  }
+
+  /** While the field is open it gets the keys, and the page's own shortcuts do not. */
+  function handlePromptKey(event) {
+    // Not composedPath(): it hides a closed shadow root from a listener on the window.
+    if (root.activeElement !== $('priorityInput')) return;
+    event.stopPropagation();
+    if (event.type !== 'keydown') return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      confirmPrompt(event.shiftKey);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelPrompt();
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      stepPrompt(event.key === 'ArrowUp' ? 1 : -1);
+    }
+  }
+
+  function startExtract(askPriority) {
+    if (promptFor) return;
+    const captured = captureSelection();
+    if (!captured) return;
+    if (askPriority) openPrompt(captured);
+    else commitExtract(captured);
   }
 
   function attach() {
@@ -283,19 +396,33 @@ function runInPage() {
     });
     // Keeps the page's selection when the bar is clicked. Clicks still work.
     $('bar').addEventListener('mousedown', (event) => event.preventDefault());
-    $('extract').addEventListener('click', () => addExtract($('priority').checked));
+    $('prompt').addEventListener('mousedown', (event) => {
+      if (event.target !== $('priorityInput')) event.preventDefault();
+    });
+    $('extract').addEventListener('click', () => startExtract($('priority').checked));
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      window.addEventListener(type, (event) => promptFor && handlePromptKey(event), true);
+    }
+    // Clicking elsewhere on the page is a change of mind. Switching to another
+    // window or the panel is not.
+    $('priorityInput').addEventListener('blur', () => {
+      setTimeout(() => {
+        if (promptFor && document.hasFocus() && root.activeElement !== $('priorityInput')) closePrompt();
+      }, 100);
+    });
+    $('priorityInput').addEventListener('input', () => $('priorityInput').classList.remove('invalid'));
 
     // Opt+X and Opt+Shift+X, only with text selected outside an editable area. The
     // key's code, because Option changes what `key` reports on a Mac.
     window.addEventListener(
       'keydown',
       (event) => {
-        if (event.code !== 'KeyX' || !event.altKey || event.ctrlKey || event.metaKey) return;
+        if (promptFor || event.code !== 'KeyX' || !event.altKey || event.ctrlKey || event.metaKey) return;
         const selection = window.getSelection();
         if (!selection?.toString().trim() || isEditable(selection.anchorNode) || isEditable(event.target)) return;
         event.preventDefault();
         event.stopPropagation();
-        addExtract(event.shiftKey || $('priority').checked);
+        startExtract(event.shiftKey || $('priority').checked);
       },
       true
     );

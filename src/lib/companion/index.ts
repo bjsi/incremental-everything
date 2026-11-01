@@ -101,7 +101,7 @@ async function ensureSection(plugin: ReactRNPlugin, doc: PluginRem, chain: Secti
 
 const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>> = {
   async addExtract(plugin, data) {
-    const { docId, url, text, markdown, chain, opId, withPriority } = data;
+    const { docId, url, text, markdown, chain, opId, withPriority, priority } = data;
     const anchor: Anchor = data.anchor;
     const started = Date.now();
     await guardTestPlugin(plugin);
@@ -126,8 +126,13 @@ const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>
     await rem.setText(richText);
     await rem.setParent(section, await positionFor(section, anchor.position, state));
     state.order[rem._id] = anchor.position;
-    // The priority popup fires its own cascade with the chosen priority.
-    await initIncrementalRem(plugin, rem, { explicitParentId: section._id, skipInitialCascade: !!withPriority });
+    // No cascade when the priority is settled here or by the popup: a new extract
+    // has no descendants to pass it to, and the popup fires its own.
+    await initIncrementalRem(plugin, rem, {
+      explicitParentId: section._id,
+      priority: typeof priority === 'number' ? priority : undefined,
+      skipInitialCascade: !!withPriority || typeof priority === 'number',
+    });
     const elapsedMs = Date.now() - started;
 
     state.extracts.push({ remId: rem._id, anchor, opId });

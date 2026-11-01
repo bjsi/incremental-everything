@@ -17,11 +17,11 @@ The feature tests passed in Chrome on the unlisted plugin `incremental-everythin
 
 ## Set priority
 
-A persistent **Set priority** checkbox on the bar makes Add Extract open the priority popup. `Opt+X` follows the checkbox, and `Opt+Shift+X` always opens the popup.
+A persistent **Set priority** checkbox on the bar makes Add Extract ask for a priority. `Opt+X` follows the checkbox, and `Opt+Shift+X` always asks.
 
-**The full `priority_interval` popup opens in the panel, rather than a priority-only prompt on the page.** It is 370 px wide, which fits the panel, and it already has priority, interval, scheduler, the previews and the tracker save job. Rebuilding that on the page would duplicate about 450 lines and drift from the original, and it would need several round trips for inherited values. This supersedes the earlier idea of a prompt on the page.
+**A small field beside the selection asks, per extract:** Enter adds the extract, an empty field keeps the inherited priority, and Esc cancels it. Nothing is written until Enter, and the priority goes straight into `initIncrementalRem`, so it works with the panel closed and needs no second save.
 
-**Chrome refuses the focus (tested on 0.0.55):** after a key press on the page, the popup opens in the panel, but one click there is needed before typing. Moving the focus by script does not work. If the click proves annoying, the next option is a small priority field on the page, which opens the full popup on request. Set priority also opens a closed panel, which Chrome allows only as a direct response to the key or click.
+**Why not only the popup:** a side panel cannot take the keyboard focus from the page (tested on 0.0.55), so the plugin's `priority_interval` popup needed one click before typing. The user found that annoying, since most of their extracts get a priority. The popup stays one key away: Shift+Enter in the field opens it in the panel, for the interval and scheduler, which would be too much to rebuild on the page.
 
 ## Shortcuts
 
@@ -32,9 +32,10 @@ A persistent **Set priority** checkbox on the bar makes Add Extract open the pri
 ## Open items
 
 - [x] Plugin frame's port, and the popup, on 0.0.55.
-- [ ] Confirm the closed-panel queue and highlights after a reload on the final build: the 0.0.55 diagnostics do not show them.
-- [ ] Decide whether one click before typing in the popup is acceptable.
-- [ ] Release the listener in the main plugin, and measure connection and extract times on a large KB.
+- [x] Closed-panel queue, highlights after a reload, and `Opt+X` in text boxes: confirmed by the user on 0.0.55.
+- [x] One click before typing in the popup: not acceptable, replaced by the field.
+- [ ] Try the priority field in Chrome on build 0.0.56.
+- [ ] Release the listener in the main plugin, and check connection and extract times on a large KB. The user expects it to work, if slower, having used the Clipper on their main KB.
 - [ ] A way to change the shortcut keys, for sites that use `Opt+X` themselves.
 - [ ] Decide how to publish the extension, without using RemNote's name or icon as if official.
 - [ ] Docs and changelog, once the final shape is approved.
