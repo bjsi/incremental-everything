@@ -180,15 +180,30 @@
     return text.replace(/([\\`*_[\]])/g, '\\$1');
   }
 
+  /**
+   * `![alt](url =WIDTHxHEIGHT)`, read by splitMarkdownImages in the plugin. A clone
+   * has no layout, so the size and the image actually shown come from the page's own
+   * copy. RemNote needs the size to show an image properly in the queue.
+   */
+  function imageToken(clone) {
+    const source = clone.getAttribute('src');
+    const live = [...clone.ownerDocument.images].find((img) => img.getAttribute('src') === source) ?? clone;
+    const url = live.currentSrc || live.src || clone.src;
+    if (!/^https?:/.test(url || '')) return '';
+    const safe = url.replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/\s/g, '%20');
+    const width = live.width || Number(clone.getAttribute('width')) || 0;
+    const height = live.height || Number(clone.getAttribute('height')) || 0;
+    const size = width && height ? ` =${Math.round(width)}x${Math.round(height)}` : '';
+    return `![${escapeMarkdown(clone.alt || '')}](${safe}${size})`;
+  }
+
   function nodeToMarkdown(node) {
     if (node.nodeType === 3) return escapeMarkdown(node.nodeValue.replace(/\s+/g, ' '));
     if (node.nodeType !== 1 && node.nodeType !== 11) return '';
     const tag = (node.tagName || '').toLowerCase();
     if (node.nodeType === 1 && node.matches(SKIP)) return '';
     if (tag === 'br') return ' ';
-    if (tag === 'img') {
-      return node.src ? `![${escapeMarkdown(node.alt || '')}](${node.src})` : '';
-    }
+    if (tag === 'img') return imageToken(node);
     const inner = [...node.childNodes].map(nodeToMarkdown).join('');
     if (!inner.trim()) return inner;
     const wrap = (mark) => {
@@ -198,7 +213,10 @@
     if (tag === 'b' || tag === 'strong') return wrap('**');
     if (tag === 'i' || tag === 'em') return wrap('*');
     if (tag === 'code') return `\`${node.textContent}\``;
-    if (tag === 'a' && /^https?:/.test(node.href || '')) return `[${inner.trim()}](${node.href})`;
+    // A linked image, as on wikis, is the image: a link cannot hold one in RemNote.
+    if (tag === 'a' && /^https?:/.test(node.href || '')) {
+      return inner.includes('![') && !inner.includes('!\\[') ? inner : `[${inner.trim()}](${node.href})`;
+    }
     if (/^(p|div|li|h[1-6]|blockquote|tr|section|article)$/.test(tag)) return ` ${inner} `;
     return inner;
   }

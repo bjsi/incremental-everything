@@ -34,7 +34,7 @@ A small bar stays at the bottom right of every page, with the panel open or clos
 
 ## Extracts
 
-Select text and press **`Opt+X`** (`Alt+X` on Windows), or click **Add Extract**. The selection becomes an Incremental Rem and turns blue on the page. Bold, italics and links in the selection come along.
+Select text and press **`Opt+X`** (`Alt+X` on Windows), or click **Add Extract**. The selection becomes an Incremental Rem and turns blue on the page. Bold, italics, links and images in the selection come along. Images stay on their original website, so one disappears from your Rem if the site removes it. To keep a copy in RemNote, use [Store Linked Images & Audio](Utilities-Cleaning-Up.md#store-linked-images-audio).
 
 Extracts go in the page's document, which RemNote keeps in its `Links` folder until you move it. The document itself isn't made Incremental, so use [Make Incremental](Getting-Started.md#making-a-rem-incremental) on it if you want it in your queue as well.
 

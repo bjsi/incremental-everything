@@ -34,7 +34,8 @@ A persistent **Set priority** checkbox on the bar makes Add Extract ask for a pr
 - [x] Plugin frame's port, and the popup, on 0.0.55.
 - [x] Closed-panel queue, highlights after a reload, and `Opt+X` in text boxes: confirmed by the user on 0.0.55.
 - [x] One click before typing in the popup: not acceptable, replaced by the field.
-- [ ] Try the priority field in Chrome on build 0.0.56.
+- [x] Priority field in Chrome on build 0.0.56.
+- [ ] Try images in extracts in Chrome on build 0.0.57. An image selected with no text around it still can't be extracted.
 - [ ] Release the listener in the main plugin, and check connection and extract times on a large KB. The user expects it to work, if slower, having used the Clipper on their main KB.
 - [ ] A way to change the shortcut keys, for sites that use `Opt+X` themselves.
 - [ ] Decide how to publish the extension, without using RemNote's name or icon as if official.

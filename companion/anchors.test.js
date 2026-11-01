@@ -108,6 +108,36 @@ describe('rangeToMarkdown', () => {
       'Plain **bold** and *slanted* a [link](https://example.org/x) ![pic](https://example.org/a/i.png) star\\*'
     );
   });
+
+  const markdownOf = (html, url) => {
+    const doc = load(`<div id="d">${html}</div>`, url);
+    const range = doc.createRange();
+    range.selectNodeContents(doc.querySelector('#d'));
+    return A.rangeToMarkdown(range);
+  };
+
+  it('adds the size when the page gives it', () => {
+    assert.equal(markdownOf('<img src="i.png" width="800" height="600">'), '![](https://example.org/a/i.png =800x600)');
+  });
+
+  it('makes a linked image just the image, as on wikis', () => {
+    assert.equal(
+      markdownOf('<a href="/wiki/File:X.jpg"><img src="/thumb/X.jpg" alt="X" width="10" height="20"></a> Figure'),
+      '![X](https://example.org/thumb/X.jpg =10x20) Figure'
+    );
+  });
+
+  it('keeps a text link that merely mentions an image', () => {
+    assert.equal(markdownOf('<a href="/x">!\\[not an image</a>').startsWith('[!'), true);
+  });
+
+  it('leaves out images that have no web address', () => {
+    assert.equal(markdownOf('Before <img src="data:image/png;base64,AAAA"> after'), 'Before after');
+  });
+
+  it('escapes parentheses and spaces in the address', () => {
+    assert.equal(markdownOf('<img src="/a (1).png">'), '![](https://example.org/a%20%281%29.png)');
+  });
 });
 
 if (process.env.REAL_PAGE) {

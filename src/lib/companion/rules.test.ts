@@ -3,7 +3,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { COMPANION_SHARD_COUNT, indexInReadingOrder, isInReadingOrder, shardOfPage } from './rules';
+import { COMPANION_SHARD_COUNT, indexInReadingOrder, isInReadingOrder, shardOfPage, splitMarkdownImages } from './rules';
 
 describe('shardOfPage', () => {
   it('stays within the fixed number of keys, and is stable', () => {
@@ -39,5 +39,36 @@ describe('isInReadingOrder', () => {
   it('ignores Rems without a position', () => {
     assert.equal(isInReadingOrder(['a', 'mine', 'b'], { a: 1, b: 2 }), true);
     assert.equal(isInReadingOrder(['b', 'a'], { a: 1, b: 2 }), false);
+  });
+});
+
+describe('splitMarkdownImages', () => {
+  const url = 'https://help.supermemo.org/images/thumb/f/f5/800px-Extract.jpg';
+  it('leaves text without images alone', () => {
+    assert.deepEqual(splitMarkdownImages('**Figure:** a [link](https://x.org/a)'), [
+      { markdown: '**Figure:** a [link](https://x.org/a)' },
+    ]);
+  });
+  it('splits an image with its size out of the text', () => {
+    assert.deepEqual(splitMarkdownImages(`![alt](${url} =800x600) **Figure:** text`), [
+      { image: { url, width: 800, height: 600 } },
+      { markdown: ' **Figure:** text' },
+    ]);
+  });
+  it('handles an image with no size, and several in a row', () => {
+    assert.deepEqual(splitMarkdownImages(`a ![](${url}) b ![x\\]y](${url} =1x2)`), [
+      { markdown: 'a ' },
+      { image: { url } },
+      { markdown: ' b ' },
+      { image: { url, width: 1, height: 2 } },
+    ]);
+  });
+  it('does not take escaped page text for an image', () => {
+    const text = `!\\[not an image\\](${url})`;
+    assert.deepEqual(splitMarkdownImages(text), [{ markdown: text }]);
+  });
+  it('ignores addresses that are not on the web', () => {
+    const text = '![x](data:image/png;base64,AAAA)';
+    assert.deepEqual(splitMarkdownImages(text), [{ markdown: text }]);
   });
 });

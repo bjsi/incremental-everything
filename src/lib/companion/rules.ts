@@ -51,3 +51,26 @@ export function isInReadingOrder(childIds: string[], order: Record<string, numbe
   const positions = childIds.map((id) => order[id]).filter((p) => p !== undefined);
   return positions.every((p, i) => i === 0 || positions[i - 1] <= p);
 }
+
+export type MarkdownPiece =
+  | { markdown: string }
+  | { image: { url: string; width?: number; height?: number } };
+
+/**
+ * Splits out the extension's image tokens, `![alt](url =WxH)`. RemNote's Markdown
+ * parser turns an image into a link to it, so the plugin builds these itself. Text
+ * that only looks like one cannot match: the extension escapes `[` in page text.
+ */
+export function splitMarkdownImages(markdown: string): MarkdownPiece[] {
+  const pieces: MarkdownPiece[] = [];
+  const token = /!\[(?:\\.|[^\]\\])*\]\((https?:[^\s)]+)(?: =(\d+)x(\d+))?\)/g;
+  let last = 0;
+  for (let match = token.exec(markdown); match; match = token.exec(markdown)) {
+    if (match.index > last) pieces.push({ markdown: markdown.slice(last, match.index) });
+    const [, url, width, height] = match;
+    pieces.push({ image: { url, ...(width && height ? { width: Number(width), height: Number(height) } : {}) } });
+    last = match.index + match[0].length;
+  }
+  if (last < markdown.length) pieces.push({ markdown: markdown.slice(last) });
+  return pieces;
+}
