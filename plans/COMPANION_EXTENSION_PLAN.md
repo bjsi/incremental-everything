@@ -38,4 +38,4 @@ A persistent **Set priority** checkbox on the bar makes Add Extract ask for a pr
 - [ ] Release the listener in the main plugin, and check connection and extract times on a large KB. The user expects it to work, if slower, having used the Clipper on their main KB.
 - [ ] A way to change the shortcut keys, for sites that use `Opt+X` themselves.
 - [ ] Decide how to publish the extension, without using RemNote's name or icon as if official.
-- [ ] Docs and changelog, once the final shape is approved.
+- [x] Docs, changelog and a privacy policy draft (Nov 1, 2026). When the store listing is live, replace the Load unpacked step in the docs with its link.

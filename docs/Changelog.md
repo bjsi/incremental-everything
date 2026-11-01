@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.185 - November 1st, 2026
+
+### ✨ New
+
+**Chrome Companion Extension**: Added support for a new Chrome extension that turns text selected on web pages into Incremental Rems, with a priority per extract, highlights that stay on the page, read points, and sections imported from the page's headings.
+
+📖 [Chrome Companion Extension](Chrome-Companion-Extension.md)
+
 ## v1.0.184 - November 1st, 2026
 
 ### ✨ New

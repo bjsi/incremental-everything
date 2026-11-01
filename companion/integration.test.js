@@ -43,7 +43,10 @@ function browser() {
     runtime: {
       sendMessage: async (message) => {
         if (message.ie === 'openPanel') opened.push(sender);
-        for (const listener of messageListeners) listener(message, sender);
+        // As in Chrome, a message does not come back to the context that sent it.
+        for (const listener of messageListeners) {
+          if (!sender.listeners?.includes(listener)) listener(message, sender, () => {});
+        }
       },
       onMessage: {
         addListener: (listener) => {
@@ -267,6 +270,47 @@ describe('Add Extract', () => {
     pressOptX(page);
     await settle(100);
     assert.deepEqual(Object.keys(b.stored).filter((k) => k.startsWith('op:')), []);
+  });
+});
+
+describe('The browser copy', () => {
+  const pageEntries = (b) => Object.keys(b.stored).filter((key) => key.startsWith('page:'));
+  const emptyState = () => ({ ok: true, result: { extracts: [] } });
+
+  async function connected(answer) {
+    const b = browser();
+    const page = openPage(b, URL_A, PAGE);
+    await settle();
+    openPanel(b);
+    const plugin = startPlugin(b, answer);
+    plugin.boot();
+    await settle(700);
+    return { b, page, plugin };
+  }
+
+  it('Keeps no entry for a page with nothing on it, so it is no browsing history', async () => {
+    const { b, plugin } = await connected(emptyState);
+    assert.ok(plugin.seen.some((op) => op.op === 'pageState'));
+    assert.deepEqual(pageEntries(b), []);
+  });
+
+  it('Keeps an entry once the page has an extract', async () => {
+    const { b, page } = await connected((op) => (op.op === 'pageState' ? emptyState() : anExtract()));
+    selectParagraph(page, '#p');
+    pressOptX(page);
+    await settle(100);
+    assert.equal(pageEntries(b).length, 1);
+  });
+
+  it('Removes the entry when the last extract is gone', async () => {
+    const b = browser();
+    b.stored[`page:${URL_A}`] = { extracts: [{ remId: 'gone', anchor: { exact: 'Another paragraph.', prefix: '', suffix: '', position: 0 } }], readPoint: null };
+    openPage(b, URL_A, PAGE);
+    await settle();
+    openPanel(b);
+    startPlugin(b, emptyState).boot();
+    await settle(700);
+    assert.deepEqual(pageEntries(b), []);
   });
 });
 

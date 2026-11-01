@@ -172,7 +172,14 @@ function runInPage() {
     return counts;
   }
 
-  const saveCache = () => chrome.storage.local.set({ [cacheKey]: { extracts, readPoint } }).catch(() => {});
+  /** Only pages with something on them, or the browser copy would become a browsing history. */
+  const saveCache = () => {
+    const write =
+      extracts.length || readPoint
+        ? chrome.storage.local.set({ [cacheKey]: { extracts, readPoint } })
+        : chrome.storage.local.remove(cacheKey);
+    write.catch(() => {});
+  };
 
   /** Extracts added here that RemNote does not know of yet, kept across a reload. */
   const stillPending = () => extracts.filter((extract) => extract.opId && !extract.remId);

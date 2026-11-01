@@ -63,6 +63,15 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Routes to the right view: **Single History** for an Incremental Rem, **[Flashcard History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)** (all of the Rem's cards) for a flashcard, **Aggregated History** for a folder with incremental descendants. A Rem that is both offers a button across. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
 | `Ctrl` + `Shift` + `I` | [Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities) | Adds/removes the `#ignore` tag on the focused Rem **or a multi-rem selection** (run from the Omnibar). Ignored rems are shrunk and dimmed (full opacity on hover/focus) and the tag chip is hidden — used during IR to mark already-read snippets that don't deserve becoming Incremental. | Editor Only |
 
+### Chrome Companion Extension
+
+On web pages, with the [Chrome Companion Extension](Chrome-Companion-Extension.md) installed and text selected:
+
+| Shortcut | Command Name | Function | Context |
+| :--- | :--- | :--- | :--- |
+| `Alt` + `X` | [Add Extract](Chrome-Companion-Extension.md#extracts) | Makes the selection an Incremental Rem | Web page, text selected |
+| `Alt` + `Shift` + `X` | [Add Extract with priority](Chrome-Companion-Extension.md#setting-a-priority) | Asks for a priority first | Web page, text selected |
+
 ### Editing Utilities
 
 | Shortcut | Command Name | Function | Context |
