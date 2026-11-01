@@ -1,40 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "Incremental RemNote Companion Test",
-  "version": "0.0.1",
-  "description": "Feasibility test only: can a second extension host RemNote in a side panel and talk to the plugin?",
-  "action": {
-    "default_title": "Open the Companion Test panel"
-  },
-  "side_panel": {
-    "default_path": "panel.html"
-  },
-  "background": {
-    "service_worker": "background.js"
-  },
-  "permissions": [
-    "sidePanel",
-    "tabs",
-    "webRequest",
-    "storage"
-  ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
+  "name": "Incremental RemNote Companion",
+  "version": "0.1.0",
+  "description": "Incremental reading of web pages with the Incremental RemNote plugin: extracts, highlights, read points and page structure.",
+  "action": { "default_title": "Open the Incremental RemNote panel" },
+  "side_panel": { "default_path": "panel.html" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["sidePanel", "tabs", "storage"],
+  "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
-      "matches": [
-        "<all_urls>"
-      ],
+      "matches": ["<all_urls>"],
       "all_frames": true,
       "run_at": "document_start",
-      "js": [
-        "anchors.js",
-        "content.js"
-      ],
-      "css": [
-        "page.css"
-      ]
+      "js": ["anchors.js", "content.js"],
+      "css": ["page.css"]
     }
   ]
 }

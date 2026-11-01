@@ -1,84 +1,60 @@
 // Runs in every frame and decides which of three roles it has here.
 
-const PLUGIN_ID = 'incremental-everything-plus';
+const PLUGIN_IDS = ['incremental-everything', 'incremental-everything-plus'];
 const send = (message) => chrome.runtime.sendMessage(message).catch(() => {});
+const ancestors = () => Array.from(location.ancestorOrigins ?? []);
+const insidePanel = () => window !== window.top && ancestors().some((origin) => origin.startsWith('chrome-extension:'));
 
 function isPanelRemNoteFrame() {
   return (
     location.origin === 'https://www.remnote.com' &&
-    window !== window.top &&
-    new URLSearchParams(location.search).get('clipperId') === 'ie-spike'
+    insidePanel() &&
+    new URLSearchParams(location.search).get('clipperId') === 'ie-companion'
   );
 }
 
-function isPanelPluginFrame() {
-  const ancestors = Array.from(location.ancestorOrigins ?? []);
+function isPanelPluginIndexFrame() {
+  const params = new URLSearchParams(location.search);
   return (
-    window !== window.top &&
-    ancestors[0] === 'https://www.remnote.com' &&
-    ancestors.some((origin) => origin.startsWith('chrome-extension:'))
+    insidePanel() &&
+    ancestors()[0] === 'https://www.remnote.com' &&
+    params.get('widgetName') === 'index' &&
+    PLUGIN_IDS.includes(params.get('pluginId'))
   );
 }
 
 // ---- Role 1: the RemNote app inside the side panel ----
 function runInRemNoteFrame() {
-  const extensionOrigin = chrome.runtime.getURL('').slice(0, -1);
-  let pluginWindow = null;
-
-  window.addEventListener('message', (event) => {
-    const data = event.data;
-    if (data?.ieSpike === 'hello' && data.from === PLUGIN_ID) {
-      pluginWindow = event.source;
-      pluginWindow.postMessage({ ieSpike: 'ack' }, '*');
-      send({ spike: 'hello', from: data.from, href: data.href });
-    } else if (data?.ieSpike === 'fromPlugin' && event.source === pluginWindow) {
-      send({ spike: 'fromPlugin', payload: data.payload });
-    } else if (data?.ieSpike === 'toPlugin' && event.origin === extensionOrigin) {
-      pluginWindow?.postMessage(data.payload, '*');
-    }
-  });
-
-  window.addEventListener('load', async () => {
+  window.addEventListener('load', () => {
     // An embedded /clipper page waits for this before starting the app. The
     // Clipper's own content script sends it the same way.
     window.postMessage(
-      { function: 'loadFrame', data: {}, messageId: `spike-${Math.random()}`, nonce: Math.random() },
+      { function: 'loadFrame', data: {}, messageId: `ie-${Math.random()}`, nonce: Math.random() },
       '*'
     );
-
-    let databases = 'unknown';
-    try {
-      databases = (await indexedDB.databases()).length;
-    } catch {}
-    send({
-      spike: 'frameAlive',
-      href: location.href,
-      ancestors: Array.from(location.ancestorOrigins ?? []).join(', '),
-      signedIn: !!localStorage.getItem('userId'),
-      databases,
-    });
-
-    let seconds = 0;
-    const timer = setInterval(() => {
-      seconds += 1;
-      if (document.querySelector('[class*="rn-"]')) {
-        clearInterval(timer);
-        send({
-          spike: 'booted',
-          title: document.title,
-          pluginFrames: document.querySelectorAll('iframe.rn-plugin-root').length,
-        });
-      } else if (seconds >= 120) {
-        clearInterval(timer);
-        send({ spike: 'notBooted', seconds });
-      }
-    }, 1000);
+    send({ ie: 'frameAlive', signedIn: !!localStorage.getItem('userId') });
   });
 }
 
-// ---- Role 2: inside a plugin's iframe. Shows which plugins loaded. ----
+// ---- Role 2: inside the plugin's index frame. Relays between it and the panel. ----
 function runInPluginFrame() {
-  send({ spike: 'pluginFrame', href: location.href, runtimeOk: !!chrome.runtime?.id });
+  const port = chrome.runtime.connect({ name: 'plugin-frame' });
+  const toPlugin = (message) => window.postMessage({ ieCompanion: 'toPlugin', ...message }, '*');
+  let answered = false;
+
+  window.addEventListener('message', (event) => {
+    if (event.source !== window || event.data?.ieCompanion !== 'toExtension') return;
+    if (event.data.kind === 'here') answered = true;
+    port.postMessage(event.data);
+  });
+  port.onMessage.addListener(({ id, op, data }) => toPlugin({ kind: 'op', id, op, data }));
+
+  // The plugin's listener starts some time after this script does.
+  let tries = 0;
+  const timer = setInterval(() => {
+    if (answered || ++tries > 240) return clearInterval(timer);
+    toPlugin({ kind: 'hello' });
+  }, 500);
 }
 
 // ---- Role 3: an ordinary web page ----
@@ -100,10 +76,13 @@ function runInPage() {
       #bar { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 340px; }
       button { padding: 5px 9px; border: 0; border-radius: 6px; background: #1f2937; color: white; cursor: pointer; }
       #extract { background: #3b82f6; }
+      label { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 6px; background: #1f2937; color: white; font: 12px system-ui, sans-serif; cursor: pointer; }
+      input { margin: 0; }
       #banner { margin-bottom: 6px; padding: 8px 10px; border-radius: 6px; background: #111827; color: white; max-width: 340px; overflow-wrap: anywhere; }
     </style>
     <div id="banner" hidden></div>
     <div id="bar">
+      <label id="priorityLabel"><input id="priority" type="checkbox" />Set priority</label>
       <button id="extract" hidden>Add Extract</button>
       <button id="setRead">Set read point</button>
       <button id="goRead">Go to read point</button>
@@ -117,22 +96,40 @@ function runInPage() {
     clearTimeout(bannerTimer);
     bannerTimer = setTimeout(() => ($('banner').hidden = true), ms);
   };
-  const report = (name, ok, detail) => send({ spike: 'pageReport', host: location.hostname, name, ok, detail });
+  const logLine = (text) => send({ ie: 'log', host: location.hostname, text });
 
-  function request(op, data, timeoutMs = 30000) {
+  /** A write: stored first, so it survives a closed panel, then carried out by the panel. */
+  async function enqueue(op, data, onDone) {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (onDone) pending.set(id, onDone);
+    await chrome.storage.local.set({
+      [`op:${id}`]: { id, op, at: Date.now(), data: { url: location.href, title: document.title, opId: id, ...data } },
+    });
+    return id;
+  }
+
+  /** A read: answered only while the panel is connected. */
+  function read(op, data, timeoutMs = 8000) {
     const id = `${Date.now()}-${Math.random()}`;
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         pending.delete(id);
-        reject(new Error(`No answer in ${timeoutMs / 1000} s. Is the panel open and the test started?`));
+        reject(new Error('The panel is not connected.'));
       }, timeoutMs);
       pending.set(id, (message) => {
         clearTimeout(timeout);
         if (message.ok) resolve(message.result);
         else reject(new Error(message.error));
       });
-      send({ spike: 'pageOp', id, op, data: { url: location.href, title: document.title, ...data } });
+      send({ ie: 'read', id, op, data: { url: location.href, ...data } });
     });
+  }
+
+  /** Says so if the panel doesn't take an operation up soon. */
+  function warnIfWaiting(id) {
+    setTimeout(() => {
+      if (pending.has(id)) show('Saved. It reaches RemNote when the panel is open and connected.', 6000);
+    }, 2500);
   }
 
   function paint(source) {
@@ -155,27 +152,32 @@ function runInPage() {
       if (point) CSS.highlights.set('ie-readpoint', new Highlight(A.toRange(document, index, point.start, point.end)));
       else CSS.highlights.delete('ie-readpoint');
     }
-    const summary = `${ranges.length} of ${extracts.length} painted (${JSON.stringify(counts)}), read point: ${readPoint ? 'yes' : 'no'}`;
+    const summary = `${ranges.length} of ${extracts.length} highlights, ${JSON.stringify(counts)}, read point: ${readPoint ? 'yes' : 'no'}`;
     if (summary !== lastSummary && (extracts.length || readPoint)) {
       lastSummary = summary;
-      report('Highlights', hasApi && counts.lost === 0, `From ${source}: ${summary}${hasApi ? '' : '; CSS Highlight API not available here'}`);
-      show(`From ${source}: ${summary}`);
+      logLine(`${source}: ${summary}${hasApi ? '' : '; no CSS Highlight API here'}`);
+      if (counts.lost) show(`${counts.lost} highlight${counts.lost === 1 ? '' : 's'} could not be placed: the page's text has changed.`);
     }
     return counts;
   }
 
   const saveCache = () => chrome.storage.local.set({ [cacheKey]: { extracts, readPoint } }).catch(() => {});
 
+  /** Extracts added here that RemNote does not know of yet, kept across a reload. */
+  const stillPending = () => extracts.filter((extract) => extract.opId && !extract.remId);
+
   async function loadFromPlugin() {
     try {
-      const state = await request('pageState', {}, 8000);
-      extracts = state.extracts;
-      readPoint = state.readPoint ?? null;
-      if (state.removed) report('Deleted extract loses its highlight', true, `${state.removed} removed`);
+      const state = await read('pageState', {});
+      const waitingOps = await chrome.storage.local.get(null);
+      const known = new Set(state.extracts.map((extract) => extract.opId));
+      const queued = stillPending().filter((e) => !known.has(e.opId) && waitingOps[`op:${e.opId}`]);
+      extracts = [...state.extracts, ...queued];
+      readPoint = state.readPoint ?? readPoint;
       saveCache();
       paint('RemNote');
     } catch {
-      // No panel yet. The cached copy is on screen, and pluginReady calls this again.
+      // No panel yet. The browser's copy is on screen, and pluginReady calls this again.
     }
   }
 
@@ -209,43 +211,94 @@ function runInPage() {
     return -1;
   }
 
+  function isEditable(node) {
+    const element = node?.nodeType === 1 ? node : node?.parentElement;
+    return !!element?.closest('input,textarea,select,[contenteditable=""],[contenteditable=true]');
+  }
+
+  async function addExtract(withPriority) {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || !selection.toString().trim()) return;
+    const range = selection.getRangeAt(0).cloneRange();
+    const index = A.buildIndex(document);
+    const anchor = A.describeRange(index, range);
+    if (!anchor) return show('Nothing to extract in that selection.');
+    const outline = A.readOutline(document);
+    const started = performance.now();
+
+    // The priority popup lives in the panel, so that needs it open. Before any
+    // await: Chrome allows opening it only as a direct response to the key or click.
+    if (withPriority) send({ ie: 'openPanel' });
+
+    const extract = { anchor };
+    extracts.push(extract);
+    selection.removeAllRanges();
+    paint('this extract');
+
+    const id = await enqueue(
+      'addExtract',
+      {
+        text: anchor.exact,
+        markdown: A.rangeToMarkdown(range),
+        anchor,
+        chain: chainFor(A.sectionOf(outline, range), outline, index),
+        withPriority,
+      },
+      (message) => {
+        if (!message.ok) {
+          extracts = extracts.filter((candidate) => candidate !== extract);
+          saveCache();
+          paint('a failed extract');
+          logLine(`Extract failed: ${message.error}`);
+          return show(`❌ ${message.error}`);
+        }
+        extract.remId = message.result.remId;
+        saveCache();
+        const r = message.result;
+        logLine(`Extract ${Math.round(performance.now() - started)} ms in all: ${JSON.stringify(r)}`);
+        show(`✅ Extract added${r.section ? ` to “${r.section}”` : ''}`, 3500);
+      }
+    );
+    extract.opId = id;
+    saveCache();
+    warnIfWaiting(id);
+  }
+
   function attach() {
     document.documentElement.append(host);
 
-    document.addEventListener('selectionchange', () => {
-      $('extract').hidden = !window.getSelection()?.toString().trim();
+    chrome.storage.local.get('setPriority').then((stored) => {
+      $('priority').checked = !!stored.setPriority;
     });
-    root.addEventListener('mousedown', (event) => event.preventDefault());
+    $('priority').addEventListener('change', () => {
+      chrome.storage.local.set({ setPriority: $('priority').checked });
+    });
+    chrome.storage.onChanged.addListener((changes) => {
+      if (changes.setPriority) $('priority').checked = !!changes.setPriority.newValue;
+    });
 
-    $('extract').addEventListener('click', async () => {
+    document.addEventListener('selectionchange', () => {
       const selection = window.getSelection();
-      if (!selection?.rangeCount) return;
-      const range = selection.getRangeAt(0).cloneRange();
-      const index = A.buildIndex(document);
-      const anchor = A.describeRange(index, range);
-      if (!anchor) return show('Nothing to extract in that selection.');
-      const outline = A.readOutline(document);
-      const started = performance.now();
-      show('Adding the extract…', 30000);
-      try {
-        const result = await request('addExtract', {
-          text: anchor.exact,
-          markdown: A.rangeToMarkdown(range),
-          anchor,
-          chain: chainFor(A.sectionOf(outline, range), outline, index),
-        });
-        extracts.push({ remId: result.remId, anchor });
-        saveCache();
-        selection.removeAllRanges();
-        paint('this extract');
-        const passed = result.isIncremental && result.inSection && result.inReadingOrder;
-        show(`${passed ? '✅' : '❌'} In “${result.section}”, ${Math.round(performance.now() - started)} ms`);
-        report(`Extract: ${anchor.exact.slice(0, 40)}…`, passed, JSON.stringify(result));
-      } catch (err) {
-        show(`❌ ${err.message}`);
-        report('Extract', false, err.message);
-      }
+      $('extract').hidden = !selection?.toString().trim() || isEditable(selection.anchorNode);
     });
+    // Keeps the page's selection when the bar is clicked. Clicks still work.
+    $('bar').addEventListener('mousedown', (event) => event.preventDefault());
+    $('extract').addEventListener('click', () => addExtract($('priority').checked));
+
+    // Opt+X and Opt+Shift+X, only with text selected outside an editable area. The
+    // key's code, because Option changes what `key` reports on a Mac.
+    window.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.code !== 'KeyX' || !event.altKey || event.ctrlKey || event.metaKey) return;
+        const selection = window.getSelection();
+        if (!selection?.toString().trim() || isEditable(selection.anchorNode) || isEditable(event.target)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        addExtract(event.shiftKey || $('priority').checked);
+      },
+      true
+    );
 
     $('setRead').addEventListener('click', async () => {
       const index = A.buildIndex(document);
@@ -253,17 +306,14 @@ function runInPage() {
       if (at === -1) return show('No text found at the top of the window.');
       const anchor = A.anchorAt(index, at, Math.min(at + 80, index.text.length));
       const percent = scrollY / Math.max(1, document.documentElement.scrollHeight - innerHeight);
-      try {
-        await request('setReadPoint', { anchor, percent });
-        readPoint = { anchor, percent };
-        saveCache();
-        paint('read point');
-        report('Read point saved', true, `“${anchor.exact.slice(0, 50)}…” at ${Math.round(percent * 100)}%`);
-        show(`📍 Read point set at “${anchor.exact.slice(0, 40)}…”`);
-      } catch (err) {
-        show(`❌ ${err.message}`);
-        report('Read point saved', false, err.message);
-      }
+      readPoint = { anchor, percent };
+      saveCache();
+      paint('read point');
+      const id = await enqueue('setReadPoint', { anchor, percent }, (message) => {
+        if (message.ok) show(`📍 Read point set at “${anchor.exact.slice(0, 40)}…”`, 3500);
+        else show(`❌ ${message.error}`);
+      });
+      warnIfWaiting(id);
     });
 
     $('goRead').addEventListener('click', () => {
@@ -272,29 +322,26 @@ function runInPage() {
       const found = A.resolveAnchor(index, readPoint.anchor);
       if (found) {
         A.toRange(document, index, found.start, found.end).startContainer.parentElement.scrollIntoView({ block: 'start' });
-        report('Go to read point', true, `Found by text (${found.how}), now at y=${Math.round(scrollY)}`);
       } else {
         scrollTo(0, readPoint.percent * (document.documentElement.scrollHeight - innerHeight));
-        report('Go to read point', false, 'Text not found, so it used the saved scroll percentage');
+        show("The read point's text has changed, so this is its old scroll position.");
       }
     });
 
     $('import').addEventListener('click', async () => {
       const index = A.buildIndex(document);
       const outline = A.readOutline(document);
-      if (!outline.length) {
-        report('Import headings', false, 'This page has no usable headings');
-        return show('This page has no usable headings.');
-      }
+      if (!outline.length) return show('This page has no usable headings.');
       show(`Importing ${outline.length} sections…`, 120000);
-      try {
-        const result = await request('importHeadings', { headings: outline.map((s) => chainFor(s, outline, index)) }, 120000);
-        show(`✅ ${result.created} sections created, in ${result.elapsedMs} ms`);
-        report('Import headings', true, JSON.stringify(result));
-      } catch (err) {
-        show(`❌ ${err.message}`);
-        report('Import headings', false, err.message);
-      }
+      const id = await enqueue('importHeadings', { headings: outline.map((s) => chainFor(s, outline, index)) }, (message) => {
+        if (message.ok) {
+          logLine(`Import: ${JSON.stringify(message.result)}`);
+          show(`✅ ${message.result.created} sections added`, 4000);
+        } else {
+          show(`❌ ${message.error}`);
+        }
+      });
+      warnIfWaiting(id);
     });
 
     chrome.storage.local.get(cacheKey).then((stored) => {
@@ -302,7 +349,7 @@ function runInPage() {
       if (cached) {
         extracts = cached.extracts ?? [];
         readPoint = cached.readPoint ?? null;
-        paint('this browser, before RemNote answered');
+        paint('browser copy');
       }
       loadFromPlugin();
     });
@@ -322,18 +369,16 @@ function runInPage() {
   else window.addEventListener('load', attach);
 
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
-    if (message.spike === 'opDone') {
+    if (message.ie === 'opDone' || message.ie === 'readDone') {
       pending.get(message.id)?.(message);
       pending.delete(message.id);
-    } else if (message.spike === 'pluginReady') {
+    } else if (message.ie === 'pluginReady') {
       loadFromPlugin();
-    } else if (message.spike === 'toPage') {
-      show(`📨 ${message.text}`);
     }
     respond(true);
   });
 }
 
 if (isPanelRemNoteFrame()) runInRemNoteFrame();
-else if (isPanelPluginFrame()) runInPluginFrame();
+else if (isPanelPluginIndexFrame()) runInPluginFrame();
 else if (window === window.top && location.protocol.startsWith('http') && location.origin !== 'https://www.remnote.com') runInPage();

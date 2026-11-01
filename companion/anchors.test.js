@@ -1,4 +1,4 @@
-// Run from the repo root: node --test spikes/companion-extension/anchors.test.js
+// Run from the repo root: node --test companion/anchors.test.js
 // REAL_PAGE=<saved html> also runs the checks against a real page.
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');

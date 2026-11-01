@@ -2,31 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Companion Test</title>
+    <title>Incremental RemNote</title>
     <style>
       :root { color-scheme: light dark; --line: rgba(128, 128, 128, 0.35); }
-      html, body { height: 100%; margin: 0; font: 13px/1.4 system-ui, sans-serif; }
+      html, body { height: 100%; margin: 0; font: 12px/1.4 system-ui, sans-serif; }
       body { display: flex; flex-direction: column; }
-      #controls { padding: 8px 10px; overflow-y: auto; max-height: 55%; border-bottom: 1px solid var(--line); }
-      h1 { font-size: 14px; margin: 0 0 6px; }
-      button { font: inherit; padding: 4px 10px; margin: 0 6px 6px 0; cursor: pointer; }
-      .check { display: flex; gap: 6px; padding: 2px 0; }
-      .mark { flex: 0 0 18px; text-align: center; }
-      .detail { opacity: 0.7; font-size: 12px; overflow-wrap: anywhere; }
-      textarea { width: 100%; height: 110px; box-sizing: border-box; font: 11px ui-monospace, monospace; display: none; }
+      #status { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+      #statusText { flex: 1; opacity: 0.8; overflow-wrap: anywhere; }
+      button { font: inherit; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
+      textarea { width: 100%; height: 140px; box-sizing: border-box; font: 11px ui-monospace, monospace; display: none; }
       #frame { flex: 1; border: 0; width: 100%; min-height: 0; }
     </style>
   </head>
   <body>
-    <div id="controls">
-      <h1>Companion Test</h1>
-      <div id="target" class="detail"></div>
-      <button id="start">Start test on this tab</button>
-      <button id="report">Show report</button>
-      <div id="checks"></div>
-      <textarea id="reportText" readonly></textarea>
+    <div id="status">
+      <span id="statusText">Open a web page to begin.</span>
+      <button id="diagnostics">Copy diagnostics</button>
     </div>
-    <iframe id="frame" title="RemNote" allow="local-network-access; local-network; loopback-network"></iframe>
+    <textarea id="diagnosticsText" readonly></textarea>
+    <iframe id="frame" title="RemNote"></iframe>
     <script src="panel.js"></script>
   </body>
 </html>

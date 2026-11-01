@@ -7,7 +7,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { refreshSourceUrlIndexIfDue } from '../lib/duplicate_source';
-import { startCompanionTest } from '../lib/companion_test';
+import { startCompanionListener } from '../lib/companion';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { writeCardPriorityCache } from '../lib/card_priority/persistence';
 import { checkFlashcardPrioritisationOptOut } from '../lib/card_priority/opt_out';
@@ -241,8 +241,8 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   await registerMenus(plugin);
 
-  // TEST BRANCH ONLY: spikes/companion-extension. Not awaited, so it cannot hold up startup.
-  void startCompanionTest(plugin).catch((err) => console.warn('[CompanionTest] failed', err));
+  // Answers the Chrome companion extension when it runs in this frame; idle otherwise.
+  startCompanionListener(plugin);
 
   // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
