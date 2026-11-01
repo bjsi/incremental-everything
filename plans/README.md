@@ -5,6 +5,7 @@ Working documents for multi-step efforts that span several releases. Maintainer 
 | File | Effort |
 |---|---|
 | [AI_STUDY_TOOLS_PLAN.md](AI_STUDY_TOOLS_PLAN.md) | AI study tools: transcription, source pins, summaries and Q&A from part of a source |
+| [COMPANION_EXTENSION_PLAN.md](COMPANION_EXTENSION_PLAN.md) | A Chrome extension for incremental reading of web pages, working with the plugin |
 | [INCREMENTAL_VIDEO_PLAN.md](INCREMENTAL_VIDEO_PLAN.md) | Plugin player ⇄ RemNote player for YouTube IncRems: rebuilding the plugin player on Embed Website, Review in Editor with PaneHeader controls, extracts from either player |
 | [STORAGE_PLAN.md](STORAGE_PLAN.md) | Reducing what the plugin keeps in RemNote's synced storage |
 

@@ -10,8 +10,6 @@ const CHECKS = [
   ['hello', 'Real plugin: its message reaches the extension', true],
   ['ready', 'Real plugin: answers, and reports its mode', true],
   ['latency', 'Real plugin: panel → plugin → panel round trips', true],
-  ['pageDocument', 'Add Extract: finds or creates the page document (by hand)', true],
-  ['extract', 'Add Extract: selection becomes an Incremental Rem (by hand)', true],
   ['pluginToPage', 'Plugin command → page banner (by hand)', true],
   ['pluginFrames', 'Info: plugins loaded in this panel', false],
 ];
@@ -21,25 +19,32 @@ const log = [];
 const frame = document.getElementById('frame');
 const CLIPPER_ID = 'ie-spike';
 const pendingPings = new Map();
-const pendingExtracts = new Map();
+const pendingOps = new Map();
+const queuedOps = [];
+const pageRows = new Map();
+let pluginReady = false;
 const pluginIds = new Set();
 let protocolTimer;
 let startedAt = 0;
 
 function render() {
+  const rows = [
+    ...CHECKS.map(([id, label]) => [state[id], label]),
+    ...[...pageRows.entries()].map(([label, row]) => [row, label]),
+  ];
   document.getElementById('checks').replaceChildren(
-    ...CHECKS.map(([id, label]) => {
+    ...rows.map(([entry, label]) => {
       const row = document.createElement('div');
       row.className = 'check';
       const mark = document.createElement('span');
       mark.className = 'mark';
-      mark.textContent = state[id].mark;
+      mark.textContent = entry.mark;
       const text = document.createElement('div');
       text.textContent = label;
-      if (state[id].detail) {
+      if (entry.detail) {
         const detail = document.createElement('div');
         detail.className = 'detail';
-        detail.textContent = state[id].detail;
+        detail.textContent = entry.detail;
         text.append(detail);
       }
       row.append(mark, text);
@@ -126,19 +131,23 @@ function fromPlugin(payload) {
   if (payload.kind === 'ready') {
     set('ready', true, JSON.stringify(payload.info));
     measureLatency();
+    pluginReady = true;
+    for (const [message, tabId, at] of queuedOps.splice(0)) {
+      if (message.op !== 'pageState') {
+        setPageRow(`Clicked before the plugin was ready: ${message.op}`, true, `Held for ${Date.now() - at} ms, then run`);
+      }
+      runOp(message, tabId);
+    }
+    chrome.tabs.query({ active: true }).then((tabs) => {
+      for (const tab of tabs) chrome.tabs.sendMessage(tab.id, { spike: 'pluginReady' }).catch(() => {});
+    });
   } else if (payload.kind === 'pong') {
     pendingPings.get(payload.id)?.(Math.round(performance.now() - payload.sentAt));
     pendingPings.delete(payload.id);
-  } else if (payload.kind === 'extractDone') {
-    const tabId = pendingExtracts.get(payload.id);
-    pendingExtracts.delete(payload.id);
-    const r = payload.result;
-    const passed = payload.ok && r.isIncremental && r.underDocument;
-    set('extract', passed, payload.ok ? JSON.stringify(r) : payload.error);
-    const text = payload.ok
-      ? `${passed ? '✅' : '❌'} Incremental: ${r.isIncremental}, priority ${r.priority}, written in ${r.elapsedMs} ms`
-      : `❌ ${payload.error}`;
-    if (tabId !== undefined) chrome.tabs.sendMessage(tabId, { spike: 'toPage', id: payload.id, text });
+  } else if (payload.kind === 'opDone') {
+    const tabId = pendingOps.get(payload.id);
+    pendingOps.delete(payload.id);
+    if (tabId !== undefined) chrome.tabs.sendMessage(tabId, { spike: 'opDone', ...payload }).catch(() => {});
   } else if (payload.kind === 'push') {
     activeTab().then((tab) => {
       if (!tab?.id) return set('pluginToPage', false, 'No active tab');
@@ -170,15 +179,26 @@ function callRemNote(name, data, timeoutMs = 15000) {
   });
 }
 
-async function addExtract({ id, text, url, title }) {
+function setPageRow(label, ok, detail) {
+  pageRows.set(label, { mark: ok ? '✅' : '❌', detail });
+  log.push(`${Date.now() - startedAt}ms ${label} ${ok ? '✅' : '❌'} ${detail}`);
+  render();
+}
+
+const NEEDS_DOCUMENT = new Set(['addExtract', 'importHeadings']);
+
+async function runOp(message, tabId) {
+  const { id, op, data } = message;
+  pendingOps.set(id, tabId);
   try {
-    const doc = await callRemNote('getOrCreatePageDocument', { url, title });
-    if (!doc?._id) throw new Error('getOrCreatePageDocument returned no Rem');
-    set('pageDocument', true, `Rem ${doc._id}`);
-    toPlugin({ kind: 'addExtract', id, docId: doc._id, text });
+    if (NEEDS_DOCUMENT.has(op)) {
+      const doc = await callRemNote('getOrCreatePageDocument', { url: data.url, title: data.title });
+      if (!doc?._id) throw new Error('getOrCreatePageDocument returned no Rem');
+      data.docId = doc._id;
+    }
+    toPlugin({ kind: 'op', id, op, data });
   } catch (err) {
-    set('pageDocument', false, err.message);
-    fromPlugin({ kind: 'extractDone', id, ok: false, error: err.message });
+    fromPlugin({ kind: 'opDone', id, ok: false, error: err.message });
   }
 }
 
@@ -205,9 +225,12 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       pluginIds.add(new URL(message.href).searchParams.get('pluginId') ?? message.href);
       set('pluginFrames', pluginIds.has('incremental-everything-plus'), [...pluginIds].join(', '));
       break;
-    case 'extract':
-      pendingExtracts.set(message.id, sender.tab?.id);
-      addExtract(message);
+    case 'pageOp':
+      if (pluginReady) runOp(message, sender.tab?.id);
+      else queuedOps.push([message, sender.tab?.id, Date.now()]);
+      break;
+    case 'pageReport':
+      setPageRow(`${message.host}: ${message.name}`, message.ok, message.detail);
       break;
   }
 });
@@ -220,6 +243,8 @@ document.getElementById('start').addEventListener('click', async () => {
   }
   for (const [id] of CHECKS) state[id] = { mark: '⬜', detail: '' };
   pluginIds.clear();
+  pageRows.clear();
+  pluginReady = false;
   log.length = 0;
   startedAt = Date.now();
   document.getElementById('target').textContent = tab.url;
@@ -244,6 +269,7 @@ document.getElementById('report').addEventListener('click', () => {
     `Tested page: ${document.getElementById('target').textContent}`,
     '',
     ...CHECKS.map(([id, label]) => `${state[id].mark} ${label}${state[id].detail ? `\n     ${state[id].detail}` : ''}`),
+    ...[...pageRows.entries()].map(([label, row]) => `${row.mark} ${label}\n     ${row.detail}`),
     '',
     'Timeline:',
     ...log,
