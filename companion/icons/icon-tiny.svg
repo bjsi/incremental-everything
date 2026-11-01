@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none">
+  <title>Incremental RemNote Companion</title>
+  <defs><clipPath id="ball"><circle cx="6.5" cy="6.5" r="5"/></clipPath></defs>
+  <rect x="7" y="12.5" width="2" height="2" fill="#a5602a"/>
+  <rect x="4" y="14" width="8" height="2" rx=".5" fill="#a5602a"/>
+  <circle cx="6.5" cy="6.5" r="5" fill="#1f76c4"/>
+  <g clip-path="url(#ball)" fill="#ffc93c">
+    <path d="M3 5.2H7.5L8.5 7 7.5 8 6.8 10.6H5.5L5 8H3.5L3 6.5Z"/>
+    <path d="M5 3.6 6.5 1.5H9L11.5 4.5 11 6.2 9.8 5 8.5 4.2H5.5Z"/>
+  </g>
+  <path d="M9.8 .9A6.5 6.5 0 1 1 2.8 11.8" stroke="#a5602a" stroke-width="1.4" stroke-linecap="round"/>
+</svg>
