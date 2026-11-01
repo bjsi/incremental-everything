@@ -46,7 +46,7 @@ import {
   PrioritySource,
 } from '../lib/card_priority';
 import { IncrementalRem, getIncrementalRemFromRem, isKnownIncRemId } from '../lib/incremental_rem';
-import { flushCacheUpdatesNow, updateCardPriorityCache } from '../lib/card_priority/cache';
+import { flushCacheUpdatesNow, updateCardPriorityCache, updateCardPriorityCacheAfterRating } from '../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { transferToDismissed } from '../lib/dismissed';
 import { IncrementalRep } from '../lib/incremental_rem/types';
@@ -911,7 +911,7 @@ async function applyCardRating(
       setTimeout(() => recentlyProcessedCards.delete(remId), CARD_PROCESSING_DEBOUNCE_MS);
 
       // console.log('LISTENER: Calling LIGHT updateCardPriorityCache...');
-      await updateCardPriorityCache(plugin, remId, true);
+      updateCardPriorityCacheAfterRating(plugin, remId);
 
       if (queueOpen) {
         // Mark card as seen for this session (used by Shield)

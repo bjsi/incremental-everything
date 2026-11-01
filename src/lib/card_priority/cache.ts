@@ -224,6 +224,45 @@ export async function updateCardPriorityCache(
   }
 }
 
+/** A flush waits this long after a rating, so it does not compete with the next card appearing. */
+const RATED_FLUSH_DELAY_MS = 2500;
+const ratedRemIds = new Set<RemId>();
+let ratedFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * The cache update for a rated card. A rating changes a Rem's due data, never its priority, and
+ * a flush reads and rewrites the whole cache, so it waits until the ratings pause and covers
+ * them all in one write. The Rem is marked dirty at once: the next startup re-reads it even if
+ * the app quits before the flush. Queue exit flushes through flushCacheUpdatesNow.
+ */
+export function updateCardPriorityCacheAfterRating(plugin: RNPlugin, remId: RemId) {
+  markCardPriorityDirty(plugin, remId);
+  ratedRemIds.add(remId);
+  if (ratedFlushTimer) clearTimeout(ratedFlushTimer);
+  ratedFlushTimer = setTimeout(() => {
+    drainRatedCards(plugin)
+      .then(() => flushCacheUpdates(plugin))
+      .catch((e) => console.error('[Cache] Flush after ratings failed:', e));
+  }, RATED_FLUSH_DELAY_MS);
+}
+
+async function drainRatedCards(plugin: RNPlugin) {
+  if (ratedFlushTimer) clearTimeout(ratedFlushTimer);
+  ratedFlushTimer = null;
+  const remIds = [...ratedRemIds];
+  ratedRemIds.clear();
+  for (const remId of remIds) {
+    try {
+      const rem = await plugin.rem.findOne(remId);
+      const info = rem ? await getCardPriority(plugin, rem) : null;
+      pendingUpdates.set(remId, { info, isLight: true });
+      if (info) lightModeOptimisticOverrides.set(remId, { info, expiresAt: Date.now() + 5000 });
+    } catch (e) {
+      console.error('Error updating card priority cache for rated Rem:', remId, e);
+    }
+  }
+}
+
 /**
  * Replaces an optimistic entry with one read from the Rem's real cards, once
  * those cards exist. A command that writes the text a card is made from (Alt+Z)
@@ -252,6 +291,7 @@ export function rereadCardPriorityCacheWhenCardsExist(
 }
 
 export async function flushCacheUpdatesNow(plugin: RNPlugin) {
+  await drainRatedCards(plugin);
   await flushCacheUpdates(plugin, true);
 }
 

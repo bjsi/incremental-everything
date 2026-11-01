@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.181 - October 31st, 2026
+
+### ⚡ Improved
+
+**Practiced Queues**: The Live Session now moves to the next card about twice as fast after a rating.
+
+📖 [Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
+### 🐛 Fixed
+
+**Practiced Queues**: Fixed the Prev. Card tile showing the current card, and the first card of a queue sometimes not being counted.
+
+📖 [Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
 ## v1.0.180 - October 31st, 2026
 
 ### ⚡ Improved
