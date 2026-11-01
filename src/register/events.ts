@@ -4,6 +4,7 @@ import { deferDuringNativeDrill, isNativeDrillQueue, registerNativeDrillListener
 import { registerClusterRatingReadback } from '../lib/cluster_rating_readback';
 import { FinalDrillEntry, buildDrillEntry } from '../lib/mastery_drill_status';
 import { deferDuringLearnNew, noteCoolingRating, registerQueueCoolingListeners } from '../lib/queue_cooling_skip';
+import { registerRecognitionFirst } from '../lib/recognition_first';
 import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
@@ -1491,6 +1492,7 @@ export function registerEventListeners(
   registerDrillCardRatingListener(plugin);
   registerNativeDrillListeners(plugin);
   registerQueueCoolingListeners(plugin);
+  registerRecognitionFirst(plugin);
 
   registerHoveredReferenceTracking(plugin);
   registerQueueDashboardRefocusListener(plugin);

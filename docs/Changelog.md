@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.183 - November 1st, 2026
+
+### ✨ New
+
+**Queue**: Added Recognition First, an optional setting that starts new bidirectional concepts with recognizing the term, and begins practice of defining it only once you have learned that.
+
+📖 [Recognition First](Priority-Review-Document.md#recognition-first)
+
 ## v1.0.182 - October 31st, 2026
 
 ### ⚡ Improved

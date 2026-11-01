@@ -183,6 +183,28 @@ A few things work as they do in the Priority Queue:
 
 In Light Mode only Learn New Cards is covered: judging the other queues would mean reading every card in the knowledge base each time a queue opens.
 
+## Recognition First for new concepts { #recognition-first }
+
+RemNote has no preferred direction for a new bidirectional concept (`Term :: description`): either card can come first, and the first one buries the other for an hour. Turn on **Recognition First for new concepts** to always start with recognizing the term from its description (back → front). Only once you have learned that does practice of defining the term (front → back) begin.
+
+When a concept whose front → back card has never been reviewed comes up in **Practice with Spaced Repetition** or **Learn New Cards**:
+
+1. The plugin sets the Rem to practise back → front only, and a toast says so the first time in a session.
+2. If the front → back card was the one loaded, it may flash before it goes. The back → front card returns within the hour, because RemNote buries it.
+3. When you rate the back → front card **Good** or **Easy** and its interval is at least 3 days, the Rem goes back to both directions. **Again** and **Hard** keep it held.
+
+The front → back card then arrives as a new, due card. In **All queues** mode, [cooling](#cooling-in-remnotes-own-queues) keeps it out for about a day; otherwise it can come up the next time you open the queue.
+
+**Recognition First: release after** sets those 3 days: the back → front card's interval must reach that many days. The first **Good** can already give two weeks or more, so a low value may change nothing. `0` releases on the first **Good** or **Easy**.
+
+A few things to expect:
+
+* The arrow on a held Rem shows one direction, on every device, until it is released.
+* Only concepts practising both directions, with front → back never reviewed, are held. A concept that has already passed back → front is released, or left alone, as soon as it meets the interval above. **Card Cluster** members are left alone.
+* If you change a held Rem's direction yourself, the plugin leaves your choice alone and stops tracking the Rem.
+* The check for held Rems runs when a queue opens, so a Rem you passed elsewhere is released then.
+* Turning the setting off releases every held concept about 8 seconds after you next open a queue. **Recognition First: Release All Held Concepts** (`rfr`) does it right away.
+
 ## The Priority Review Queue in your sidebar
 
 Every Priority Queue document is tagged `#Priority Review Queue`, and that tag Rem lists all of them: open it and the **All Tagged Bullets** table shows every one, on desktop and on your phone alike. The **👁** button of the panel opens it.

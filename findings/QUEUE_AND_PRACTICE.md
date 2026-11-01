@@ -66,6 +66,25 @@ The queue controller chains providers:
 
 The order of portals in a document is irrelevant. The only order control a plugin has is the **size** of the document it queues (small bursts).
 
+## New bidirectional cards have no preferred direction
+
+Read from the `app.asar` of October 30, 2026, and measured in the main knowledge base on 2026-10-31. Nothing in a spaced or Practice All queue serves front → back before back → front, and concepts get no special case.
+
+- **No clusters:** the `random` provider splices each card in at a random position.
+- **Clusters on:** `addCardsFromRemTinygraph` runs `shuffle([forward, backward, cloze])` and stops at the first group that adds a card.
+- **New cards:** `new_and_stale` releases them with `_.sample`.
+- **First one wins:** whichever direction is served first buries the other for 60 minutes (`hasSpoiler`).
+
+In the database, of 1,052 concept Rems first practised since 2023, 46.6% started with the forward card (±3.0). Since 2025 it was 45.7% of 291. Rems first practised in 2016–2020 are almost all forward; the likely cause is that their backward cards were enabled later, but this was not checked. The filter for "both cards born together" uses the card's `m` field, so it is approximate.
+
+Not settled: the order `graph_todays_cards` returns inside the WASM module. It does not matter for the routes above, which reshuffle it, but In Order routes keep whatever order they receive.
+
+**Forcing back → front first.** A plugin skip works against this: skipping the forward card records it as seen, which buries the backward card for 60 minutes ([A skip buries the card's siblings](#a-skip-buries-the-cards-siblings)). The exception is Learn New, where In Order has no bury provider and Shuffled only defers buried cards to the end of the batch. The controller's `moveCurrentCardToBackOfQueue` does not go through the bury hook, but the SDK does not expose it. `rem.setPracticeDirection('backward')` avoids the queue altogether.
+
+Measured on 2026-10-31 on six test concepts: a forward card with no reps loses its record when the direction goes backward-only. A later `'both'` writes a new record, due at once. This differs from a card with reps, whose record survives ([CARD_STATE_REFERENCE.md](CARD_STATE_REFERENCE.md)). The new record has a new card id.
+
+The deleted card can still be served. The queue's loaded batch keeps it, and after Keep Practicing it fired `QueueLoadCard` with an id found only in `deleted_cards`. A plugin that changes a direction during a queue has to remember those ids and skip them when they load.
+
 ## "Need to Learn" cards and the Learn New queue
 
 Read from the 1.28.19 bundle and the local database, 2026-09-26.

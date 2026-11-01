@@ -790,3 +790,10 @@ export const coolingInQueuesId = 'cooling-in-queues';
 // Queue setting, off by default: the "just created" rule (coolingNewCardDaysId) also skips
 // cards in RemNote's spaced-repetition queues. Never in Learn New. Needs coolingInQueuesId on.
 export const coolingNewCardsInQueuesId = 'cooling-new-cards-in-queues';
+// Queue setting, off by default: new bidirectional concepts practise back → front until that card
+// is passed (lib/recognition_first.ts).
+export const recognitionFirstId = 'recognition-first';
+// How long the back → front card's interval must be before front → back is released. 0 = first pass.
+export const recognitionFirstMinDaysId = 'recognition-first-min-days';
+// Synced, per KB: Rem id → when Recognition First set it to back → front only.
+export const recognitionFirstHeldKeyPrefix = 'recognition-first-held';
