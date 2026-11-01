@@ -38,11 +38,15 @@ Select text and press **`Opt+X`** (`Alt+X` on Windows), or click **Add Extract**
 
 Extracts go in the page's document, which RemNote keeps in its `Links` folder until you move it. The document itself isn't made Incremental, so use [Make Incremental](Getting-Started.md#making-a-rem-incremental) on it if you want it in your queue as well.
 
+![Extracts marked blue on a Wikipedia page, and the same text in the panel with its image and LaTeX imported](assets/companion-assets/extracted-image-latex.png)
+
 `Opt+X` is left alone when no text is selected, or inside a text box, so it still types `≈` there.
 
 ## Setting a priority
 
 Press **`Opt+Shift+X`** (`Alt+Shift+X` on Windows), or use Add Extract with **Set priority** ticked. A small field beside the selection asks for this extract's priority:
+
+![The priority field below a selected passage, with 16 typed in](assets/companion-assets/priority-set.png)
 
 | Key | What it does |
 |---|---|
@@ -57,6 +61,8 @@ The full popup needs one click in the panel before you can type, because Chrome 
 ## Sections of the page
 
 **Import headings** creates the page's headings as nested Rems in its document, in the page's order.
+
+![A page's headings imported as nested Rems in the panel, matching the page's contents](assets/companion-assets/headings-imported.png)
 
 Extracts go under the section they came from, and stay in reading order however you add them. If you haven't imported the headings, the extract's own section is created when it's needed, so importing is optional.
 
