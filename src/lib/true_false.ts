@@ -61,3 +61,24 @@ export function backTextWithVerdict(
 
   return elements.length === 0 ? [mark] : [`${mark} `, ...elements];
 }
+
+/**
+ * Whether a back says nothing beyond the verdict mark. Anything not known to be
+ * text (an image, an unresolved reference) counts as content.
+ */
+export function isBareVerdictBack(back: any[] | undefined, refText: Record<string, string> = {}): boolean {
+  const onlyMarks = (text: string) =>
+    text
+      .split(VERDICT_MARK.true)
+      .join('')
+      .split(VERDICT_MARK.false)
+      .join('')
+      .replace(/\uFE0F/g, '')
+      .trim() === '';
+
+  return (back ?? []).every((el) => {
+    if (typeof el === 'string') return onlyMarks(el);
+    if (isRemReference(el)) return el._id in refText && onlyMarks(refText[el._id]);
+    return el?.i === 'm' && typeof el.text === 'string' && onlyMarks(el.text);
+  });
+}

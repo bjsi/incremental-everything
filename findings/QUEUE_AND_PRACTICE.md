@@ -36,9 +36,15 @@ Going back with the left arrow reloads the previous card with an ordinary `Queue
 
 ## Card Cluster ratings emit no QueueCompleteCard
 
-Read from the bundle and confirmed in the database, 2026-10-04. The queue's `answerCard` emits `QueueCompleteCard` only when `this.answerCardOverride?.(score)` is falsy. The Card Cluster renderer defines `answerCardOverride`, writes the repetition itself (`submitAnswerWrite` → `updateRepStatusInner`), moves to the next sibling (`goToNextCompoundCard`) and returns `true`. So a cluster member's rating reaches no plugin event, even when it is the only member of its cluster in the queue. `GlobalRemChanged` is not a substitute: the Rem changes only when the rating moves its mastery level.
+Read from the bundle and confirmed in the database, 2026-10-04. The queue's `answerCard` emits `QueueCompleteCard` only when `this.answerCardOverride?.(score)` is falsy. The Card Cluster renderer defines `answerCardOverride`, writes the repetition itself (`submitAnswerWrite` → `updateRepStatusInner`), moves to the next sibling (`goToNextCompoundCard`) and returns `true`. So a cluster member's rating reaches no plugin rating event, even when it is the only member of its cluster in the queue.
+
+`GlobalRemChanged` can stand in for it only in part, because it never names the rated Rem. `Card.update` writes the Cards collection and emits nothing. A rating calls `Rem.update`, which emits the event, in two places: `onFinishedCard` on the practiced document for scores other than Again and Too Early, and `updateDeckInCounts` on each ancestor deck when the card goes from due to not due. Logged on 2026-10-31: a normal and a cluster rating, both Good, each fired one event naming the practiced document 35–50 ms later, and the rated Rem's last write stayed before the rating. An Again on a card that was not due should fire neither.
+
+An earlier fallback ran on that event and read the history of `clusterVisibleCardId`. In a test on 2026-10-31 it recorded the first three siblings of a real `cc` cluster about 190 ms after each rating and missed the fourth; an earlier pass also missed the last card rated. The likely cause, not confirmed, is that the last sibling leaves the cluster at once, so `QueueLoadCard` clears the key before the fallback reads it. `src/lib/cluster_rating_readback.ts` replaced it: it keeps its own list of cards seen on screen and reads their history 1.5 s after a card change.
 
 Two cards of `cc` parents had Good ratings stored with the drill document as `subQueueId` and were still in `finalDrillIds`. The card's `repetitionHistory` is the only reliable source: read it back after the next card change (`reconcileRatings` in `src/lib/mastery_drill_native.ts`; the popup drill's `registerDrillCardRatingListener` does the same for the card `QueueLoadCard` named).
+
+Rechecked in the bundle on 2026-10-31. `answerCardOverride` is assigned once, in `SpacedRepetitionCardCluster`, and every path returns `true`. The other emitters with a card id are the leech screen's Skip and Edit Myself, which pass that card's own id. So `cardId` in `QueueCompleteCard` is always the card rated, never a cluster anchor. Don't refine it with `clusterVisibleCardId`: that key names the card on screen, which may already be the next one. Replacing it when both cards shared a Rem put a never-reviewed cloze into the drill in place of the sibling rated Again.
 
 ## A skip buries the card's siblings
 
@@ -59,6 +65,25 @@ The queue controller chains providers:
 - the cluster selector.
 
 The order of portals in a document is irrelevant. The only order control a plugin has is the **size** of the document it queues (small bursts).
+
+## New bidirectional cards have no preferred direction
+
+Read from the `app.asar` of October 30, 2026, and measured in the main knowledge base on 2026-10-31. Nothing in a spaced or Practice All queue serves front → back before back → front, and concepts get no special case.
+
+- **No clusters:** the `random` provider splices each card in at a random position.
+- **Clusters on:** `addCardsFromRemTinygraph` runs `shuffle([forward, backward, cloze])` and stops at the first group that adds a card.
+- **New cards:** `new_and_stale` releases them with `_.sample`.
+- **First one wins:** whichever direction is served first buries the other for 60 minutes (`hasSpoiler`).
+
+In the database, of 1,052 concept Rems first practised since 2023, 46.6% started with the forward card (±3.0). Since 2025 it was 45.7% of 291. Rems first practised in 2016–2020 are almost all forward; the likely cause is that their backward cards were enabled later, but this was not checked. The filter for "both cards born together" uses the card's `m` field, so it is approximate.
+
+Not settled: the order `graph_todays_cards` returns inside the WASM module. It does not matter for the routes above, which reshuffle it, but In Order routes keep whatever order they receive.
+
+**Forcing back → front first.** A plugin skip works against this: skipping the forward card records it as seen, which buries the backward card for 60 minutes ([A skip buries the card's siblings](#a-skip-buries-the-cards-siblings)). The exception is Learn New, where In Order has no bury provider and Shuffled only defers buried cards to the end of the batch. The controller's `moveCurrentCardToBackOfQueue` does not go through the bury hook, but the SDK does not expose it. `rem.setPracticeDirection('backward')` avoids the queue altogether.
+
+Measured on 2026-10-31 on six test concepts: a forward card with no reps loses its record when the direction goes backward-only. A later `'both'` writes a new record, due at once. This differs from a card with reps, whose record survives ([CARD_STATE_REFERENCE.md](CARD_STATE_REFERENCE.md)). The new record has a new card id.
+
+The deleted card can still be served. The queue's loaded batch keeps it, and after Keep Practicing it fired `QueueLoadCard` with an id found only in `deleted_cards`. A plugin that changes a direction during a queue has to remember those ids and skip them when they load.
 
 ## "Need to Learn" cards and the Learn New queue
 

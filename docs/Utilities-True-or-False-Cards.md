@@ -12,7 +12,7 @@ Statement cards whose answer is "true" or "false", marked with one command and m
 
 ![The question side of a card: the split green ✔ / red ✘ badge above the statement, with Reveal Answer below](assets/true-or-false-question.png){ width="700" }
 
-**Back of the card**: the statement and its answer sit in a green (true) or red (false) block closed by a full-width ✔ or ✘ bar, and the answer is set on its own line in large bold type. The colour stays inside that block; the rest of the card is untouched.
+**Back of the card**: the statement and its answer sit in a green (true) or red (false) block closed by a full-width ✔ or ✘ bar, and any observation on the back sits on its own line, in a smaller serif type and a softer colour, so a long quotation reads as a note under the statement. The ✅ / ❌ and the "→" are not shown: the bar already gives the verdict. A back holding only the mark shows just the statement and the bar. The colour stays inside the block; the rest of the card is untouched.
 
 ![The answer side of a false statement: a red block holding the statement, the ❌ and its correction in large bold type, and a red ✘ bar; the Card Info Bar and answer buttons below keep their normal background](assets/true-or-false-answer-false.png){ width="700" }
 
@@ -38,6 +38,8 @@ Each command does two things:
     - the opposite mark is there: only that mark is swapped;
     - no mark: one is put in front of the existing back text, so explanations, references, links and pins stay as they are;
     - the Rem has no back: it becomes a forward-only card whose back is the mark.
+
+The mark stays on the back and in the editor; only the queue hides it. So the verdict is still there if the plugin is not installed, for example on a shared or exported card.
 
 Run the other command on a card to flip its verdict.
 
@@ -70,7 +72,7 @@ The command swaps each plain `TFT` / `TFF` tag for the powerup, writes the ✅ /
 
 A common layout is one question Rem ("mark each item true or false") with the statements as its children, the parent being a **Card Cluster**. Mark each statement with `tft` / `tff` as usual.
 
-In the queue, the statement being tested gets the badge and, once revealed, the green or red block with the large answer and the verdict bar. The other statements of the cluster stay as RemNote draws them, and the styling moves along as you go from one statement to the next.
+In the queue, the statement being tested gets the badge and, once revealed, the green or red block with its answer and the verdict bar. The other statements of the cluster stay as RemNote draws them, and the styling moves along as you go from one statement to the next.
 
 - The styling appears a moment after each statement loads, not with it.
 - In the Compact queue the tested statement loses its bullet; the frame marks it instead.
@@ -80,6 +82,6 @@ In the queue, the statement being tested gets the badge and, once revealed, the 
 
 ## Notes { #notes }
 
-- The whole back is enlarged, not only the mark, so keep long explanations in a child Rem (for example an Extra Card Detail) rather than on the back itself.
+- Every ✅ and ❌ on the back is hidden in the queue, including one in the middle of a sentence.
 - The `TFT` / `TFF` pill is hidden in the editor while it is the Rem's only tag; with several tags RemNote shows its own "2 tags" chip.
 - From the queue, the styling of a card you have just marked appears the next time the card is shown.

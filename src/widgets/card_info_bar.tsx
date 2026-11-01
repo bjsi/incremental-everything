@@ -271,15 +271,17 @@ export function CardInfoBar() {
 
   // Cluster-aware signaling: broadcast the actually-visible cardId/remId to session storage.
   // These signals are consumed by:
-  //   - src/register/events.ts (QueueCompleteCard listener) — to attribute AGAIN/HARD and
-  //     flashcard-history entries to the sibling actually rated, not the cluster anchor.
-  //   - src/lib/queue_session.ts — to compute accurate per-sibling time-spent when
-  //     QueueCompleteCard fires with the cluster anchor cardId.
+  //   - src/lib/cluster_rating_readback.ts — to read back cluster ratings, which emit no
+  //     QueueCompleteCard, from each sibling's own history.
+  //   - src/lib/queue_session.ts — to advance the per-card panel across siblings.
+  //   - src/lib/queue_visible_card.ts and src/lib/mastery_drill_native.ts — to act on the
+  //     sibling on screen.
+  // It names the card on screen, which right after a rating can already be the NEXT one, so
+  // never use it to say which card a QueueCompleteCard was for.
   //
-  // We deliberately do NOT write to flashcardHistoryData here: events.ts already records
-  // it on QueueCompleteCard using `effectiveCardId` (which resolves from the signals below),
-  // and doing that write on every card transition caused ~several-hundred-ms of IPC lag on
-  // the hot path, competing with the trackers that render the widget's visible data.
+  // We deliberately do NOT write to flashcardHistoryData here: doing that write on every card
+  // transition caused ~several-hundred-ms of IPC lag on the hot path, competing with the
+  // trackers that render the widget's visible data.
   React.useEffect(() => {
     const cardId = currentIds.cardId;
     const remId = currentIds.remId;
@@ -288,7 +290,6 @@ export function CardInfoBar() {
     (async () => {
       try {
         await plugin.storage.setSession('clusterVisibleCardId', cardId);
-        await plugin.storage.setSession('clusterVisibleCardLoadTime', Date.now());
         if (remId) await plugin.storage.setSession('clusterVisibleRemId', remId);
       } catch (error) {
         console.error('Failed to broadcast cluster-visible card signals:', error);

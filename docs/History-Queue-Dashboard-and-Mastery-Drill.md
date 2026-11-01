@@ -78,7 +78,7 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Priority Badge & inline editing:** Each entry also shows a priority badge, right-aligned in the badge row. Click it to open an inline slider editor directly in the row — adjust with the number field or the drag slider, then Save. No popup is opened, so editing a priority here never conflicts with the queue's target-rem selection. The change is written by the plugin's persistent background tracker, so it is saved reliably and still triggers the priority-inheritance cascade. The Incremental Rem History sidebar has the same badge, showing the IncRem priority (colored by its KB-wide percentile).
 
-**Cluster-aware recording:** Inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters), each sibling card is recorded individually as it becomes visible — not just the cluster anchor. This ensures your history accurately reflects every card you actually reviewed. Cards rated inside the [Mastery Drill](#mastery-drill) popup are recorded here too, for the same reason.
+**Cluster-aware recording:** Inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters), each sibling card you rate is recorded individually, about a second and a half after it leaves the screen, up to and including the cluster's last card. This ensures your history accurately reflects every card you actually reviewed. Cards rated inside the [Mastery Drill](#mastery-drill) popup are recorded here too, for the same reason.
 
 **Retention:** The list keeps the **500 most recent** cards for the knowledge base you are in. See [How the history lists are stored](#how-the-history-lists-are-stored).
 
@@ -196,7 +196,7 @@ In calibrated mode the Sessions Summary carries a caption spelling out the scale
 
 Both modes affect only the Practiced Queues dashboard. The [Study Dashboard](Study-Dashboard.md) has its own speed columns and still uses the fixed 1.5 / 4 cpm gradient.
 
-**Cluster-aware tracking:** Card count, time, and retention are tracked per sibling card in a cluster — not just the cluster anchor. Average speed (s/card) and total card count correctly reflect all siblings rated.
+**Cluster-aware tracking:** Card count, time, and retention are tracked per sibling card in a cluster — not just the cluster anchor. Average speed (s/card) and total card count reflect all siblings rated, using the answer time RemNote stores with each rating. A sibling rated in the last moment before you leave the queue reaches the history but not that session's numbers.
 
 **IncRem tracking across all review surfaces:** IncRem count and time are recorded no matter where the review takes place — in the queue widget, via the ⏱️ Start Timer (editor timer), or via the Editor Review popup (manual-minutes confirm). If you open an IncRem in the editor directly from the queue (*Review in Editor*), the time is counted once in the same session rather than creating a duplicate engagement. Editor-only reviews (not started from a queue) appear as a separate **"Editor Review"** session that auto-saves after 60 minutes of inactivity.
 
@@ -279,15 +279,15 @@ Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused s
 - A periodic notification widget appears in the Left Sidebar when ≥ 10 cards are pending, with a motivational phrase and a direct *Start Drill* button.
 - If the [Incremental RemNote panel is collapsed](Getting-Started.md#collapsed-panel), the notification is not shown as a card — the panel's 🎯 icon carries the drill instead, with the same count on a badge.
 
-!!! warning "Known limitation — [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters)"
-    Inside a cluster, RemNote reports only the **cluster anchor** to plugins: the visible sibling advances on screen, but the card identity the plugin receives stays on the first one. The Mastery Drill inherits two consequences from that, both verified by measurement:
+!!! warning "Known limitation — [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters) in the popup drill"
+    Inside a cluster, RemNote reports only the **cluster anchor** to plugins: the visible sibling advances on screen, but the card identity the plugin receives stays on the first one. In ordinary queues and the [regular-queue drill](#regular-queue-drill), the plugin sees each sibling and reads its rating back from the card's history, so every sibling you rate *Forgot*/*Hard* enters the drill and every one you rate *Good*/*Easy* leaves it.
 
-    - **Sibling ratings mostly don't reach the drill.** Rate the first sibling *Good* and later siblings *Forgot*/*Hard* and nothing is added; rate several siblings *Forgot*/*Hard* and only the first one is added. In practice the drill tracks the anchor of a cluster and nothing else.
-    - **The popup's per-card actions target the anchor.** On siblings 2 and beyond, *Remove from Drill*, *Edit Later*, *Go to Rem*, *Edit Current* and the priority badge act on the anchor rather than on the card you are looking at.
+    The **popup drill** cannot see the siblings, with two consequences:
 
-    This is a limitation of what RemNote exposes, not something the plugin can work around, and it is left as-is: clusters rarely reach a drill queue, and the failure mode is an under-populated drill — never a wrong rating, and never a lost repetition. Everything outside clusters is unaffected.
+    - **Only the anchor's rating reaches the drill list.** Ratings of siblings 2 and beyond change nothing there.
+    - **The per-card actions target the anchor.** On siblings 2 and beyond, *Remove from Drill*, *Edit Later*, *Go to Rem*, *Edit Current* and the priority badge act on the anchor rather than on the card you are looking at.
 
-    The [regular-queue drill](#regular-queue-drill) does not depend on those reports: it reads ratings back from each card's history, so a cluster card rated *Good* or *Easy* there leaves the drill, and its **Remove from Drill** acts on the sibling on screen (which stays on screen until you rate it).
+    This is a limitation of what RemNote exposes to a popup, and it costs at most a stale entry in the drill list — never a wrong rating, and never a lost repetition. Everything outside clusters is unaffected.
 
 ### Why Use It
 
@@ -338,7 +338,7 @@ RemNote practises whole Rems, not a hand-picked set of cards. So each session cr
 - **"Time to Take a Break"**: skipping a card counts as seeing it, and RemNote then hides the other cards of that Rem for an hour, sometimes including its drill card. When RemNote shows its "Time to Take a Break" screen for them, the drill presses **Keep Practicing** itself and a toast says how many drill cards it is continuing with. It affects only the drill session, not your other queues. If the press ever fails, the screen stays up with Keep Practicing highlighted and a note under the buttons: press it, or **Esc**.
 - **The drill bar**, under the queue's top bar, has the same [queue tools](#queue-management) as the popup's top row. The Card List and the clear views open in their own popup. It has no per-card editing actions: the regular queue already lets you edit the card, open its Rem and set its priority.
 - Ratings work as in any queue: *Again*/*Hard* keep the card in the drill and restart its [minimum delay](#minimum-delay), *Good*/*Easy* take it out. The session is recorded as **Mastery Drill** in the [Practiced Queues History](#practiced-queues-history-live-dashboard).
-- **[Card Cluster](https://help.remnote.com/en/articles/10104223-card-clusters) cards**: RemNote tells plugins nothing when a cluster card is rated, so the drill reads the rating from the card's own history a moment after the next card appears (or after you leave the queue). A cluster card rated *Good* or *Easy* leaves the drill like any other, and *Again*/*Hard* restarts its delay. When the drill starts, it also drops any card whose last rating since it entered the drill was *Good* or *Easy* — which catches cluster cards rated *Good* in an ordinary queue.
+- **[Card Cluster](https://help.remnote.com/en/articles/10104223-card-clusters) cards**: RemNote tells plugins nothing when a cluster card is rated, so the drill reads the rating from the card's own history a moment after the next card appears (or after you leave the queue). A cluster card rated *Good* or *Easy* leaves the drill like any other, and *Again*/*Hard* restarts its delay. When the drill starts, it also drops any card whose last rating since it entered the drill was *Good* or *Easy* — which catches any rating that was missed, such as a cluster card rated in the popup. The drill's **Remove from Drill** acts on the sibling on screen.
 
 [Queue Management](#queue-management) below applies to both drills; [Editor Access](#editor-access) and [Keyboard Shortcuts](#mastery-drill-keyboard-shortcuts) describe the popup drill.
 

@@ -418,7 +418,9 @@ The seven-day limit covers the one change that cannot be detected. If you edit a
 
 ### What the cache cannot see { #cache-blind-spot }
 
-Within a session, the cache is kept current by what happens **on this device**: every card you rate in a queue updates its entry straight away, and every start rebuilds the card data from scratch.
+Within a session, the cache is kept current by what happens **on this device**, and every start rebuilds the card data from scratch.
+
+Ratings in a queue reach the cache in batches: after 60 seconds without a rating, once 25 Rems are waiting, or when you leave or open a queue. The [Card Shield](#monitoring-your-load-card-shield) still moves with each rating, because it leaves out the Rems you have reviewed. Until the next batch, a view opened in the middle of a queue, such as the Priority Graph, can show the old due data of a card you just rated.
 
 !!! warning "Reviews synced from another device arrive only at the next start"
     Cards you review on **another device** while the plugin is running here — your phone, another computer, the web app — are synced into RemNote, but nothing tells this device's cache about them. Until you restart RemNote here, those cards still look due to the plugin.

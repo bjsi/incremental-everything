@@ -3,7 +3,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { backTextWithVerdict, referencedRemIds } from './true_false';
+import { backTextWithVerdict, isBareVerdictBack, referencedRemIds } from './true_false';
 
 const ref = (id: string) => ({ i: 'q', _id: id });
 const bold = (text: string) => ({ i: 'm', text, b: true });
@@ -44,5 +44,27 @@ describe('referencedRemIds', () => {
   it('lists reference elements only', () => {
     assert.deepEqual(referencedRemIds(['a', ref('x'), bold('b'), ref('y')]), ['x', 'y']);
     assert.deepEqual(referencedRemIds(undefined), []);
+  });
+});
+
+describe('isBareVerdictBack', () => {
+  it('accepts a back holding only the mark', () => {
+    assert.equal(isBareVerdictBack(['✅']), true);
+    assert.equal(isBareVerdictBack(['❌ ']), true);
+    assert.equal(isBareVerdictBack(['✅\uFE0F']), true);
+    assert.equal(isBareVerdictBack([bold('❌')]), true);
+    assert.equal(isBareVerdictBack([ref('a')], { a: '✅' }), true);
+    assert.equal(isBareVerdictBack([]), true);
+  });
+
+  it('rejects a back with anything else on it', () => {
+    assert.equal(isBareVerdictBack(['✅ see art. 16']), false);
+    assert.equal(isBareVerdictBack(['❌ ', bold('only one')]), false);
+    assert.equal(isBareVerdictBack([ref('a')], { a: 'Article 16' }), false);
+  });
+
+  it('counts what it cannot read as content', () => {
+    assert.equal(isBareVerdictBack([ref('a')]), false);
+    assert.equal(isBareVerdictBack([{ i: 'i', url: 'x.png' }]), false);
   });
 });

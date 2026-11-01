@@ -49,6 +49,10 @@ The only per-row channel is `registerCSS` keyed on `data-rem-tags`, which is pre
 
 In both the Compact and the Beautiful queue, the back of a basic card is rendered inside the question Rem as `span.rn-fill-in-blank.rn-fill-in-blank--revealed`, after the ` → ` delimiter (saved DOM, 2026-10-03). Beautiful's `.queue-beautiful-basic-card-answer-line` class exists only on the block variant; short cards use an inline span that carries no class, only `data-test="Beautiful Queue Basic Card Answer Line"`. So `.rn-question-rem[data-queue-rem-container-tags~="slug"] .rn-fill-in-blank--revealed` is the selector that styles an answer in every case (`src/register/true_false.ts`).
 
+The delimiter is a sibling before the answer: `span.rn-clr-content-tertiary` before the answer wrapper in Beautiful, a span with no class attribute before the fill-in-the-blank in Compact (`app.asar` 1.29.1, saved DOM).
+
+Part of a text node can't be selected, but specific characters can be hidden: put a font first in the stack whose `unicode-range` covers only them and whose glyphs are empty and zero-width. Chrome uses it for emoji too (rendered in headless Chrome, 2026-10-31). The host page sets no CSP, so a `data:` font loads from `registerCSS`. Their line box stays, since CSS can't tell the text is invisible.
+
 The question Rem's bullet is `absolute left-[-24px]`: a border or background on `.rn-question-rem` needs about 36px of left padding to clear it.
 
 ## Card Cluster cards carry no tags and no Rem ids

@@ -57,6 +57,8 @@ import {
   coolingNewCardDaysId,
   coolingInQueuesId,
   coolingNewCardsInQueuesId,
+  recognitionFirstId,
+  recognitionFirstMinDaysId,
   displayWeightedShieldId,
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
@@ -155,6 +157,8 @@ export interface IESettings {
   [coolingNewCardDaysId]: number;
   [coolingInQueuesId]: boolean;
   [coolingNewCardsInQueuesId]: boolean;
+  [recognitionFirstId]: boolean;
+  [recognitionFirstMinDaysId]: number;
   [displayWeightedShieldId]: boolean;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
@@ -250,6 +254,8 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [coolingNewCardDaysId]: 1,
   [coolingInQueuesId]: true,
   [coolingNewCardsInQueuesId]: false,
+  [recognitionFirstId]: false,
+  [recognitionFirstMinDaysId]: 3,
   [displayWeightedShieldId]: true,
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
@@ -812,6 +818,32 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       '(a document, the daily queue), not only kept out of the Priority Queue. Off by default: with it on, ' +
       'the queue of a document you wrote today opens empty. Needs All queues above; ' +
       'Learn New Cards is never affected.',
+  },
+  [recognitionFirstId]: {
+    kind: 'boolean',
+    group: 'priorityQueue',
+    helpPath: 'Priority-Review-Document/#recognition-first',
+    title: 'Recognition First for new concepts',
+    description:
+      'A new bidirectional concept practises back → front only (description → name) until you pass that ' +
+      'card, then both directions. The plugin changes the Rem’s practice direction while it waits, and restores ' +
+      'it afterwards. A front → back card that loads first flashes before it goes, and its other direction ' +
+      'returns within the hour. Card Clusters are left alone. Turning this off releases every held concept the ' +
+      'next time you open a queue.',
+  },
+  [recognitionFirstMinDaysId]: {
+    kind: 'number',
+    group: 'priorityQueue',
+    helpPath: 'Priority-Review-Document/#recognition-first',
+    min: 0,
+    max: 365,
+    integer: true,
+    unit: 'days',
+    showWhen: { id: recognitionFirstId, equals: true },
+    title: 'Recognition First: release after',
+    description:
+      'How long the back → front card’s interval must be before front → back is released. ' +
+      '0 releases it on the first Good or Easy.',
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',

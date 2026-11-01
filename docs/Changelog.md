@@ -2,6 +2,56 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.183 - November 1st, 2026
+
+### ✨ New
+
+**Queue**: Added Recognition First, an optional setting that starts new bidirectional concepts with recognizing the term, and begins practice of defining it only once you have learned that.
+
+📖 [Recognition First](Priority-Review-Document.md#recognition-first)
+
+## v1.0.182 - October 31st, 2026
+
+### ⚡ Improved
+
+**Queue**: Reduced the background work after each rating by updating the card priority data in batches instead of after every card.
+
+📖 [How ratings reach the cache](Priorities-for-Flashcards.md#cache-blind-spot)
+
+## v1.0.181 - October 31st, 2026
+
+### ⚡ Improved
+
+**Practiced Queues**: The Live Session now moves to the next card about twice as fast after a rating.
+
+📖 [Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
+### 🐛 Fixed
+
+**Practiced Queues**: Fixed the Prev. Card tile showing the current card, and the first card of a queue sometimes not being counted.
+
+📖 [Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
+## v1.0.180 - October 31st, 2026
+
+### ⚡ Improved
+
+**True or False Cards**: Answers in the queue no longer repeat the verdict with a ✅ / ❌ and now appear in a smaller, quieter type suited to long observations and quotations.
+
+📖 [What a True/False card looks like](Utilities-True-or-False-Cards.md#what-it-looks-like)
+
+## v1.0.179 - October 31st, 2026
+
+### 🐛 Fixed
+
+**Card Clusters**: Ratings inside a cluster, including its last card, now reach Flashcard History, the Mastery Drill, Practiced Queues statistics and the Card Shield.
+
+📖 [Cluster-aware recording](History-Queue-Dashboard-and-Mastery-Drill.md#flashcard-history)
+
+**Mastery Drill**: Fixed a rating going to another card of the same Rem when that card came up next, which could add a never-reviewed cloze to the drill. An entry already added this way stays until you press **Remove from Drill**.
+
+📖 [How the Mastery Drill works](History-Queue-Dashboard-and-Mastery-Drill.md#how-it-works)
+
 ## v1.0.178 - October 30th, 2026
 
 ### ✨ New

@@ -224,6 +224,68 @@ export async function updateCardPriorityCache(
   }
 }
 
+/** Ratings are flushed once this long has passed without another one. */
+const RATED_FLUSH_IDLE_MS = 60_000;
+/** At this many Rems waiting, the flush no longer waits for a pause in the ratings. */
+const RATED_FLUSH_MAX_REMS = 25;
+/** Even then it stays clear of the next card appearing (2.2 s measured for the write). */
+const RATED_FLUSH_AT_CAP_DELAY_MS = 2500;
+const ratedRemIds = new Set<RemId>();
+let ratedFlushTimer: ReturnType<typeof setTimeout> | null = null;
+let ratedFlushAtCap = false;
+
+/**
+ * The cache update for a rated card. A rating changes a Rem's due data, never its priority, and
+ * a flush reads and rewrites the whole cache (over 2 s, for one Rem or many), so ratings are
+ * batched. Nothing in the queue needs them sooner: the shields leave out rated Rems through the
+ * seen list, and cooling keeps its own record of the session's ratings. A view opened mid-queue
+ * (Priority Graph, Selection Odds) can show a rated Rem's due data up to the next flush.
+ *
+ * The Rem is marked dirty at once, so the next startup re-reads it even if the app quits before
+ * the flush. Queue exit flushes through flushCacheUpdatesNow.
+ */
+export function updateCardPriorityCacheAfterRating(plugin: RNPlugin, remId: RemId) {
+  markCardPriorityDirty(plugin, remId);
+  ratedRemIds.add(remId);
+  // Further ratings do not postpone a flush already due at the cap.
+  if (ratedFlushAtCap) return;
+  ratedFlushAtCap = ratedRemIds.size >= RATED_FLUSH_MAX_REMS;
+  if (ratedFlushTimer) clearTimeout(ratedFlushTimer);
+  ratedFlushTimer = setTimeout(
+    () => {
+      drainRatedCards(plugin)
+        .then(() => flushCacheUpdates(plugin))
+        .catch((e) => console.error('[Cache] Flush after ratings failed:', e));
+    },
+    ratedFlushAtCap ? RATED_FLUSH_AT_CAP_DELAY_MS : RATED_FLUSH_IDLE_MS
+  );
+}
+
+/** For a new queue's shield data: leaving by navigation fires no QueueExit, so no flush ran. */
+export async function flushRatedCardsNow(plugin: RNPlugin) {
+  if (ratedRemIds.size === 0) return;
+  await drainRatedCards(plugin);
+  await flushCacheUpdates(plugin);
+}
+
+async function drainRatedCards(plugin: RNPlugin) {
+  if (ratedFlushTimer) clearTimeout(ratedFlushTimer);
+  ratedFlushTimer = null;
+  ratedFlushAtCap = false;
+  const remIds = [...ratedRemIds];
+  ratedRemIds.clear();
+  for (const remId of remIds) {
+    try {
+      const rem = await plugin.rem.findOne(remId);
+      const info = rem ? await getCardPriority(plugin, rem) : null;
+      pendingUpdates.set(remId, { info, isLight: true });
+      if (info) lightModeOptimisticOverrides.set(remId, { info, expiresAt: Date.now() + 5000 });
+    } catch (e) {
+      console.error('Error updating card priority cache for rated Rem:', remId, e);
+    }
+  }
+}
+
 /**
  * Replaces an optimistic entry with one read from the Rem's real cards, once
  * those cards exist. A command that writes the text a card is made from (Alt+Z)
@@ -252,6 +314,7 @@ export function rereadCardPriorityCacheWhenCardsExist(
 }
 
 export async function flushCacheUpdatesNow(plugin: RNPlugin) {
+  await drainRatedCards(plugin);
   await flushCacheUpdates(plugin, true);
 }
 

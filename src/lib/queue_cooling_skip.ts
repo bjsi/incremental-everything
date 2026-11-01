@@ -151,6 +151,21 @@ let session: Session | null = null;
 let lastScope: { at: number; ids: RemId[] } | null = null;
 /** The QueueEnter work in flight; a load waits for it so the first card is judged too. */
 let entering: Promise<void> = Promise.resolve();
+const CLAIM_MS = 5000;
+let lastClaim: { cardId: string; at: number } | null = null;
+
+/**
+ * Two modules skip cards on load (this one and recognition_first.ts). The second removal of one
+ * card would take the card after it, so each claims the card first. A claimed card also counts as
+ * skipped here: it was removed, not seen, so it must not cool its siblings.
+ */
+export function claimCardRemoval(cardId: string): boolean {
+  const now = Date.now();
+  if (lastClaim?.cardId === cardId && now - lastClaim.at < CLAIM_MS) return false;
+  lastClaim = { cardId, at: now };
+  session?.skipped.add(cardId);
+  return true;
+}
 
 /** Resolves after DEFER_MS while a Learn New session is open, at once otherwise. */
 export const deferDuringLearnNew = () =>
@@ -477,7 +492,7 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
     console.log(`${LOG} "${verdict.label ?? remId}" is cooling but left in: the queue moved on before the check ended (${Date.now() - started} ms).`);
     return;
   }
-  s.skipped.add(cardId);
+  if (!claimCardRemoval(cardId)) return;
   const removing = Date.now();
   await plugin.queue.removeCurrentCardFromQueue(false);
   const timing =
@@ -502,6 +517,24 @@ async function checkCard(plugin: RNPlugin, s: Session, cardId: string): Promise<
     verdict
   );
   announce(plugin, s, verdict);
+}
+
+/** A rating for this session's sightings: from QueueCompleteCard, or read back for a Card Cluster. */
+export function noteCoolingRating(plugin: RNPlugin, cardId: string, rawScore: unknown) {
+  const receivedAt = Date.now();
+  const s = session;
+  if (!s || s.skipped.has(cardId)) return;
+  const score: number | undefined = typeof rawScore === 'number' ? rawScore : undefined;
+  const noted = s.sightings.get(cardId);
+  if (noted) noted.score = score;
+  const current = s.currentCardId === cardId;
+  if (current) s.currentCardId = null;
+  // Usually already noted when the next card loaded; a no-op then.
+  noteSeen(plugin, s, cardId, {
+    how: 'rated',
+    score,
+    currentForMs: current && s.currentLoadedAt !== null ? receivedAt - s.currentLoadedAt : undefined,
+  });
 }
 
 export function registerQueueCoolingListeners(plugin: RNPlugin) {
@@ -579,21 +612,8 @@ export function registerQueueCoolingListeners(plugin: RNPlugin) {
   });
 
   plugin.event.addListener(AppEvents.QueueCompleteCard, undefined, (data: any) => {
-    const receivedAt = Date.now();
-    const s = session;
     const cardId: string | undefined = data?.cardId;
-    if (!s || !cardId || s.skipped.has(cardId)) return;
-    const score: number | undefined = typeof data?.score === 'number' ? data.score : undefined;
-    const noted = s.sightings.get(cardId);
-    if (noted) noted.score = score;
-    const current = s.currentCardId === cardId;
-    if (current) s.currentCardId = null;
-    // Usually already noted when the next card loaded; a no-op then.
-    noteSeen(plugin, s, cardId, {
-      how: 'rated',
-      score,
-      currentForMs: current && s.currentLoadedAt !== null ? receivedAt - s.currentLoadedAt : undefined,
-    });
+    if (cardId) noteCoolingRating(plugin, cardId, data?.score);
   });
 
   // Leaving the queue by navigating (a link, Review in Editor) fires no QueueExit, and the session

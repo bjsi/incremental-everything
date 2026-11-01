@@ -121,6 +121,9 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Clean Priority Review Documents](Priority-Review-Document.md#cleaning-up-leftovers)** — `quick: clean`
   Drains every document tagged *Priority Review Queue* at once: finds the entries whose Rem no longer has anything due — or is cooling — and removes them after you confirm, per document. Leftover snapshot documents from earlier versions with **no flashcards left due** are deleted outright; Priority Queue documents are never deleted. Entries you have written notes under, and documents holding them, are never touched.
 
+- **[Recognition First: Release All Held Concepts](Priority-Review-Document.md#recognition-first)** — `quick: rfr`
+  Sets every concept held by Recognition First back to practising both directions, and reports how many were released.
+
 - **[Open Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)** — `quick: sort`
   Brings up the Sorting dialog to manipulate the flashcard:increm ratio and queue randomization.
 

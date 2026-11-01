@@ -49,7 +49,7 @@ export async function getCoolingParams(plugin: RNPlugin): Promise<CoolingParams>
   }
 }
 
-async function getKbId(plugin: RNPlugin): Promise<string> {
+export async function getKbId(plugin: RNPlugin): Promise<string> {
   try {
     const kb = await plugin.kb.getCurrentKnowledgeBaseData();
     return kb?._id ?? FALLBACK_KB_ID;
