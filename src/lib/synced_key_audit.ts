@@ -14,6 +14,8 @@ import {
   cardShieldCleanupBackupIndexKey,
   debugHistoryBackupPrefix,
   noIncRemTimerKey,
+  sourceUrlIndexKey,
+  sourceUrlIndexScannedAtKey,
   ieKbSettingsKeyPrefix,
   lastDetectedOSKey,
   lastDetectedPlatformKey,
@@ -490,6 +492,8 @@ async function buildCandidates(
       REVIEW_GRAPH_INDEX_KEY,
       lastDetectedOSKey,
       lastDetectedPlatformKey,
+      sourceUrlIndexKey,
+      sourceUrlIndexScannedAtKey,
     ],
   });
 

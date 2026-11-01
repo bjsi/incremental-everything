@@ -77,3 +77,34 @@ So before merging, remove from the merged Rem every powerup whose values must no
 3. re-checks the kept highlight's `Data`, `PdfId` and colour.
 
 Merge only rewrites `key` and `value` rich text. **References stored in other Rems' powerup slot values are not repointed**, and neither is anything a plugin keeps in its own JSON (the plugin's PDF bookmarks, for instance, are moved by `repointBookmarksInState` in `src/lib/pdf_state.ts`).
+
+## Web pages: Link Rems, Sources and the Clipper
+
+Read from the RemNote 1.29.1-beta bundle and the Clipper 1.0.12 extension, and measured in the main KB's `remnote.db` (Nov 1, 2026). The plugin-side `remsReferencingThis` behaviour below comes from reading the code and was not run.
+
+A clipped page is **two Rems**:
+
+| Rem | Parent | Holds |
+|---|---|---|
+| Link Rem (powerup `b`) | the host Rem (`supermemo.guru`) under the `Website` powerup Rem | `b_u` URL, `b_t` title, and the singleton key `e = "p.b.<url>"` |
+| Document (powerup `o`) | `Links` at first; the user may move it | Sources slot `os_os` = a rich-text reference `{i:'q',_id:<Link Rem>}` |
+
+In newer Rems the slots are in `doc.ps` and `doc.apu`; older ones use `doc.bpc`. The document has no copy of the URL.
+
+**The Link Rem is unique per URL string.** `getOrCreateLinkRem` looks up the indexed `e` field KB-wide, and creates a Link Rem only on a miss. The main KB has 2,413 Link Rems and no repeated `e`. The only normalization is `sanitize-url` (it strips control characters and blocks `javascript:`), so `http`/`https`, `www`, `#fragment`, query strings and letter case all give different Link Rems. URLs ending in `.pdf`, and arXiv/OpenReview PDF links, take the uploaded-file path instead.
+
+**The Clipper reuses the document.** The extension only opens an iframe at `/clipper?clipperURL=<tab.url>&clipperTitle=…`, or posts `getOrCreatePageDocument`, and the app does the rest in `getOrCreateDocumentWithSourceURL(url, parent)`:
+
+1. Get or create the Link Rem.
+2. Take `documentsThisIsASourceOf(link)[0]`, a WASM graph query, and return it if there is one. Moving the document does not break this.
+3. Otherwise create a new Rem under `Links` and set the Link Rem as its source.
+
+A new document follows when the URL string differs, or when no Rem has that source any more (document deleted, or source removed). The iframe route does not tag the document; `getOrCreatePageDocument` also adds the `Clipped Document` tag, but only when the title is empty.
+
+**What a plugin can reach:**
+
+- Forward: `rem.getSources()`, then `getPowerupProperty(BuiltInPowerupCodes.Link, 'URL')`.
+- URL to Link Rem: `plugin.rem.createLinkRem(url, false)`, which creates one on a miss. There is no read-only lookup.
+- Link Rem to documents: **no API.** `documentsThisIsASourceOf` and `powerupSlotReferenceRemsAsync` are not on the bridge. `remsReferencingThis` calls `referenceRemsAsync`, which reads only the key and value reference caches (`kr`, `vr`), while the source reference is in a powerup slot. `Sources` has no powerup Rem to enumerate either.
+
+Counting from `remnote.db`: built-in powerups show in `doc.apu`, but plugin powerups are tags, in `doc.tp.<tag Rem id>.t`. A query on `apu` finds no Dismissed Rems at all. On Nov 1, 2026 the main KB had 6,494 Incremental and 388 Dismissed Rems; 86 of them had a Link source, and none shared a page.

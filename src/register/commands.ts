@@ -172,6 +172,7 @@ import {
   getEffectiveSelection,
 } from '../lib/editor_selection';
 import { createExtract } from '../lib/extract';
+import { confirmNoDuplicateSource, registerRemPagesIfTracked } from '../lib/duplicate_source';
 import { bulletizeSelection } from '../lib/bulletize';
 import {
   inlinizeListSelection,
@@ -1556,6 +1557,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // 3. Ensure the focused Rem is an incremental Rem, initializing it if necessary.
       if (!(await rem.hasPowerup(powerupCode))) {
+        if (!(await confirmNoDuplicateSource(plugin, [rem])).length) return;
         await initIncrementalRem(plugin, rem);
       }
 
@@ -2410,6 +2412,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
       try {
+        if (!(await confirmNoDuplicateSource(plugin, [rem])).length) return;
         await plugin.app.toast('🎞️ Choose the video in the dialog…');
         const file = await chooseLocalVideo('file', 'Choose a video for this Rem');
         if (!file) return;
@@ -3510,6 +3513,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             await registerRemsAsPdfKnown(plugin, source._id, [target._id]);
           }
         }
+        await registerRemPagesIfTracked(plugin, target);
       }
 
       const remLabel = targetRems.length === 1 ? '1 Rem' : `${targetRems.length} Rems`;

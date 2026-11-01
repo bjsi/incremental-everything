@@ -353,6 +353,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Warning that another Incremental or Dismissed Rem has the same web page as a
+  // source (lib/duplicate_source).
+  plugin.app.registerWidget('duplicate_source_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 460,
+      height: 'auto',
+    },
+  });
+
   // Generic message dialog for failures the user must read (lib/message_dialog.ts).
   plugin.app.registerWidget('message_popup', WidgetLocation.Popup, {
     dimensions: {

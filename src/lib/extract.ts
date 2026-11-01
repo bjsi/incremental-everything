@@ -20,6 +20,7 @@ import {
 } from '../register/queue_display_powerups';
 import { getEffectiveSelection } from './editor_selection';
 import { collectSourcePins } from './source_pins';
+import { confirmNoDuplicateSource } from './duplicate_source';
 
 export const createExtract = async (
   plugin: ReactRNPlugin,
@@ -279,7 +280,9 @@ export const createExtract = async (
 
     return extractRem;
   } else if (selection.type === SelectionType.Rem) {
-    const rems = (await plugin.rem.findMany(selection.remIds)) || [];
+    const selected = (await plugin.rem.findMany(selection.remIds)) || [];
+    // Before the flag below goes up: this can wait on the user for a while.
+    const rems = await confirmNoDuplicateSource(plugin, selected);
     // Single outer flag bracket for the entire batch — each initIncrementalRem
     // skips its own flag management so the flag stays UP for the whole loop.
     await plugin.storage.setSession('plugin_operation_active', true);

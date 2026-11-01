@@ -8,7 +8,7 @@ A finding earns a file here when getting it wrong costs real time: a silent fail
 |---|---|
 | [CARD_STATE_REFERENCE.md](CARD_STATE_REFERENCE.md) | Disabled, paused and not-generated cards: what each looks like through the API, and how to tell them apart |
 | [REMNOTE_POWERUP_CODES.md](REMNOTE_POWERUP_CODES.md) | RemNote's built-in powerup and slot codes compared with the SDK's (e.g. Card Cluster `cc`, missing from the SDK) |
-| [REM_REFERENCES_AND_MERGE.md](REM_REFERENCES_AND_MERGE.md) | References, pins, inline links, tags, portals: how they are stored, and how RemNote's merge repoints them |
+| [REM_REFERENCES_AND_MERGE.md](REM_REFERENCES_AND_MERGE.md) | References, pins, inline links, tags, portals: how they are stored, and how RemNote's merge repoints them; Link Rems, Sources and how the Clipper reuses documents |
 | [PDF_AND_HTML_HIGHLIGHTS.md](PDF_AND_HTML_HIGHLIGHTS.md) | PDF and web-article highlight Rems: `Data` shapes, text vs area highlights, creating highlights, the Highlights container, reader zoom steps |
 | [QUEUE_AND_PRACTICE.md](QUEUE_AND_PRACTICE.md) | The flashcard queue from a plugin: the GetNextCard deadline, why a queue never opens on a plugin card, queue events, bury, Need to Learn cards, launching queues, the `<Queue>` embed, flashcard widget slots, the Beautiful queue bottom layout, and how queue images are drawn and sized |
 | [MULTI_LINE_SUB_CARDS.md](MULTI_LINE_SUB_CARDS.md) | Partial list/set cards: sub-item schedules are replayed from the main card's history, the card's single due date is the earliest candidate, and partial reps don't count for the main card |

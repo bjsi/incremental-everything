@@ -6,6 +6,7 @@ import { allCardPriorityInfoKey } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
+import { refreshSourceUrlIndexIfDue } from '../lib/duplicate_source';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { writeCardPriorityCache } from '../lib/card_priority/persistence';
 import { checkFlashcardPrioritisationOptOut } from '../lib/card_priority/opt_out';
@@ -327,6 +328,17 @@ async function onActivate(plugin: ReactRNPlugin) {
   );
   hiddenSlotCheck.catch((err) => console.warn('Card priority hidden-slot migration check failed', err));
   startup.track('hiddenSlotCheck', hiddenSlotCheck);
+
+  // Keeps the duplicate-source index current. Well after startup, since it is the
+  // lowest-priority work here, and not in light mode, where the Synced index built
+  // by a full-mode device is used as it stands.
+  if (!useLightMode) {
+    setTimeout(() => {
+      refreshSourceUrlIndexIfDue(plugin).catch((err) =>
+        console.warn('[DuplicateSource] Index scan failed', err)
+      );
+    }, 120000);
+  }
 
   // The band stylesheets are normally re-registered warm by the caches' own
   // bumps. Two paths never get there: an IncRem cache with no IncRems (which

@@ -22,6 +22,11 @@ export const dismissedPowerupCode = 'dismissed';
 export const dismissedHistorySlotCode = 'dismissedHistory';
 export const dismissedDateSlotCode = 'dismissedDate';
 
+// Duplicate-source warning (lib/duplicate_source)
+export const sourceUrlIndexKey = 'source_url_index'; // synced: page key -> Incremental or Dismissed Rems with that source
+export const sourceUrlIndexScannedAtKey = 'source_url_index_scanned_at'; // synced: when a device last rebuilt it
+export const duplicateSourceDecisionKey = 'duplicate_source_decision'; // session: the popup's answer to the caller
+
 // Marks a "tombstone" rem whose content was removed by the
 // 'Preserve history & remove' command but whose review history was preserved on
 // its Dismissed powerup. Used purely as a CSS hook (data-rem-tags~="preservedhistory")
