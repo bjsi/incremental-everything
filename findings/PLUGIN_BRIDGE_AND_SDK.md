@@ -78,3 +78,16 @@ RemNote's built-in defaults are listed in [RemNote-Native-Shortcuts](../docs/Rem
 **Never import from a widget file.** Every `src/widgets/*.tsx` is a webpack entry that calls `renderWidget(...)` when loaded. Importing a component from one runs that `renderWidget` inside the importing widget: the wrong widget renders, and React throws minified error #40 on deactivate. It only shows in the production build. Shared UI belongs in `src/components/` or `src/lib/`.
 
 **New widget files need `npm run dev` restarted.** Webpack entries are globbed at startup.
+
+## A Chrome extension can host RemNote and reach plugin frames
+
+Tested Nov 1, 2026 on Chrome 156 with `spikes/companion-extension/`, on the web client inside the extension's side panel.
+
+- **Embedding works for any extension.** An iframe of `https://www.remnote.com/clipper?clipperURL=…&clipperTitle=…&clipperId=…` loads with no `x-frame-options` or `frame-ancestors`, although the response status is 404. It shares the browser's session and storage, so there is no second sign-in or KB download.
+- **The app waits for `loadFrame`.** An embedded page does not start until a content script in that frame posts `{function: 'loadFrame', data: {}, messageId, nonce}`. A few embedders are exempt by origin (Notion, ClickUp and others); extensions are not.
+- **Page commands answer any extension.** `getRemById` replied to a `chrome-extension:` origin that was not the Clipper.
+- **Plugin frames can reach the extension.** A plugin frame's `window.parent.postMessage` reaches a content script on the RemNote page, which can reply through `event.source`. Round trips averaged 1 ms. RemNote's host ignores messages lacking `isIntendedForRemNoteAPIMain`.
+- **The full path works:** page content script → `chrome.runtime` → panel page → `postMessage` to the RemNote frame → plugin frame, and back. Tabs reach the panel through `runtime.sendMessage`, and the panel reaches a tab through `tabs.sendMessage`. A frame inside the panel has no tab id, so the panel talks to it by `postMessage`.
+- **Content scripts also run inside sandboxed plugin frames,** including in the page's own world, which gives a second possible channel.
+- **A development plugin did not load in the panel:** a plugin at `localhost:8080` never appeared there, and a fetch from that frame failed, with the dev server possibly not running at the time. Test through a published unlisted plugin instead.
+- **The real plugin works from the panel.** On Nov 1, 2026, in a small throwaway KB, the published test plugin (`incremental-everything-plus` 0.0.53) ran in light mode with platform `web`. Its first message arrived about 13 s after the panel started loading. A selection on the page became an Incremental Rem under the page's document in 608 ms, with `getOrCreatePageDocument` supplying the document's id. This has not been measured on a KB the size of the main one.

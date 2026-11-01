@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Incremental RemNote Companion Test",
+  "version": "0.0.1",
+  "description": "Feasibility test only: can a second extension host RemNote in a side panel and talk to the plugin?",
+  "action": { "default_title": "Open the Companion Test panel" },
+  "side_panel": { "default_path": "panel.html" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["sidePanel", "tabs", "webRequest"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "all_frames": true,
+      "run_at": "document_start",
+      "js": ["content.js"]
+    }
+  ]
+}
