@@ -98,45 +98,74 @@ describe('outline', () => {
   });
 });
 
-describe('rangeToMarkdown', () => {
-  it('keeps bold, italic, absolute links and images, on one line', () => {
-    const doc = load('<div id="d"><p>Plain <b>bold</b> and <i>slanted</i></p><p>a <a href="/x">link</a> <img src="i.png" alt="pic"> star*</p></div>');
-    const range = doc.createRange();
-    range.selectNodeContents(doc.querySelector('#d'));
-    assert.equal(
-      A.rangeToMarkdown(range),
-      'Plain **bold** and *slanted* a [link](https://example.org/x) ![pic](https://example.org/a/i.png) star\\*'
-    );
-  });
-
-  const markdownOf = (html, url) => {
+describe('rangeToRichText', () => {
+  const richTextOf = (html, url) => {
     const doc = load(`<div id="d">${html}</div>`, url);
     const range = doc.createRange();
     range.selectNodeContents(doc.querySelector('#d'));
-    return A.rangeToMarkdown(range);
+    return A.rangeToRichText(range);
   };
 
-  it('adds the size when the page gives it', () => {
-    assert.equal(markdownOf('<img src="i.png" width="800" height="600">'), '![](https://example.org/a/i.png =800x600)');
+  it('keeps formats and absolute links, on one line', () => {
+    assert.deepEqual(richTextOf('<p>Plain <b>bold</b> and <i>slanted</i></p><p>a <a href="/x">link</a></p>'), [
+      'Plain ',
+      { i: 'm', text: 'bold', b: true },
+      ' and ',
+      { i: 'm', text: 'slanted', l: true },
+      ' a ',
+      { i: 'm', text: 'link', iUrl: 'https://example.org/x' },
+    ]);
   });
 
-  it('makes a linked image just the image, as on wikis', () => {
-    assert.equal(
-      markdownOf('<a href="/wiki/File:X.jpg"><img src="/thumb/X.jpg" alt="X" width="10" height="20"></a> Figure'),
-      '![X](https://example.org/thumb/X.jpg =10x20) Figure'
-    );
+  it('leaves page text that looks like commands as text', () => {
+    assert.deepEqual(richTextOf('a → b :: c \\[30\\] *d* ![x](y)'), ['a → b :: c \\[30\\] *d* ![x](y)']);
   });
 
-  it('keeps a text link that merely mentions an image', () => {
-    assert.equal(markdownOf('<a href="/x">!\\[not an image</a>').startsWith('[!'), true);
+  it('keeps a citation as a superscript link', () => {
+    assert.deepEqual(richTextOf('as<sup><a href="#c">[30]</a></sup>'), [
+      'as',
+      { i: 'm', text: '[30]', sup: true, iUrl: 'https://example.org/a/b#c' },
+    ]);
+  });
+
+  it('makes an image an image, with its size, inside a link or not', () => {
+    assert.deepEqual(richTextOf('<a href="/wiki/File:X.jpg"><img src="/thumb/X.jpg" alt="X" width="10" height="20"></a> Figure'), [
+      { i: 'i', url: 'https://example.org/thumb/X.jpg', width: 10, height: 20, title: 'X' },
+      ' Figure',
+    ]);
   });
 
   it('leaves out images that have no web address', () => {
-    assert.equal(markdownOf('Before <img src="data:image/png;base64,AAAA"> after'), 'Before after');
+    assert.deepEqual(richTextOf('Before <img src="data:image/png;base64,AAAA"> after'), ['Before after']);
   });
 
-  it('escapes parentheses and spaces in the address', () => {
-    assert.equal(markdownOf('<img src="/a (1).png">'), '![](https://example.org/a%20%281%29.png)');
+  const wikiMath = (tex, kind = 'inline') =>
+    `<span class="mwe-math-element mwe-math-element-${kind}"><span class="mwe-math-mathml-a11y" style="display:none"><math alttext="{\\displaystyle ${tex}}"><semantics><mrow><mi>k</mi><mo>→</mo></mrow><annotation encoding="application/x-tex">{\\displaystyle ${tex}}</annotation></semantics></math></span><img src="https://wikimedia.org/render/svg/abc" class="mwe-math-fallback-image-${kind}" alt="{\\displaystyle ${tex}}"></span>`;
+
+  it('turns a Wikipedia formula into LaTeX, once, with no image', () => {
+    assert.deepEqual(richTextOf(`where ${wikiMath('C')} is`), ['where ', { i: 'x', text: 'C' }, ' is']);
+  });
+
+  it('marks a displayed formula as a block', () => {
+    assert.deepEqual(richTextOf(wikiMath('\\Delta \\varphi', 'block')), [{ i: 'x', text: '\\Delta \\varphi', block: true }]);
+    assert.deepEqual(
+      richTextOf(`<img src="https://w.org/a" class="mwe-math-fallback-image-display" alt="{\\displaystyle x}">`),
+      [{ i: 'x', text: 'x', block: true }]
+    );
+  });
+
+  it('reads KaTeX', () => {
+    const html = '<span class="katex"><span class="katex-mathml"><math><semantics><annotation encoding="application/x-tex">a^2</annotation></semantics></math></span><span class="katex-html">a2</span></span>';
+    assert.deepEqual(richTextOf(html), [{ i: 'x', text: 'a^2' }]);
+  });
+
+  it('reads MathJax 2, leaving out what it draws', () => {
+    const html = '<span class="MathJax">drawn</span><script type="math/tex; mode=display">b_1</script>';
+    assert.deepEqual(richTextOf(html), [{ i: 'x', text: 'b_1', block: true }]);
+  });
+
+  it('leaves MathML with no LaTeX in it as text', () => {
+    assert.deepEqual(richTextOf('<math><mi>k</mi></math>'), ['k']);
   });
 });
 
@@ -186,7 +215,7 @@ if (process.env.REAL_PAGE) {
       const range = doc.createRange();
       range.selectNodeContents(paragraph);
       assert.deepEqual(A.sectionOf(outline, range).path, ['The main problem in education']);
-      console.log('markdown sample:', A.rangeToMarkdown(range).slice(0, 170));
+      console.log('rich text sample:', JSON.stringify(A.rangeToRichText(range)).slice(0, 170));
     });
   });
 }

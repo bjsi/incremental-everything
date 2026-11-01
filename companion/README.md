@@ -15,6 +15,8 @@ Writes made while the panel is closed wait in the browser, shown as a count on t
 
 User docs: `docs/Chrome-Companion-Extension.md`. Privacy policy: `docs/Companion-Privacy-Policy.md`, which must change along with what the extension handles or stores.
 
+Extracts are built as rich text in `anchors.js`, never through RemNote's Markdown parser, which reads page text as commands.
+
 ## How the parts talk
 
 - **Page ↔ panel:** `chrome.storage` holds queued writes as `op:<id>`, and `chrome.runtime` carries reads and results.

@@ -19,7 +19,7 @@ import {
   MAX_SHARD_CHARACTERS,
   PageState,
   shardOfPage,
-  splitMarkdownImages,
+  sanitizeExtractRichText,
 } from './rules';
 
 const FONT_BY_DEPTH = ['H1', 'H2', 'H3'] as const;
@@ -100,34 +100,9 @@ async function ensureSection(plugin: ReactRNPlugin, doc: PluginRem, chain: Secti
   return { section: parent, created };
 }
 
-/** The extract's text, with its images as real image elements at their web addresses. */
-async function extractRichText(plugin: ReactRNPlugin, markdown: string, text: string): Promise<RichTextInterface> {
-  const pieces = splitMarkdownImages(markdown);
-  const images = pieces.flatMap((piece) =>
-    'image' in piece ? [{ i: 'i' as const, ...piece.image }] : []
-  );
-  try {
-    const richText: RichTextInterface = [];
-    for (const piece of pieces) {
-      if ('image' in piece) {
-        richText.push({ i: 'i', ...piece.image });
-      } else if (piece.markdown.trim()) {
-        const parsed = await plugin.richText.parseFromMarkdown(piece.markdown.trim());
-        richText.push(...(parsed?.length ? parsed : [piece.markdown.trim()]));
-        // The parser drops the space that separated this text from the next image.
-        if (/\s$/.test(piece.markdown)) richText.push(' ');
-      }
-    }
-    return richText.length ? richText : [text];
-  } catch (err) {
-    console.warn('[Companion] Markdown not parsed, keeping plain text', err);
-    return [...images, text];
-  }
-}
-
 const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>> = {
   async addExtract(plugin, data) {
-    const { docId, url, text, markdown, chain, opId, withPriority, priority } = data;
+    const { docId, url, text, richText, chain, opId, withPriority, priority } = data;
     const anchor: Anchor = data.anchor;
     const started = Date.now();
     await guardTestPlugin(plugin);
@@ -142,7 +117,8 @@ const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>
 
     const rem = await plugin.rem.createRem();
     if (!rem) throw new Error('Could not create a Rem.');
-    await rem.setText(await extractRichText(plugin, markdown, text));
+    const content = sanitizeExtractRichText(richText) as RichTextInterface;
+    await rem.setText(content.length ? content : [text]);
     await rem.setParent(section, await positionFor(section, anchor.position, state));
     state.order[rem._id] = anchor.position;
     // No cascade when the priority is settled here or by the popup: a new extract

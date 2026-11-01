@@ -3,7 +3,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { COMPANION_SHARD_COUNT, indexInReadingOrder, isInReadingOrder, shardOfPage, splitMarkdownImages } from './rules';
+import { COMPANION_SHARD_COUNT, indexInReadingOrder, isInReadingOrder, sanitizeExtractRichText, shardOfPage } from './rules';
 
 describe('shardOfPage', () => {
   it('stays within the fixed number of keys, and is stable', () => {
@@ -42,33 +42,35 @@ describe('isInReadingOrder', () => {
   });
 });
 
-describe('splitMarkdownImages', () => {
-  const url = 'https://help.supermemo.org/images/thumb/f/f5/800px-Extract.jpg';
-  it('leaves text without images alone', () => {
-    assert.deepEqual(splitMarkdownImages('**Figure:** a [link](https://x.org/a)'), [
-      { markdown: '**Figure:** a [link](https://x.org/a)' },
-    ]);
+describe('sanitizeExtractRichText', () => {
+  const url = 'https://example.org/a.png';
+  it('keeps text, formats, links, images and LaTeX', () => {
+    const items = [
+      'plain',
+      { i: 'm', text: 'bold', b: true },
+      { i: 'm', text: '[30]', sup: true, iUrl: 'https://example.org/#c' },
+      { i: 'i', url, width: 10, height: 20, title: 'pic' },
+      { i: 'x', text: 'E=mc^2' },
+      { i: 'x', text: '\\frac{1}{2}', block: true },
+    ];
+    assert.deepEqual(sanitizeExtractRichText(items), items);
   });
-  it('splits an image with its size out of the text', () => {
-    assert.deepEqual(splitMarkdownImages(`![alt](${url} =800x600) **Figure:** text`), [
-      { image: { url, width: 800, height: 600 } },
-      { markdown: ' **Figure:** text' },
-    ]);
+  it('drops what a page should not be able to create', () => {
+    assert.deepEqual(
+      sanitizeExtractRichText([
+        { i: 'q', _id: 'someRem' },
+        { i: 's' },
+        { i: 'm', text: 'x', qId: 'someRem', cId: 'c', iUrl: 'javascript:alert(1)' },
+        { i: 'i', url: 'data:image/png;base64,AAAA' },
+        '',
+        null,
+        7,
+      ]),
+      [{ i: 'm', text: 'x' }]
+    );
   });
-  it('handles an image with no size, and several in a row', () => {
-    assert.deepEqual(splitMarkdownImages(`a ![](${url}) b ![x\\]y](${url} =1x2)`), [
-      { markdown: 'a ' },
-      { image: { url } },
-      { markdown: ' b ' },
-      { image: { url, width: 1, height: 2 } },
-    ]);
-  });
-  it('does not take escaped page text for an image', () => {
-    const text = `!\\[not an image\\](${url})`;
-    assert.deepEqual(splitMarkdownImages(text), [{ markdown: text }]);
-  });
-  it('ignores addresses that are not on the web', () => {
-    const text = '![x](data:image/png;base64,AAAA)';
-    assert.deepEqual(splitMarkdownImages(text), [{ markdown: text }]);
+  it('gives nothing for anything but a list', () => {
+    assert.deepEqual(sanitizeExtractRichText(undefined), []);
+    assert.deepEqual(sanitizeExtractRichText('text'), []);
   });
 });

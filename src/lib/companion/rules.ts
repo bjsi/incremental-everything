@@ -52,25 +52,34 @@ export function isInReadingOrder(childIds: string[], order: Record<string, numbe
   return positions.every((p, i) => i === 0 || positions[i - 1] <= p);
 }
 
-export type MarkdownPiece =
-  | { markdown: string }
-  | { image: { url: string; width?: number; height?: number } };
+const TEXT_FORMATS = ['b', 'l', 'u', 'sup', 'sub', 'q', 'str'] as const;
+const isWebAddress = (url: unknown): url is string => typeof url === 'string' && /^https?:\/\//.test(url);
 
 /**
- * Splits out the extension's image tokens, `![alt](url =WxH)`. RemNote's Markdown
- * parser turns an image into a link to it, so the plugin builds these itself. Text
- * that only looks like one cannot match: the extension escapes `[` in page text.
+ * Keeps only what an extract may contain. This came from a web page by way of the
+ * extension, so anything else, such as a reference to another Rem, is dropped.
  */
-export function splitMarkdownImages(markdown: string): MarkdownPiece[] {
-  const pieces: MarkdownPiece[] = [];
-  const token = /!\[(?:\\.|[^\]\\])*\]\((https?:[^\s)]+)(?: =(\d+)x(\d+))?\)/g;
-  let last = 0;
-  for (let match = token.exec(markdown); match; match = token.exec(markdown)) {
-    if (match.index > last) pieces.push({ markdown: markdown.slice(last, match.index) });
-    const [, url, width, height] = match;
-    pieces.push({ image: { url, ...(width && height ? { width: Number(width), height: Number(height) } : {}) } });
-    last = match.index + match[0].length;
+export function sanitizeExtractRichText(items: unknown): Array<string | Record<string, unknown>> {
+  if (!Array.isArray(items)) return [];
+  const clean: Array<string | Record<string, unknown>> = [];
+  for (const item of items as any[]) {
+    if (typeof item === 'string') {
+      if (item) clean.push(item);
+    } else if (item?.i === 'm' && typeof item.text === 'string' && item.text) {
+      const element: Record<string, unknown> = { i: 'm', text: item.text };
+      for (const format of TEXT_FORMATS) if (item[format] === true) element[format] = true;
+      if (isWebAddress(item.iUrl)) element.iUrl = item.iUrl;
+      clean.push(element);
+    } else if (item?.i === 'x' && typeof item.text === 'string' && item.text) {
+      clean.push({ i: 'x', text: item.text, ...(item.block === true ? { block: true } : {}) });
+    } else if (item?.i === 'i' && isWebAddress(item.url)) {
+      clean.push({
+        i: 'i',
+        url: item.url,
+        ...(Number.isFinite(item.width) && Number.isFinite(item.height) ? { width: item.width, height: item.height } : {}),
+        ...(typeof item.title === 'string' && item.title ? { title: item.title } : {}),
+      });
+    }
   }
-  if (last < markdown.length) pieces.push({ markdown: markdown.slice(last) });
-  return pieces;
+  return clean;
 }

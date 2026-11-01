@@ -176,57 +176,123 @@
     return found;
   }
 
-  function escapeMarkdown(text) {
-    return text.replace(/([\\`*_[\]])/g, '\\$1');
+  /** A formula's LaTeX, without the wrapper Wikipedia puts around it. */
+  function cleanLatex(tex) {
+    const text = (tex || '').trim();
+    const wrapped = text.match(/^\{\\(?:displaystyle|textstyle)\s*([\s\S]*)\}$/);
+    return (wrapped ? wrapped[1] : text).trim();
   }
 
   /**
-   * `![alt](url =WIDTHxHEIGHT)`, read by splitMarkdownImages in the plugin. A clone
-   * has no layout, so the size and the image actually shown come from the page's own
-   * copy. RemNote needs the size to show an image properly in the queue.
+   * If this element is a formula, its LaTeX and whether it is shown on its own line.
+   * Covers MathML with a TeX annotation (Wikipedia, KaTeX) and MathJax 2's script
+   * tags. MathML with no TeX in it has no LaTeX to give, and stays as its text.
    */
-  function imageToken(clone) {
+  function formulaOf(element) {
+    if (element.matches('script[type^="math/tex"]')) {
+      return { text: cleanLatex(element.textContent), block: element.type.includes('mode=display') };
+    }
+    if (!element.matches('.mwe-math-element,.katex,.katex-display,math,img[class*="mwe-math-fallback-image"]')) return null;
+    const annotation = element.querySelector('annotation[encoding="application/x-tex"]');
+    const math = element.matches('math') ? element : element.querySelector('math');
+    const image = element.matches('img') ? element : element.querySelector('img[class*="mwe-math-fallback-image"]');
+    const text = cleanLatex(annotation?.textContent || math?.getAttribute('alttext') || image?.getAttribute('alt'));
+    if (!text) return null;
+    const block =
+      element.matches('.mwe-math-element-block,.katex-display') ||
+      math?.getAttribute('display') === 'block' ||
+      !!image?.className.includes('fallback-image-display');
+    return { text, block };
+  }
+
+  /** A clone has no layout, so the size and the image shown come from the page's own copy. */
+  function imageElement(clone) {
     const source = clone.getAttribute('src');
     const live = [...clone.ownerDocument.images].find((img) => img.getAttribute('src') === source) ?? clone;
     const url = live.currentSrc || live.src || clone.src;
-    if (!/^https?:/.test(url || '')) return '';
-    const safe = url.replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/\s/g, '%20');
-    const width = live.width || Number(clone.getAttribute('width')) || 0;
-    const height = live.height || Number(clone.getAttribute('height')) || 0;
-    const size = width && height ? ` =${Math.round(width)}x${Math.round(height)}` : '';
-    return `![${escapeMarkdown(clone.alt || '')}](${safe}${size})`;
-  }
-
-  function nodeToMarkdown(node) {
-    if (node.nodeType === 3) return escapeMarkdown(node.nodeValue.replace(/\s+/g, ' '));
-    if (node.nodeType !== 1 && node.nodeType !== 11) return '';
-    const tag = (node.tagName || '').toLowerCase();
-    if (node.nodeType === 1 && node.matches(SKIP)) return '';
-    if (tag === 'br') return ' ';
-    if (tag === 'img') return imageToken(node);
-    const inner = [...node.childNodes].map(nodeToMarkdown).join('');
-    if (!inner.trim()) return inner;
-    const wrap = (mark) => {
-      const body = inner.trim();
-      return `${inner.startsWith(' ') ? ' ' : ''}${mark}${body}${mark}${inner.endsWith(' ') ? ' ' : ''}`;
+    if (!/^https?:/.test(url || '')) return null;
+    // RemNote needs the size to show an image properly in the queue.
+    const width = Math.round(live.width || Number(clone.getAttribute('width')) || 0);
+    const height = Math.round(live.height || Number(clone.getAttribute('height')) || 0);
+    return {
+      i: 'i',
+      url,
+      ...(width && height ? { width, height } : {}),
+      ...(clone.alt ? { title: clone.alt } : {}),
     };
-    if (tag === 'b' || tag === 'strong') return wrap('**');
-    if (tag === 'i' || tag === 'em') return wrap('*');
-    if (tag === 'code') return `\`${node.textContent}\``;
-    // A linked image, as on wikis, is the image: a link cannot hold one in RemNote.
-    if (tag === 'a' && /^https?:/.test(node.href || '')) {
-      return inner.includes('![') && !inner.includes('!\\[') ? inner : `[${inner.trim()}](${node.href})`;
+  }
+
+  const INLINE_FORMAT = { b: 'b', strong: 'b', i: 'l', em: 'l', u: 'u', sup: 'sup', sub: 'sub', code: 'q', s: 'str', del: 'str' };
+  const BLOCK_TAG = /^(p|div|li|h[1-6]|blockquote|tr|td|th|dd|dt|section|article|br)$/;
+
+  function collectRichText(node, format, out) {
+    if (node.nodeType === 3) {
+      const text = node.nodeValue.replace(/\s+/g, ' ');
+      if (text) out.push({ text, format });
+      return;
     }
-    if (/^(p|div|li|h[1-6]|blockquote|tr|section|article)$/.test(tag)) return ` ${inner} `;
-    return inner;
+    if (node.nodeType !== 1 && node.nodeType !== 11) return;
+    if (node.nodeType === 1) {
+      const formula = formulaOf(node);
+      if (formula) {
+        out.push({ i: 'x', text: formula.text, ...(formula.block ? { block: true } : {}) });
+        return;
+      }
+      // MathJax 2 draws a formula next to the script that holds its LaTeX.
+      if (node.matches('.MathJax,.MathJax_Preview,.MathJax_Display') && node.parentNode?.querySelector('script[type^="math/tex"]')) return;
+      if (node.matches(SKIP)) return;
+    }
+    const tag = (node.tagName || '').toLowerCase();
+    if (tag === 'img') {
+      const image = imageElement(node);
+      if (image) out.push(image);
+      return;
+    }
+    let inner = format;
+    if (INLINE_FORMAT[tag]) inner = { ...format, [INLINE_FORMAT[tag]]: true };
+    if (tag === 'a' && /^https?:/.test(node.href || '')) inner = { ...format, iUrl: node.href };
+    const isBlock = BLOCK_TAG.test(tag);
+    if (isBlock) out.push({ text: ' ', format: {} });
+    for (const child of node.childNodes) collectRichText(child, inner, out);
+    if (isBlock) out.push({ text: ' ', format: {} });
   }
 
-  /** The selection as one line of Markdown, keeping bold, italic, links and images. */
-  function rangeToMarkdown(range) {
-    return nodeToMarkdown(range.cloneContents()).replace(/ +/g, ' ').trim();
+  /**
+   * The selection as RemNote rich text, built here rather than through RemNote's
+   * Markdown parser. That parser reads page text as commands: `→` and `::` start a
+   * flashcard, and `\[30\]` becomes block LaTeX.
+   */
+  function rangeToRichText(range) {
+    const pieces = [];
+    collectRichText(range.cloneContents(), {}, pieces);
+
+    const merged = [];
+    for (const piece of pieces) {
+      const last = merged[merged.length - 1];
+      const sameFormat = last && 'format' in last && 'format' in piece && JSON.stringify(last.format) === JSON.stringify(piece.format);
+      if (sameFormat) last.text += piece.text;
+      else if ('format' in piece) merged.push({ text: piece.text, format: piece.format });
+      else merged.push(piece);
+    }
+
+    // Spaces where blocks and inline text meet: collapse them, and trim both ends.
+    merged.forEach((piece, index) => {
+      if (!('format' in piece)) return;
+      const previous = merged[index - 1];
+      piece.text = piece.text.replace(/ +/g, ' ');
+      if (index === 0 || (previous && 'format' in previous && previous.text.endsWith(' '))) piece.text = piece.text.replace(/^ /, '');
+      if (index === merged.length - 1) piece.text = piece.text.replace(/ $/, '');
+    });
+
+    return merged
+      .filter((piece) => !('format' in piece) || piece.text)
+      .map((piece) => {
+        if (!('format' in piece)) return piece;
+        return Object.keys(piece.format).length ? { i: 'm', text: piece.text, ...piece.format } : piece.text;
+      });
   }
 
-  const api = { buildIndex, describeRange, anchorAt, resolveAnchor, toRange, readOutline, sectionOf, rangeToMarkdown };
+  const api = { buildIndex, describeRange, anchorAt, resolveAnchor, toRange, readOutline, sectionOf, rangeToRichText };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.IEAnchors = api;
 })(globalThis);

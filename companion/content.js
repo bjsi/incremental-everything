@@ -252,7 +252,7 @@ function runInPage() {
       started: performance.now(),
       payload: {
         text: anchor.exact,
-        markdown: A.rangeToMarkdown(range),
+        richText: A.rangeToRichText(range),
         anchor,
         chain: chainFor(A.sectionOf(outline, range), outline, index),
       },

@@ -207,7 +207,7 @@ describe('Add Extract', () => {
     assert.equal(plugin.seen.filter((op) => op.op === 'addExtract').length, 1);
     const { data } = plugin.seen.find((op) => op.op === 'addExtract');
     assert.equal(data.text, 'Some bold text to extract from this page.');
-    assert.equal(data.markdown, 'Some **bold** text to extract from this page.');
+    assert.deepEqual(data.richText, ['Some ', { i: 'm', text: 'bold', b: true }, ' text to extract from this page.']);
     assert.deepEqual(data.chain.map((c) => c.text), ['A section']);
     assert.equal(data.docId, 'doc1');
     assert.equal(data.withPriority, undefined);
