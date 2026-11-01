@@ -52,3 +52,29 @@ export function canonicalUrlKey(raw: unknown): string | null {
   const route = /^#[/!]/.test(url.hash) ? url.hash : '';
   return `${host}${path}${query}${route}`;
 }
+
+/** Second-level names under which each registrant gets a third: `folha.uol.com.br` is under `uol.com.br`. */
+const COUNTRY_SECOND_LEVEL = new Set(['ac', 'co', 'com', 'edu', 'gov', 'mil', 'ne', 'net', 'or', 'org']);
+/** Hosts whose subdomains are unrelated sites. */
+const SHARED_HOSTS = ['github.io', 'substack.com', 'medium.com', 'wordpress.com', 'blogspot.com', 'notion.site'];
+
+/**
+ * The website a page key belongs to, for grouping: `en.wikipedia.org/wiki/X` and
+ * `pt.wikipedia.org/wiki/Y` are both `wikipedia.org`. This is a heuristic rather
+ * than the full public-suffix list, which is too large to ship for a label. Keys
+ * of other schemes group by scheme (`file:`).
+ */
+export function domainOfPageKey(key: string): string {
+  const scheme = key.match(/^[a-z][a-z0-9+.-]*:(?!\d)/i);
+  if (scheme) return scheme[0].toLowerCase();
+
+  const host = key.split(/[/?#]/)[0].replace(/:\d+$/, '');
+  const labels = host.split('.');
+  if (labels.length <= 2 || /^[\d.]+$/.test(host) || host.includes(':')) return host;
+
+  const lastTwo = labels.slice(-2).join('.');
+  const [secondLevel, topLevel] = labels.slice(-2);
+  const keepThree =
+    SHARED_HOSTS.includes(lastTwo) || (topLevel.length === 2 && COUNTRY_SECOND_LEVEL.has(secondLevel));
+  return keepThree ? labels.slice(-3).join('.') : lastTwo;
+}

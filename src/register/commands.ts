@@ -172,7 +172,12 @@ import {
   getEffectiveSelection,
 } from '../lib/editor_selection';
 import { createExtract } from '../lib/extract';
-import { confirmNoDuplicateSource, registerRemPagesIfTracked } from '../lib/duplicate_source';
+import {
+  confirmNoDuplicateSource,
+  registerRemPagesIfTracked,
+  SOURCE_SITES_POPUP,
+  websiteOfRem,
+} from '../lib/duplicate_source';
 import { bulletizeSelection } from '../lib/bulletize';
 import {
   inlinizeListSelection,
@@ -2397,6 +2402,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       } catch (e) {
         await localVideoFailure(e);
       }
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'incremental-rems-by-website',
+    name: 'Incremental Rems by Website',
+    description: 'List your Incremental and Dismissed Rems by the website of their source, starting at the focused Rem\'s website',
+    quickCode: 'irw',
+    action: async () => {
+      const domain = await websiteOfRem(plugin, await plugin.focus.getFocusedRem());
+      await plugin.widget.openPopup(SOURCE_SITES_POPUP, { domain });
     },
   });
 

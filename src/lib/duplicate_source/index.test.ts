@@ -7,7 +7,13 @@ import assert from 'node:assert/strict';
 // First: the SDK's bundle reads the browser's `self` as it loads.
 import './sdk_node_shim.test_support';
 import { BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { confirmNoDuplicateSource, refreshSourceUrlIndexIfDue, registerRemPagesIfTracked } from './index';
+import {
+  confirmNoDuplicateSource,
+  loadTrackedSites,
+  refreshSourceUrlIndexIfDue,
+  registerRemPagesIfTracked,
+  websiteOfRem,
+} from './index';
 import {
   dismissedPowerupCode,
   duplicateSourceDecisionKey,
@@ -37,6 +43,7 @@ function world(rems: Array<Partial<FakeRem> & { _id: string }>, answer?: Duplica
 
   const wrap = (rem: FakeRem): any => ({
     ...rem,
+    parent: (rem as any).parent,
     hasPowerup: async (code: string) => rem.powerups.includes(code),
     getPowerupProperty: async () => rem.url,
     getSources: async () => rem.sources.map((id) => wrap(store[id])),
@@ -236,5 +243,43 @@ describe('registerRemPagesIfTracked', () => {
     assert.equal(w.synced[sourceUrlIndexKey], undefined);
     await registerRemPagesIfTracked(w.plugin, w.get('dis'));
     assert.deepEqual(w.synced[sourceUrlIndexKey], { 'example.com/article': ['dis'] });
+  });
+});
+
+describe('loadTrackedSites', () => {
+  it('groups Incremental and Dismissed Rems by website, and leaves stale entries out', async () => {
+    const w = world([
+      link('en', 'https://en.wikipedia.org/wiki/A'),
+      link('pt', 'https://pt.wikipedia.org/wiki/B'),
+      { _id: 'inc', sources: ['en'], powerups: [powerupCode] },
+      { _id: 'dis', sources: ['pt'], powerups: [dismissedPowerupCode] },
+      { _id: 'lost', sources: ['pt'] },
+    ]);
+    w.synced[sourceUrlIndexKey] = {
+      'en.wikipedia.org/wiki/A': ['inc'],
+      'pt.wikipedia.org/wiki/B': ['dis', 'lost', 'deleted'],
+    };
+    const { sites, scanned } = await loadTrackedSites(w.plugin);
+    assert.equal(scanned, false);
+    assert.equal(sites.length, 1);
+    assert.equal(sites[0].domain, 'wikipedia.org');
+    assert.deepEqual(sites[0].rems.map((rem) => [rem.remId, rem.status]).sort(), [
+      ['dis', 'dismissed'],
+      ['inc', 'incremental'],
+    ]);
+  });
+});
+
+describe('websiteOfRem', () => {
+  it('finds the website on the Rem or its nearest ancestor with a web source', async () => {
+    const w = world([
+      link('l', 'https://www.supermemo.guru/wiki/X'),
+      { _id: 'doc', sources: ['l'] },
+      { _id: 'extract', parent: 'doc' } as any,
+      { _id: 'plain' },
+    ]);
+    assert.equal(await websiteOfRem(w.plugin, w.get('extract')), 'supermemo.guru');
+    assert.equal(await websiteOfRem(w.plugin, w.get('plain')), undefined);
+    assert.equal(await websiteOfRem(w.plugin, undefined), undefined);
   });
 });

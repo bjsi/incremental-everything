@@ -325,6 +325,35 @@ Two consequences worth knowing: caption an area highlight and the next scan swap
 
 > **Only image pins.** Pins to ordinary Rems are left alone. Ringing *every* pin was tried and says nothing — a marker that appears on all of them carries no information.
 
+---
+
+## Incremental Rems by Website
+
+Everything you are reading from one website, in one list. Run **`Incremental Rems by Website`** (quick code `irw`) to see your Incremental and Dismissed Rems grouped by the website of their source, largest group first.
+
+![The Incremental Rems by Website popup, listing websites with their Incremental and Dismissed counts](assets/increms-by-website.png)
+
+### How to use it
+
+- **↑/↓** choose · **Enter** shows the website's Rems · **Esc** closes.
+- In a website's list, each Rem shows its priority and next date, or *Dismissed*, along with its address. Incremental Rems come first, by priority. **Enter** opens the Rem, and **Esc** goes back to all websites.
+- **Type** at either level to filter: websites by name, or a website's Rems by name or address.
+
+If the focused Rem has a web source, the popup opens directly on that website. So does a Rem inside such a Rem, which means an extract leads to the website of the article it came from.
+
+### What counts as one website
+
+- **Subdomains join their parent:** `en.wikipedia.org` and `pt.wikipedia.org` are both `wikipedia.org`.
+- **Different domains stay apart:** `supermemo.guru` and `supermemo.org` are two websites.
+- **Country domains group on the name before the ending:** `www.totalsimulation.co.uk` is `totalsimulation.co.uk`, and `www1.folha.uol.com.br` is `uol.com.br`.
+- **Blogging hosts keep each site apart:** `alice.github.io` and `bob.github.io` are two websites. The same goes for `substack.com`, `medium.com`, `wordpress.com`, `blogspot.com` and `notion.site`.
+
+### When the list updates
+
+The list shares its data with the [duplicate web page warning](Getting-Started.md#duplicate-web-page-warning). A Rem joins it when you make it Incremental or use Paste Sources. A source added through RemNote's own menu appears after the next refresh, which runs about once a week, a couple of minutes after RemNote starts on a computer.
+
+---
+
 ## Readable Breadcrumbs in Rem Preview
 
 When you hover a reference, RemNote's **Preview** popup shows the Rem's ancestors as breadcrumbs at the top, but cuts each name to about five characters: `AN1 P... > Highl... > Page...`. That is too short to tell which book or section the Rem comes from.

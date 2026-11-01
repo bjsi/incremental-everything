@@ -105,3 +105,31 @@ export function remsToKeep<T extends { _id: string }>(
   const duplicated = new Set(groups.map((group) => group.remId));
   return rems.filter((rem) => !duplicated.has(rem._id));
 }
+
+export interface TrackedSite {
+  domain: string;
+  rems: SourceMatch[];
+  incremental: number;
+  dismissed: number;
+}
+
+/**
+ * Groups index entries by website: largest first, then by name. A Rem with two
+ * pages on one website appears once, and a Rem with pages on two websites under
+ * each of them.
+ */
+export function groupByDomain(entries: Array<{ domain: string; match: SourceMatch }>): TrackedSite[] {
+  const byDomain = new Map<string, Map<string, SourceMatch>>();
+  for (const { domain, match } of entries) {
+    const rems = byDomain.get(domain) ?? new Map<string, SourceMatch>();
+    if (!rems.has(match.remId)) rems.set(match.remId, match);
+    byDomain.set(domain, rems);
+  }
+  return [...byDomain.entries()]
+    .map(([domain, rems]) => {
+      const list = [...rems.values()];
+      const dismissed = list.filter((rem) => rem.status === 'dismissed').length;
+      return { domain, rems: list, incremental: list.length - dismissed, dismissed };
+    })
+    .sort((a, b) => b.rems.length - a.rems.length || a.domain.localeCompare(b.domain));
+}

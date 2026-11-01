@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DuplicateGroup,
+  groupByDomain,
   indexAfterScan,
   mergedIndex,
   remsToKeep,
@@ -85,5 +86,33 @@ describe('remsToKeep', () => {
   it('cancel and open keep nothing', () => {
     assert.deepEqual(remsToKeep(rems, groups, { kind: 'cancel' }), []);
     assert.deepEqual(remsToKeep(rems, groups, { kind: 'open', remId: 'x' }), []);
+  });
+});
+
+describe('groupByDomain', () => {
+  const match = (remId: string, status: 'incremental' | 'dismissed' = 'incremental') => ({
+    remId,
+    name: remId,
+    status,
+    url: `https://x/${remId}`,
+  });
+  it('counts each status, and orders by size and then name', () => {
+    const sites = groupByDomain([
+      { domain: 'b.org', match: match('1') },
+      { domain: 'c.org', match: match('2') },
+      { domain: 'c.org', match: match('3', 'dismissed') },
+      { domain: 'a.org', match: match('4') },
+    ]);
+    assert.deepEqual(sites.map((site) => site.domain), ['c.org', 'a.org', 'b.org']);
+    assert.equal(sites[0].incremental, 1);
+    assert.equal(sites[0].dismissed, 1);
+  });
+  it('lists a Rem once per website', () => {
+    const sites = groupByDomain([
+      { domain: 'a.org', match: match('1') },
+      { domain: 'a.org', match: match('1') },
+      { domain: 'b.org', match: match('1') },
+    ]);
+    assert.deepEqual(sites.map((site) => site.rems.length), [1, 1]);
   });
 });

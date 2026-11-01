@@ -362,6 +362,14 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Incremental and Dismissed Rems grouped by the website of their source.
+  plugin.app.registerWidget('source_sites_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 560,
+      height: 'auto',
+    },
+  });
+
   // Generic message dialog for failures the user must read (lib/message_dialog.ts).
   plugin.app.registerWidget('message_popup', WidgetLocation.Popup, {
     dimensions: {

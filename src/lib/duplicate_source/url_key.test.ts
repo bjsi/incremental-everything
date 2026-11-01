@@ -3,7 +3,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalUrlKey } from './url_key';
+import { canonicalUrlKey, domainOfPageKey } from './url_key';
 
 const same = (...urls: string[]) => {
   const keys = new Set(urls.map(canonicalUrlKey));
@@ -58,5 +58,30 @@ describe('canonicalUrlKey', () => {
     for (const value of ['', '   ', '#fn:1', '/docs/a', undefined, null, 42]) {
       assert.equal(canonicalUrlKey(value), null);
     }
+  });
+});
+
+describe('domainOfPageKey', () => {
+  const domain = (url: string) => domainOfPageKey(canonicalUrlKey(url)!);
+  it('groups subdomains under the registered domain', () => {
+    assert.equal(domain('https://en.wikipedia.org/wiki/X'), 'wikipedia.org');
+    assert.equal(domain('https://pt.wikipedia.org/wiki/Y'), 'wikipedia.org');
+    assert.equal(domain('https://supermemo.guru/wiki/Z'), 'supermemo.guru');
+    assert.equal(domain('https://help.supermemo.org/wiki/A'), 'supermemo.org');
+  });
+  it('keeps the third label under country second levels', () => {
+    assert.equal(domain('https://www1.folha.uol.com.br/a'), 'uol.com.br');
+    assert.equal(domain('http://www.planalto.gov.br/a'), 'planalto.gov.br');
+    assert.equal(domain('https://www.totalsimulation.co.uk/a'), 'totalsimulation.co.uk');
+  });
+  it('keeps unrelated sites on shared hosts apart', () => {
+    assert.equal(domain('https://alice.github.io/a'), 'alice.github.io');
+    assert.equal(domain('https://bob.github.io/a'), 'bob.github.io');
+  });
+  it('reads YouTube keys, ports, addresses and other schemes', () => {
+    assert.equal(domain('https://youtu.be/abc'), 'youtube.com');
+    assert.equal(domain('http://localhost:3000/a'), 'localhost');
+    assert.equal(domain('http://192.168.0.1:8080/a'), '192.168.0.1');
+    assert.equal(domain('file:///Users/me/a.html'), 'file:');
   });
 });

@@ -30,18 +30,21 @@ import {
   DuplicateChoice,
   DuplicateDecision,
   DuplicateGroup,
+  groupByDomain,
   indexAfterScan,
   mergedIndex,
   remsToKeep,
   SourceMatch,
   SourceUrlIndex,
+  TrackedSite,
   unscannedRemIds,
   withoutEntries,
   withRemUnderKeys,
 } from './rules';
-import { canonicalUrlKey } from './url_key';
+import { canonicalUrlKey, domainOfPageKey } from './url_key';
 
 export const DUPLICATE_SOURCE_POPUP = 'duplicate_source_popup';
+export const SOURCE_SITES_POPUP = 'source_sites_popup';
 
 const POLL_MS = 200;
 /** Only ends the wait for a popup closed by clicking outside, which reports nothing. */
@@ -290,4 +293,42 @@ export async function refreshSourceUrlIndexIfDue(plugin: RNPlugin): Promise<void
     `[DuplicateSource] Scanned ${rems.length} Rems in ${Math.round((Date.now() - startedAt) / 1000)}s: ` +
       `${Object.keys(scanned).length} web pages.`
   );
+}
+
+/**
+ * Every website in the index and the Incremental and Dismissed Rems reading it.
+ * Entries are re-read, so a stale one is left out; removing it is left to the
+ * weekly scan, as this runs in a popup that can be closed at any moment.
+ */
+export async function loadTrackedSites(plugin: RNPlugin): Promise<{ sites: TrackedSite[]; scanned: boolean }> {
+  const [index, scannedAt] = await Promise.all([
+    readIndex(plugin),
+    plugin.storage.getSynced<number>(sourceUrlIndexScannedAtKey),
+  ]);
+  const pairs = Object.entries(index).flatMap(([key, remIds]) => remIds.map((remId) => ({ key, remId })));
+  const entries: Array<{ domain: string; match: SourceMatch }> = [];
+  for (let i = 0; i < pairs.length; i += SCAN_BATCH_SIZE) {
+    const matches = await Promise.all(
+      pairs.slice(i, i + SCAN_BATCH_SIZE).map(async ({ key, remId }) => {
+        const match = await readMatch(plugin, remId, key).catch(() => null);
+        return match ? { domain: domainOfPageKey(key), match } : null;
+      })
+    );
+    for (const entry of matches) if (entry) entries.push(entry);
+  }
+  return { sites: groupByDomain(entries), scanned: !!scannedAt };
+}
+
+/**
+ * The website of a Rem or its nearest ancestor with a web source, so an extract
+ * inside a clipped article leads to that article's website.
+ */
+export async function websiteOfRem(plugin: RNPlugin, start: PluginRem | undefined): Promise<string | undefined> {
+  let rem = start;
+  for (let depth = 0; rem && depth < 12; depth++) {
+    const [page] = await readPageUrls(rem);
+    if (page) return domainOfPageKey(page.key);
+    rem = rem.parent ? await plugin.rem.findOne(rem.parent) : undefined;
+  }
+  return undefined;
 }

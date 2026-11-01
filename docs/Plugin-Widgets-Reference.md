@@ -690,6 +690,20 @@ The front door to the persistent review document, one per scope.
 
 📖 **Full documentation:** [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size)
 
+### 6.16. Duplicate Web Page Warning
+**Trigger:** making a Rem Incremental when another Incremental or Dismissed Rem has the same web page as a source.
+
+Offers to open the existing Rem, make the Rem Incremental anyway, or cancel. With several Rems selected, it can also skip the duplicates.
+
+📖 **Full documentation:** [Duplicate web page warning](Getting-Started.md#duplicate-web-page-warning)
+
+### 6.17. Incremental Rems by Website Popup
+**Trigger:** command `Incremental Rems by Website` (quick code `irw`).
+
+Lists websites with their Incremental and Dismissed counts, then the Rems of the chosen website, with a filter box at both levels.
+
+📖 **Full documentation:** [Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website)
+
 ## 7. Mastery Drill
 
 ### 7.1. Mastery Drill Popup

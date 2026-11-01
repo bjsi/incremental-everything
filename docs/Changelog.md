@@ -2,6 +2,18 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.184 - November 1st, 2026
+
+### ✨ New
+
+**Incremental Rems**: Added a warning when a Rem you are making Incremental has the same web page as a source as another Incremental or Dismissed Rem, with the choice to open that Rem instead.
+
+📖 [Duplicate web page warning](Getting-Started.md#duplicate-web-page-warning)
+
+**Incremental Website Rems list**: Added Incremental Rems by Website, a list of your Incremental and Dismissed Rems grouped by the website of their source.
+
+📖 [Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website)
+
 ## v1.0.183 - November 1st, 2026
 
 ### ✨ New
