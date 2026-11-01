@@ -46,7 +46,7 @@ import {
   PrioritySource,
 } from '../lib/card_priority';
 import { IncrementalRem, getIncrementalRemFromRem, isKnownIncRemId } from '../lib/incremental_rem';
-import { flushCacheUpdatesNow, updateCardPriorityCache, updateCardPriorityCacheAfterRating } from '../lib/card_priority/cache';
+import { flushCacheUpdatesNow, flushRatedCardsNow, updateCardPriorityCache, updateCardPriorityCacheAfterRating } from '../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { transferToDismissed } from '../lib/dismissed';
 import { IncrementalRep } from '../lib/incremental_rem/types';
@@ -545,6 +545,7 @@ export function registerQueueEnterListener(
     await plugin.storage.setSession('originalScopeId', originalScopeId);
     await plugin.storage.setSession('isPriorityReviewDoc', isPriorityReviewDoc);
 
+    await flushRatedCardsNow(plugin);
     const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
 
     if (allCardInfos.length === 0) {

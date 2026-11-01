@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.182 - October 31st, 2026
+
+### ⚡ Improved
+
+**Queue**: Reduced the background work after each rating by updating the card priority data in batches instead of after every card.
+
+📖 [How ratings reach the cache](Priorities-for-Flashcards.md#cache-blind-spot)
+
 ## v1.0.181 - October 31st, 2026
 
 ### ⚡ Improved
