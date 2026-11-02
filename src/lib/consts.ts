@@ -530,6 +530,9 @@ export const openSourcesByWindowKey = 'open-sources-by-window';
 export const openInWindowRequestKey = 'open-in-window-request';
 // Session key: this window's id for those requests.
 export const openInWindowOwnIdKey = 'open-in-window-own-id';
+// Local keys: the window following the queue, and the sources it should show (see lib/follow_queue_sources.ts).
+export const followQueueWindowKey = 'follow-queue-window';
+export const followQueueTargetKey = 'follow-queue-target';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // Rem IDs whose cards exist but whose parent rem could not be found during the

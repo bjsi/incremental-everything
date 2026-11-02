@@ -13,6 +13,7 @@ import { openMasteryDrill } from '../lib/mastery_drill_launch';
 import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote } from '../lib/pdf_source_pins';
+import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { localizeMediaInRems } from '../lib/localize_media';
 import { showMessageDialog } from '../lib/message_dialog';
 import {
@@ -1231,6 +1232,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         false
       );
       await plugin.storage.setSession(sourceFloatingActiveIdKey, id);
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'follow-queue-sources',
+    name: "Follow the Queue's Sources in This Window",
+    action: async () => {
+      await toggleFollowQueueSources(plugin);
     },
   });
 

@@ -191,6 +191,30 @@ While it's waiting, click the button again to cancel. The request also expires a
 - **The other window doesn't come to the front by itself;** switch to it yourself.
 - **The viewer stays open** in the first window, so you can keep peeking at it.
 
+### Follow the queue
+
+One RemNote window can show the sources of the cards you practice in another, so you can read them on a second screen, or beside the queue, without opening anything. Desktop app only.
+
+1. Press **`⌘⇧N` / `Ctrl+Shift+N`** to open a second window, and place it where you want the sources.
+2. In that window, run **Follow the Queue's Sources in This Window** from the Omnibar.
+3. Start a queue in your main window. Each card's sources open in the second window a moment after the card appears.
+
+Run the command again in that window to stop.
+
+**What it opens:**
+
+- **The card's source pins.** It looks at the front and back of the card's Rem. If there are no pins, it looks at the parent, then the grandparent, and uses the first one that has any. A Rem that is itself a highlight counts as a pin to that highlight. A reference to a whole PDF or article counts only if it's pinned.
+- **Up to 4 different sources,** in the order the card mentions them: one fills the window, two sit side by side, the first of three takes the left half, and four form a grid.
+- **Each source once,** scrolled to its first pin. If the next card uses the same sources, the readers stay as they are and just scroll to the new highlight.
+
+**Good to know:**
+
+- **The panes are replaced.** When the sources change, every pane in that window's current tab gives way to them, so keep your notes in another tab or window.
+- **A card with no pins** leaves the last sources up.
+- **A queue started in the following window** pauses following until you leave that queue.
+- **Following ends when that window reloads or RemNote restarts;** run the command again to resume.
+- **Only one window follows at a time.** Running the command in another window moves it there.
+
 ### Floating window — interaction & closing
 
 The floating variant is designed so the source sits **beside** your card while you study, which is why it behaves a little differently from the modal:

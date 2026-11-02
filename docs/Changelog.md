@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.186 - November 2nd, 2026
+
+### ✨ New
+
+**Follow the Queue**: Added a command that makes a second RemNote window show the sources pinned on the cards you practice in the first, up to 4 at a time, each scrolled to its first pin. Open a window with `⌘⇧N` / `Ctrl+Shift+N`, place it on another screen, and run **Follow the Queue's Sources in This Window** there.
+
+📖 [Follow the queue](Utilities-Finding-and-Navigating.md#follow-the-queue)
+
 ## v1.0.185 - November 1st, 2026
 
 ### ✨ New
