@@ -34,7 +34,7 @@ Each command does two things:
 
 1. **Tags the Rem** with the `TFT` (true) or `TFF` (false) powerup, which is what the styling above is keyed on.
 2. **Makes the back say ✅ or ❌**, keeping whatever the back already holds:
-    - the right mark is already there, typed or as a reference to a Rem named ✅ / ❌: nothing is written;
+    - the right mark is already there, typed or as a reference to a Rem named after it: nothing is written. ✔️, ☑️ and ✓ count as well as ✅, and ✖️ as well as ❌;
     - the opposite mark is there: only that mark is swapped;
     - no mark: one is put in front of the existing back text, so explanations, references, links and pins stay as they are;
     - the Rem has no back: it becomes a forward-only card whose back is the mark.
@@ -42,6 +42,37 @@ Each command does two things:
 The mark stays on the back and in the editor; only the queue hides it. So the verdict is still there if the plugin is not installed, for example on a shared or exported card.
 
 Run the other command on a card to flip its verdict.
+
+---
+
+## Judge by Emoji (`tfj`) { #judge-by-emoji }
+
+Already have cards with ✅ or ❌ on the back? Press **`Ctrl+Opt+Shift+J`** (`Ctrl+Alt+Shift+J` on Windows; `Ctrl` is the Control key on macOS too) or run **True/False: Judge by Emoji** to mark them all from that emoji, instead of one by one.
+
+**What is judged:**
+
+- The focused Rem **and everything under it**. If it has descendants, you first see how many candidates were found and how many would be marked true and false.
+- With several Rems selected, only those Rems, without asking unless a card was judged by a word.
+- While you practise, only the card on screen.
+
+**What counts as a candidate:** a question card (forward and/or backward, not a concept or descriptor) with no clozes and with a verdict on the back:
+
+- **A mark** anywhere on the back, typed or as a reference to a Rem named after it. ✅, ✔️, ☑️ and ✓ mean true; ❌ and ✖️ mean false.
+- **If there is no mark, a word**: *true*, *verdadeiro* or *verdadeira*; *false*, *falso* or *falsa*, in any case. It must be a whole word, so *untrue* or *falsos* do not count, but it can be anywhere in the back, even inside an explanation. A reference counts only if the Rem's whole name is that word.
+
+**What is skipped:** every other Rem, cards already tagged to match their emoji, and backs saying both true and false, which are left for you to decide. A mark outranks the words, so *✅ the false claim was corrected* is true.
+
+**Cards judged by a word always ask first**, wherever you ran the command, because "a false premise" is not a verdict. The popup lists each of them with its front, its whole back with the word in bold, and the verdict it would get, all ticked. Untick the wrong ones and press **Mark**; cards judged by a mark are marked along with them.
+
+| Key | Action |
+| :--- | :--- |
+| `↑` / `↓` | Move through the cards and buttons |
+| `Space` | Tick or untick the card |
+| `←` / `→` | Go to the buttons, and between them |
+| `Enter` | Mark the ticked cards (or press the button you are on) |
+| `Esc` | Cancel |
+
+A card tagged one way whose back now says the opposite gets its tag flipped. A back with a mark is not changed; one judged by a word gets the ✅ or ❌ in front, as Mark as True / False would write, and the word stays.
 
 ---
 
@@ -82,6 +113,6 @@ In the queue, the statement being tested gets the badge and, once revealed, the 
 
 ## Notes { #notes }
 
-- Every ✅ and ❌ on the back is hidden in the queue, including one in the middle of a sentence.
+- Every ✅, ✔️, ☑️, ✓, ❌ and ✖️ on the back of a True/False card is hidden in the queue, including one in the middle of a sentence.
 - The `TFT` / `TFF` pill is hidden in the editor while it is the Rem's only tag; with several tags RemNote shows its own "2 tags" chip.
 - From the queue, the styling of a card you have just marked appears the next time the card is shown.

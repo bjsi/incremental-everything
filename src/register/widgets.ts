@@ -597,6 +597,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // True/False: Judge by Emoji, asking first when the Rem has descendants or a card
+  // was judged by a word.
+  plugin.app.registerWidget('true_false_judge_confirm', WidgetLocation.Popup, {
+    dimensions: {
+      width: 620,
+      height: 'auto',
+    },
+  });
+
   // Cycle Image Size: the confirmation, and the size it just set (lib/image_size_session.ts).
   plugin.app.registerWidget('image_size_confirm', WidgetLocation.Popup, {
     dimensions: {

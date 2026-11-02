@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.187 - November 2nd, 2026
+
+### ✨ New
+
+**True or False Cards**: Added **Judge by Emoji** (`Ctrl+Opt+Shift+J`, `tfj`), which marks question cards without clozes as true or false from the mark on their back (✅ ✔️ ☑️ ✓ or ❌ ✖️), on a selection or on a Rem and its descendants; cards with only the word true, false, verdadeiro/a or falso/a are listed for you to confirm.
+
+📖 [Judge by Emoji](Utilities-True-or-False-Cards.md#judge-by-emoji)
+
 ## v1.0.186 - November 2nd, 2026
 
 ### ✨ New

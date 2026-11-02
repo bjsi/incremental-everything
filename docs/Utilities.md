@@ -49,6 +49,7 @@ Mark a statement as true or false with one command, and make that kind of questi
 
 - [What a True/False card looks like](Utilities-True-or-False-Cards.md#what-it-looks-like)
 - [Mark as True (`tft`) / Mark as False (`tff`) — New](Utilities-True-or-False-Cards.md#mark-as-true-or-false)
+- [Judge by Emoji (`tfj`) — New](Utilities-True-or-False-Cards.md#judge-by-emoji)
 - [Remove Marking (`tfx`)](Utilities-True-or-False-Cards.md#remove-marking)
 - [Importing True/False cards from text (`tfc`)](Utilities-True-or-False-Cards.md#importing-from-text)
 - [In a Card Cluster](Utilities-True-or-False-Cards.md#card-clusters)

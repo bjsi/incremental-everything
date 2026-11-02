@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Prints the base64 WOFF used by src/register/true_false.ts to hide ✅ / ❌ in the queue.
+"""Prints the base64 WOFF used by src/register/true_false.ts to hide the verdict marks in the queue.
 
-The font covers only those two marks and the emoji variation selector, each as an
+The font covers only the marks (✅ ✔ ☑ ✓ and ❌ ✖) and the emoji variation selector, each as an
 empty zero-width glyph. Requires fontTools.
 """
 import base64
@@ -10,7 +10,15 @@ import io
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
-CODEPOINTS = {0x2705: "check", 0x274C: "cross", 0xFE0F: "vs16"}
+CODEPOINTS = {
+    0x2705: "check",
+    0x2714: "heavycheck",
+    0x2611: "ballotcheck",
+    0x2713: "lightcheck",
+    0x274C: "cross",
+    0x2716: "heavycross",
+    0xFE0F: "vs16",
+}
 
 glyphs = [".notdef", *CODEPOINTS.values()]
 empty = TTGlyphPen(None).glyph()

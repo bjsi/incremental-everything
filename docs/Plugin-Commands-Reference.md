@@ -267,6 +267,9 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 - **True/False: Mark as False** (`Ctrl+Shift+F`) — `quick: tff`
   The same with the `TFF` tag and ❌. Running it on a card marked true flips the verdict, swapping only the mark.
 
+- **True/False: Judge by Emoji** (`Ctrl+Opt+Shift+J` / `Ctrl+Alt+Shift+J`) — `quick: tfj`
+  [Marks question cards without clozes](Utilities-True-or-False-Cards.md#judge-by-emoji) as true or false from the mark on their back (✅ ✔️ ☑️ ✓ or ❌ ✖️), or else the words true, false, verdadeiro/a or falso/a, skipping everything else. On a single Rem it also covers its descendants, asking first with the counts; cards judged by a word are always listed for you to tick.
+
 - **True/False: Convert Pasted Tags** — `quick: tfc`
   For cards [imported from text](Utilities-True-or-False-Cards.md#importing-from-text) with `#[[TFT]]` / `#[[TFF]]`: swaps those plain tags for the powerups, writes the mark where it is missing, and deletes the plain tag Rem once unused. Covers the selected Rems, or the focused Rem and everything under it.
 
