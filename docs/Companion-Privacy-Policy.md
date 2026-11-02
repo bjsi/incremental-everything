@@ -1,6 +1,6 @@
 # Incremental RemNote Companion: Privacy Policy
 
-**Effective date: November 1, 2026**
+**Effective date: November 2, 2026**
 
 This policy covers the Incremental RemNote Companion Chrome extension ("the extension"). It works with the Incremental RemNote plugin for [RemNote](https://www.remnote.com).
 
@@ -20,7 +20,7 @@ This policy covers the Incremental RemNote Companion Chrome extension ("the exte
 - the page's headings, for the section of an extract, or all of them when you import headings;
 - the priority you enter, if any.
 
-**When you open the side panel:** the address and title of the current tab are sent to RemNote, which opens or creates that page's document in your account.
+**When you open the side panel on a page, or click Show this page in RemNote:** that page's address and title are sent to RemNote, which opens or creates its document in your account. Switching tabs or following links sends nothing of this kind.
 
 **While the panel is connected:** when a page loads, its address goes to the plugin running in your browser, to look up that page's saved highlights and read point.
 
@@ -34,16 +34,17 @@ The extension does not read passwords or form fields, keep a record of the sites
 
 - the highlights and read points of pages you have used it on, with their addresses;
 - anything waiting to reach RemNote while the panel is closed;
-- your **Set priority** preference.
+- your **Set priority** preference;
+- the names and identifiers of the RemNote knowledge bases the panel has connected to, and which one is in use, so that each page shows only that one's highlights.
 
 **In your RemNote account:**
 
 - your extracts and imported headings, as ordinary Rems;
-- the addresses, highlight positions and read points of those pages, in the plugin's storage.
+- the addresses, highlight positions and read points of those pages, in the plugin's storage, marked with the knowledge base they belong to.
 
 RemNote stores and syncs this data as it does your other notes, under RemNote's own terms and privacy policy. Its help center explains [the privacy of your notes](https://help.remnote.com/en/articles/7974260-privacy-of-your-notes).
 
-The panel shows RemNote itself, signed in with your own account, and any other plugins you have installed in RemNote run there as usual. They are not part of this extension.
+The panel shows RemNote itself, signed in with your own account, and any other plugins you have installed in RemNote run there as usual. They are not part of this extension. When you choose another knowledge base in the extension, it changes RemNote's own setting for the current knowledge base in this browser.
 
 **Copy diagnostics** in the panel builds a technical log that stays in memory until the panel closes. It leaves only if you copy it and send it to someone.
 

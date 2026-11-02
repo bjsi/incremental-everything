@@ -7,8 +7,8 @@ It works together with the plugin, through RemNote open in Chrome's side panel.
 ## What you need
 
 - **Chrome on a computer**, or another Chromium browser. It doesn't work on phones.
-- **The Incremental RemNote plugin**, version 1.0.185 or later, installed from the [plugin marketplace](https://www.remnote.com/plugins/incremental-everything).
-- **A RemNote account, signed in on www.remnote.com in the same browser.** The panel opens whichever knowledge base this browser used last.
+- **The Incremental RemNote plugin**, version 1.0.186 or later, installed from the [plugin marketplace](https://www.remnote.com/plugins/incremental-everything).
+- **A RemNote account, signed in on www.remnote.com in the same browser.** The panel opens whichever [knowledge base](#knowledge-bases) this browser used last.
 
 ## Setting it up
 
@@ -20,6 +20,22 @@ The first connection takes a while, as RemNote and your plugins have to start. A
 
 If you also use the RemNote Clipper, close its panel while using this one.
 
+After the extension is updated, reload any pages that were already open. Until you do, the bar on them says so, and refuses to add anything.
+
+## The panel and your documents
+
+RemNote gets a document for a page only when you ask for it: by opening the panel on that page, or by acting on it, such as adding an extract or importing headings. Browsing doesn't add anything to your knowledge base.
+
+| What you do | What happens |
+|---|---|
+| Click the icon on a page | The panel opens on that tab, with that page's document |
+| Switch to another tab | The panel hides. No document is created |
+| Return to that tab | The panel comes back |
+| Follow a link in that tab | The panel stays, and offers **Show this page in RemNote**. Adding an extract there also brings up that page's document |
+| Click the icon on a second tab | The panel moves there, and closes on the first tab, as each one runs all of RemNote |
+
+To close the panel, use the **X** at the top of it.
+
 ## The bar
 
 A small bar stays at the bottom right of every page, with the panel open or closed:
@@ -27,6 +43,7 @@ A small bar stays at the bottom right of every page, with the panel open or clos
 | Control | What it does |
 |---|---|
 | **Add Extract** | Appears when text is selected, and makes it an extract |
+| **Send to** | The [knowledge base](#knowledge-bases) this page's extracts go to, and whose highlights it shows |
 | **Set priority** | When ticked, each extract asks for its priority. It stays as you left it, on every page |
 | **Set read point** | Remembers the top of the window as your place on this page |
 | **Go to read point** | Scrolls back to that place |
@@ -74,9 +91,19 @@ Highlights and the orange read point come back whenever you return to a page, an
 
 They are found again by their text. If a page has changed so much that an extract's text is gone, a message says how many highlights couldn't be placed. A read point whose text has gone falls back to its old scroll position.
 
+## Knowledge bases
+
+Each knowledge base keeps its own extracts, highlights and read points. A page marks only what belongs to the current one, so a highlight made in another knowledge base doesn't appear, and returns when you switch back.
+
+**Send to** on the bar lists the knowledge bases the panel has connected to, and starts with the one it connected to last. Picking another changes every open page at once, and moves the panel there, or does so when you next open it. RemNote tabs you reload afterwards also open in that knowledge base.
+
+If you change the knowledge base in a RemNote tab, the panel restarts in it by itself. It then shows no page until you click **Show this page in RemNote**, so that changing doesn't create a document.
+
+An extract goes to the knowledge base that was picked when you made it. If the panel is in a different one, the extract waits, and the panel says **N waiting for** that knowledge base, with a button to switch to it.
+
 ## With the panel closed
 
-The bar keeps working. Extracts, read points and imports wait in the browser, with a count on the toolbar icon, and reach RemNote when you next open the panel. Highlights are kept in the browser too, so they still appear.
+The bar keeps working. Extracts, read points and imports wait in the browser, with a count on the toolbar icon, and reach RemNote when you next open the panel. Highlights are kept in the browser too, so they still appear. **Send to** says which knowledge base they belong to.
 
 **Shift+Enter** in the priority field opens the panel by itself, since the full popup lives there.
 

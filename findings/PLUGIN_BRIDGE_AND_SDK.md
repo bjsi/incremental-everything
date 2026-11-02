@@ -8,6 +8,10 @@ Places where the SDK looks like it works and silently doesn't, or where the obvi
 
 Plugin storage has **no deletion API**. Writing `null` does not free a key.
 
+**Synced keys belong to the account, not the KB.** `setSynced` writes through the store of `Accounts.userId()`, as `plugin|<manifestId>|<key>`. On the user's disk (Nov 2, 2026), all of this plugin's keys were in the primary KB's `remnote.db` and none in the other 14. A Rem from another KB gives `rem.findOne` → undefined, so removing "gone" Rems from a synced list deletes other KBs' entries unless the list is scoped per KB. Plugins too belong to the account.
+
+**The current KB is read once.** It is `localStorage.knowledgebaseId` (RemNote removes it for the primary KB, and setting it to the primary's id also resolves to the primary, per the code), read as the app starts. A running client stays in its KB until reloaded.
+
 ## Powerups and slots
 
 **Built-in powerup membership can't be enumerated.** `powerup.taggedRem()` is reliable only for the plugin's own powerups. For RemNote's built-ins it returns a small fraction with no error: 3 Rems for Extra Card Detail on a KB holding thousands. `getTagRems()` on a Rem also omits built-ins, though it does list plugin powerups and plain named tags. To find Rems carrying a built-in:
@@ -98,3 +102,6 @@ Tested Nov 1, 2026 on Chrome 156 with `spikes/companion-extension/`, on the web 
 - **A side panel cannot take the keyboard focus from the page.** `window.focus()`, `frame.focus()` and `contentWindow.focus()` in the panel did not work after a key press on the page, so typing in a popup there needs one click first (Chrome 156).
 - **Do not pass web page text through `richText.parseFromMarkdown`.** It reads text as commands. `→` became a flashcard separator (`{i: 's'}`), an escaped `\\[30\\]` became block LaTeX, and a linked image became a text link to its page, with the image's address as the text (Rems `yEqpu9rDIr4ezlxWh` and `S6MjYuQq9xq1G4ylk`, Nov 1, 2026). A plain `![alt](url)` does become an image, with the alt as its `title`, but anything after the address lands in `url`. Build rich text directly: `{i: 'i', url, width, height}` (the size matters in the queue), `{i: 'x', text, block}` for LaTeX, and `{i: 'm', text, iUrl}` for web links.
 - **Wikipedia formulas** carry their LaTeX in `annotation[encoding="application/x-tex"]` inside hidden MathML, wrapped as `{\\displaystyle …}`, next to an SVG fallback image with the same text as `alt`.
+- **`/clipper` creates documents.** `focusDoc`, `getOrCreatePageDocument` and a `clipperURL` in the address all get or create the page's Link Rem and document, and there is no way to open a page's document without that. `/clipper` with no `clipperURL` skips it, and leaves a loading spinner until `focusDoc` is called.
+- **A panel per tab.** `chrome.sidePanel.setOptions({tabId, path, enabled: true})` followed by `open({tabId})`, with no `default_path` in the manifest, gives a panel that Chrome hides on other tabs. Nothing may be awaited before `open`, which needs the user's gesture. `setPanelBehavior({openPanelOnActionClick: false})` is needed for `action.onClicked` to fire, and persists across reloads.
+- **After an extension reload,** a page opened before it keeps running the old content script, whose `chrome.*` calls fail with "Extension context invalidated". `chrome.runtime.id` is undefined there, which is how to detect it.
