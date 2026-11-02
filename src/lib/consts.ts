@@ -533,6 +533,13 @@ export const openInWindowOwnIdKey = 'open-in-window-own-id';
 // Local keys: the window following the queue, and the sources it should show (see lib/follow_queue_sources.ts).
 export const followQueueWindowKey = 'follow-queue-window';
 export const followQueueTargetKey = 'follow-queue-target';
+// Session keys for the following window's bar: its widget id, the sources on show, and a press of Stop.
+export const followQueueBarIdKey = 'follow-queue-bar-id';
+export const followQueueShownKey = 'follow-queue-shown';
+export const followQueueStopKey = 'follow-queue-stop';
+export const followQueueBarPositionKey = 'follow-queue-bar-position';
+// Above the PDF reader's bottom toolbar, and left of its page number and zoom buttons.
+export const followQueueBarDefaultPosition = { bottom: 66, right: 64 };
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // Rem IDs whose cards exist but whose parent rem could not be found during the

@@ -42,7 +42,7 @@ import { registerLogosBridge } from '../lib/logos_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { registerOpenInWindowListener } from '../lib/open_in_window';
-import { registerFollowQueueSources } from '../lib/follow_queue_sources';
+import { registerFollowQueueSources, startFollowingQueueSources } from '../lib/follow_queue_sources';
 import { registerVideoReviewBar } from '../lib/video_review_bar';
 import { registerImageSizeSession } from '../lib/image_size_session';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
@@ -145,7 +145,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   // RemNote window can find them.
   registerWindowSourcesPresence(plugin);
   // Opens a source another window asks this one to show.
-  void registerOpenInWindowListener(plugin);
+  void registerOpenInWindowListener(plugin, startFollowingQueueSources);
   // Shows the sources of the queue's cards in the window that asks to follow it.
   void registerFollowQueueSources(plugin);
   await registerWidgets(plugin);

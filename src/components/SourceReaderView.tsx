@@ -1,7 +1,7 @@
 import { usePlugin, ReactRNPlugin, PDFWebReader } from '@remnote/plugin-sdk';
 import React, { useEffect, useRef, useState } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { OpenInWindowButton } from './OpenInWindowButton';
+import { FollowQueueButton, HEADER_BUTTON_HEIGHT, OpenInWindowButton } from './OpenInWindowButton';
 
 export interface SourceReaderViewProps {
   /** Source-document rem to feed into PDFWebReader. */
@@ -134,7 +134,8 @@ export function SourceReaderView({
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          rowGap: '6px',
           padding: '8px 12px',
           cursor: onHeaderPointerDown ? 'move' : undefined,
           userSelect: onHeaderPointerDown ? 'none' : undefined,
@@ -149,6 +150,8 @@ export function SourceReaderView({
           style={{
             fontWeight: 600,
             fontSize: '13px',
+            // Too narrow for the name beside the buttons, the buttons take a row of their own.
+            flex: '1 1 120px',
             minWidth: 0,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -162,11 +165,7 @@ export function SourceReaderView({
             <span style={{ fontWeight: 400, color: 'var(--rn-clr-content-secondary)' }}>: {sourceName}</span>
           )}
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '0 0 auto' }}>
-          <OpenInWindowButton
-            remId={hostRemId}
-            highlightRemId={kind === 'highlight' ? hoveredRemId : null}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '0 0 auto', marginLeft: 'auto' }}>
           {kind === 'highlight' && hoveredRemId && (
             <button
               onClick={async () => {
@@ -180,7 +179,8 @@ export function SourceReaderView({
                 }
               }}
               style={{
-                padding: '4px 10px',
+                height: HEADER_BUTTON_HEIGHT,
+                padding: '0 10px',
                 fontSize: '12px',
                 fontWeight: 600,
                 backgroundColor: 'transparent',
@@ -203,6 +203,11 @@ export function SourceReaderView({
               🔖 Scroll to Highlight
             </button>
           )}
+          <OpenInWindowButton
+            remId={hostRemId}
+            highlightRemId={kind === 'highlight' ? hoveredRemId : null}
+          />
+          <FollowQueueButton />
           <button
             onClick={onClose}
             style={{

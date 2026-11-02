@@ -416,7 +416,7 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   📖 See [Utilities → Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup).
 
 - **Follow the Queue's Sources in This Window**
-  Makes this window show the sources pinned on the cards you practice in another window, up to 4 at a time. Run it again to stop. Desktop app only.
+  Makes this window show the sources pinned on the cards you practice in another window, up to 4 at a time. Run it again, or press **Stop** on its bar, to stop. Desktop app only.
 
   📖 See [Utilities → Follow the queue](Utilities-Finding-and-Navigating.md#follow-the-queue).
 

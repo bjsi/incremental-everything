@@ -195,11 +195,18 @@ While it's waiting, click the button again to cancel. The request also expires a
 
 One RemNote window can show the sources of the cards you practice in another, so you can read them on a second screen, or beside the queue, without opening anything. Desktop app only.
 
-1. Press **`⌘⇧N` / `Ctrl+Shift+N`** to open a second window, and place it where you want the sources.
-2. In that window, run **Follow the Queue's Sources in This Window** from the Omnibar.
-3. Start a queue in your main window. Each card's sources open in the second window a moment after the card appears.
+There are two ways to start it:
 
-Run the command again in that window to stop.
+- **From a queue:** open the Source viewer on a card and click **🧭 Follow the Queue in another window** in its header. Another open window starts following. If none is open, the button changes to **⏳ Waiting**: press **`⌘⇧N` / `Ctrl+Shift+N`** and the new window starts following. While it's waiting, click the button again to cancel. The request also expires after a minute. The button appears only while a queue is open.
+- **From the second window:** open it with **`⌘⇧N` / `Ctrl+Shift+N`**, then run **Follow the Queue's Sources in This Window** from the Omnibar there, before or during a queue.
+
+Place the second window where you want the sources. Each card's sources then open there a moment after the card appears.
+
+**The Following the queue bar** appears at the lower right of the following window:
+
+- **🔖 Scroll to Highlight** returns to the highlight. It appears when the card has a single source and its pin is a highlight.
+- **■ Stop** stops following and closes the bar. Running the command again in that window does the same.
+- **To move the bar,** drag it by any part outside its buttons. If you drag it out of the window, stop and start following again to bring it back to its usual spot.
 
 **What it opens:**
 

@@ -414,6 +414,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: { height: 'auto', width: 'auto' },
   });
 
+  // Shows that a window follows the queue, with its controls; opened by lib/follow_queue_sources.ts.
+  plugin.app.registerWidget('follow_queue_bar', WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+
   // Register incremental rem counter widget below document title. It also
   // hosts a local video's player (components/LocalVideoEditorPlayer).
   plugin.app.registerWidget('inc_rem_counter', WidgetLocation.DocumentBelowTitle, {

@@ -528,6 +528,7 @@ A centered **modal** popup that renders the **PDF or web article behind a hovere
 - **Auto-scroll to highlight:** for highlights, the embedded reader scrolls to the highlighted passage once it mounts (retried a few times while the PDF engine initializes).
 - **🔖 Scroll to Highlight button** in the header re-centers on the highlight after you've scrolled around the document.
 - **🪟 Open in Another Window button** in the header shows the source in another RemNote window ([details](Utilities-Finding-and-Navigating.md#open-in-another-window)). Desktop app only.
+- **🧭 Follow the Queue in another window button** in the header makes another RemNote window show the sources of the queue's cards ([details](Utilities-Finding-and-Navigating.md#follow-the-queue)). Desktop app only, and only while a queue is open.
 - **Queue-safe:** uses a modal overlay (not a pane), so the queue, your position, and the rating buttons stay intact underneath.
 - **Screen-fitted height:** 80% of the display's height (600–1500 px), measured when the plugin loads.
 

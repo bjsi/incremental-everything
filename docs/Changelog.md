@@ -6,7 +6,7 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ New
 
-**Follow the Queue**: Added a command that makes a second RemNote window show the sources pinned on the cards you practice in the first, up to 4 at a time, each scrolled to its first pin. Open a window with `⌘⇧N` / `Ctrl+Shift+N`, place it on another screen, and run **Follow the Queue's Sources in This Window** there.
+**Follow the Queue**: Added a mode that makes a second RemNote window show the sources pinned on the cards you practice in the first, up to 4 at a time, each scrolled to its first pin. Start it from the Source viewer's new **🧭 Follow the Queue in another window** button during a queue, or by running **Follow the Queue's Sources in This Window** in the second window. A small bar there shows it's on, with **Scroll to Highlight** and **Stop**.
 
 📖 [Follow the queue](Utilities-Finding-and-Navigating.md#follow-the-queue)
 
