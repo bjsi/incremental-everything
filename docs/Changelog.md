@@ -8,6 +8,12 @@ This page documents the major changes and improvements for each version of the I
 
 **Chrome Companion Extension**: Added support for a new Chrome extension that turns text selected on web pages into Incremental Rems, with a priority per extract, highlights that stay on the page, read points, and sections imported from the page's headings.
 
+![Extracts marked blue on a Wikipedia page, and the same text in the panel with its image and LaTeX imported](assets/companion-assets/extracted-image-latex.png){ width="900" }
+
+![The priority field below a selected passage, with 16 typed in](assets/companion-assets/priority-set.png){ width="500" }
+
+![A page's headings imported as nested Rems in the panel, matching the page's contents](assets/companion-assets/headings-imported.png){ width="900" }
+
 📖 [Chrome Companion Extension](Chrome-Companion-Extension.md)
 
 ## v1.0.184 - November 1st, 2026
@@ -19,6 +25,8 @@ This page documents the major changes and improvements for each version of the I
 📖 [Duplicate web page warning](Getting-Started.md#duplicate-web-page-warning)
 
 **Incremental Website Rems list**: Added Incremental Rems by Website, a list of your Incremental and Dismissed Rems grouped by the website of their source.
+
+![The Incremental Rems by Website popup, listing websites with their Incremental and Dismissed counts](assets/increms-by-website.png){ width="500" }
 
 📖 [Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website)
 
