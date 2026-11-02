@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Incremental RemNote Companion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Incremental reading of web pages with the Incremental RemNote plugin: extracts, highlights, read points and page structure.",
   "action": {
     "default_title": "Open the Incremental RemNote panel",
@@ -10,9 +10,6 @@
       "32": "icons/icon-32.png",
       "48": "icons/icon-48.png"
     }
-  },
-  "side_panel": {
-    "default_path": "panel.html"
   },
   "background": {
     "service_worker": "background.js"

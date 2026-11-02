@@ -12,12 +12,15 @@ import { getIncrementalRemFromRem, initIncrementalRem } from '../incremental_rem
 import { getPlatform, shouldUseLightMode } from '../mobileUtils';
 import {
   Anchor,
+  claimLegacyPage,
+  companionEntryKey,
   companionShardKey,
   emptyPageState,
   indexInReadingOrder,
   isInReadingOrder,
   MAX_SHARD_CHARACTERS,
   PageState,
+  remIdsOfPage,
   shardOfPage,
   sanitizeExtractRichText,
 } from './rules';
@@ -32,17 +35,37 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pageKeyOf = (url: string) => canonicalUrlKey(url) ?? url;
 
+async function currentKbId(plugin: ReactRNPlugin): Promise<string> {
+  const knowledgeBase = await plugin.kb.getCurrentKnowledgeBaseData();
+  if (!knowledgeBase?._id) throw new Error('RemNote did not say which knowledge base this is.');
+  return knowledgeBase._id;
+}
+
 async function readPage(plugin: ReactRNPlugin, url: string): Promise<PageState> {
-  const key = pageKeyOf(url);
-  const shard = await plugin.storage.getSynced<Record<string, PageState>>(companionShardKey(shardOfPage(key)));
-  return { ...emptyPageState(), ...shard?.[key] };
+  const pageKey = pageKeyOf(url);
+  const entryKey = companionEntryKey(await currentKbId(plugin), pageKey);
+  const shardKey = companionShardKey(shardOfPage(pageKey));
+  const shard = (await plugin.storage.getSynced<Record<string, PageState>>(shardKey)) ?? {};
+  const state = { ...emptyPageState(), ...shard[entryKey] };
+  const legacy = shard[pageKey];
+  if (!legacy) return state;
+
+  const owned = new Set<string>();
+  for (const remId of remIdsOfPage(legacy)) {
+    if (await plugin.rem.findOne(remId)) owned.add(remId);
+  }
+  const { claimed, rest } = claimLegacyPage(legacy, owned, state);
+  if (!claimed) return state;
+  const { [pageKey]: _moved, ...others } = shard;
+  await plugin.storage.setSynced(shardKey, { ...others, [entryKey]: claimed, ...(rest ? { [pageKey]: rest } : {}) });
+  return claimed;
 }
 
 async function writePage(plugin: ReactRNPlugin, url: string, state: PageState) {
-  const key = pageKeyOf(url);
-  const shardKey = companionShardKey(shardOfPage(key));
+  const pageKey = pageKeyOf(url);
+  const shardKey = companionShardKey(shardOfPage(pageKey));
   const shard = (await plugin.storage.getSynced<Record<string, PageState>>(shardKey)) ?? {};
-  const next = { ...shard, [key]: state };
+  const next = { ...shard, [companionEntryKey(await currentKbId(plugin), pageKey)]: state };
   if (JSON.stringify(next).length > MAX_SHARD_CHARACTERS) {
     throw new Error('The extension has run out of room to remember highlights in this group of pages.');
   }
@@ -100,7 +123,7 @@ async function ensureSection(plugin: ReactRNPlugin, doc: PluginRem, chain: Secti
   return { section: parent, created };
 }
 
-const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>> = {
+export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>> = {
   async addExtract(plugin, data) {
     const { docId, url, text, richText, chain, opId, withPriority, priority } = data;
     const anchor: Anchor = data.anchor;
@@ -167,7 +190,7 @@ const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>
       }
     }
     if (alive.length !== state.extracts.length) await writePage(plugin, url, { ...state, extracts: alive });
-    return { extracts: alive, readPoint: state.readPoint };
+    return { kbId: await currentKbId(plugin), extracts: alive, readPoint: state.readPoint };
   },
 
   async setReadPoint(plugin, { url, anchor, percent }) {
@@ -207,6 +230,7 @@ export function startCompanionListener(plugin: ReactRNPlugin) {
         kind: 'here',
         info: {
           knowledgeBase: knowledgeBase?.name,
+          knowledgeBaseId: knowledgeBase?._id,
           isPrimaryKnowledgeBase: await plugin.kb.isPrimaryKnowledgeBase(),
           platform: await getPlatform(plugin),
           lightMode: await shouldUseLightMode(plugin),

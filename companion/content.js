@@ -1,7 +1,14 @@
 // Runs in every frame and decides which of three roles it has here.
 
 const PLUGIN_IDS = ['incremental-everything', 'incremental-everything-plus'];
-const send = (message) => chrome.runtime.sendMessage(message).catch(() => {});
+/**
+ * After the extension is updated or reloaded, a page opened before that still runs
+ * this script, but every chrome.* call fails until the page is reloaded.
+ */
+const extensionIsGone = () => !chrome.runtime?.id;
+const send = (message) => {
+  if (!extensionIsGone()) chrome.runtime.sendMessage(message).catch(() => {});
+};
 const ancestors = () => Array.from(location.ancestorOrigins ?? []);
 const insidePanel = () => window !== window.top && ancestors().some((origin) => origin.startsWith('chrome-extension:'));
 
@@ -25,6 +32,18 @@ function isPanelPluginIndexFrame() {
 
 // ---- Role 1: the RemNote app inside the side panel ----
 function runInRemNoteFrame() {
+  // RemNote reads this once as it starts, so the panel reloads the frame after a change.
+  const KB_KEY = 'knowledgebaseId';
+  const port = chrome.runtime.connect({ name: 'remnote-frame' });
+  port.onMessage.addListener(({ kind, id }) => {
+    if (kind !== 'setKb' || typeof id !== 'string' || !/^[\w-]+$/.test(id)) return;
+    localStorage.setItem(KB_KEY, id);
+    port.postMessage({ kind: 'kbSet', id });
+  });
+  // Fires only for a change made elsewhere, such as in a RemNote tab.
+  window.addEventListener('storage', (event) => {
+    if (event.key === KB_KEY) port.postMessage({ kind: 'kbChanged' });
+  });
   window.addEventListener('load', () => {
     // An embedded /clipper page waits for this before starting the app. The
     // Clipper's own content script sends it the same way.
@@ -60,7 +79,11 @@ function runInPluginFrame() {
 // ---- Role 3: an ordinary web page ----
 function runInPage() {
   const A = globalThis.IEAnchors;
-  const cacheKey = `page:${location.origin}${location.pathname}${location.search}`;
+  // The knowledge base this page shows and adds to, as { id, name }. None until the
+  // panel has connected for the first time.
+  let kb = null;
+  let knownKbs = {};
+  const cacheKey = (kbId = kb?.id) => `page:${kbId ?? 'none'}:${location.origin}${location.pathname}${location.search}`;
   let extracts = [];
   let readPoint = null;
   let lastSummary = '';
@@ -85,6 +108,9 @@ function runInPage() {
       #priorityInput:focus { border-color: #3b82f6; }
       #priorityInput.invalid { border-color: #ef4444; }
       #promptHint { margin-top: 4px; font-size: 11px; color: #9ca3af; }
+      #kbField { max-width: 100%; }
+      #kbField[hidden] { display: none; }
+      #kbPick { max-width: 150px; border: 0; background: #1f2937; color: white; font: 12px system-ui, sans-serif; cursor: pointer; }
       #banner { margin-bottom: 6px; padding: 8px 10px; border-radius: 6px; background: #111827; color: white; max-width: 340px; overflow-wrap: anywhere; }
     </style>
     <div id="prompt" hidden>
@@ -93,6 +119,7 @@ function runInPage() {
     </div>
     <div id="banner" hidden></div>
     <div id="bar">
+      <label id="kbField" hidden>Send to <select id="kbPick"></select></label>
       <label id="priorityLabel"><input id="priority" type="checkbox" />Set priority</label>
       <button id="extract" hidden>Add Extract</button>
       <button id="setRead">Set read point</button>
@@ -107,6 +134,12 @@ function runInPage() {
     clearTimeout(bannerTimer);
     bannerTimer = setTimeout(() => ($('banner').hidden = true), ms);
   };
+  /** For what the user just asked for, so that it does not seem to work and then vanish. */
+  const refuseIfGone = () => {
+    if (!extensionIsGone()) return false;
+    show('The extension was updated. Reload this page to go on using it.', 15000);
+    return true;
+  };
   const logLine = (text) => send({ ie: 'log', host: location.hostname, text });
 
   /** A write: stored first, so it survives a closed panel, then carried out by the panel. */
@@ -114,7 +147,7 @@ function runInPage() {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     if (onDone) pending.set(id, onDone);
     await chrome.storage.local.set({
-      [`op:${id}`]: { id, op, at: Date.now(), data: { url: location.href, title: document.title, opId: id, ...data } },
+      [`op:${id}`]: { id, op, at: Date.now(), data: { url: location.href, title: document.title, opId: id, kbId: kb?.id, ...data } },
     });
     return id;
   }
@@ -139,7 +172,7 @@ function runInPage() {
   /** Says so if the panel doesn't take an operation up soon. */
   function warnIfWaiting(id) {
     setTimeout(() => {
-      if (pending.has(id)) show('Saved. It reaches RemNote when the panel is open and connected.', 6000);
+      if (pending.has(id)) show(`Saved${kb ? ` for “${kb.name}”` : ''}. It reaches RemNote when the panel is open and connected to it.`, 6000);
     }, 2500);
   }
 
@@ -174,10 +207,11 @@ function runInPage() {
 
   /** Only pages with something on them, or the browser copy would become a browsing history. */
   const saveCache = () => {
+    if (extensionIsGone()) return;
     const write =
       extracts.length || readPoint
-        ? chrome.storage.local.set({ [cacheKey]: { extracts, readPoint } })
-        : chrome.storage.local.remove(cacheKey);
+        ? chrome.storage.local.set({ [cacheKey()]: { extracts, readPoint } })
+        : chrome.storage.local.remove(cacheKey());
     write.catch(() => {});
   };
 
@@ -187,6 +221,8 @@ function runInPage() {
   async function loadFromPlugin() {
     try {
       const state = await read('pageState', {});
+      // The panel may be on its way to another KB. This page shows the one it names.
+      if (state.kbId && kb && state.kbId !== kb.id) return;
       const waitingOps = await chrome.storage.local.get(null);
       const known = new Set(state.extracts.map((extract) => extract.opId));
       const queued = stillPending().filter((e) => !known.has(e.opId) && waitingOps[`op:${e.opId}`]);
@@ -197,6 +233,46 @@ function runInPage() {
     } catch {
       // No panel yet. The browser's copy is on screen, and pluginReady calls this again.
     }
+  }
+
+  function showKbs() {
+    const names = { ...knownKbs, ...(kb ? { [kb.id]: kb.name } : {}) };
+    $('kbField').hidden = !Object.keys(names).length;
+    $('kbPick').replaceChildren(
+      ...Object.entries(names).map(([id, name]) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name;
+        return option;
+      })
+    );
+    if (kb) $('kbPick').value = kb.id;
+  }
+
+  async function loadBrowserCopy() {
+    const key = cacheKey();
+    const cached = (await chrome.storage.local.get(key))[key];
+    if (key !== cacheKey()) return;
+    extracts = cached?.extracts ?? [];
+    readPoint = cached?.readPoint ?? null;
+    lastSummary = '';
+    paint('browser copy');
+  }
+
+  /** The panel connected, or a KB was picked: this page now shows that KB only. */
+  async function showKb(next) {
+    const previous = kb;
+    kb = next ?? null;
+    showKbs();
+    if (previous?.id === kb?.id) return;
+    if (previous || !kb) {
+      await loadBrowserCopy();
+    } else {
+      // The first connection: what was added before it goes to this KB.
+      chrome.storage.local.remove(cacheKey('none')).catch(() => {});
+      saveCache();
+    }
+    loadFromPlugin();
   }
 
   /** The heading chain of a section, each with its position in the text. */
@@ -260,6 +336,7 @@ function runInPage() {
   }
 
   async function commitExtract({ anchor, started, payload }, options = {}) {
+    if (refuseIfGone()) return;
     const extract = { anchor };
     extracts.push(extract);
     window.getSelection()?.removeAllRanges();
@@ -377,7 +454,7 @@ function runInPage() {
   }
 
   function startExtract(askPriority) {
-    if (promptFor) return;
+    if (promptFor || refuseIfGone()) return;
     const captured = captureSelection();
     if (!captured) return;
     if (askPriority) openPrompt(captured);
@@ -391,10 +468,15 @@ function runInPage() {
       $('priority').checked = !!stored.setPriority;
     });
     $('priority').addEventListener('change', () => {
-      chrome.storage.local.set({ setPriority: $('priority').checked });
+      if (!refuseIfGone()) chrome.storage.local.set({ setPriority: $('priority').checked });
     });
     chrome.storage.onChanged.addListener((changes) => {
       if (changes.setPriority) $('priority').checked = !!changes.setPriority.newValue;
+      if (changes.kbKnown) {
+        knownKbs = changes.kbKnown.newValue ?? {};
+        showKbs();
+      }
+      if (changes.kb) showKb(changes.kb.newValue);
     });
 
     document.addEventListener('selectionchange', () => {
@@ -402,7 +484,14 @@ function runInPage() {
       $('extract').hidden = !selection?.toString().trim() || isEditable(selection.anchorNode);
     });
     // Keeps the page's selection when the bar is clicked. Clicks still work.
-    $('bar').addEventListener('mousedown', (event) => event.preventDefault());
+    $('bar').addEventListener('mousedown', (event) => {
+      if (event.target !== $('kbPick')) event.preventDefault();
+    });
+    $('kbPick').addEventListener('change', () => {
+      if (refuseIfGone()) return;
+      const id = $('kbPick').value;
+      chrome.storage.local.set({ kb: { id, name: knownKbs[id] ?? id }, kbPick: id });
+    });
     $('prompt').addEventListener('mousedown', (event) => {
       if (event.target !== $('priorityInput')) event.preventDefault();
     });
@@ -435,6 +524,7 @@ function runInPage() {
     );
 
     $('setRead').addEventListener('click', async () => {
+      if (refuseIfGone()) return;
       const index = A.buildIndex(document);
       const at = firstVisiblePosition(index);
       if (at === -1) return show('No text found at the top of the window.');
@@ -463,6 +553,7 @@ function runInPage() {
     });
 
     $('import').addEventListener('click', async () => {
+      if (refuseIfGone()) return;
       const index = A.buildIndex(document);
       const outline = A.readOutline(document);
       if (!outline.length) return show('This page has no usable headings.');
@@ -478,13 +569,11 @@ function runInPage() {
       warnIfWaiting(id);
     });
 
-    chrome.storage.local.get(cacheKey).then((stored) => {
-      const cached = stored[cacheKey];
-      if (cached) {
-        extracts = cached.extracts ?? [];
-        readPoint = cached.readPoint ?? null;
-        paint('browser copy');
-      }
+    chrome.storage.local.get(['kb', 'kbKnown']).then(async (stored) => {
+      kb = stored.kb ?? null;
+      knownKbs = stored.kbKnown ?? {};
+      showKbs();
+      await loadBrowserCopy();
       loadFromPlugin();
     });
 

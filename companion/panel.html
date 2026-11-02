@@ -9,6 +9,9 @@
       body { display: flex; flex-direction: column; }
       #status { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--line); }
       #statusText { flex: 1; opacity: 0.8; overflow-wrap: anywhere; }
+      #pageOffer, #waiting { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+      #pageOffer[hidden], #waiting[hidden] { display: none; }
+      #waitingText { flex: 1; overflow-wrap: anywhere; }
       button { font: inherit; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
       textarea { width: 100%; height: 140px; box-sizing: border-box; font: 11px ui-monospace, monospace; display: none; }
       #frame { flex: 1; border: 0; width: 100%; min-height: 0; }
@@ -18,6 +21,14 @@
     <div id="status">
       <span id="statusText">Open a web page to begin.</span>
       <button id="diagnostics">Copy diagnostics</button>
+    </div>
+    <div id="pageOffer" hidden>
+      <span style="flex: 1">RemNote is not showing this page.</span>
+      <button id="showPage">Show this page in RemNote</button>
+    </div>
+    <div id="waiting" hidden>
+      <span id="waitingText"></span>
+      <button id="switchKb"></button>
     </div>
     <textarea id="diagnosticsText" readonly></textarea>
     <iframe id="frame" title="RemNote"></iframe>

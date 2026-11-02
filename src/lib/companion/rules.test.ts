@@ -3,7 +3,15 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { COMPANION_SHARD_COUNT, indexInReadingOrder, isInReadingOrder, sanitizeExtractRichText, shardOfPage } from './rules';
+import {
+  claimLegacyPage,
+  COMPANION_SHARD_COUNT,
+  emptyPageState,
+  indexInReadingOrder,
+  isInReadingOrder,
+  sanitizeExtractRichText,
+  shardOfPage,
+} from './rules';
 
 describe('shardOfPage', () => {
   it('stays within the fixed number of keys, and is stable', () => {
@@ -16,6 +24,49 @@ describe('shardOfPage', () => {
   it('spreads pages across the keys', () => {
     const used = new Set(Array.from({ length: 500 }, (_, i) => shardOfPage(`example.com/page/${i}`)));
     assert.ok(used.size > COMPANION_SHARD_COUNT / 2);
+  });
+});
+
+describe('claimLegacyPage', () => {
+  const anchor = { exact: 'x', prefix: '', suffix: '', position: 0 };
+  const readPoint = { anchor, percent: 0.5, at: 1 };
+  const legacy = {
+    extracts: [{ remId: 'mine', anchor }, { remId: 'theirs', anchor }],
+    sections: { A: 'mineSection', B: 'theirSection' },
+    order: { mine: 1, theirs: 2, mineSection: 3, theirSection: 4 },
+    readPoint,
+  };
+
+  it('moves only what this KB owns, and leaves the rest', () => {
+    const { claimed, rest } = claimLegacyPage(legacy, new Set(['mine', 'mineSection']), emptyPageState());
+    assert.deepEqual(claimed?.extracts.map((extract) => extract.remId), ['mine']);
+    assert.deepEqual(claimed?.sections, { A: 'mineSection' });
+    assert.deepEqual(claimed?.order, { mine: 1, mineSection: 3 });
+    assert.equal(claimed?.readPoint, readPoint);
+    assert.deepEqual(rest?.extracts.map((extract) => extract.remId), ['theirs']);
+    assert.deepEqual(rest?.sections, { B: 'theirSection' });
+    assert.equal(rest?.readPoint, undefined);
+  });
+  it('claims nothing, and changes nothing, in another KB', () => {
+    const { claimed, rest } = claimLegacyPage(legacy, new Set(), emptyPageState());
+    assert.equal(claimed, undefined);
+    assert.equal(rest?.extracts.length, 2);
+    assert.equal(rest?.readPoint, readPoint);
+  });
+  it('leaves nothing behind once all of it is claimed', () => {
+    const all = new Set(['mine', 'theirs', 'mineSection', 'theirSection']);
+    assert.equal(claimLegacyPage(legacy, all, emptyPageState()).rest, undefined);
+  });
+  it('gives a lone read point to the first KB to open the page', () => {
+    const { claimed, rest } = claimLegacyPage({ readPoint }, new Set(), emptyPageState());
+    assert.equal(claimed?.readPoint, readPoint);
+    assert.equal(rest, undefined);
+  });
+  it('keeps what this KB already has', () => {
+    const current = { ...emptyPageState(), extracts: [{ remId: 'mine', anchor, opId: 'kept' }], readPoint: { ...readPoint, at: 2 } };
+    const { claimed } = claimLegacyPage(legacy, new Set(['mine']), current);
+    assert.deepEqual(claimed?.extracts, current.extracts);
+    assert.equal(claimed?.readPoint?.at, 2);
   });
 });
 
