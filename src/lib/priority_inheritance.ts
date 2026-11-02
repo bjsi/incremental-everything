@@ -162,9 +162,11 @@ export async function findClosestAncestorWithAnyPriority(
     // Fetch Card Priority details
     // Hidden slot first, then the pre-migration visible one — see
     // card_priority/slot_access.ts.
-    const parentCardPriorityValue = await getRawCardPriorityString(parent);
-    const parentCardSource = await parent.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-    const parentIncPriority = await getIncrementalPriorityOnly(parent);
+    const [parentCardPriorityValue, parentCardSource, parentIncPriority] = await Promise.all([
+      getRawCardPriorityString(parent),
+      parent.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT),
+      getIncrementalPriorityOnly(parent),
+    ]);
 
     const hasCardPriority = parentCardPriorityValue && (parentCardSource === 'manual' || parentCardSource === 'incremental');
     const hasIncRemPriority = parentIncPriority !== null;

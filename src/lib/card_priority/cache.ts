@@ -287,10 +287,23 @@ async function drainRatedCards(plugin: RNPlugin) {
 }
 
 /**
+ * Holds an entry for a new Rem until rereadCardPriorityCacheWhenCardsExist flushes it. Flushing
+ * now as well would rewrite the whole cache (over 2 s) twice per new Rem, with the entry about
+ * to be replaced anyway. Readers in this realm see it through getPendingCacheUpdate, and it is
+ * marked dirty so that a reload before the flush still re-reads the Rem.
+ */
+export function holdCardPriorityCacheEntry(plugin: RNPlugin, info: CardPriorityInfo) {
+  markCardPriorityDirty(plugin, info.remId);
+  pendingUpdates.set(info.remId, { info, isLight: true });
+  lightModeOptimisticOverrides.set(info.remId, { info, expiresAt: Date.now() + 5000 });
+}
+
+/**
  * Replaces an optimistic entry with one read from the Rem's real cards, once
  * those cards exist. A command that writes the text a card is made from (Alt+Z)
  * cannot read that card straight away, so it stores what it knows and calls
  * this; each attempt waits longer, and the first one that finds cards wins.
+ * If no attempt finds cards, what the command stored is flushed as it is.
  */
 export function rereadCardPriorityCacheWhenCardsExist(
   plugin: RNPlugin,
@@ -300,7 +313,11 @@ export function rereadCardPriorityCacheWhenCardsExist(
   const attempt = async (i: number) => {
     try {
       const rem = await plugin.rem.findOne(remId);
-      if (!rem) return;
+      if (!rem) {
+        // Deleted while the entry was held: it must not reach the cache.
+        pendingUpdates.delete(remId);
+        return;
+      }
       if (((await rem.getCards()) || []).length > 0) {
         await updateCardPriorityCache(plugin, remId);
         return;
@@ -308,7 +325,11 @@ export function rereadCardPriorityCacheWhenCardsExist(
     } catch (e) {
       console.warn('[Cache] Deferred card re-read failed for Rem:', remId, e);
     }
-    if (i + 1 < delaysMs.length) setTimeout(() => void attempt(i + 1), delaysMs[i + 1]);
+    if (i + 1 < delaysMs.length) {
+      setTimeout(() => void attempt(i + 1), delaysMs[i + 1]);
+    } else {
+      flushCacheUpdates(plugin).catch((e) => console.error('[Cache] Flush of held entry failed:', e));
+    }
   };
   setTimeout(() => void attempt(0), delaysMs[0]);
 }

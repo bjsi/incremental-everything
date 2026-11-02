@@ -245,6 +245,8 @@ export interface SetCardPriorityOptions {
    * would discard anyway. Not a way to hide a real change.
    */
   skipHistory?: boolean;
+  /** The rem was created by the caller a moment ago, so it cannot have the powerup yet. Saves a read. */
+  isNewRem?: boolean;
 }
 
 /**
@@ -274,7 +276,8 @@ export async function setCardPriority(
     return;
   }
 
-  const hasPowerup = knownHasPowerup || (await rem.hasPowerup(CARD_PRIORITY_CODE));
+  const hasPowerup =
+    knownHasPowerup || (!options?.isNewRem && (await rem.hasPowerup(CARD_PRIORITY_CODE)));
   if (!hasPowerup) {
     await rem.addPowerup(CARD_PRIORITY_CODE);
   }
