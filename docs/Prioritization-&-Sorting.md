@@ -43,13 +43,15 @@ The full 0-100 range is included for maximum flexibility and to align with the w
 
 To streamline workflow and make priority management more intuitive, new items automatically inherit their priority from their closest parent or ancestor that is also prioritized.
 
-  * **How it works (True Priorities):** When you tag a new Rem as `Incremental` (or generate flashcards), the plugin searches up through the Rem's parents looking for a "true" origin priority to inherit. A priority is considered "true" if it's an Incremental Rem priority, or a Flashcard priority whose source is "manual" or "incremental" (that is, one originated from a processed Incremental Rem when "Dismiss" was pressed). Purely inherited Flashcard priorities are skipped, acting as transparent pass-throughs so the plugin can find the real source higher up the tree.
+  * **How it works (True Priorities):** When you tag a new Rem as `Incremental` (or generate flashcards), the plugin searches up through the Rem's parents looking for a "true" origin priority to inherit. A priority is considered "true" if it's an Incremental Rem priority, or a Flashcard priority whose source is "manual" or "incremental" (that is, one originated from a processed Incremental Rem when "Dismiss" was pressed). Purely inherited Flashcard priorities are skipped, acting as transparent pass-throughs so the plugin can find the real source higher up the tree. Only when no true priority exists anywhere above is the nearest inherited value used, an [orphan](Priorities-for-Flashcards.md#orphaned-inherited) left behind by a removed anchor.
   * **Smart Category Matching:** Proximity is the strongest factor. If the direct parent has a true priority (even of a different type), the new child inherits it immediately. However, if the closest true ancestor possesses *both* an Incremental Rem priority and a Flashcard priority, the child will smartly inherit the priority from the matching category space (e.g., a new Incremental Rem will inherit the ancestor's Incremental Rem priority, while a new flashcard will inherit the ancestor's Flashcard priority).
   * **Fallback:** If no true prioritized ancestor is found, the new item will receive the default priority value you have set in the plugin settings.
 
 This system is particularly useful for hierarchically organized notes. For example, if you have an important book summary with a high priority (e.g., 5), any new extracts or notes you create within that summary will automatically inherit the same priority, saving you from setting it manually each time.
 
 The "[Set Priority](#main-priority-popup)" and "Reschedule" popups also display the ancestor's priority, giving you immediate context when you decide to manually override the inherited value.
+
+For flashcards, [How Inheritance Works](Priorities-for-Flashcards.md#inheritance) covers the full resolution order, when inherited values are refreshed, and what happens when an anchor is removed.
 
 ### Use Cases
 

@@ -68,13 +68,14 @@ export async function mayWriteCardPrioritySource(
 async function findClosestAncestorWithPriority(
   plugin: RNPlugin,
   rem: PluginRem
-): Promise<{ priority: number; source: 'incremental' | 'card' } | null> {
+): Promise<{ priority: number; source: 'incremental' | 'card'; anchored: boolean } | null> {
   const result = await findClosestAncestorWithAnyPriority(plugin, rem);
 
   if (result) {
     return {
       priority: result.priority,
-      source: result.sourceType === 'IncRem' ? 'incremental' : 'card'
+      source: result.sourceType === 'IncRem' ? 'incremental' : 'card',
+      anchored: result.anchored,
     };
   }
 
@@ -395,12 +396,18 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
 /**
  * Calculate what the priority should be without actually saving it
  * Used for optimization to avoid unnecessary updates
+ *
+ * `orphaned` is set on an 'inherited' result that has no anchor above it: no
+ * ancestor holds a manual/incremental card priority or is an Incremental Rem,
+ * so the value is either the rem's own leftover or copied from an ancestor that
+ * is itself an orphan. The value is still returned unchanged (inheritance is
+ * sticky by design); the flag only lets the bulk update offer a reset.
  */
 export async function calculateNewPriority(
   plugin: RNPlugin,
   rem: PluginRem,
   existingPriority: CardPriorityInfo | null = null
-): Promise<{ priority: number; source: PrioritySource }> {
+): Promise<{ priority: number; source: PrioritySource; orphaned?: boolean }> {
   if (existingPriority && (existingPriority.source === 'manual' || existingPriority.source === 'incremental')) {
     return { priority: existingPriority.priority, source: existingPriority.source };
   }
@@ -413,11 +420,15 @@ export async function calculateNewPriority(
   const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
 
   if (ancestorPriority) {
-    return { priority: ancestorPriority.priority, source: 'inherited' };
+    return {
+      priority: ancestorPriority.priority,
+      source: 'inherited',
+      ...(ancestorPriority.anchored ? {} : { orphaned: true }),
+    };
   }
 
   if (existingPriority && existingPriority.source === 'inherited') {
-    return { priority: existingPriority.priority, source: 'inherited' };
+    return { priority: existingPriority.priority, source: 'inherited', orphaned: true };
   }
 
   const defaultPriority = await getIESetting(plugin, defaultCardPriorityId);

@@ -520,6 +520,8 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 - **Update all inherited Card Priorities** — `quick: ucp`
   Crucial maintenance task. Recursively processes every flashcard and tagged Rem in your knowledge base, pre-computing and propagating `cardPriority` tags so that the queue loads instantly on startup.
 
+  If it finds `inherited` priorities that have **lost their anchor** (no ancestor holds a manual or incremental card priority or is an Incremental Rem anymore), it asks once what to do with all of them: **OK** resets them to the default value with source `default`, **Cancel** leaves them as they are. See [Inherited priorities that lost their anchor](Priorities-for-Flashcards.md#orphaned-inherited).
+
   After the update completes, if any **"Rem not found"** errors were detected, the command automatically offers to **remove orphan cards** — flashcards whose parent Rem has since been deleted. The cleanup flow:
 
   - Shows a summary of all orphan cards found (count + affected Rem IDs)

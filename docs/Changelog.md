@@ -2,6 +2,16 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.190 - November 3rd, 2026
+
+### ⚡ Improved
+
+**Update all inherited Card Priorities**: Now finds inherited flashcard priorities whose ancestor no longer holds a priority, and asks whether to reset them to the default or leave them as they are.
+
+**Priority popup**: Now says when a flashcard's inherited priority has lost its anchor, instead of showing "inherited" with no ancestor.
+
+📖 [Inherited priorities that lost their anchor](Priorities-for-Flashcards.md#orphaned-inherited) · [How Inheritance Works](Priorities-for-Flashcards.md#inheritance)
+
 ## v1.0.189 - November 2nd, 2026
 
 ### ⚡ Improved

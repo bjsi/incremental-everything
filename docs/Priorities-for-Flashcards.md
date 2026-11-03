@@ -57,14 +57,73 @@ Every flashcard in your knowledge base is assigned a priority from **0-100** (Lo
     * **OR** An Incremental Rem Priority set (this creates a seamless bridge between your reading list and your flashcards).
 4.  **Default (Lowest Strength):** If no ancestor has a priority, the card defaults to **50** (or whatever value you set in Settings).
 
-### The Inheritance Logic
+### How Inheritance Works { #inheritance }
 
-This is the "magic" that makes the system manageable. You don't need to prioritize every single card.
+Inheritance is what makes flashcard priority manageable. You set a priority on a handful of Rems (a book, a chapter, a topic), and every flashcard below them takes its value from there. You never prioritise cards one by one.
 
-* **Scenario:** You are reading a high-priority book (Priority: 10).
-* **Action:** You highlight a sentence and create a flashcard from it.
-* **Result:** That new flashcard automatically inherits Priority **10**.
-* **Benefit:** If you decide the whole book is less important later and change the book's priority to 80, **all** flashcards generated from it update to 80 instantly (unless you manually overrode specific ones or specific branches / chapters / sections).
+#### Anchors and pass-throughs
+
+Not every priority in your tree is a starting point. The plugin distinguishes two kinds:
+
+* **Anchors** are priorities someone actually decided:
+    * a card priority with source `manual` (you set it),
+    * a card priority with source `incremental` (stamped when an Incremental Rem was dismissed),
+    * an **Incremental Rem priority** (the Rem is in your reading queue).
+* **Pass-throughs** are values that were only *copied* from an anchor: card priorities with source `inherited` or `default`. When the plugin looks for a card's priority, it climbs past them to find the anchor they came from.
+
+The difference matters when you change an anchor. Every card that copied from it follows the new value, because none of the pass-throughs in between hold a decision of their own.
+
+#### How a card's priority is resolved
+
+For a flashcard Rem, the plugin checks, in order:
+
+1. **The Rem's own `manual` or `incremental` priority.** If it has one, that is the answer and nothing below applies.
+2. **The Rem's own Incremental Rem priority.** A card on an Incremental Rem uses the reading priority of that Rem.
+3. **The nearest anchor among its ancestors.** It walks up parent by parent and stops at the first anchor. Nearer always wins over stronger: a parent at P60 beats a grandparent at P5. If that ancestor has **both** a card priority and an Incremental Rem priority, a flashcard takes the card priority (and a new Incremental Rem takes the Incremental Rem priority).
+4. **The default** from Settings (**Default Card Priority**, 50 unless you changed it), when there is no anchor anywhere above.
+
+Steps 3 and 4 produce the `inherited` and `default` sources. Both are recomputed whenever the card is refreshed, so **a `default` card follows a new anchor just like an `inherited` one does**: give one of its ancestors a priority and the card switches to that value with source `inherited`. Only `manual` and `incremental` stay put.
+
+#### Example
+
+```
+📕 Navigation Manual            manual P10       ← anchor
+   📄 Chapter 3: Tides                           (no priority)
+      🗂 Tidal streams           (flashcard)     → inherited P10 (grandparent)
+      📄 Exercises              manual P40       ← anchor
+         🗂 Exercise 1           (flashcard)     → inherited P40 (parent)
+      🗂 Spring tides            manual P5       → stays P5
+```
+
+Change the book to P30 and *Tidal streams* moves to P30. The two cards under *Exercises* and *Spring tides* keep their own anchors and do not move. Remove the book's priority and *Tidal streams* falls back to the default.
+
+The [Priority popup](Prioritization-&-Sorting.md#main-priority-popup) (`Alt+P`) shows the anchor a card inherits from, with how far up it is (Parent, Grandparent, 4th ancestor…).
+
+#### When inherited values are refreshed
+
+| What happens | What updates |
+|---|---|
+| You create or edit a flashcard | That card takes its value from the nearest anchor *(Full Mode)* |
+| You change an anchor's priority (`Alt+P`, Quick Priority, batch tools, Reschedule) | Every `inherited`/`default` flashcard below it, in a background [cascade](#maintenance-keeping-inherited-priorities-in-sync) *(Full Mode)* |
+| You dismiss an Incremental Rem | The Rem keeps its priority as an `incremental` anchor, so its subtree is unaffected |
+| You run **[Update all inherited Card Priorities](#manual-full-kb-sweep-update-all-inherited-card-priorities)** | Every flashcard in the knowledge base |
+
+In Light Mode the cascade does not run. A card that has never been tagged still shows the right value, because it is resolved by walking up on each read, but tagged `inherited` values stay as they are until the next Full Mode session runs the sweep. The sweep is also how existing cards catch up after you move a whole subtree to a new parent.
+
+#### Inherited priorities that lost their anchor { #orphaned-inherited }
+
+An `inherited` value can outlive its anchor: you removed the ancestor's priority, dismissed it without a stamp, or moved the subtree somewhere with no prioritised ancestor. With no anchor above, the plugin keeps the value it had (inheritance is sticky) instead of silently changing your queue order. The Priority popup flags such a card: *"No ancestor holds a priority anymore — this inherited value has lost its anchor."*
+
+**Update all inherited Card Priorities** collects these orphans and asks once what to do with them all: **OK** resets them to the default (value and source `default`), **Cancel** leaves them as they are. Resetting loses nothing structural: as soon as an ancestor gets a priority again, the cards inherit from it. Before writing, the command lists every orphan and its previous value in the console.
+
+#### Why this design
+
+* **A few decisions cover thousands of cards.** Prioritise at the level you think at (a book, a chapter, an exam topic) and every card below follows.
+* **Reading and remembering share one scale.** An Incremental Rem's reading priority flows straight into the flashcards you make from it. No second prioritisation pass.
+* **Changing your mind is cheap.** Re-rank a book and all its unpinned cards move with it.
+* **Exceptions stay where you put them.** A `manual` priority on a card or a branch is never overwritten by inheritance, so you can raise one hard chapter inside an unimportant book.
+* **Nearest wins, so context wins.** A section's own priority is the most specific statement about its cards, and it beats any broader one higher up.
+* **Your reading decisions outlive your reading.** Dismissing an Incremental Rem turns its priority into an `incremental` anchor, so cards created under it later still inherit it instead of a distant ancestor's.
 
 ## Where a priority is stored { #hidden-slot }
 
@@ -341,7 +400,7 @@ In **Full Mode**, the plugin **automatically cascades inheritance** whenever you
 | **Batch Card Priority** / **Batch Priority Change** (bulk over a tag or selection) | ✅ Yes |
 
 *   The cascade runs silently in the background — the popup closes immediately with no delay.
-*   Descendants with `inherited` card priority (that haven't been manually overridden) update automatically.
+*   Descendants with an `inherited` or `default` card priority (that haven't been manually overridden) update automatically.
 *   The cascade only touches descendants that **actually own flashcards** (and existing inheritance anchors). Non-flashcard nodes — tag slots, property values, list items — are never tagged; they still inherit the priority dynamically without a physical `cardPriority` tag. (Earlier versions tagged the whole subtree indiscriminately, which produced [rogue CardPriority tags](Troubleshooting.md#rogue-cardpriority-tags-sanitization); fixed in v0.2.272.)
 *   This covers both **Flashcard priority** saves and **Incremental Rem priority** saves (for descendants whose inherited card priority traces back to that IncRem).
 *   **Requests are consolidated, not queued one-by-one.** Rapid consecutive saves and bulk operations accumulate into a single cascade pass: duplicate Rems are dropped, and where several changed Rems share a subtree that subtree is walked once rather than once per Rem. A cascade already in flight absorbs anything requested while it runs and sweeps it up at the end, still in one pass.
