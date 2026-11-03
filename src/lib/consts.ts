@@ -195,6 +195,8 @@ export const cardPriorityHiddenSlotStateKey = 'card-priority-hidden-slot-state';
 export const displayFsrsDsrId = 'display-fsrs-dsr';
 export const fsrsWeightsId = 'fsrs-weights';
 export const fsrsRequestedRetentionId = 'fsrs-requested-retention';
+/** A second weight set, drawn faintly over the forgetting curves for comparison only. */
+export const fsrsComparisonWeightsId = 'fsrs-comparison-weights';
 
 // --- Plugin-owned settings store (see lib/settings_migration.ts) ---
 /** Synced blob holding the values of every popup-tier setting. */

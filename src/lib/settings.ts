@@ -85,6 +85,7 @@ import {
   displayFsrsDsrId,
   fsrsWeightsId,
   fsrsRequestedRetentionId,
+  fsrsComparisonWeightsId,
   remnoteEnvironmentId,
   flashcardResponseTimeLimitId,
   titleCaseAcronymsId,
@@ -189,6 +190,7 @@ export interface IESettings {
   [displayFsrsDsrId]: boolean;
   [fsrsWeightsId]: string;
   [fsrsRequestedRetentionId]: number;
+  [fsrsComparisonWeightsId]: string;
 
   // Misc
   [remnoteEnvironmentId]: 'beta' | 'www';
@@ -283,6 +285,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [displayFsrsDsrId]: true,
   [fsrsWeightsId]: '',
   [fsrsRequestedRetentionId]: 90,
+  [fsrsComparisonWeightsId]: '',
 
   [remnoteEnvironmentId]: 'www',
   [flashcardResponseTimeLimitId]: 180,
@@ -1028,6 +1031,21 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Stability is an interval only at the 90% default: a stricter retention schedules a card ' +
       'sooner than its stability, a looser one later. The card info bar uses this to show the ' +
       'interval you will actually get, and to compute the U-Factor from it.',
+  },
+  [fsrsComparisonWeightsId]: {
+    kind: 'string',
+    group: 'fsrs',
+    wide: true,
+    placeholder: 'w0, w1, … w20 — leave blank for no comparison',
+    title: 'FSRS Comparison Weights',
+    perKnowledgeBase: true,
+    description:
+      'A second set of 19 or 21 FSRS weights — say, a fresh optimizer result you are considering. ' +
+      'The forgetting curves in the Queue Dashboard and the Flashcard Repetition History then ' +
+      'replay each card with these weights too, as faint magenta lines over the real ones, with a ' +
+      'one-line summary of stability, due date and next Good interval under both. The chart stays ' +
+      'scaled to the Global Weights above, and nothing else uses this set. Leave blank to hide the ' +
+      'comparison. Saved for this knowledge base only.',
   },
 
   // --- Mastery Drill ---
