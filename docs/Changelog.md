@@ -2,6 +2,26 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.191 - November 3rd, 2026
+
+### ✨ New
+
+**FSRS Comparison Weights**: Added a setting for a second set of FSRS weights, drawn as faint magenta lines over every forgetting curve, with a one-line summary of what it would change for the card on screen.
+
+**Memory Analytics and FSRS Calibration**: Added a **Use comparison weights** checkbox that recomputes them with that second set, so you can judge new weights before adopting them.
+
+**FSRS Optimizer Scripts**: Added `export_fsrs_revlog.py`, which exports every review for an external FSRS optimizer — including the same-day reviews RemNote's **Download revlog.csv** drops — and `run_fsrs_optimizer.py`, which runs fsrs-optimizer without its SM-2 comparison crash.
+
+📖 [Comparing two weight sets](Reviewing-Items-in-the-Queue.md#comparison-weights) · [Optimizing weights outside RemNote](Reviewing-Items-in-the-Queue.md#export-revlog)
+
+### 🐛 Fixed
+
+**Memory Analytics**: Fixed Retention counting the first answer of each card, which Avg pR leaves out, so R-dev read too low.
+
+**Memory Analytics and FSRS Calibration**: Same-day reviews (learning and relearning steps, Mastery Drill passes) are no longer scored, as fsrs-optimizer does; they had filled the Again row of Calibration's Grid C with predictions near 100%.
+
+📖 [Card Priority × Memory Analytics](Prioritization-&-Sorting.md#card-memory-analytics) · [FSRS Calibration](Prioritization-&-Sorting.md#fsrs-calibration)
+
 ## v1.0.190 - November 3rd, 2026
 
 ### ✨ New

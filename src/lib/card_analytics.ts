@@ -19,6 +19,7 @@ import {
   forgettingCurve,
   resolveWeights,
 } from './fsrs';
+import { isScoredRep } from './scored_reps';
 
 export interface CardBucketStats {
   label: string;          // "0-10%" or "All KB"
@@ -66,8 +67,8 @@ export interface CardBucketStats {
   avgCostMinPerYear: number; // mean of per-card cost over cards with cost
   // Outcome
   avgLapses: number;      // mean over non-new cards
-  retention: number;      // 0-100, (gradeableReps - agains) / gradeableReps
-  avgPredR: number;       // 0-100, mean predicted R over every step where r != null
+  retention: number;      // 0-100, pass rate over the scored reps (lib/scored_reps.ts)
+  avgPredR: number;       // 0-100, mean predicted R over the same scored reps
   rDevPP: number;         // retention - avgPredR (percentage points)
   avgGrade: number;       // 1-4
   // FSRS current state (today)
@@ -127,9 +128,9 @@ interface AccData {
   // Throughput aggregates (all over gradeable reps in the FULL history, capped responseTime)
   totGradeableReps: number;
   totTimeMs: number;
-  /** Gradeable reps that count for the main card — the denominator for retention. */
-  totMainReps: number;
-  totAgains: number;
+  /** Scored reps (lib/scored_reps.ts) — the denominator for retention AND Avg pR. */
+  totScoredReps: number;
+  totScoredAgains: number;
   // Outcome aggregates
   totLapses: number;
   nonNewCards: number;
@@ -158,9 +159,14 @@ interface PerCardStats {
   gradeableReps: number;
   /** Sum of response time across gradeable reps, each capped at cardCapMs. */
   totalTimeMs: number;
-  /** Gradeable reps that count for the main card (no partial multi-line reps). */
-  mainReps: number;
-  agains: number;
+  /**
+   * Main-card reps in the period that test a prediction (lib/scored_reps.ts),
+   * and the Agains among them: retention is taken over exactly the reps Avg pR
+   * is, so R-dev compares like with like.
+   */
+  scoredReps: number;
+  scoredAgains: number;
+  /** Every main-card Again in the period, first reps and same-day steps included. */
   lapses: number;
   cost: number | null;
   sumPredR: number;
@@ -190,8 +196,8 @@ function mergeAcc(a: AccData, b: AccData): AccData {
     staleCount: a.staleCount + b.staleCount,
     totGradeableReps: a.totGradeableReps + b.totGradeableReps,
     totTimeMs: a.totTimeMs + b.totTimeMs,
-    totMainReps: a.totMainReps + b.totMainReps,
-    totAgains: a.totAgains + b.totAgains,
+    totScoredReps: a.totScoredReps + b.totScoredReps,
+    totScoredAgains: a.totScoredAgains + b.totScoredAgains,
     totLapses: a.totLapses + b.totLapses,
     nonNewCards: a.nonNewCards + b.nonNewCards,
     sumCost: a.sumCost + b.sumCost,
@@ -220,8 +226,8 @@ function makeAcc(): AccData {
     staleCount: 0,
     totGradeableReps: 0,
     totTimeMs: 0,
-    totMainReps: 0,
-    totAgains: 0,
+    totScoredReps: 0,
+    totScoredAgains: 0,
     totLapses: 0,
     nonNewCards: 0,
     sumCost: 0,
@@ -256,7 +262,8 @@ function gradeValue(score: QueueInteractionScore): number | null {
   }
 }
 
-function computeCardStats(
+/** Exported for tests. */
+export function computeCardStats(
   card: any,
   weights: number[] | null,
   now: number,
@@ -284,8 +291,7 @@ function computeCardStats(
   // ---- Period-filtered tallies (Reps, Time, Lapses, Retention, Grade) ----
   let gradeableReps = 0;
   let totalTimeMs = 0;
-  let mainReps = 0;
-  let agains = 0;
+  let lapses = 0;
   let sumGrade = 0;
   let gradeCount = 0;
 
@@ -296,15 +302,13 @@ function computeCardStats(
     const t = Math.min(Math.max(0, h.responseTime || 0), cardCapMs);
     totalTimeMs += t;
     if (!countsForMainCard(h)) continue;
-    mainReps++;
-    if (h.score === QueueInteractionScore.AGAIN) agains++;
+    if (h.score === QueueInteractionScore.AGAIN) lapses++;
     const g = gradeValue(h.score);
     if (g !== null) {
       sumGrade += g;
       gradeCount++;
     }
   }
-  const lapses = agains;
 
   // ---- Always-current population flags (isNew, isDue, isStale) ------------
   //
@@ -362,6 +366,8 @@ function computeCardStats(
   // only over reps in the period — same period filter as Reps/Time/Retention.
   let sumPredR = 0;
   let predRCount = 0;
+  let scoredReps = 0;
+  let scoredAgains = 0;
   let d: number | null = null;
   let s: number | null = null;
   let rToday: number | null = null;
@@ -400,7 +406,8 @@ function computeCardStats(
           continue;
         }
 
-        if (inPeriod(h)) {
+        // Same-day steps move the replay but are not scored (lib/scored_reps.ts).
+        if (inPeriod(h) && isScoredRep(mainHistory[lastGradeableIdx].date, h.date)) {
           const step = steps[i];
           let r: number | null = step?.r ?? null;
           if (r === null) {
@@ -413,9 +420,12 @@ function computeCardStats(
               r = forgettingCurve(elapsedDays, prevS, DECAY, FACTOR);
             }
           }
+          // Retention is counted on the same reps, so the two share a denominator.
           if (r !== null && Number.isFinite(r)) {
             sumPredR += r;
             predRCount++;
+            scoredReps++;
+            if (h.score === QueueInteractionScore.AGAIN) scoredAgains++;
           }
         }
 
@@ -441,8 +451,8 @@ function computeCardStats(
     isPaused,
     gradeableReps,
     totalTimeMs,
-    mainReps,
-    agains,
+    scoredReps,
+    scoredAgains,
     lapses,
     cost,
     sumPredR,
@@ -480,8 +490,8 @@ function accumulate(acc: AccData, stats: PerCardStats, priority: number) {
 
   acc.totGradeableReps += stats.gradeableReps;
   acc.totTimeMs += stats.totalTimeMs;
-  acc.totMainReps += stats.mainReps;
-  acc.totAgains += stats.agains;
+  acc.totScoredReps += stats.scoredReps;
+  acc.totScoredAgains += stats.scoredAgains;
 
   if (!stats.isNew) {
     acc.totLapses += stats.lapses;
@@ -532,12 +542,12 @@ function finalize(acc: AccData, label: string): CardBucketStats {
   const avgCost = acc.cardsWithCost > 0 ? acc.sumCost / acc.cardsWithCost : 0;
   const avgLapses = acc.nonNewCards > 0 ? acc.totLapses / acc.nonNewCards : 0;
   const retention =
-    acc.totMainReps > 0
-      ? ((acc.totMainReps - acc.totAgains) / acc.totMainReps) * 100
+    acc.totScoredReps > 0
+      ? ((acc.totScoredReps - acc.totScoredAgains) / acc.totScoredReps) * 100
       : 0;
   const avgPredR = acc.predRCount > 0 ? (acc.sumPredR / acc.predRCount) * 100 : 0;
   // R-deviation only meaningful when both retention and predicted R have a basis.
-  const rDevPP = acc.totMainReps > 0 && acc.predRCount > 0 ? retention - avgPredR : 0;
+  const rDevPP = acc.totScoredReps > 0 && acc.predRCount > 0 ? retention - avgPredR : 0;
   const avgGrade = acc.gradeCount > 0 ? acc.sumGrade / acc.gradeCount : 0;
   const avgD = acc.fsrsCount > 0 ? acc.sumD / acc.fsrsCount : 0;
   const avgS = acc.fsrsCount > 0 ? acc.sumS / acc.fsrsCount : 0;

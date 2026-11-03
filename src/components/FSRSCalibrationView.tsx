@@ -667,7 +667,9 @@ export function FSRSCalibrationView() {
             blurb={
               <>
                 Every gradeable rep in the period (skipping the first rep of each post-RESET
-                lifetime <em>and</em> any rep whose prior stability is ≤ 1 month — short-term
+                lifetime, any rep on the same calendar day as the previous one — learning
+                and relearning steps, Mastery Drill passes, which fsrs-optimizer also leaves
+                out — <em>and</em> any rep whose prior stability is ≤ 1 month — short-term
                 learning reps would dominate the totals) is placed into a cell by its
                 FSRS-predicted retrievability at the moment of the rep (rows, 5pp each, shown
                 top-down high → low) and the stability set by the previous gradeable rep
@@ -700,7 +702,9 @@ export function FSRSCalibrationView() {
                 <strong>pR</strong>, and <strong>R-dev</strong> for the <em>current</em>{' '}
                 rep, exactly as in Grid A. ≤1mo prior stability is excluded for the same
                 short-term-volume reason as Grid A. Requires ≥3 gradeable reps in the
-                lifetime so the previous rep has its own prior to predict from.
+                lifetime so the previous rep has its own prior to predict from. Neither
+                rep may be a same-day step: the current one is not scored, and a previous
+                one's ~100% prediction would say nothing about being overdue.
                 <br />
                 <br />
                 <strong>What to look for:</strong> this grid tests whether passing an
@@ -745,7 +749,9 @@ export function FSRSCalibrationView() {
             title="C · Previous grade × Stability before that grade"
             blurb={
               <>
-                Every gradeable rep with at least two prior gradeable reps in its lifetime is
+                Every gradeable rep with at least two prior gradeable reps in its lifetime,
+                and not on the same calendar day as the previous one (a relearning step after
+                an Again would otherwise fill the Again row with ~100% predictions), is
                 placed by the <em>previous</em> rep's grade (rows) and the stability that
                 existed <em>before that previous grading</em> (columns) — i.e. the stability
                 FSRS was acting on when the previous Hard/Good/Easy/Again was applied. Same

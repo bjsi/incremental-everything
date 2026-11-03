@@ -543,6 +543,25 @@ The opening window is always one of the two or somewhere between them. The butto
 
 Zooming out goes well past where the chart opens. The forecast is computed until **Easy** decays to 50% — the point at which that memory is as likely gone as recalled — so you can follow every branch far beyond the next repetition and watch the four separate. On a mature card that is a long way out: FSRS's curve is a power law with a heavy tail, and 50% arrives at roughly ninety times the stability, so do not be surprised to find the axis running into centuries.
 
+#### Comparing two weight sets { #comparison-weights }
+
+Before you adopt a new set of FSRS weights — a fresh result from RemNote's **Optimize Weights**, or from an [external optimizer](#export-revlog) — you can see what it would do to your cards. Paste it into **FSRS Comparison Weights** in the [FSRS settings](Plugin-Settings-Reference.md#fsrs), and every forgetting curve replays the card a second time with those weights, drawn as thin, faint **magenta** lines over the real ones:
+
+| Magenta line | Shadows |
+|---|---|
+| Solid | The history |
+| Long dashes | **If not reviewed** |
+| Short dashes | **If Good** |
+| Staircase (bottom panel) | The stability after each repetition, and after a Good answer now |
+
+Each one keeps the dash of the line it shadows, so the same pattern means the same thing in both sets. Again, Hard and Easy get no comparison line, to keep the chart readable.
+
+A line under the legend sums up the difference for the card on screen, current → comparison: its stability now, its retrievability now, when it would fall to your target retention (roughly when it is due), and the interval a Good answer would earn.
+
+The comparison is an overlay only. The axes, the opening window, the **History** / **Forecast** presets and the zoom refit all follow your **FSRS Global Weights**, so a comparison line that leaves the view is cut off rather than rescaling the chart. Hover any point to read both sets' values side by side. Leave the setting blank, or paste the same weights as the Global ones, and the comparison disappears.
+
+To compare the two sets over your whole knowledge base rather than card by card, tick **Use comparison weights** in [Memory Analytics](Prioritization-&-Sorting.md#card-memory-analytics) or [FSRS Calibration](Prioritization-&-Sorting.md#fsrs-calibration).
+
 #### What the curve is, and is not
 
 The curve is computed by the plugin's own FSRS implementation, from the weights and retention in [FSRS settings](Plugin-Settings-Reference.md#fsrs) — **not** from the scheduler RemNote actually runs on the card, which the plugin API does not expose. It therefore describes your real scheduling only where those settings match it. If your cards use a per-document scheduler, or Anki SM-2, or FSRS with different weights, treat the curve as an estimate of that model rather than a record of RemNote's decisions. See [Cards on other schedulers](#cards-on-other-schedulers).
@@ -603,6 +622,30 @@ The script and the popup warn you if your Global Default Scheduler isn't FSRS-6:
 A retention outside the setting's 70–99% range is also left as it is, with a warning. Neither the script nor the import changes anything in RemNote's schedulers.
 
 Run the script and import again after you change your scheduler's weights.
+
+#### Optimizing weights outside RemNote { #export-revlog }
+
+RemNote's **Download revlog.csv** button (in **Settings → Schedulers**) gives you a file for an external optimizer such as [fsrs-optimizer](https://github.com/open-spaced-repetition/fsrs-optimizer), but that file keeps only the **first review of each day**. Every same-day review is lost — learning and relearning steps, Mastery Drill passes — and with it everything the short-term weights (w17–w19) learn from. A day whose first entry is not a rating (a manual date change, say) loses its real rating too. RemNote's own **Optimize Weights** reads the same data, with the short-term weights switched off.
+
+[`scripts/export_fsrs_revlog.py`](https://github.com/hugomarins/incremental-remnote/blob/main/scripts/export_fsrs_revlog.py) writes the same file straight from your local RemNote database, keeping every review:
+
+```bash
+python3 export_fsrs_revlog.py                      # your main knowledge base
+python3 export_fsrs_revlog.py --since 2021-01-01   # only cards first reviewed after this date
+python3 export_fsrs_revlog.py --kb <id>            # another knowledge base (--list shows them)
+```
+
+It writes `revlog-<id>.csv` to your `Downloads` folder. It applies RemNote's other filters (history before a card's last Reset, partial [list and set](#partial-list-and-set-cards) repetitions, cards reviewed on a single day), drops entries that are not ratings, and labels each review with the card's real phase: learning, review or relearning. `--since` works like the optimizer's own *revlog start date*: a card is left out entirely if its first review comes before that date. `--remnote-compatible` writes exactly what RemNote's button writes instead, for checking.
+
+Then run the optimizer on it through [`scripts/run_fsrs_optimizer.py`](https://github.com/hugomarins/incremental-remnote/blob/main/scripts/run_fsrs_optimizer.py), which takes the same arguments as `python3 -m fsrs_optimizer`:
+
+```bash
+python3 run_fsrs_optimizer.py ~/Downloads/revlog-<id>.csv
+```
+
+When it asks, enter your own timezone and answer **y** to the short-term component. The wrapper fixes one crash in fsrs-optimizer 6.5.0: a card with a long run of passes made its SM-2 comparison overflow, which stopped the run after the weights were printed.
+
+Before adopting the weights it prints, paste them into [FSRS Comparison Weights](#comparison-weights) to see what they would change.
 
 #### How accurate the figures are { #how-accurate-the-figures-are }
 

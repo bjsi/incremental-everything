@@ -183,9 +183,9 @@ const COL_TOOLTIPS = {
   lapses:
     'Average count of Again responses per non-new card. New cards are excluded from the denominator so never-reviewed cards don\'t dilute the average. Period-filtered.',
   retention:
-    'Observed pass rate at the bucket level = (gradeableReps − Again) / gradeableReps. Period-filtered. Same definition as the Study Dashboard / Practiced Queues.',
+    'Observed pass rate = (scored reps − Again) / scored reps, over exactly the reps Avg pR averages, so R-dev compares like with like. Period-filtered.\nScored reps leave out the first rep of each card / each post-RESET lifetime (a new card\'s first answer is not forgetting) and any rep on the same calendar day as the previous one (learning and relearning steps, Mastery Drill passes). This is therefore higher than the Study Dashboard\'s pass rate, which counts every rep.',
   avgPR:
-    'Average FSRS-predicted retrievability across every gradeable rep in the period, EXCEPT the first rep of each card / each post-RESET lifetime (the model has no prior state to predict from).\nFor learning/relearning reps where FSRS leaves r undefined, the forgetting curve is computed locally using the previous gradeable rep\'s stability — so Avg pR\'s denominator matches Retention\'s.',
+    'Average FSRS-predicted retrievability at the moment of each scored rep in the period: every gradeable rep EXCEPT the first of each card / each post-RESET lifetime (no prior state to predict from) and any rep on the same calendar day as the previous one (a minutes-old prediction near 100%, not a test of the model — fsrs-optimizer leaves these out too). Those reps still drive the FSRS replay.\nFor learning/relearning reps where FSRS leaves r undefined, the forgetting curve is computed locally using the previous gradeable rep\'s stability.',
   rDev:
     'Retention − Avg pR (percentage points).\nPositive: you remember better than FSRS expected (schedule could be relaxed).\nNegative: you forget more than predicted (schedule may be stale, or grading has been too generous).',
   grade:
@@ -1804,12 +1804,15 @@ export function CardMemoryAnalyticsView() {
             <strong>Export cards</strong> for the cause behind each one. <strong>Cost</strong> is
             expressed in <em>minutes per year (min/y)</em>: lifetime per-card coverage when
             period = All; otherwise annualized as <em>time-in-period / period-length</em>{' '}
-            averaged across cards with reps in the period. <strong>Avg pR</strong> averages the FSRS-predicted retrievability at the moment
-            of every gradeable rep (skipping only the first rep of each card / each
-            post-RESET lifetime, which has no prior model state). For learning and
-            relearning reps — where FSRS leaves <em>r</em> undefined — the forgetting
-            curve is computed from the previous gradeable rep's stability so that Avg pR
-            and Retention share the same denominator.{' '}
+            averaged across cards with reps in the period. <strong>Retention</strong> and{' '}
+            <strong>Avg pR</strong> are taken over the same <em>scored</em> reps: every
+            gradeable rep except the first of each card / each post-RESET lifetime (no
+            prior model state) and any rep on the same calendar day as the previous one
+            (learning and relearning steps, Mastery Drill passes — a test minutes after
+            the last answer, which fsrs-optimizer also leaves out). Those reps still drive
+            the FSRS replay. For learning and relearning reps — where FSRS leaves{' '}
+            <em>r</em> undefined — the forgetting curve is computed from the previous
+            gradeable rep's stability.{' '}
             <strong>R-dev = Retention − Avg pR</strong> in percentage points:
             positive means you remember better than FSRS expected, negative means worse.{' '}
             <strong>Lapses</strong> are averaged only over non-new cards.
