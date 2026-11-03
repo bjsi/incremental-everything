@@ -39,6 +39,8 @@ Plugin storage has **no deletion API**. Writing `null` does not free a key.
 - `Card.lastRepetitionTime` is null even after several repetitions: derive it from `repetitionHistory`.
 - `Card.createdAt` is per card and reliable. `Rem.createdAt` is not a baseline: a recreated or moved Rem can be younger than its cards.
 
+**`rem.setType(SetRemType.DEFAULT_TYPE)` always fails** (1.29.6-beta, Nov 3, 2026). The bridge handler `name:"setType"` validates `type` with `z.nativeEnum(SetRemType)`. `DEFAULT_TYPE` is `void 0` in the SDK, so the call is rejected with `[Invalid Method Arguments …]: rem.setType / type parameter: Required`. Plugins can set Concept (`1`) and Descriptor (`2`), but cannot set a Rem back to the default type. Neither can RemNote's own "Unset as Concept/Descriptor": it stores `"type": null`, which the Beautiful queue treats as no type at all (see [QUEUE_AND_PRACTICE.md](QUEUE_AND_PRACTICE.md#when-the-beautiful-queue-draws-a-basic-card-with-the-divider)). The raw `type` on a PluginRem is the stored field, so a `null` reaches the plugin unchanged.
+
 **Tag instances list regardless of parent.** A tag Rem lists its tagged Rems in *All Tagged Bullets* whether or not they are its children, and a document queue already gathers a Rem's instances with all their descendants. Reparenting under a tag is a filing choice, never a discoverability or queue-scope one.
 
 ## Commands and UI
