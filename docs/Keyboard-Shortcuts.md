@@ -97,6 +97,7 @@ On web pages, with the [Chrome Companion Extension](Chrome-Companion-Extension.m
 | `Ctrl` + `Shift` + `F1` | [Copy Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Copies all sources of the **focused Rem** into a session clipboard (and registers it in the PDF index). | Editor Only |
 | `Alt` + `Shift` + `V` | [Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Adds the copied sources to **every selected Rem** (or the focused Rem). Sources already present are skipped, so it is safe to re-run. | Editor Only |
 | `Alt` + `Shift` + `Q` | [Pin Source Quote](Source-Pins.md) | Finds the focused Rem's text in the open PDF or article, reuses the highlight that covers it or creates one, and pins it to the Rem. | Editor Only |
+| `Ctrl` + `Alt` + `Shift` + `Q` | [Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants) | Runs Pin Source Quote on every Quote Rem in the focused Rem and its descendants (or in each selected Rem's subtree). `Ctrl` on macOS too. | Editor Only |
 | `Alt` + `Shift` + `Enter` | [Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | After **📍 Pick in editor** in the Select Parent popup, creates the new Rem under the Rem that has the cursor. Outside the IncRem under review, press it twice to confirm. *(Not `Cmd/Ctrl+Shift+Enter`: that is RemNote's Add Portal.)* | Editor Only |
 
 ### In Logos Bible Software (LogosBridge helper)
@@ -209,6 +210,7 @@ Function keys carry the utilities whose natural letter combination was already t
 | Shortcut | Command | Context |
 | :--- | :--- | :--- |
 | `Ctrl` + `Alt` + `Shift` + `J` | [True/False: Judge by Emoji](Utilities-True-or-False-Cards.md#judge-by-emoji) | Editor and Queue |
+| `Ctrl` + `Alt` + `Shift` + `Q` | [Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants) | Editor |
 
 ### Not bound by default
 

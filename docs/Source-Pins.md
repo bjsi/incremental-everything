@@ -25,6 +25,14 @@ A toast reports where the passage was found and what was reused or created — f
 - The PDF is searched **page by page**; a sentence that runs across a page break is not matched yet.
 - If the same short phrase appears **word for word** more than once, the first occurrence is pinned.
 
+## Pinning every quote in a subtree { #quote-rems-in-descendants }
+
+**Pin Source Quote (Quote Rems in descendants)** — `Ctrl+Opt+Shift+Q` / `Ctrl+Alt+Shift+Q` (`Ctrl` on macOS too), or quick code `psqd` — runs Pin Source Quote on every Rem formatted as a **Quote** in the focused Rem and all its descendants, the focused Rem included. With several Rems selected, it covers each of them and their descendants.
+
+Other Rems in the subtree are left alone. The run works like a [multi-Rem selection](#pin-source-quote): one question about [which view](#text-reader) for a PDF with a Text Reader version, a final toast with the totals, and the passages not found listed together at the end.
+
+Running it again on the same subtree adds nothing twice, but every Quote Rem is looked up in the source again, so a second run takes as long as the first.
+
 ## Reusing highlights { #reusing-highlights }
 
 Highlights never overlap — so every passage keeps a single highlight, and clicking it in the PDF shows every Rem linked to it.

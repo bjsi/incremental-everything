@@ -655,3 +655,4 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 | Keys | Command | Where | Notes |
 | :--- | :--- | :--- | :--- |
 | `Ctrl + Opt + Shift + J` / `Ctrl + Alt + Shift + J` | [True/False: Judge by Emoji](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
+| `Ctrl + Opt + Shift + Q` / `Ctrl + Alt + Shift + Q` | [Pin Source Quote (Quote Rems in descendants)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |

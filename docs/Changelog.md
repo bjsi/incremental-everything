@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.190 - November 3rd, 2026
 
+### ✨ New
+
+**Pin Source Quote**: Added **Quote Rems in descendants** (`Ctrl+Opt+Shift+Q`, `psqd`), which pins the source of every Quote Rem in the focused Rem and its descendants at once.
+
+📖 [Pinning every quote in a subtree](Source-Pins.md#quote-rems-in-descendants)
+
 ### ⚡ Improved
 
 **Update all inherited Card Priorities**: Now finds inherited flashcard priorities whose ancestor no longer holds a priority, and asks whether to reset them to the default or leave them as they are.

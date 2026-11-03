@@ -583,19 +583,70 @@ export async function pinQuotesInViews(
  * view(s) to use, once for the whole selection.
  */
 export async function pinSourceQuote(plugin: ReactRNPlugin) {
-  const selection = await getEffectiveSelection(plugin);
-  let rems: PluginRem[] = [];
-  if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
-    rems = (await plugin.rem.findMany(selection.remIds)) || [];
-  } else {
-    const focused = await plugin.focus.getFocusedRem();
-    if (focused) rems = [focused];
-  }
+  const rems = await selectedOrFocusedRems(plugin);
   if (!rems.length) {
     await plugin.app.toast('Focus or select Rems whose text is a passage from the open PDF or article.');
     return;
   }
+  await pinSourcesOfRems(plugin, rems);
+}
 
+/**
+ * Command: Pin Source Quote over every Quote-formatted Rem in the focused Rem's
+ * subtree (or the selected Rems' subtrees), the Rems themselves included.
+ */
+export async function pinSourceQuotesInTree(plugin: ReactRNPlugin) {
+  const roots = await selectedOrFocusedRems(plugin);
+  if (!roots.length) {
+    await plugin.app.toast('Focus or select the Rem whose descendants hold the quotes to pin.');
+    return;
+  }
+
+  const seen = new Set<string>();
+  const scope: PluginRem[] = [];
+  for (const root of roots) {
+    for (const rem of [root, ...(await root.getDescendants())]) {
+      if (seen.has(rem._id)) continue;
+      seen.add(rem._id);
+      // Snapshot filter first: a Rem with no text is never worth a powerup read.
+      if (rem.text?.length || rem.backText?.length) scope.push(rem);
+    }
+  }
+
+  // Quote is a built-in powerup, so its members cannot be listed (taggedRem
+  // under-reports built-ins); probe each Rem instead, a few reads in flight.
+  const isQuote = new Array<boolean>(scope.length).fill(false);
+  let next = 0;
+  const worker = async () => {
+    while (next < scope.length) {
+      const k = next++;
+      isQuote[k] = await scope[k].isQuote();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(16, scope.length) }, worker));
+  const quotes = scope.filter((_, k) => isQuote[k]);
+
+  if (!quotes.length) {
+    await plugin.app.toast(
+      roots.length === 1
+        ? 'No Quote Rems in the focused Rem or its descendants.'
+        : 'No Quote Rems in the selected Rems or their descendants.'
+    );
+    return;
+  }
+  await pinSourcesOfRems(plugin, quotes);
+}
+
+async function selectedOrFocusedRems(plugin: ReactRNPlugin): Promise<PluginRem[]> {
+  const selection = await getEffectiveSelection(plugin);
+  if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+    return (await plugin.rem.findMany(selection.remIds)) || [];
+  }
+  const focused = await plugin.focus.getFocusedRem();
+  return focused ? [focused] : [];
+}
+
+async function pinSourcesOfRems(plugin: ReactRNPlugin, rems: PluginRem[]) {
   const plain = (rt: RichTextInterface | undefined) =>
     plugin.richText.toString(((rt ?? []) as RichTextInterface).filter((el) => !isPin(el)));
   const withText: { remId: string; candidates: string[] }[] = [];

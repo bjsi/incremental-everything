@@ -211,6 +211,9 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Pin Source Quote](Source-Pins.md#pin-source-quote)** (`Opt+Shift+Q` / `Alt+Shift+Q`) — `quick: psq`
   Pins the source of the focused Rem's text: finds the passage in the PDF or saved web article open in a pane and appends a pin to its highlight, reusing a highlight that already covers it or creating one. Works in a PDF's page view, a saved web article and a PDF's Text Reader view (asking which, when a PDF has both). Needs the local helper — see [Source Pins](Source-Pins.md).
 
+- **[Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants)** (`Ctrl+Opt+Shift+Q` / `Ctrl+Alt+Shift+Q`) — `quick: psqd`
+  Runs Pin Source Quote on every Rem formatted as a Quote in the focused Rem and all its descendants, or in each selected Rem's subtree; other Rems are left alone.
+
 - <a id="store-linked-images-audio-in-remnote"></a>**Store linked images & audio in RemNote** — `quick: slm`
   An image or audio added through **Embed Link** (or **Audio Search**) is saved as the bare web address: nothing is copied, so the Rem breaks the day that server moves or removes the file, and it does not play offline. This command fetches each such file, stores it in RemNote the way an uploaded file is stored, and points the Rem at the stored copy.
   Run it on the focused Rem or on a selection of Rems; front and back are both handled. The Rem itself is edited in place — only the address inside the image or audio changes — so its flashcards and their history are untouched. Files RemNote already stores, and video embeds such as YouTube, are left alone, so it is safe to re-run.

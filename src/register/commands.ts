@@ -12,7 +12,7 @@ import {
 import { openMasteryDrill } from '../lib/mastery_drill_launch';
 import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
-import { pinSourceQuote } from '../lib/pdf_source_pins';
+import { pinSourceQuote, pinSourceQuotesInTree } from '../lib/pdf_source_pins';
 import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { localizeMediaInRems } from '../lib/localize_media';
 import { showMessageDialog } from '../lib/message_dialog';
@@ -47,6 +47,7 @@ import {
   aiTranscribeHighlightCommandId,
   restoreHighlightBeforeAiCommandId,
   pinSourceQuoteCommandId,
+  pinSourceQuotesInTreeCommandId,
   localizeMediaCommandId,
   localizeMediaTreeCommandId,
   currentIncrementalRemTypeKey,
@@ -375,6 +376,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'opt+shift+q',
     action: async () => {
       await pinSourceQuote(plugin);
+    },
+  });
+
+  // Same, for every Quote Rem in the focused Rem's subtree (the Rem included).
+  await plugin.app.registerCommand({
+    id: pinSourceQuotesInTreeCommandId,
+    name: 'Pin Source Quote (Quote Rems in descendants)',
+    quickCode: 'psqd',
+    keyboardShortcut: 'ctrl+opt+shift+q',
+    action: async () => {
+      await pinSourceQuotesInTree(plugin);
     },
   });
 
