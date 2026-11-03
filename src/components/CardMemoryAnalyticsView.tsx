@@ -10,6 +10,11 @@
 import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import { ExcludeOtherSchedulersToggle, useSchedulerManifest } from './OtherSchedulers';
+import {
+  ComparisonWeightsNote,
+  ComparisonWeightsToggle,
+  loadFsrsWeights,
+} from './ComparisonWeightsToggle';
 import { SchedulerCardsManifest, getOtherSchedulerCardIds } from '../lib/scheduler_cards';
 import {
   CardAnalyticsBreakdown,
@@ -31,10 +36,8 @@ import {
   allCardPriorityInfoKey,
   cardAnalyticsCacheKey,
   cardAnalyticsLastPeriodKey,
-  fsrsWeightsId,
   flashcardResponseTimeLimitId,
 } from '../lib/consts';
-import { parseWeightsString } from '../lib/fsrs';
 import {
   PausedDeckScan,
   getCachedPausedDeckScan,
@@ -984,18 +987,22 @@ function StatusBar({
   schedulerManifest,
   excludeOtherSchedulers,
   onToggleExcludeOtherSchedulers,
+  useComparisonWeights,
+  onToggleComparisonWeights,
   onRecompute,
   onExport,
   onScanPaused,
   pausedScan,
   disabled,
 }: {
-  breakdown: CardAnalyticsBreakdown;
+  breakdown: CachedBreakdown;
   ignorePreReset: boolean;
   onToggleIgnorePreReset: (next: boolean) => void;
   schedulerManifest: SchedulerCardsManifest | null;
   excludeOtherSchedulers: boolean;
   onToggleExcludeOtherSchedulers: (next: boolean) => void;
+  useComparisonWeights: boolean;
+  onToggleComparisonWeights: (next: boolean) => void;
   onRecompute: () => void;
   onExport: () => void;
   onScanPaused: () => void;
@@ -1051,8 +1058,14 @@ function StatusBar({
             · Paused decks not scanned — their cards are counted as due.
           </span>
         )}
+        <ComparisonWeightsNote used={!!breakdown.usedComparisonWeights} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <ComparisonWeightsToggle
+          checked={useComparisonWeights}
+          disabled={disabled}
+          onChange={onToggleComparisonWeights}
+        />
         <label
           style={{
             display: 'flex',
@@ -1400,11 +1413,17 @@ function ExportDiagnosisPanel({
 
 // --- Main view -------------------------------------------------------------
 
+/**
+ * The session cache, marked with the weight set that produced it, so a view
+ * reopened on a comparison run says so and its checkbox matches the figures.
+ */
+type CachedBreakdown = CardAnalyticsBreakdown & { usedComparisonWeights?: boolean };
+
 export function CardMemoryAnalyticsView() {
   const plugin = usePlugin();
 
   const [state, setState] = React.useState<ComputeState>('idle');
-  const [cache, setCache] = React.useState<CardAnalyticsBreakdown | null>(null);
+  const [cache, setCache] = React.useState<CachedBreakdown | null>(null);
   const [progress, setProgress] = React.useState<ProgressInfo>({ done: 0, total: 0 });
   const [error, setError] = React.useState<string | null>(null);
   // Default ignorePreReset → OFF (matches Study Dashboard).
@@ -1432,6 +1451,9 @@ export function CardMemoryAnalyticsView() {
   const [excludeOtherSchedulers, setExcludeOtherSchedulers] = React.useState<boolean>(false);
   // Read by compute, whose signature every period and RESET handler already shares.
   const excludeOtherSchedulersRef = React.useRef(false);
+  // Same arrangement. Not persisted across openings — see ComparisonWeightsToggle.
+  const [useComparisonWeights, setUseComparisonWeights] = React.useState<boolean>(false);
+  const useComparisonWeightsRef = React.useRef(false);
 
   const compute = React.useCallback(
     async (flag: boolean, p: Period, cs: string, ce: string) => {
@@ -1439,14 +1461,13 @@ export function CardMemoryAnalyticsView() {
       setState('computing');
       setProgress({ done: 0, total: 0 });
       try {
-        const [infos, weightsRaw, capSec] = await Promise.all([
+        const [infos, { weights, usedComparison }, capSec] = await Promise.all([
           plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-          getIESetting(plugin, fsrsWeightsId),
+          loadFsrsWeights(plugin as any, useComparisonWeightsRef.current),
           // Per-rep responseTime cap (seconds). Same setting the Study Dashboard
           // and Practiced Queues read so per-rep outliers don't dominate CPM.
           getIESetting(plugin, flashcardResponseTimeLimitId),
         ]);
-        const weights = parseWeightsString(weightsRaw);
         const cardCapMs = ((capSec ?? 180) as number) * 1000;
         const { startMs, endMs } = resolvePeriod(p, cs, ce);
         const pausedRemIds = await getPausedRemIds(plugin);
@@ -1462,7 +1483,8 @@ export function CardMemoryAnalyticsView() {
           pausedRemIds,
           excludeOtherSchedulersRef.current ? await getOtherSchedulerCardIds(plugin as any) : null,
         );
-        await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
+        const cached: CachedBreakdown = { ...breakdown, usedComparisonWeights: usedComparison };
+        await plugin.storage.setSession(cardAnalyticsCacheKey, cached);
         // Persist user prefs (period + ignorePreReset) across app restarts
         // (device-local). Stored independently from the session cache so it
         // survives full RemNote restarts when the in-memory cache is gone.
@@ -1475,7 +1497,7 @@ export function CardMemoryAnalyticsView() {
             excludeOtherSchedulers: excludeOtherSchedulersRef.current,
           })
           .catch(() => {});
-        setCache(breakdown);
+        setCache(cached);
         setState('ready');
       } catch (e: any) {
         console.error('[CardMemoryAnalytics] compute failed', e);
@@ -1499,12 +1521,11 @@ export function CardMemoryAnalyticsView() {
     setProgress({ done: 0, total: 0 });
     setPhaseLabel('Replaying FSRS and collecting one row per card…');
     try {
-      const [infos, weightsRaw, capSec] = await Promise.all([
+      const [infos, { weights, usedComparison }, capSec] = await Promise.all([
         plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-        getIESetting(plugin, fsrsWeightsId),
+        loadFsrsWeights(plugin as any, useComparisonWeightsRef.current),
         getIESetting(plugin, flashcardResponseTimeLimitId),
       ]);
-      const weights = parseWeightsString(weightsRaw);
       const cardCapMs = ((capSec ?? 180) as number) * 1000;
       const { startMs, endMs } = resolvePeriod(period, customStart, customEnd);
 
@@ -1535,7 +1556,9 @@ export function CardMemoryAnalyticsView() {
       // Summarize after enrichment so the cause breakdown can use the context.
       const summary = summarizeRows(rows, context, !!pausedRemIds);
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-      const meta = `period=${period}, ignorePreReset=${ignorePreReset}, ${rows.length} cards`;
+      const meta =
+        `period=${period}, ignorePreReset=${ignorePreReset}, ` +
+        `weights=${usedComparison ? 'comparison' : 'global'}, ${rows.length} cards`;
       const summaryText = summaryToText(summary, meta);
       console.log(`[CardMemoryAnalytics] export\n${summaryText}`);
       // Only the CSV downloads here — this click is its user gesture. The
@@ -1544,8 +1567,9 @@ export function CardMemoryAnalyticsView() {
       downloadText(rowsToCsv(rows, context), `card-analytics-cards-${stamp}.csv`);
       setExportSummaryText(summaryText);
 
-      await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
-      setCache(breakdown);
+      const cached: CachedBreakdown = { ...breakdown, usedComparisonWeights: usedComparison };
+      await plugin.storage.setSession(cardAnalyticsCacheKey, cached);
+      setCache(cached);
       setExportSummary(summary);
       setState('ready');
     } catch (e: any) {
@@ -1602,6 +1626,10 @@ export function CardMemoryAnalyticsView() {
     excludeOtherSchedulersRef.current = next;
     setExcludeOtherSchedulers(next);
   };
+  const applyComparisonWeights = (next: boolean) => {
+    useComparisonWeightsRef.current = next;
+    setUseComparisonWeights(next);
+  };
 
   // Mount: prefer the in-memory session cache (instant). If absent, fall back
   // to the last-selected period saved in device-local storage so that re-opens
@@ -1610,7 +1638,7 @@ export function CardMemoryAnalyticsView() {
   React.useEffect(() => {
     let cancelled = false;
     Promise.all([
-      plugin.storage.getSession<CardAnalyticsBreakdown | null>(cardAnalyticsCacheKey),
+      plugin.storage.getSession<CachedBreakdown | null>(cardAnalyticsCacheKey),
       plugin.storage.getLocal<{
         period?: Period;
         customStart?: string;
@@ -1625,6 +1653,8 @@ export function CardMemoryAnalyticsView() {
           setCache(c);
           setIgnorePreReset(c.ignorePreReset ?? false);
           applyExcludeOtherSchedulers((c.excludedOtherSchedulerCards ?? 0) > 0);
+          // The session cache shows a comparison run as one, with the box ticked to match.
+          applyComparisonWeights(!!c.usedComparisonWeights);
           setPeriod(((c.period as Period) ?? 'thisYear'));
           setCustomStart(c.periodCustomStart ?? '');
           setCustomEnd(c.periodCustomEnd ?? '');
@@ -1664,6 +1694,10 @@ export function CardMemoryAnalyticsView() {
   };
   const handleToggleExcludeOtherSchedulers = (next: boolean) => {
     applyExcludeOtherSchedulers(next);
+    compute(ignorePreReset, period, customStart, customEnd);
+  };
+  const handleToggleComparisonWeights = (next: boolean) => {
+    applyComparisonWeights(next);
     compute(ignorePreReset, period, customStart, customEnd);
   };
   const handlePeriodChange = (p: Period) => {
@@ -1724,6 +1758,8 @@ export function CardMemoryAnalyticsView() {
             schedulerManifest={schedulerManifest}
             excludeOtherSchedulers={excludeOtherSchedulers}
             onToggleExcludeOtherSchedulers={handleToggleExcludeOtherSchedulers}
+            useComparisonWeights={useComparisonWeights}
+            onToggleComparisonWeights={handleToggleComparisonWeights}
             onRecompute={() => compute(ignorePreReset, period, customStart, customEnd)}
             onExport={runExport}
             onScanPaused={runPausedScan}

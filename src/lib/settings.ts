@@ -1044,8 +1044,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'The forgetting curves in the Queue Dashboard and the Flashcard Repetition History then ' +
       'replay each card with these weights too, as faint magenta lines over the real ones, with a ' +
       'one-line summary of stability, due date and next Good interval under both. The chart stays ' +
-      'scaled to the Global Weights above, and nothing else uses this set. Leave blank to hide the ' +
-      'comparison. Saved for this knowledge base only.',
+      'scaled to the Global Weights above. Memory Analytics and FSRS Calibration gain a "Use ' +
+      'comparison weights" checkbox that recomputes their tables with this set. Nothing else uses ' +
+      'it. Leave blank to hide the comparison. Saved for this knowledge base only.',
   },
 
   // --- Mastery Drill ---

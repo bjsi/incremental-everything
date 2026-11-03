@@ -23,11 +23,14 @@ import {
   rBucketLabel,
 } from '../lib/fsrs_calibration';
 import { FSRSInitialStabilityPanel } from './FSRSInitialStabilityPanel';
-import { fsrsCalibrationLastPeriodKey, fsrsWeightsId } from '../lib/consts';
-import { parseWeightsString } from '../lib/fsrs';
+import { fsrsCalibrationLastPeriodKey } from '../lib/consts';
+import {
+  ComparisonWeightsNote,
+  ComparisonWeightsToggle,
+  loadFsrsWeights,
+} from './ComparisonWeightsToggle';
 import { Period, resolvePeriod } from '../lib/period';
 import { PeriodPickerCompact } from './CardMemoryAnalyticsView';
-import { getIESetting } from '../lib/settings';
 
 // --- Cell merge helper ----------------------------------------------------
 // Used to fuse the (mostly empty) bottom-pR buckets of Grids A and B into a
@@ -288,6 +291,9 @@ function StatusBar({
   schedulerManifest,
   excludeOtherSchedulers,
   onToggleExcludeOtherSchedulers,
+  useComparisonWeights,
+  usedComparisonWeights,
+  onToggleComparisonWeights,
   onRecompute,
   disabled,
 }: {
@@ -297,6 +303,9 @@ function StatusBar({
   schedulerManifest: SchedulerCardsManifest | null;
   excludeOtherSchedulers: boolean;
   onToggleExcludeOtherSchedulers: (next: boolean) => void;
+  useComparisonWeights: boolean;
+  usedComparisonWeights: boolean;
+  onToggleComparisonWeights: (next: boolean) => void;
   onRecompute: () => void;
   disabled: boolean;
 }) {
@@ -322,8 +331,14 @@ function StatusBar({
             · {breakdown.excludedOtherSchedulerCards.toLocaleString()} on other schedulers excluded
           </span>
         )}
+        <ComparisonWeightsNote used={usedComparisonWeights} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <ComparisonWeightsToggle
+          checked={useComparisonWeights}
+          disabled={disabled}
+          onChange={onToggleComparisonWeights}
+        />
         <label
           style={{
             display: 'flex',
@@ -426,6 +441,11 @@ export function FSRSCalibrationView() {
   const [excludeOtherSchedulers, setExcludeOtherSchedulers] = React.useState<boolean>(false);
   // Read by compute, whose signature every period and RESET handler already shares.
   const excludeOtherSchedulersRef = React.useRef(false);
+  // Same arrangement. Not persisted — see ComparisonWeightsToggle.
+  const [useComparisonWeights, setUseComparisonWeights] = React.useState<boolean>(false);
+  const useComparisonWeightsRef = React.useRef(false);
+  // Which set the figures on screen came from (the setting may have been blank).
+  const [usedComparisonWeights, setUsedComparisonWeights] = React.useState<boolean>(false);
 
   const compute = React.useCallback(
     async (flag: boolean, p: Period, cs: string, ce: string) => {
@@ -433,8 +453,10 @@ export function FSRSCalibrationView() {
       setState('computing');
       setProgress({ done: 0, total: 0 });
       try {
-        const weightsRaw = await getIESetting(plugin, fsrsWeightsId);
-        const weights = parseWeightsString(weightsRaw);
+        const { weights, usedComparison } = await loadFsrsWeights(
+          plugin as any,
+          useComparisonWeightsRef.current,
+        );
         const { startMs, endMs } = resolvePeriod(p, cs, ce);
         const breakdown = await computeFSRSCalibrationBreakdown(
           plugin as any,
@@ -454,6 +476,7 @@ export function FSRSCalibrationView() {
           })
           .catch(() => {});
         setData(breakdown);
+        setUsedComparisonWeights(usedComparison);
         setState('ready');
       } catch (e: any) {
         console.error('[FSRSCalibration] compute failed', e);
@@ -508,6 +531,11 @@ export function FSRSCalibrationView() {
   const handleToggleExcludeOtherSchedulers = (next: boolean) => {
     excludeOtherSchedulersRef.current = next;
     setExcludeOtherSchedulers(next);
+    compute(ignorePreReset, period, customStart, customEnd);
+  };
+  const handleToggleComparisonWeights = (next: boolean) => {
+    useComparisonWeightsRef.current = next;
+    setUseComparisonWeights(next);
     compute(ignorePreReset, period, customStart, customEnd);
   };
   const handlePeriodChange = (p: Period) => {
@@ -627,6 +655,9 @@ export function FSRSCalibrationView() {
             schedulerManifest={schedulerManifest}
             excludeOtherSchedulers={excludeOtherSchedulers}
             onToggleExcludeOtherSchedulers={handleToggleExcludeOtherSchedulers}
+            useComparisonWeights={useComparisonWeights}
+            usedComparisonWeights={usedComparisonWeights}
+            onToggleComparisonWeights={handleToggleComparisonWeights}
             onRecompute={() => compute(ignorePreReset, period, customStart, customEnd)}
             disabled={state !== 'ready'}
           />
