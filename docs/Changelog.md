@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.189 - November 2nd, 2026
+
+### ⚡ Improved
+
+**Create Cloze**: Changed `Alt+Z` and `Alt+Shift+Z` to show the new Rem and the highlight before doing the priority work, so you see the result sooner, especially when RemNote is busy.
+
+📖 [Create Cloze](IR-Flow--Reading-Extracting-and-Clozing.md#create-cloze-altz-altshiftz)
+
 ## v1.0.188 - November 2nd, 2026
 
 ### ⚡ Improved

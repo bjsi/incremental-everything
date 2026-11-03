@@ -1,3 +1,4 @@
+import { OpTimer } from '../op_timer';
 import { cardLastSeenAt, cardTypeTag } from '../priority_review_document/cooling';
 import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
@@ -247,6 +248,8 @@ export interface SetCardPriorityOptions {
   skipHistory?: boolean;
   /** The rem was created by the caller a moment ago, so it cannot have the powerup yet. Saves a read. */
   isNewRem?: boolean;
+  /** Receives this write's steps, for a command timing itself. */
+  timer?: OpTimer;
 }
 
 /**
@@ -281,6 +284,7 @@ export async function setCardPriority(
   if (!hasPowerup) {
     await rem.addPowerup(CARD_PRIORITY_CODE);
   }
+  options?.timer?.lap('addCardPriority');
 
   // Parallelize the property updates for maximum speed (Fire and Forget style).
   // The value goes through writeRawCardPriority, which writes the hidden slot and
@@ -291,6 +295,7 @@ export async function setCardPriority(
     rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]),
     rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()])
   ]);
+  options?.timer?.lap('slots');
 
   // Record what just happened. Deliberately AFTER the value write and not folded
   // into the Promise.all above: it reads the existing history first, and a
@@ -315,6 +320,8 @@ export async function setCardPriority(
     });
   }
 
+  options?.timer?.lap('history');
+
   // Keep the table-cell badge in step. Static import: a dynamic import() here
   // emits a chunk the RemNote index sandbox cannot evaluate ("Cannot use
   // 'import.meta' outside a module"). priority_bands only pulls constants from
@@ -325,6 +332,7 @@ export async function setCardPriority(
   } catch (err) {
     console.error('[CardPriority] band sync failed', err);
   }
+  options?.timer?.lap('band');
 }
 
 /**

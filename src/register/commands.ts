@@ -119,6 +119,8 @@ import {
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
+import { createOpTimer, OpTimer } from '../lib/op_timer';
+import { createTurnQueue } from '../lib/turn_queue';
 import { holdCardPriorityCacheEntry, loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist } from '../lib/card_priority/cache';
 import {
   isHiddenSlotMigrated,
@@ -676,21 +678,36 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  const createClozeDeletion = async (): Promise<{
+  type ClozeResult = {
     clozeRem: PluginRem;
     parentRem: PluginRem;
     autoPriority: ClozeAutoPriorityInfo;
-  } | undefined> => {
-      const clozeStartedAt = Date.now();
-      const clozeLaps: string[] = [];
-      let clozeLapAt = clozeStartedAt;
-      const lapCloze = (label: string) => {
-        const now = Date.now();
-        clozeLaps.push(`${label} ${now - clozeLapAt}`);
-        clozeLapAt = now;
-      };
+  };
 
-      const selection = await plugin.editor.getSelection();
+  // Clozes made in quick succession from one Rem overlap. Each must see the previous one's
+  // highlight in the parent's text, or its own write erases it, and the previous one's tag, or
+  // both count the same earlier clozes and get the same priority.
+  const takeClozeTurn = createTurnQueue();
+
+  const createClozeDeletion = async (): Promise<ClozeResult | undefined> => {
+    const timer = createOpTimer();
+    // Read at the key press, since the selection moves on while this press waits its turn.
+    const selectionRead = plugin.editor.getSelection();
+    const turn = takeClozeTurn();
+    try {
+      await turn.ready;
+      timer.lap('wait');
+      return await createClozeInTurn(await selectionRead, turn.release, timer);
+    } finally {
+      turn.release();
+    }
+  };
+
+  const createClozeInTurn = async (
+    selection: Awaited<ReturnType<typeof plugin.editor.getSelection>>,
+    releaseTurn: () => void,
+    timer: OpTimer
+  ): Promise<ClozeResult | undefined> => {
       if (!selection || selection.type !== SelectionType.Text) return;
       if (selection.range.start === selection.range.end) {
         await plugin.app.toast('Please select some text to create a cloze deletion.');
@@ -700,10 +717,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const rem = await plugin.rem.findOne(selection.remId);
       if (!rem) return;
 
-      // Compute auto-priority BEFORE creating the new cloze rem, so the count of existing
-      // cloze-extract children reflects only prior clozes (not the one we're about to create).
-      const autoPriority = await computeClozeAutoPriority(plugin, rem);
-      lapCloze('priority');
+      timer.lap('read');
 
       const r_start = Math.min(selection.range.start, selection.range.end);
 
@@ -1039,10 +1053,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         await clozeRem.setText(buildChildText());
         // Before the parent's own write below, as this one changes the parent too.
         await clozeRem.setParent(rem);
-        lapCloze('create');
+        timer.lap('create');
 
-        const tagClozeChild = async () => {
-          let clozeExtractTagId = autoPriority.clozeExtractTagId;
+        const tagClozeChild = async (existingTagId: string | null) => {
+          let clozeExtractTagId = existingTagId;
           if (!clozeExtractTagId) {
             const newTag = await plugin.rem.createRem();
             if (newTag) {
@@ -1100,18 +1114,25 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return arr;
         };
 
-        // These touch different Rems, so neither waits for the other. This is the last of what
-        // the user sees; the priority work below comes after it.
-        const parentMarked = isBack
-          ? rem.setBackText(processParentSection(backText, sect_r_start, sect_r_end))
-          : rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
-        await Promise.all([parentMarked, tagClozeChild()]);
-        lapCloze('visible');
+        // The new Rem and this mark are what the user is waiting for, so they come before every
+        // read and write that only the priority needs. It also means a second Alt+Z pressed
+        // soon after reads the parent with this mark in place.
+        if (isBack) {
+          await rem.setBackText(processParentSection(backText, sect_r_start, sect_r_end));
+        } else {
+          await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
+        }
+        timer.lap('parentMark');
 
-        // Apply the auto-priority computed at the top (before the new cloze existed,
-        // so the existing-cloze count was correct).
-        await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual', false, { event: 'cloze', isNewRem: true });
-        lapCloze('setPriority');
+        // Before tagging the new cloze, so that the count covers only earlier ones.
+        const autoPriority = await computeClozeAutoPriority(plugin, rem, timer);
+        timer.lap('priority');
+
+        await tagClozeChild(autoPriority.clozeExtractTagId);
+        timer.lap('tag');
+        releaseTurn();
+
+        await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual', false, { event: 'cloze', isNewRem: true, timer });
         // The new cloze card cannot be read yet, but its facts are known: due now,
         // created now, never shown. Writing them keeps the entry usable by the
         // Priority Queue's cooling (which reads the per-card arrays, not the
@@ -1130,7 +1151,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           cardsCreatedAt: [clozeCreatedAt],
         } as any);
         rereadCardPriorityCacheWhenCardsExist(plugin, clozeRem._id);
-        console.log(`[Cloze] created in ${Date.now() - clozeStartedAt} ms (${clozeLaps.join(', ')})`);
+        console.log(`[Cloze] created in ${timer.report()}`);
 
         return { clozeRem, parentRem: rem, autoPriority };
       } finally {
