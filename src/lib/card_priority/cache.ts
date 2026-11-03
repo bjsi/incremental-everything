@@ -7,7 +7,7 @@ import {
   PrioritySource,
   calculateCardRemPercentilesFromCards,
 } from './types';
-import { getRawCardPriorityString } from './slot_access';
+import { getRawCardPriorityString, isHiddenSlotMigrated } from './slot_access';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
 import {
   writeCardPriorityCache,
@@ -613,11 +613,26 @@ async function tryWarmPhase1(
       sample.push(reusable[i]);
     }
 
+    // Same slot-retirement settling getCardPriority does first, so the sample
+    // reads exactly the slots the cold build read.
+    await isHiddenSlotMigrated(plugin);
     const mismatches = (
       await Promise.all(
         sample.map(async (rem) => {
           const live = await getRawCardPriorityString(rem);
           const stored = store.byRem.get(rem._id)!;
+          // A tagged rem with NO stored value is not a disagreement: getCardPriority
+          // synthesises an 'inherited' or 'default' entry for it, and that is what
+          // the cold build saved. Comparing '' against that number failed every
+          // such rem — and a KB restored from a backup can have nearly all its
+          // values in that state (RemNote keeps the old slot values in the rem's
+          // `bpc` field, which getPowerupProperty does not read), so the check
+          // failed 200/200 on every launch, right after the cold build that wrote
+          // the copy. Like is compared with like: no live value must mean a
+          // synthesised stored entry.
+          if (!live) {
+            return stored.source === 'inherited' || stored.source === 'default' ? null : rem._id;
+          }
           const liveNum = parseInt(live);
           return !isNaN(liveNum) && liveNum === stored.priority ? null : rem._id;
         })

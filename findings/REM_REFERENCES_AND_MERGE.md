@@ -78,6 +78,31 @@ So before merging, remove from the merged Rem every powerup whose values must no
 
 Merge only rewrites `key` and `value` rich text. **References stored in other Rems' powerup slot values are not repointed**, and neither is anything a plugin keeps in its own JSON (the plugin's PDF bookmarks, for instance, are moved by `repointBookmarksInState` in `src/lib/pdf_state.ts`).
 
+## Merging two powerup Rems erases their instances' slot values
+
+Established 2026-11-03 from the RemNote 1.29.1-beta bundle and four test knowledge bases ("test 5" to "test 7", plus a restored backup).
+
+**When it happens.** A knowledge base ends up with two Rems representing the same powerup code (`rcrt`) when a `.rem` import or backup restore brings in a plugin powerup that already exists there. The importer (`importRemsToKnowledgeBase` → `getExistingCRTRem`) maps an incoming powerup Rem onto the existing one only if the code is registered where the import runs. Imports run in RemNote's background worker (desktop and web), which does not see plugin registrations, so plugin powerups always come in as a second Rem. Built-in powerups are mapped correctly.
+
+The next uncached `getRemForPowerup` for that code finds both. It keeps the oldest by `createdAt` (imported Rems are stamped with the import time, so the import's copy loses) and merges the rest in with `mergeAll(others, false, /*allowPowerups*/ true)`. This is the only route by which two powerup Rems get merged: the editor and `rem.merge` refuse with *"You cannot merge a power-up bullet."*
+
+**Why the values go.** Slot values live on each instance, keyed by **code**, not by tag Rem: `ps["cardPriority_priorityValue"]`. They would be just as valid under the kept Rem. But `moveInformationToOtherRem` moves each instance with:
+
+```js
+await t.addTypeParent(kept, true)
+await t.removeTypeParent(merged, true)   // 3rd arg `clearSlots` defaults to true
+```
+
+`removeTypeParent` reads the code the removed tag represents and, in the same write that sets `tp.<merged>.t = false`, deletes every `ps` and `psh` key starting with `<code>_`. The kept tag represents the same code, so this deletes the values it now owns. `addTypeParent` never touches `ps`, so nothing re-creates them.
+
+The merge does copy slot values **of the merged Rem itself** onto the kept Rem (the loop over `getAppliedPowerupCodes()` + `setPowerupProperty`). It has no step for the slot values of the merged Rem's *instances*. For ordinary tags that is harmless, because a tag without `rcrt` makes `removeTypeParent` clear nothing. It only bites powerup Rems, which reach this code solely through the dedup path.
+
+**Evidence.** In every case, each blanked `ps` key's `,u` is the same millisecond as the instance's `tp.<merged>.,u`. Test 5 (desktop, plugin active): 381/391 priorities and 454/454 IncRem schedules gone. Test 7 (web app): 386/387 and 444/444. Test 6 (plugin disabled until after the import, in a KB it had never run in): one powerup Rem per code, no `mh`, every value identical to the export.
+
+**What would fix it in RemNote:** pass `clearSlots = false` there when the kept Rem represents the same code (`kept.rcrt === merged.rcrt`). Or map plugin powerups in the importer.
+
+**Workaround:** import into a new KB before the plugin has ever been enabled there, then enable it.
+
 ## Web pages: Link Rems, Sources and the Clipper
 
 Read from the RemNote 1.29.1-beta bundle and the Clipper 1.0.12 extension, and measured in the main KB's `remnote.db` (Nov 1, 2026). The plugin-side `remsReferencingThis` behaviour below comes from reading the code and was not run.
