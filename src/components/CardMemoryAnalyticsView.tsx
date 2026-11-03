@@ -133,7 +133,8 @@ interface ProgressInfo {
 
 // --- Column tooltips -------------------------------------------------------
 //
-// Native `title` attribute — rendered by the OS as a hover tooltip.
+// Written as `title` attributes but drawn by HoverTipLayer (mounted at the
+// popup root): the OS tooltip often fails to appear inside the plugin iframe.
 // Multi-line via "\n". Kept terse so hover doesn't take a paragraph to read.
 
 const GROUP_TOOLTIPS = {
