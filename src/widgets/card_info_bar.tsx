@@ -17,6 +17,8 @@ import {
   cardPriorityCacheRefreshKey,
   pendingCardPriorityKey,
   seenCardInSessionKey,
+  seenRemInSessionKey,
+  allIncrementalRemKey,
   coolingCacheKey,
   priorityCalcScopeRemIdsKey,
   incrementalQueueActiveKey,
@@ -30,13 +32,16 @@ import {
   expandCardInfosToCards,
   isPerCardDue,
   getCardPriority,
-  PerCardShieldItem,
   estimateCardRemPercentile,
 } from '../lib/card_priority';
+import type { IncrementalRem } from '../lib/incremental_rem';
+import { computeLiveShields } from '../lib/live_shield';
+import { UnifiedShieldEntry } from '../lib/unified_shield';
+import { PriorityShieldValue } from '../components/PriorityShieldValue';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PendingCardPriority, pendingCardPriorityFor } from '../lib/card_priority/pending_priority';
 import { reportCardInfoBarHeight } from '../lib/card_info_bar_dock';
-import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
 import { CardSchedulerLabel } from '../components/OtherSchedulers';
@@ -57,104 +62,56 @@ type ShieldSlice = {
 type ShieldStatus = {
   kb: ShieldSlice | null;
   doc: ShieldSlice | null;
+  /** The Priority Shield (IncRems + cards). */
+  unifiedKb: UnifiedShieldEntry | null;
+  unifiedDoc: UnifiedShieldEntry | null;
 } | null;
 
 /**
- * Compute the shield status using pre-filtered session cache data.
- * Falls back to the main cache only when percentiles are missing.
+ * Card Shield + Priority Shield for the card on screen, through the same
+ * helper as the IncRem bar (lib/live_shield.ts), with the saved shield's rules.
  */
-/**
- * The per-CARD universe the saved shield ranks, built once per cache version.
- * The live shield used to rank Rems-with-cards while the history saved at queue
- * exit ranks cards (see shield_history.ts), so the same shield read P9 · 8.2%
- * live and P9 · 7.3% saved. Keyed by the cache array's identity: a new cache
- * write is a new array, so the expansion never goes stale.
- */
-const perCardUniverseCache = new WeakMap<object, PerCardShieldItem[]>();
-function perCardUniverse(infos: CardPriorityInfo[]): PerCardShieldItem[] {
-  let universe = perCardUniverseCache.get(infos);
-  if (!universe) {
-    universe = expandCardInfosToCards(infos);
-    perCardUniverseCache.set(infos, universe);
-  }
-  return universe;
-}
-
 function computeShieldStatus(
   remId: string | undefined,
   sessionCache: QueueSessionCache | null,
   allPrioritizedCardInfo: CardPriorityInfo[] | null | undefined,
+  allIncRems: IncrementalRem[],
+  seenCardIds: string[],
   seenRemIds: string[],
   scopeRemIds: string[] | null | undefined,
   coolingRemIds: ReadonlySet<string> = new Set()
 ): ShieldStatus {
   if (!remId || !sessionCache) return null;
 
-  // A cooling Rem (priority_review_document/cooling.ts) cannot set the shield:
-  // its sibling was reviewed recently, so it is deliberately not being asked.
-  const filterUnreviewed = (list: CardPriorityInfo[]) =>
-    list.filter(
-      (info) =>
-        (!seenRemIds.includes(info.remId) && !coolingRemIds.has(info.remId)) || info.remId === remId
-    );
-
-  // Use the overdue lists (start-of-today criterion) for the shield.
-  // Falls back to [] when the session cache pre-dates this feature.
-  const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.overdueCardsInKB ?? []), (info) => info.priority);
-  const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.overdueCardsInScope ?? []), (info) => info.priority);
-
-  // Percentile over CARDS, with exactly the saved shield's test (QueueExit →
-  // calculateShieldStatus): a card is still pending when it was due by the start
-  // of today and its Rem has not been reviewed this session (the Rem on screen
-  // always counts, as in the pick above). Cooling decides which Rem sets the
-  // shield, not how the ranking counts — same as the saved one.
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfTodayMs = startOfToday.getTime();
-  const seenSet = new Set(seenRemIds);
-  const perCardPending = (item: PerCardShieldItem) =>
-    isPerCardDue(item, startOfTodayMs) && (!seenSet.has(item.remId) || item.remId === remId);
-
-  let kbPercentile: number | undefined;
-  if (topMissedInKb && allPrioritizedCardInfo) {
-    kbPercentile = calculateVolumeBasedPercentile(
-      perCardUniverse(allPrioritizedCardInfo),
-      topMissedInKb.priority,
-      perCardPending
-    );
-
-  }
-
-  let docPercentile: number | undefined;
-  if (topMissedInDoc && allPrioritizedCardInfo && scopeRemIds) {
-    const scopeSet = new Set(scopeRemIds);
-    const cardsInScope = perCardUniverse(allPrioritizedCardInfo).filter((c) => scopeSet.has(c.remId));
-    if (cardsInScope.length > 0) {
-      docPercentile = calculateVolumeBasedPercentile(
-        cardsInScope,
-        topMissedInDoc.priority,
-        perCardPending
-      );
-
-    }
-  }
+  const live = computeLiveShields({
+    allIncRems,
+    dueIncRemsKb: sessionCache.dueIncRemsInKB ?? [],
+    dueIncRemsDoc: sessionCache.dueIncRemsInScope ?? [],
+    seenRemIds: new Set(seenRemIds),
+    allCardInfos: allPrioritizedCardInfo ?? [],
+    // The overdue lists (start-of-today criterion); [] for a session cache
+    // that pre-dates them.
+    overdueCardsKb: sessionCache.overdueCardsInKB ?? [],
+    overdueCardsDoc: sessionCache.overdueCardsInScope ?? [],
+    seenCardRemIds: new Set(seenCardIds),
+    coolingRemIds,
+    scopeRemIds: scopeRemIds ? new Set(scopeRemIds) : null,
+    currentCardRemId: remId,
+  });
 
   return {
-    kb: topMissedInKb
-      ? {
-        absolute: topMissedInKb.priority,
-        percentile: kbPercentile,
-      }
+    kb: live.kb.card !== null
+      ? { absolute: live.kb.card, percentile: allPrioritizedCardInfo ? live.kb.cardPercentile : undefined }
       : null,
-    doc:
-      topMissedInDoc && docPercentile !== undefined
-        ? {
-          absolute: topMissedInDoc.priority,
-          percentile: docPercentile,
-        }
-        : null,
+    doc: live.doc && live.doc.card !== null && live.doc.cardPercentile !== undefined
+      ? { absolute: live.doc.card, percentile: live.doc.cardPercentile }
+      : null,
+    unifiedKb: allPrioritizedCardInfo ? live.kb.unified : null,
+    unifiedDoc: allPrioritizedCardInfo ? live.doc?.unified ?? null : null,
   };
 }
+
+const EMPTY_INCREMS: IncrementalRem[] = [];
 
 export function CardInfoBar() {
   // console.log('[CardInfoBar] Mounting/Rendering');
@@ -191,6 +148,16 @@ export function CardInfoBar() {
     (rp) => rp.storage.getSession<string[]>(seenCardInSessionKey),
     [refreshSignal]
   ) ?? [];
+
+  // The IncRem side of the Priority Shield.
+  const seenRemIds = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string[]>(seenRemInSessionKey),
+    []
+  ) ?? [];
+  const allIncRems = useTrackerPlugin(
+    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+    []
+  ) ?? EMPTY_INCREMS;
 
   // Rems cooling as of the last cooling scan (published at QueueExit and on
   // every Priority Queue refresh). Read from the session cache only — no scan
@@ -514,8 +481,8 @@ export function CardInfoBar() {
   // --- REWRITTEN: The Shield calculation is now ultra-fast ---
   const shieldStatus = useMemo(() => {
     if (useLightMode || !rem || !sessionCache) return null;
-    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds, scopeRemIds, coolingRemIds);
-  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds, coolingRemIds]);
+    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, allIncRems, seenCardIds, seenRemIds, scopeRemIds, coolingRemIds);
+  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, allIncRems, seenCardIds, seenRemIds, scopeRemIds, coolingRemIds]);
 
   // --- Weighted Shield: per-CARD bucketing (matches Card Priority × Memory
   // Analytics). Expand each CardPriorityInfo into one item per card and use
@@ -736,7 +703,7 @@ export function CardInfoBar() {
         </div>
 
         {/* Shield */}
-        {displayPriorityShield && !useLightMode && cacheReady && (shieldStatus?.kb || shieldStatus?.doc) && (
+        {displayPriorityShield && !useLightMode && cacheReady && shieldStatus && (shieldStatus.kb || shieldStatus.doc || shieldStatus.unifiedKb?.absolute != null || shieldStatus.unifiedDoc?.absolute != null) && (
           <>
             <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
             <div className="flex items-center gap-2">
@@ -770,6 +737,17 @@ export function CardInfoBar() {
                 )}
               </div>
             </div>
+            {(shieldStatus.unifiedKb?.absolute != null || shieldStatus.unifiedDoc?.absolute != null) && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                  Priority:
+                </span>
+                <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                  <PriorityShieldValue label="KB" entry={shieldStatus.unifiedKb} />
+                  <PriorityShieldValue label="Doc" entry={shieldStatus.unifiedDoc} />
+                </div>
+              </div>
+            )}
             <style>{`
             @keyframes shieldPulse {
               0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(59, 130, 246, 0)); }

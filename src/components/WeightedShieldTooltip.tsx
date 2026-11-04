@@ -9,6 +9,17 @@ interface WeightedShieldTooltipProps {
   isDuePredicate: (item: any) => boolean;
   docItems?: Array<{ priority: number; remId: string }> | null;
   itemLabel?: string;
+  /**
+   * A separate universe for the popup's Queue Selection Odds panel. The
+   * Priority Shield's joint universe is not one the queue draws from, so its
+   * popup offers the IncRem universe there instead.
+   */
+  odds?: {
+    kind: 'incRem' | 'card';
+    allItems: Array<{ priority: number; remId: string }>;
+    docItems?: Array<{ priority: number; remId: string }> | null;
+    isDuePredicate: (item: any) => boolean;
+  };
 }
 
 /**
@@ -23,6 +34,7 @@ export function WeightedShieldTooltip({
   isDuePredicate,
   docItems,
   itemLabel = 'items',
+  odds,
 }: WeightedShieldTooltipProps) {
   const plugin = usePlugin();
 
@@ -39,10 +51,18 @@ export function WeightedShieldTooltip({
         ? computeWeightedShieldBreakdown(docItems, isDuePredicate)
         : null;
 
+    const oddsSorted = (items: Array<{ priority: number; remId: string }> | null | undefined) =>
+      odds && items && items.length > 0
+        ? computeWeightedShieldBreakdown(items, odds.isDuePredicate).sortedItems
+        : undefined;
+
     await plugin.widget.openPopup('weighted_shield_popup', {
       kbBreakdown,
       docBreakdown,
       itemLabel,
+      odds: odds
+        ? { kind: odds.kind, kb: oddsSorted(odds.allItems), doc: oddsSorted(odds.docItems) }
+        : undefined,
     });
   };
 

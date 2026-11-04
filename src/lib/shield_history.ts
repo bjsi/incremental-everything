@@ -5,6 +5,7 @@ import { calculateVolumeBasedPercentile, calculateWeightedShield } from './utils
 import { IncrementalRem } from './incremental_rem';
 import { CardPriorityInfo, expandCardInfosToCards } from './card_priority';
 import { isPerCardDue } from './card_priority/types';
+import { UnifiedShieldEntry } from './unified_shield';
 import {
   allCardPriorityInfoKey,
   allIncrementalRemKey,
@@ -25,6 +26,13 @@ export type ShieldHistoryEntry = {
   universeSize: number;
   dismissedCount?: number;
   weightedShield?: number | null;
+  /**
+   * The unified Priority Shield (IncRems + cards, see lib/unified_shield.ts).
+   * Stored only on the IncRem history keys, whose own fields stay the
+   * IncRem-only values; absent on days before it existed, and on exits where
+   * one of the two caches or scopes was incomplete.
+   */
+  unified?: UnifiedShieldEntry;
 };
 
 export type ShieldHistory = Record<string, ShieldHistoryEntry>;
@@ -392,7 +400,13 @@ export function formatShieldSummary(s: ShieldSaveSummary): string {
     st.weightedShield === undefined || st.weightedShield === null ? '' : `weighted ${st.weightedShield}`,
     s.triggerRemId ? `by ${s.triggerRemId}` : '',
   ].filter(Boolean);
-  return `${head} ${parts.join(' · ')}`;
+  const u = st.unified;
+  const unifiedPart = u
+    ? ` | Priority P${u.absolute ?? '–'} · ${u.percentile}% · universe ${u.universeSize.toLocaleString()} ` +
+      `(IncRem P${u.incRemAbsolute ?? '–'}, Card P${u.cardAbsolute ?? '–'})` +
+      (u.weightedShield == null ? '' : ` · weighted ${u.weightedShield}`)
+    : '';
+  return `${head} ${parts.join(' · ')}${unifiedPart}`;
 }
 
 /**
@@ -414,7 +428,9 @@ export async function saveKBShield<T extends PriorityItem>(
   label: string,
   computeWeighted: boolean = false,
   verifyOptions?: VerifyOptions<T>,
-  excludeRemIds?: ReadonlySet<string>
+  excludeRemIds?: ReadonlySet<string>,
+  /** Adds fields to the entry before it is written (one write per key per exit). */
+  extend?: (status: ShieldHistoryEntry) => void
 ): Promise<ShieldSaveSummary> {
   if (allItems.length === 0) {
     return { scope: 'KB', label, skipped: `no ${label} items` };
@@ -427,6 +443,7 @@ export async function saveKBShield<T extends PriorityItem>(
   const today = dayjs().format('YYYY-MM-DD');
   const unreviewedDue = filterUnreviewedDue(allItems, isDue, seenIds, excludeRemIds);
   const status = await calculateShieldStatus(plugin, allItems, unreviewedDue, isDue, seenIds, dismissedCount, computeWeighted, verifyOptions);
+  extend?.(status);
 
   await saveKBShieldHistory(plugin, storageKey, status, today);
   const kbTriggerItem = unreviewedDue.find(item => item.priority === status.absolute);
@@ -463,7 +480,9 @@ export async function saveDocumentShield<T extends PriorityItem>(
   label: string,
   computeWeighted: boolean = false,
   verifyOptions?: VerifyOptions<T>,
-  excludeRemIds?: ReadonlySet<string>
+  excludeRemIds?: ReadonlySet<string>,
+  /** Adds fields to the entry before it is written (one write per key per exit). */
+  extend?: (status: ShieldHistoryEntry) => void
 ): Promise<ShieldSaveSummary> {
   if (!scopeRemIds || scopeRemIds.length === 0) {
     return { scope: 'Doc', label, skipped: 'no scope Rems' };
@@ -479,6 +498,7 @@ export async function saveDocumentShield<T extends PriorityItem>(
 
   const today = dayjs().format('YYYY-MM-DD');
   const status = await calculateShieldStatus(plugin, scopedItems, unreviewedDueInScope, isDue, seenIds, scopedDismissedCount, computeWeighted, verifyOptions);
+  extend?.(status);
 
   await saveScopedShieldHistory(plugin, storageKey, historyKey, status, today);
   const docTriggerItem = unreviewedDueInScope.find(item => item.priority === status.absolute);
@@ -515,7 +535,8 @@ export const isPerCardDueOverdue = (
   startOfToday: number,
 ): boolean => isPerCardDue(item, startOfToday);
 
-export type ItemKind = 'incRem' | 'card';
+/** 'unified' = the Priority Shield (IncRems + cards), stored on the IncRem keys. */
+export type ItemKind = 'incRem' | 'card' | 'unified';
 export type ScopeKind = 'kb' | 'doc';
 
 /**
@@ -533,6 +554,7 @@ export async function getMonthlyBestAbsolutePriorityShield(
   scopeKind: ScopeKind,
   docScopeId: string | null,
 ): Promise<number | null> {
+  // The unified shield lives on the IncRem keys (ShieldHistoryEntry.unified).
   const key = itemKind === 'card'
     ? (scopeKind === 'kb' ? cardPriorityShieldHistoryKey : documentCardPriorityShieldHistoryKey)
     : (scopeKind === 'kb' ? priorityShieldHistoryKey : documentPriorityShieldHistoryKey);
@@ -543,7 +565,7 @@ export async function getMonthlyBestAbsolutePriorityShield(
   const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
   const currentKbId = kbData?._id || 'global';
 
-  let history: Record<string, { absolute?: number | null }> | undefined;
+  let history: Record<string, { absolute?: number | null; unified?: { absolute?: number | null } }> | undefined;
 
   if (scopeKind === 'kb') {
     if (raw[currentKbId] && typeof raw[currentKbId] === 'object') {
@@ -583,10 +605,11 @@ export async function getMonthlyBestAbsolutePriorityShield(
   const cutoff = dayjs().subtract(30, 'day').startOf('day');
   let best: number | null = null;
   for (const [dateStr, entry] of Object.entries(history)) {
-    if (!entry || entry.absolute == null) continue;
+    const absolute = itemKind === 'unified' ? entry?.unified?.absolute : entry?.absolute;
+    if (absolute == null) continue;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
     if (!dayjs(dateStr).isAfter(cutoff)) continue;
-    if (best == null || entry.absolute > best) best = entry.absolute;
+    if (best == null || absolute > best) best = absolute;
   }
   return best;
 }
@@ -631,7 +654,7 @@ export async function computeMonthlyShieldCatchUp(
 
   const now = Date.now();
 
-  if (itemKind === 'incRem') {
+  const countIncRems = async () => {
     const [allIncRems, seenRemIds] = await Promise.all([
       plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey).then(v => v ?? []),
       plugin.storage.getSession<string[]>(seenRemInSessionKey).then(v => v ?? []),
@@ -645,7 +668,11 @@ export async function computeMonthlyShieldCatchUp(
       if (seen.has(r.remId)) continue;
       dueCount++;
     }
-    return { monthlyBest, dueCount };
+    return dueCount;
+  };
+
+  if (itemKind === 'incRem') {
+    return { monthlyBest, dueCount: await countIncRems() };
   }
 
   const [allCardInfos, seenCardIds] = await Promise.all([
@@ -666,5 +693,6 @@ export async function computeMonthlyShieldCatchUp(
     if (seen.has(item.remId)) continue;
     dueCount++;
   }
+  if (itemKind === 'unified') dueCount += await countIncRems();
   return { monthlyBest, dueCount };
 }

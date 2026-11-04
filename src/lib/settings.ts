@@ -721,8 +721,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     helpPath: 'Prioritization-%26-Sorting/#priority-shield',
     title: 'Display Priority Shield in Queue',
     description:
-      'Shows a live status of your highest-priority due items — below the answer buttons for ' +
-      'IncRems, and in the card priority widget under the flashcard for regular cards.',
+      'Shows a live status of your highest-priority due items: the Priority Shield (IncRems and ' +
+      'cards ranked together) below the answer buttons for IncRems, and the Card Shield plus the ' +
+      'Priority Shield in the card priority widget under the flashcard.',
   },
   [deferSpoilerIncRemsId]: {
     kind: 'boolean',

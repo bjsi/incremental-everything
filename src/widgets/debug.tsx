@@ -3491,9 +3491,9 @@ function Debug() {
       const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
 
       const storeDefs: Array<{ key: string; label: string; level: 'kb' | 'doc' }> = [
-        { key: priorityShieldHistoryKey, label: 'IncRem Shield (KB)', level: 'kb' },
+        { key: priorityShieldHistoryKey, label: 'Priority + IncRem Shield (KB)', level: 'kb' },
         { key: cardPriorityShieldHistoryKey, label: 'Card Shield (KB)', level: 'kb' },
-        { key: documentPriorityShieldHistoryKey, label: 'IncRem Shield (Doc)', level: 'doc' },
+        { key: documentPriorityShieldHistoryKey, label: 'Priority + IncRem Shield (Doc)', level: 'doc' },
         { key: documentCardPriorityShieldHistoryKey, label: 'Card Shield (Doc)', level: 'doc' },
       ];
 

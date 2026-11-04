@@ -1,3 +1,4 @@
+import type { UnifiedShieldEntry } from '../lib/unified_shield';
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
 import {
   ComposedChart,
@@ -48,6 +49,8 @@ interface ShieldHistoryEntry {
   percentile: number | null;
   universeSize?: number; // NEW: Track the total count of items in scope
   dismissedCount?: number;
+  /** The Priority Shield, on the IncRem keys (lib/shield_history.ts). */
+  unified?: UnifiedShieldEntry;
 }
 
 interface ChartData {
@@ -60,6 +63,16 @@ interface ChartData {
   totalUniverse?: number;
   processingPercentage?: number;
   weightedShield?: number | null;
+  /** Priority charts only (IncRem history keys): */
+  isPriority?: boolean;
+  /** The IncRem side's own absolute (the old IncRem Shield). */
+  incRemAbsolute?: number | null;
+  /** The card side's own absolute, from the same exit. */
+  cardAbsolute?: number | null;
+  /** Cards in the Priority Shield's universe. */
+  cardCount?: number | null;
+  /** IncRems + cards: the Priority Shield's universe. */
+  unifiedUniverse?: number | null;
 }
 
 type TimePeriod = 'month' | '3m' | '6m' | 'year' | 'all';
@@ -168,23 +181,48 @@ function PriorityShieldGraph() {
     return await plugin.richText.toString(rem.text) || 'Document';
   }, [effectiveDocScopeId]);
 
+  /**
+   * The IncRem history keys hold the Priority Shield (IncRems + cards) in
+   * `entry.unified`; their own fields are the IncRem-only values. A Priority
+   * chart plots the unified values and keeps the IncRem-only absolute as a
+   * secondary line — its percentile is not shown, since dismissing an IncRem
+   * takes it out of that universe. Days before the Priority Shield existed
+   * have only that IncRem line.
+   */
   const processHistoryData = (history: Record<string, ShieldHistoryEntry> | undefined, isIncRemChart: boolean = true) => {
     if (!history) return [];
 
     const unsortedData = Object.entries(history)
-      // NEW: Filter out any flawed data where absolute priority is missing
-      .filter(([_, values]) => values.absolute !== null && values.absolute !== undefined)
+      // Filter out flawed entries with no absolute priority at all.
+      .filter(([_, values]) =>
+        (values.absolute !== null && values.absolute !== undefined) ||
+        (isIncRemChart && values.unified?.absolute != null)
+      )
       .map(([date, values]) => {
         const universeSize = values.universeSize || 0;
         const isIncRem = isIncRemChart && 'dismissedCount' in values;
+        const u = isIncRemChart ? values.unified : undefined;
 
-        const item: any = {
-          date: date,
-          absolute: values.absolute,
-          relative: values.percentile,
-          universeSize: universeSize,
-          weightedShield: (values as any).weightedShield ?? null,
-        };
+        const item: any = isIncRemChart
+          ? {
+              date: date,
+              isPriority: true,
+              absolute: u?.absolute ?? null,
+              relative: u?.percentile ?? null,
+              universeSize: universeSize,
+              weightedShield: u?.weightedShield ?? null,
+              incRemAbsolute: values.absolute ?? null,
+              cardAbsolute: u ? u.cardAbsolute : null,
+              cardCount: u ? u.cardCount : null,
+              unifiedUniverse: u ? u.universeSize : null,
+            }
+          : {
+              date: date,
+              absolute: values.absolute,
+              relative: values.percentile,
+              universeSize: universeSize,
+              weightedShield: (values as any).weightedShield ?? null,
+            };
 
         if (isIncRem) {
           const dismissedCount = values.dismissedCount || 0;
@@ -346,7 +384,8 @@ function PriorityShieldGraph() {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0]?.payload;
-      const isIncRem = data && 'dismissedCount' in data;
+      const isIncRem = !!data?.isPriority;
+      const fmtP = (v: number | null | undefined) => (v === null || v === undefined ? 'N/A' : v);
 
       return (
         <div className="bg-white p-2 border border-gray-300 rounded shadow text-sm tooltip-container">
@@ -368,6 +407,14 @@ function PriorityShieldGraph() {
                 </p>
               );
             }
+            if (isIncRem && entry.dataKey === 'incRemAbsolute') {
+              return (
+                <p key={index} style={{ color: entry.color }}>
+                  {`IncRem side (absolute): ${fmtP(entry.value)}`}
+                  {data.cardAbsolute !== undefined && data.unifiedUniverse != null && ` · Card side: ${fmtP(data.cardAbsolute)}`}
+                </p>
+              );
+            }
             if (!isIncRem && entry.dataKey === 'universeSize') {
               return (
                 <p key={index} style={{ color: entry.color }}>
@@ -382,8 +429,16 @@ function PriorityShieldGraph() {
             <div className="mt-1 pt-1 border-t border-gray-100">
               <p style={{ color: '#10b981' }}>{`Universe of Incremental Rems: ${(data.universeSize || 0).toLocaleString()}`}</p>
               <p style={{ color: '#d97706' }}>{`Universe of Dismissed Rems: ${(data.dismissedCount || 0).toLocaleString()}`}</p>
-              <p style={{ color: '#333' }} className="font-medium">{`Total Universe: ${(data.totalUniverse || 0).toLocaleString()}`}</p>
-              <p className="text-[11px] text-gray-500 mt-1 uppercase tracking-wider">{`Processing: ${data.processingPercentage ? data.processingPercentage.toFixed(1) : 0}%`}</p>
+              <p style={{ color: '#333' }} className="font-medium">{`IncRems + Dismissed: ${(data.totalUniverse || 0).toLocaleString()}`}</p>
+              <p className="text-[11px] text-gray-500 uppercase tracking-wider">{`Processing: ${data.processingPercentage ? data.processingPercentage.toFixed(1) : 0}%`}</p>
+              {data.unifiedUniverse != null ? (
+                <>
+                  <p className="mt-1" style={{ color: '#2563eb' }}>{`Universe of Cards: ${(data.cardCount || 0).toLocaleString()}`}</p>
+                  <p style={{ color: '#2563eb' }} className="font-medium">{`Priority Shield Universe (IncRems + Cards): ${data.unifiedUniverse.toLocaleString()}`}</p>
+                </>
+              ) : (
+                <p className="text-[11px] text-gray-500 mt-1">No Priority Shield recorded on this day (before it existed, or a cache was still loading).</p>
+              )}
             </div>
           )}
         </div>
@@ -393,7 +448,7 @@ function PriorityShieldGraph() {
   };
 
   const renderChart = (data: ChartData[], title: string, color1: string, color2: string, color3: string) => {
-    const isIncRemChart = title.includes('IncRem');
+    const isIncRemChart = title.includes('Priority Shield');
     const zState = getZState(title);
 
     const zoomOut = () => {
@@ -464,7 +519,10 @@ function PriorityShieldGraph() {
     let relativeMax = 100;
 
     if (zState.autoFit && displayData.length > 0) {
-      const absValues = displayData.map(d => d.absolute).filter((v): v is number => v !== null);
+      const absValues = [
+        ...displayData.map(d => d.absolute),
+        ...(isIncRemChart ? displayData.map(d => d.incRemAbsolute ?? null) : []),
+      ].filter((v): v is number => v !== null && v !== undefined);
       const relValues = displayData.map(d => d.relative).filter((v): v is number => v !== null);
 
       const allValues = [...absValues, ...relValues];
@@ -588,6 +646,12 @@ function PriorityShieldGraph() {
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ paddingTop: '10px' }} />
 
+            {/* Hidden axis for the IncRems + Cards universe: an order of magnitude
+                above the IncRem layers, it would flatten them on a shared scale. */}
+            {isIncRemChart && (
+              <YAxis yAxisId="unifiedUniverse" hide domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.1) || 10]} />
+            )}
+
             <Line
               yAxisId="left"
               type="monotone"
@@ -597,6 +661,21 @@ function PriorityShieldGraph() {
               strokeWidth={2}
               dot={{ r: 3 }}
             />
+
+            {isIncRemChart && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="incRemAbsolute"
+                name="IncRem Shield (absolute)"
+                stroke={color1}
+                strokeOpacity={0.45}
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+                dot={false}
+                connectNulls
+              />
+            )}
 
             <Line
               yAxisId="middle"
@@ -632,6 +711,18 @@ function PriorityShieldGraph() {
                   fill="rgba(250, 204, 21, 0.4)"
                   strokeWidth={2}
                   strokeDasharray="5 5"
+                  animationDuration={300}
+                />
+                <Line
+                  yAxisId="unifiedUniverse"
+                  type="monotone"
+                  dataKey="unifiedUniverse"
+                  name="Universe Size (IncRems + Cards, own scale)"
+                  stroke="#2563eb"
+                  strokeWidth={1.5}
+                  strokeDasharray="2 4"
+                  dot={false}
+                  connectNulls
                   animationDuration={300}
                 />
               </>
@@ -752,7 +843,7 @@ function PriorityShieldGraph() {
       )}
       {hasKbData && renderChart(
         filteredKbChartData,
-        '🌐 Knowledge Base IncRem Shield',
+        '🌐 Knowledge Base Priority Shield',
         '#8884d8', '#82ca9d', '#e91e63'
       )}
 
@@ -768,7 +859,7 @@ function PriorityShieldGraph() {
       )}
       {effectiveDocScopeId && hasDocData && renderChart(
         filteredDocChartData,
-        `📄 ${documentName || 'Document'} IncRem Shield`,
+        `📄 ${documentName || 'Document'} Priority Shield`,
         '#e74c3c', '#f39c12', '#9b59b6'
       )}
 
@@ -778,7 +869,15 @@ function PriorityShieldGraph() {
         </p>
 
         <p className="mb-3">
-          <b>Priority Shield:</b> This metric represents your processing capacity for high-priority items. A higher shield value (closer to 100) means you are successfully reviewing your most important material on time.
+          <b>Shields:</b> A shield is the priority of the most important item still due. A higher value (closer to 100) means you are reviewing your most important material on time.
+        </p>
+
+        <p className="mb-3">
+          <b>Priority Shield</b> ranks your Incremental Rems and your cards together by absolute priority, one element each (a Rem with three cards counts three), so its percentile says how much of your whole knowledge base's top-priority material is protected. Dismissed Rems are left out: they need no more reading, and their remaining work is in their cards, which are already counted. Its absolute value is the lower of two sides, both shown in the tooltip: the IncRem side (also drawn as a faint dashed line, the old IncRem Shield) and the card side. Days before v1.0.193 have only the IncRem line.
+        </p>
+
+        <p className="mb-3">
+          <b>Card Shield</b> ranks only your cards: the retention view on its own.
         </p>
 
         {effectiveDocScopeId && hasDocData && (
@@ -792,10 +891,11 @@ function PriorityShieldGraph() {
             <b>Universe Size:</b> This metric is represented differently depending on the graph type:
           </p>
           <ul className="list-disc pl-5 mt-1">
-            <li><b>For Incremental Rems:</b> The chart tracks your processing lifecycle using three layered components:<br />
-              - <b>Total Universe (Black dashed line):</b> The absolute maximum volume of material you have managed in this scope (Active + Dismissed).<br />
+            <li><b>For the Priority Shield:</b> The chart tracks your processing lifecycle using these layers:<br />
+              - <b>Total Universe (Black dashed line):</b> The absolute maximum volume of material you have managed in this scope (Active + Dismissed IncRems).<br />
               - <b>Active Universe (Green line):</b> The physical volume of IncRems currently in your queue awaiting review.<br />
-              - <b>Dismissed Area (Yellow shading):</b> The accumulated volume of material you have permanently marked with the `dismissed` powerup. The wider this area gets, the more backlog you've cleared!</li>
+              - <b>Dismissed Area (Yellow shading):</b> The accumulated volume of material you have permanently marked with the `dismissed` powerup. The wider this area gets, the more backlog you've cleared!<br />
+              - <b>IncRems + Cards (Blue dotted line):</b> The Priority Shield's own universe. Cards far outnumber IncRems, so this line has its own hidden scale; hover for the numbers.</li>
             <li><b>For Cards:</b> It shows the <b>Universe Size (Dashed line)</b>, which is the total number of <i>cards</i> in scope (each card counts as one item — a Rem owning N cards contributes N to the universe). <i>Note:</i> points stored before v1.0.65 (2026-08-28) used a per-Rem-with-cards universe, so expect a one-time step in the Card shield charts on the day you upgraded to it.</li>
           </ul>
         </div>

@@ -8,7 +8,6 @@ import {
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import React, { useMemo, useRef, useState, useLayoutEffect, useEffect } from 'react';
-import * as _ from 'remeda';
 import { repCountsForScheduling } from '../lib/incremental_rem/types';
 import { NextRepTime } from '../components/NextRepTime';
 import { DraggableButton } from '../components/buttons/DraggableButton';
@@ -25,7 +24,14 @@ import {
   remnoteEnvironmentId,
   queueSessionCacheKey,
   priorityCalcScopeRemIdsKey,
+  seenCardInSessionKey,
+  allCardPriorityInfoKey,
+  cardPriorityCacheRefreshKey,
+  coolingCacheKey,
 } from '../lib/consts';
+import { computeLiveShields } from '../lib/live_shield';
+import { CoolingCache, shieldExclusionIds } from '../lib/priority_review_document/cooling_store';
+import { PriorityShieldValue } from '../components/PriorityShieldValue';
 import { getIncrementalRemFromRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import {
   queueNextRepetition,
@@ -36,11 +42,11 @@ import {
 } from '../lib/incremental_rem/review_jobs';
 import { openRemInBrowserTab } from '../lib/remHelpers';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, calculateWeightedShield, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
+import { percentileToHslColor, calculateRelativePercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, getPageHistory, getDescendantsToDepth } from '../lib/pdfUtils';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
-import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
+import { CardPriorityInfo, QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
@@ -107,88 +113,72 @@ export function AnswerButtons() {
 
   const coreData = baseData ? { ...baseData, sessionCache: sessionCacheData } : null;
 
-  const shieldStatusAsync = useTrackerPlugin(async (rp) => {
-    if (useLightMode || !shouldDisplayShield || !coreData?.sessionCache) return null;
+  // --- Priority Shield (IncRems + cards) and its IncRem side ---
+  // Raw inputs come from trackers; the shield itself is a memo over them, so
+  // the 8 MB card cache is read only when it changes, not on every re-run.
+  const shieldInputsWanted = !useLightMode && !!shouldDisplayShield && !!coreData?.sessionCache;
+  const seenRemIdsList = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string[]>(seenRemInSessionKey),
+    []
+  );
+  const seenCardIdsList = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string[]>(seenCardInSessionKey),
+    []
+  );
+  const cardCacheRefresh = useTrackerPlugin(
+    (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
+    []
+  );
+  const allCardInfos = useTrackerPlugin(
+    async (rp) => {
+      if (!shieldInputsWanted) return null;
+      return (await rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) ?? [];
+    },
+    [shieldInputsWanted, cardCacheRefresh]
+  );
+  const coolingCache = useTrackerPlugin(
+    (rp) => rp.storage.getSession<CoolingCache>(coolingCacheKey),
+    []
+  );
 
-    const seenRemIds = (await rp.storage.getSession<string[]>(seenRemInSessionKey)) || [];
-
+  const shieldStatusAsync = useMemo(() => {
+    if (!shieldInputsWanted || !coreData?.sessionCache || !allCardInfos) return null;
     const { sessionCache, rem } = coreData;
-    const dueKb = sessionCache.dueIncRemsInKB || [];
-    const unreviewedDueKb = dueKb.filter(
-      (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
-    );
-    const topMissedInKb = _.minBy(unreviewedDueKb, (r) => r.priority);
+    const seenRemIds = seenRemIdsList ?? [];
+    const scopeSet = scopeRemIds ? new Set(scopeRemIds) : null;
 
-    const dueDoc = sessionCache.dueIncRemsInScope || [];
-    const unreviewedDueDoc = dueDoc.filter(
-      (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
-    );
-    const topMissedInDoc = _.minBy(unreviewedDueDoc, (r) => r.priority);
-
-    const kbPercentile = topMissedInKb ? calculateVolumeBasedPercentile(
+    const live = computeLiveShields({
       allIncRems,
-      topMissedInKb.priority,
-      (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
-    ) : null;
+      dueIncRemsKb: sessionCache.dueIncRemsInKB ?? [],
+      dueIncRemsDoc: sessionCache.dueIncRemsInScope ?? [],
+      seenRemIds: new Set(seenRemIds),
+      allCardInfos,
+      overdueCardsKb: sessionCache.overdueCardsInKB ?? [],
+      overdueCardsDoc: sessionCache.overdueCardsInScope ?? [],
+      seenCardRemIds: new Set(seenCardIdsList ?? []),
+      coolingRemIds: shieldExclusionIds(coolingCache),
+      scopeRemIds: scopeSet,
+      currentIncRemId: rem._id,
+      computeWeighted: !!shouldDisplayWeightedShield,
+    });
 
-    if (topMissedInKb) {
-      // console.log(`[AnswerButtons] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allIncRems.length}`);
-    }
-
-
-    // DOC Shield Calculation
-    let docPercentile: number | null = null;
-    if (topMissedInDoc && scopeRemIds) {
-      const scopeSet = new Set(scopeRemIds);
-      const allIncRemsInScope = allIncRems.filter(r => scopeSet.has(r.remId));
-      if (allIncRemsInScope.length > 0) {
-        docPercentile = calculateVolumeBasedPercentile(
-          allIncRemsInScope,
-          topMissedInDoc.priority,
-          (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
-        );
-        // console.log(`[AnswerButtons] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allIncRemsInScope.length}`);
-      }
-    }
-
-    // Weighted Shield Calculation
-    let weightedKB: number | null = null;
-    let weightedDoc: number | null = null;
-    let docIncRems: IncrementalRem[] | null = null;
-
-    if (shouldDisplayWeightedShield && allIncRems.length > 0) {
-      weightedKB = calculateWeightedShield(
-        allIncRems,
-        (r) => Date.now() >= r.nextRepDate && (!seenRemIds.includes(r.remId) || r.remId === rem._id)
-      );
-
-      if (scopeRemIds) {
-        const scopeSet2 = new Set(scopeRemIds);
-        docIncRems = allIncRems.filter(r => scopeSet2.has(r.remId));
-        if (docIncRems.length > 0) {
-          weightedDoc = calculateWeightedShield(
-            docIncRems,
-            (r) => Date.now() >= r.nextRepDate && (!seenRemIds.includes(r.remId) || r.remId === rem._id)
-          );
-        }
-      }
-    }
+    // The IncRem-only universe, for the Weighted Shield popup's selection odds.
+    const docIncRems = scopeSet ? allIncRems.filter((r) => scopeSet.has(r.remId)) : null;
 
     return {
-      kb: topMissedInKb ? {
-        absolute: topMissedInKb.priority,
-        percentile: kbPercentile ?? null,
-      } : null,
-      doc: topMissedInDoc ? {
-        absolute: topMissedInDoc.priority,
-        percentile: docPercentile,
-      } : null,
-      weightedKB,
-      weightedDoc,
+      unifiedKb: live.kb.unified,
+      unifiedDoc: live.doc?.unified ?? null,
+      incRemKb: live.kb.incRem,
+      incRemDoc: live.doc ? live.doc.incRem : null,
+      hasDoc: !!live.doc,
+      weightedKB: live.kb.unified?.weightedShield ?? null,
+      weightedDoc: live.doc?.unified?.weightedShield ?? null,
+      jointKb: live.jointKb,
+      jointDoc: live.jointDoc && live.jointDoc.length > 0 ? live.jointDoc : null,
       docIncRems,
       seenRemIds,
     };
-  }, [shouldDisplayShield, shouldDisplayWeightedShield, coreData?.sessionCache, allIncRems, coreData?.rem?._id, useLightMode, scopeRemIds]);
+  }, [shieldInputsWanted, coreData?.sessionCache, coreData?.rem?._id, allIncRems, allCardInfos, seenRemIdsList, seenCardIdsList, coolingCache, scopeRemIds, shouldDisplayWeightedShield]);
 
   const htmlSourceUrl = useTrackerPlugin(async (rp) => {
     // console.log('[htmlSourceUrl] rem:', baseData?.rem?._id, 'remType:', remType);
@@ -362,8 +352,9 @@ export function AnswerButtons() {
   const readerBookmarkIsLatest = !!remReadPointInfo && !remReadPointInfo.isLatest;
 
   // --- NEW: Check if current IncRem is directly impacting the shield ---
-  const isKbShieldActive = shieldStatusAsync?.kb && incRemInfo.priority === shieldStatusAsync.kb.absolute;
-  const isDocShieldActive = shieldStatusAsync?.doc && incRemInfo.priority === shieldStatusAsync.doc.absolute;
+  // Pulses when this IncRem is the element setting the Priority Shield.
+  const isKbShieldActive = shieldStatusAsync?.unifiedKb?.absolute != null && incRemInfo.priority === shieldStatusAsync.unifiedKb.absolute;
+  const isDocShieldActive = shieldStatusAsync?.unifiedDoc?.absolute != null && incRemInfo.priority === shieldStatusAsync.unifiedDoc.absolute;
   const isAnyShieldActive = isKbShieldActive || isDocShieldActive;
 
   // Container styles using RemNote CSS variables
@@ -943,30 +934,42 @@ export function AnswerButtons() {
                       display: 'inline-block',
                       animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
                     }}>🛡️</span>
-                    <span>IncRem Shield:</span>
+                    <span>Priority Shield:</span>
                   </span>
                   <div style={{ display: 'flex', gap: '12px' }}>
-                    {shieldStatusAsync.kb ? (
-                      <span style={{
-                        animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
-                        color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
-                      }}>
-                        KB: <strong style={{ color: percentileToHslColor(shieldStatusAsync.kb.percentile ?? shieldStatusAsync.kb.absolute) }}>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile?.toFixed(1)}%)
-                      </span>
+                    {shieldStatusAsync.unifiedKb?.absolute != null ? (
+                      <PriorityShieldValue
+                        label="KB"
+                        entry={shieldStatusAsync.unifiedKb}
+                        style={{
+                          animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                          color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
+                        }}
+                      />
                     ) : (
                       <span>KB: 100%</span>
                     )}
-                    {shieldStatusAsync.doc ? (
-                      <span style={{
-                        animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
-                        color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
-                      }}>
-                        Doc: <strong style={{ color: percentileToHslColor(shieldStatusAsync.doc.percentile ?? shieldStatusAsync.doc.absolute) }}>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile?.toFixed(1)}%)
-                      </span>
+                    {shieldStatusAsync.unifiedDoc?.absolute != null ? (
+                      <PriorityShieldValue
+                        label="Doc"
+                        entry={shieldStatusAsync.unifiedDoc}
+                        style={{
+                          animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                          color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
+                        }}
+                      />
                     ) : (
-                      sessionCache?.dueIncRemsInScope && <span>Doc: 100%</span>
+                      shieldStatusAsync.hasDoc && <span>Doc: 100%</span>
                     )}
                   </div>
+                  {/* The IncRem side's own absolute: where the reading backlog starts. */}
+                  <span
+                    style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '11px' }}
+                    title="IncRem Shield: the highest-priority Incremental Rem still due (absolute priority)"
+                  >
+                    IncRem: {shieldStatusAsync.incRemKb ?? '✓'}
+                    {shieldStatusAsync.hasDoc && ` · ${shieldStatusAsync.incRemDoc ?? '✓'}`}
+                  </span>
                 </div>
                 <style>{`
                   @keyframes shieldPulse {
@@ -1001,10 +1004,16 @@ export function AnswerButtons() {
                   <WeightedShieldTooltip
                     kbValue={shieldStatusAsync.weightedKB}
                     docValue={shieldStatusAsync.weightedDoc}
-                    allItems={allIncRems}
-                    isDuePredicate={(r: any) => Date.now() >= r.nextRepDate && (!(shieldStatusAsync.seenRemIds || []).includes(r.remId) || r.remId === coreData?.rem?._id)}
-                    docItems={shieldStatusAsync.docIncRems}
-                    itemLabel="IncRem"
+                    allItems={shieldStatusAsync.jointKb}
+                    isDuePredicate={(x: any) => x.due}
+                    docItems={shieldStatusAsync.jointDoc}
+                    itemLabel="Priority"
+                    odds={{
+                      kind: 'incRem',
+                      allItems: allIncRems,
+                      docItems: shieldStatusAsync.docIncRems,
+                      isDuePredicate: (r: any) => Date.now() >= r.nextRepDate && (!shieldStatusAsync.seenRemIds.includes(r.remId) || r.remId === coreData?.rem?._id),
+                    }}
                   />
                   <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
                 </>

@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.193 - November 4th, 2026
+
+### ✨ New
+
+**Priority Shield**: The IncRem Shield is replaced by a Priority Shield that ranks Incremental Rems and cards together by priority (dismissed Rems left out); the Card Shield is unchanged, and the history graph adds an IncRems + Cards universe line while keeping the IncRem-only value as a dashed line.
+
+📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield)
+
 ## v1.0.192 - November 4th, 2026
 
 ### ⚡ Improved

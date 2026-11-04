@@ -69,7 +69,9 @@ import {
   isCardDueOverdue,
   isPerCardDueOverdue,
   VerifyOptions,
+  ShieldHistoryEntry,
 } from '../lib/shield_history';
+import { computeUnifiedShield } from '../lib/unified_shield';
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
@@ -230,13 +232,9 @@ export function registerQueueExitListener(
 
       const displayWeighted = await getIESetting(plugin, displayWeightedShieldId);
 
-      // Save KB-level shields
-      if (shouldSaveIncRem) {
-        shieldLine(await saveKBShield(plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem', displayWeighted));
-      } else {
-        summary.push('KB  IncRem skipped: cache incomplete');
-      }
-
+      // Save KB-level shields. Cards first: the unified Priority Shield, stored
+      // on the IncRem entry, needs the card side's verified top missed priority,
+      // and each history key must be written once per exit.
       // Card KB shield: recorded over the PER-CARD universe, the same one the
       // queue's shield and the Weighted Shield popup use. It used to be recorded
       // over CardPriorityInfo[] — one entry per Rem-with-cards — so the stored
@@ -279,8 +277,11 @@ export function registerQueueExitListener(
         }
       }
 
+      // The card side of the unified shield: undefined = unusable (not saved
+      // this exit), null = nothing missed.
+      let cardKbAbsolute: number | null | undefined;
       if (shouldSaveCard) {
-        shieldLine(await saveKBShield(
+        const cardKb = await saveKBShield(
           plugin,
           allCardItems,
           (item) => isPerCardDueOverdue(item, startOfToday),
@@ -290,9 +291,41 @@ export function registerQueueExitListener(
           displayWeighted,
           cardVerifyOptions,
           coolingRemIds
-        ));
+        );
+        shieldLine(cardKb);
+        if (cardKb.status) cardKbAbsolute = cardKb.status.absolute;
+        else if (isCardCacheLoaded && allCardItems.length === 0) cardKbAbsolute = null;
       } else {
         summary.push('KB  Card   skipped: cache incomplete');
+      }
+
+      const seenRemSet = new Set(seenRemIds);
+      const seenCardSet = new Set(seenCardIds);
+      const unifiedExtend = (
+        incRems: IncrementalRem[],
+        cards: PerCardShieldItem[],
+        cardAbsolute: number | null
+      ) => (status: ShieldHistoryEntry) => {
+        status.unified = computeUnifiedShield({
+          incRems,
+          isIncRemDue: (r) => isIncRemDue(r) && !seenRemSet.has(r.remId),
+          cards,
+          isCardDue: (c) => isPerCardDueOverdue(c, startOfToday) && !seenCardSet.has(c.remId),
+          incRemAbsolute: status.absolute,
+          cardAbsolute,
+          computeWeighted: displayWeighted,
+        });
+      };
+
+      if (shouldSaveIncRem) {
+        shieldLine(await saveKBShield(
+          plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem', displayWeighted,
+          undefined, undefined,
+          cardKbAbsolute === undefined ? undefined : unifiedExtend(allIncRems, allCardItems, cardKbAbsolute)
+        ));
+        if (cardKbAbsolute === undefined) summary.push('KB  Priority skipped: card side not saved');
+      } else {
+        summary.push('KB  IncRem skipped: cache incomplete (Priority Shield not saved)');
       }
 
       // Save document-level shields if scope exists
@@ -337,24 +370,9 @@ export function registerQueueExitListener(
       }
 
       if (historyKey && docScopeRemIds && docScopeRemIds.length > 0) {
-        if (shouldSaveIncRem && scopeUsable.incRem) {
-          shieldLine(await saveDocumentShield(
-            plugin,
-            allIncRems as any,
-            docScopeRemIds,
-            isIncRemDue,
-            seenRemIds,
-            documentPriorityShieldHistoryKey,
-            historyKey,
-            'IncRem',
-            displayWeighted
-          ));
-        } else if (shouldSaveIncRem) {
-          summary.push('Doc IncRem skipped: scope built before the IncRem cache finished loading');
-        }
-
+        let cardDocAbsolute: number | null | undefined;
         if (shouldSaveCard && scopeUsable.card) {
-          shieldLine(await saveDocumentShield(
+          const cardDoc = await saveDocumentShield(
             plugin,
             allCardItems,
             docScopeRemIds,
@@ -366,9 +384,38 @@ export function registerQueueExitListener(
             displayWeighted,
             cardVerifyOptions,
             coolingRemIds
-          ));
+          );
+          shieldLine(cardDoc);
+          if (cardDoc.status) cardDocAbsolute = cardDoc.status.absolute;
         } else if (shouldSaveCard) {
           summary.push('Doc Card   skipped: scope built before the card cache finished loading');
+        }
+
+        if (shouldSaveIncRem && scopeUsable.incRem) {
+          const docScopeSet = new Set(docScopeRemIds);
+          shieldLine(await saveDocumentShield(
+            plugin,
+            allIncRems as any,
+            docScopeRemIds,
+            isIncRemDue,
+            seenRemIds,
+            documentPriorityShieldHistoryKey,
+            historyKey,
+            'IncRem',
+            displayWeighted,
+            undefined,
+            undefined,
+            cardDocAbsolute === undefined
+              ? undefined
+              : unifiedExtend(
+                  allIncRems.filter((r) => docScopeSet.has(r.remId)),
+                  allCardItems.filter((c) => docScopeSet.has(c.remId)),
+                  cardDocAbsolute
+                )
+          ));
+          if (cardDocAbsolute === undefined) summary.push('Doc Priority skipped: card side not saved');
+        } else if (shouldSaveIncRem) {
+          summary.push('Doc IncRem skipped: scope built before the IncRem cache finished loading');
         }
         if (historyKey) summary.push(`doc history key ${historyKey}`);
       } else {
