@@ -10,7 +10,10 @@
  * The rows are resolved by lib/mastery_drill_audit.ts. Cards RemNote will never
  * present sort to the top, since those are the reason anyone opens this list —
  * a drill that says "1 Remaining" above "You've finished practicing all your
- * cards!".
+ * cards!". Next come the cards that are due now (not cooling): those should be
+ * in the drill's queue, so one the drill never showed stands out there. The
+ * three filter chips (keys 1–3) hide whole groups, to leave just the ones
+ * being checked.
  */
 
 import { usePlugin } from '@remnote/plugin-sdk';
@@ -45,11 +48,38 @@ function statusColor(status: DrillCardStatus): string {
   return '#ef4444';
 }
 
-/** Unplayable first, then the ones that should have left, then the rest — oldest first within each. */
-function sortRank(status: DrillCardStatus): number {
-  if (UNPLAYABLE_STATUSES.has(status)) return 0;
-  if (status === 'ok') return 2;
-  return 1;
+/** Which filter chip a row falls under. Unplayable wins: cooling ends, unplayable does not. */
+type Group = 'unplayable' | 'ready' | 'cooling';
+
+const GROUPS: { id: Group; label: string; key: string; color: string; hint: string }[] = [
+  {
+    id: 'ready',
+    label: 'Due now',
+    key: '1',
+    color: '#16a34a',
+    hint: 'Cards past their cooling period — the drill should be serving these now (key 1)',
+  },
+  {
+    id: 'cooling',
+    label: 'Cooling',
+    key: '2',
+    color: '#3b82f6',
+    hint: 'Cards resting after a recent rating — the drill holds them back until the time is up (key 2)',
+  },
+  {
+    id: 'unplayable',
+    label: 'Unplayable',
+    key: '3',
+    color: '#ef4444',
+    hint: 'Cards RemNote will never show, whatever the drill does (key 3)',
+  },
+];
+
+const GROUP_RANK: Record<Group, number> = { unplayable: 0, ready: 1, cooling: 2 };
+
+/** Within a group: the ones that should have left the drill, then the rest. */
+function statusRank(status: DrillCardStatus): number {
+  return status === 'ok' ? 1 : 0;
 }
 
 const selectionRing = (isSelected: boolean): React.CSSProperties =>
@@ -87,6 +117,7 @@ export function MasteryDrillCardList({
   const [audits, setAudits] = React.useState<Map<string, Row>>(new Map());
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const [busy, setBusy] = React.useState(false);
+  const [shown, setShown] = React.useState<Record<Group, boolean>>({ ready: true, cooling: true, unplayable: true });
   // Shared for the life of the list, so re-auditing after a sync only walks new ancestors.
   const chainsRef = React.useRef(new AncestorChainCache(plugin));
 
@@ -131,21 +162,33 @@ export function MasteryDrillCardList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, plugin]);
 
-  const rows = React.useMemo(
-    () =>
-      Array.from(audits.values()).sort(
-        (a, b) => sortRank(a.status) - sortRank(b.status) || (a.addedAt ?? 0) - (b.addedAt ?? 0),
-      ),
-    [audits],
-  );
-  const loading = audits.size < items.length;
-  const unplayable = rows.filter((r) => UNPLAYABLE_STATUSES.has(r.status));
   const now = Date.now();
   const readyAtById = React.useMemo(
     () => new Map(items.map((item) => [drillItemCardId(item), drillReadyAt(item, cooling)])),
     [items, cooling],
   );
+  const groupOf = (row: Row): Group => {
+    if (UNPLAYABLE_STATUSES.has(row.status)) return 'unplayable';
+    return (readyAtById.get(row.cardId) ?? 0) > now ? 'cooling' : 'ready';
+  };
+  const allRows = Array.from(audits.values()).sort(
+    (a, b) =>
+      GROUP_RANK[groupOf(a)] - GROUP_RANK[groupOf(b)] ||
+      statusRank(a.status) - statusRank(b.status) ||
+      (a.addedAt ?? 0) - (b.addedAt ?? 0),
+  );
+  const groupCounts: Record<Group, number> = { ready: 0, cooling: 0, unplayable: 0 };
+  for (const row of allRows) groupCounts[groupOf(row)]++;
+  const rows = allRows.filter((row) => shown[groupOf(row)]);
+  const hiddenCount = allRows.length - rows.length;
+  const loading = audits.size < items.length;
+  const unplayable = allRows.filter((r) => UNPLAYABLE_STATUSES.has(r.status));
   const coolingCount = Array.from(readyAtById.values()).filter((readyAt) => readyAt > now).length;
+
+  const toggleGroup = (group: Group) => {
+    setShown((prev) => ({ ...prev, [group]: !prev[group] }));
+    setSelectedIndex(0);
+  };
 
   React.useEffect(() => {
     if (selectedIndex > rows.length - 1) setSelectedIndex(Math.max(rows.length - 1, 0));
@@ -192,6 +235,12 @@ export function MasteryDrillCardList({
       return;
     }
     if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
+    const chip = GROUPS.find((g) => g.key === e.key);
+    if (chip && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      toggleGroup(chip.id);
+      return;
+    }
     const row = rows[selectedIndex];
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
@@ -268,10 +317,67 @@ export function MasteryDrillCardList({
           </div>
         </div>
 
+        <div
+          className="flex items-center flex-wrap flex-shrink-0 border-b"
+          style={{ gap: '6px', padding: '6px 14px', borderColor: 'var(--rn-clr-border-primary)' }}
+        >
+          <span style={{ fontSize: '10.5px', color: 'var(--rn-clr-content-tertiary)', marginRight: '2px' }}>Show</span>
+          {GROUPS.map((g) => {
+            const on = shown[g.id];
+            return (
+              <button
+                key={g.id}
+                type="button"
+                aria-pressed={on}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => toggleGroup(g.id)}
+                title={g.hint}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '1px 9px 1px 7px',
+                  fontSize: '11px',
+                  lineHeight: 1.6,
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  border: `1px solid ${on ? g.color : 'var(--rn-clr-background-tertiary)'}`,
+                  background: on ? `${g.color}1a` : 'transparent',
+                  color: on ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-tertiary)',
+                  fontWeight: on ? 600 : 400,
+                }}
+              >
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '2px',
+                    border: `1.5px solid ${g.color}`,
+                    background: on ? g.color : 'transparent',
+                    flexShrink: 0,
+                  }}
+                />
+                {g.label}
+                <span style={{ fontVariantNumeric: 'tabular-nums', opacity: 0.75 }}>{groupCounts[g.id]}</span>
+              </button>
+            );
+          })}
+          {hiddenCount > 0 && (
+            <span style={{ fontSize: '10.5px', color: 'var(--rn-clr-content-tertiary)', marginLeft: '4px' }}>
+              {hiddenCount} hidden
+            </span>
+          )}
+        </div>
+
         <div ref={listRef} className="flex-grow min-h-0" style={{ overflowY: 'auto' }}>
           {rows.length === 0 && (
             <div style={{ padding: '24px', textAlign: 'center', fontSize: '12px', color: 'var(--rn-clr-content-secondary)' }}>
-              {loading ? 'Loading…' : 'No cards are in the Mastery Drill for this knowledge base.'}
+              {loading && allRows.length === 0
+                ? 'Loading…'
+                : allRows.length > 0
+                  ? 'No cards in the groups shown. Turn a filter back on above (keys 1–3).'
+                  : 'No cards are in the Mastery Drill for this knowledge base.'}
             </div>
           )}
           {rows.map((row, index) => {
@@ -403,7 +509,7 @@ export function MasteryDrillCardList({
             color: 'var(--rn-clr-content-tertiary)',
           }}
         >
-          ↑↓ choose · Enter go to Rem · Delete remove · Shift+Delete remove unplayable · Esc back to the drill
+          ↑↓ choose · Enter go to Rem · 1–3 filter · Delete remove · Shift+Delete remove unplayable · Esc back to the drill
         </div>
       </div>
   );

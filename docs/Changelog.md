@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.192 - November 4th, 2026
+
+### ⚡ Improved
+
+**Mastery Drill Card List**: Added **Due now**, **Cooling** and **Unplayable** filters (keys `1`–`3`), so a due card that never came up in the drill is easy to spot; due cards now sort above cooling ones.
+
+📖 [Filtering the Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list-filters)
+
 ## v1.0.191 - November 3rd, 2026
 
 ### ✨ New

@@ -378,12 +378,25 @@ Each row shows the card's text, its type (e.g. *Cloze (…)*, *Forward Card*), w
 | **Card switched off** | The card was switched off on its own; open the Rem and run */Enable All Cloze Cards*, or click the greyed cloze → *Enable this card*. |
 | **Not surfaced** | RemNote does not show the card, and no Rem-level cause explains it. |
 
-Cards RemNote cannot show are listed first, and **Remove N unplayable** takes them all out at once. Per row, **Go to Rem** opens the Rem (closing the drill), **↗** opens it in a browser tab and keeps the list open, and **Remove** takes the card out of the drill.
+Cards RemNote cannot show are listed first, then the cards that are due now, then the ones still cooling. **Remove N unplayable** takes every card RemNote cannot show out at once. Per row, **Go to Rem** opens the Rem (closing the drill), **↗** opens it in a browser tab and keeps the list open, and **Remove** takes the card out of the drill.
+
+#### Filtering the list { #card-list-filters }
+
+Under the header, three chips split the drill into groups, each with its count:
+
+| Chip | Cards |
+|---|---|
+| **Due now** | Past their cooling time, and RemNote can show them. The drill should be serving these. |
+| **Cooling** | Resting after a recent rating; the drill holds them back until the time is up. |
+| **Unplayable** | RemNote will never show them, cooling or not. |
+
+Click a chip (or press **1**, **2**, **3**) to hide or show its group. To find a card that is due but never came up in the drill, turn off **Cooling** and **Unplayable**: what remains is everything the drill should be showing you now.
 
 | Key | Action |
 |---|---|
 | **↑** / **↓** | Choose a card |
 | **Enter** | Go to the chosen card's Rem |
+| **1** / **2** / **3** | Show or hide *Due now* / *Cooling* / *Unplayable* |
 | **Delete** | Remove the chosen card from the drill |
 | **Shift+Delete** | Remove every card RemNote cannot show |
 | **Esc** | Back to the drill |
