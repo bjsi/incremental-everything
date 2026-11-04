@@ -154,22 +154,30 @@ export async function resolvePriorityTargets(
       (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
     const queueRemId = currentQueueItem?.remId ?? currentIncRemId;
 
+    // Only a LIVE selection may outrank the card on screen, as in
+    // resolveQueueCommandTarget. The Omnibar cache outlives the previewer: edit a
+    // Rem there, close it, press Opt+P within 20 s, and the cached Rem used to win
+    // over the card, so the popup wrote to a Rem nobody was looking at.
+    const fromCache = selectionSource === 'cache';
+    const liveSelType = fromCache ? undefined : selType;
+    const liveRemIds = fromCache ? [] : selectedRemIds;
+
     const selectionTargetsQueueItem =
-      !selType ||
-      (!!queueRemId && selectedRemIds.length <= 1 && selectedRemIds[0] === queueRemId);
+      !liveSelType ||
+      (!!queueRemId && liveRemIds.length <= 1 && liveRemIds[0] === queueRemId);
 
     if (selectionTargetsQueueItem) {
       return queueRemId
         ? { remIds: [queueRemId], source: 'queue' }
         : { remIds: [], source: 'none' };
     }
-    if (selectedRemIds.length) {
+    if (liveRemIds.length) {
       // Names the source so a popup opening on the wrong Rem can be traced to a
-      // live selection or to the Omnibar cache.
+      // live selection or to getSelectedRem.
       console.log(
         `[PriorityTargets] ${selectionSource} selection outranks the queue item ${queueRemId ?? '(none)'}`
       );
-      return { remIds: selectedRemIds, source: 'selection' };
+      return { remIds: liveRemIds, source: 'selection' };
     }
   }
 
