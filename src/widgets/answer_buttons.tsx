@@ -32,6 +32,7 @@ import {
 import { computeLiveShields } from '../lib/live_shield';
 import { CoolingCache, shieldExclusionIds } from '../lib/priority_review_document/cooling_store';
 import { PriorityShieldValue } from '../components/PriorityShieldValue';
+import { ShieldIcon } from '../components/ShieldIcon';
 import { getIncrementalRemFromRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import {
   queueNextRepetition,
@@ -931,9 +932,9 @@ export function AnswerButtons() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{
-                      display: 'inline-block',
+                      display: 'inline-flex',
                       animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
-                    }}>🛡️</span>
+                    }}><ShieldIcon kind="priority" /></span>
                     <span>Priority Shield:</span>
                   </span>
                   <div style={{ display: 'flex', gap: '12px' }}>

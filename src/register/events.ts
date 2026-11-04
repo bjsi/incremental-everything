@@ -26,6 +26,7 @@ import {
   incrementalQueueActiveKey,
   currentIncrementalRemTypeKey,
   displayWeightedShieldId,
+  flashcardBarShieldModeKey,
   sourceFloatingActiveIdKey,
   autoFocusQueueDashboardId,
   pendingQueueDashboardRefocusKey,
@@ -576,6 +577,8 @@ export function registerQueueEnterListener(
     // whose iframe cleanup may not have fired.
     await plugin.storage.setSession(incrementalQueueActiveKey, false);
     await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
+    // A shield switched in the flashcard bar lasts one session; back to the setting.
+    await plugin.storage.setSession(flashcardBarShieldModeKey, undefined);
     // An editor selection must not outrank the first cards (see registerURLChangeListener).
     await clearSelectionCache(plugin);
 

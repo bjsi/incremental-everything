@@ -63,6 +63,11 @@ export interface LiveShieldContext {
   /** The Rem whose card is on screen (flashcard bar), if any. */
   currentCardRemId?: string;
   computeWeighted?: boolean;
+  /**
+   * False skips the Priority Shield (and the joint list): the flashcard bar
+   * showing the Card Shield needs only the card side. Default true.
+   */
+  unified?: boolean;
 }
 
 export interface LiveShieldScope {
@@ -120,8 +125,9 @@ export function computeLiveShields(c: LiveShieldContext): LiveShields {
   ): { scope: LiveShieldScope; joint: JointItem[] } => {
     const incRem = minPriority(dueIncRems, incRemCanSet);
     const card = minPriority(overdueCards, cardCanSet);
+    const wantUnified = c.unified !== false;
     const unified =
-      incRems.length + scopeCards.length > 0
+      wantUnified && incRems.length + scopeCards.length > 0
         ? computeUnifiedShield({
             incRems,
             isIncRemDue: incRemPending,
@@ -137,7 +143,7 @@ export function computeLiveShields(c: LiveShieldContext): LiveShields {
         ? calculateVolumeBasedPercentile(scopeCards, card, cardPending)
         : undefined;
     const joint: JointItem[] = [];
-    if (c.computeWeighted) {
+    if (wantUnified && c.computeWeighted) {
       for (const r of incRems) joint.push({ priority: r.priority, remId: r.remId, due: incRemPending(r) });
       for (const x of scopeCards) joint.push({ priority: x.priority, remId: x.remId, due: cardPending(x) });
     }
@@ -150,7 +156,7 @@ export function computeLiveShields(c: LiveShieldContext): LiveShields {
   if (c.scopeRemIds) {
     const scope = c.scopeRemIds;
     doc = scopeOf(
-      c.allIncRems.filter((r) => scope.has(r.remId)),
+      c.unified === false ? [] : c.allIncRems.filter((r) => scope.has(r.remId)),
       cards.filter((x) => scope.has(x.remId)),
       c.dueIncRemsDoc,
       c.overdueCardsDoc

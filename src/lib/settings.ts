@@ -60,6 +60,8 @@ import {
   recognitionFirstId,
   recognitionFirstMinDaysId,
   displayWeightedShieldId,
+  flashcardBarShieldId,
+  FlashcardBarShield,
   displayQueueToolbarPriorityId,
   isolatedQueueModeId,
   IsolatedQueueMode,
@@ -161,6 +163,7 @@ export interface IESettings {
   [recognitionFirstId]: boolean;
   [recognitionFirstMinDaysId]: number;
   [displayWeightedShieldId]: boolean;
+  [flashcardBarShieldId]: FlashcardBarShield;
   [displayQueueToolbarPriorityId]: boolean;
   [isolatedQueueModeId]: IsolatedQueueMode;
   [defaultVideoPlayerId]: DefaultVideoPlayer;
@@ -259,6 +262,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [recognitionFirstId]: false,
   [recognitionFirstMinDaysId]: 3,
   [displayWeightedShieldId]: true,
+  [flashcardBarShieldId]: 'card',
   [displayQueueToolbarPriorityId]: true,
   [isolatedQueueModeId]: 'highlights',
   [defaultVideoPlayerId]: 'plugin',
@@ -858,6 +862,20 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Shows what fraction of your total priority-weighted workload has been processed. ' +
       'High-priority items carry exponentially more weight (~10× at the top vs the bottom), so ' +
       'processing them gives a bigger boost.',
+  },
+  [flashcardBarShieldId]: {
+    kind: 'dropdown',
+    group: 'queue',
+    helpPath: 'Prioritization-%26-Sorting/#flashcard-bar-shield',
+    showWhen: { id: displayPriorityShieldId, equals: true },
+    title: 'Shield Shown on Flashcards',
+    description:
+      'Which shield the flashcard bar opens with. Click the shield in the bar to switch to the other one; ' +
+      'the switch lasts until the queue is closed.',
+    options: [
+      { value: 'card', label: 'Card Shield (flashcards only)' },
+      { value: 'priority', label: 'Priority Shield (IncRems + cards)' },
+    ],
   },
   [displayQueueToolbarPriorityId]: {
     kind: 'boolean',

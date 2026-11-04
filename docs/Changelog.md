@@ -8,7 +8,9 @@ This page documents the major changes and improvements for each version of the I
 
 **Priority Shield**: The IncRem Shield is replaced by a Priority Shield that ranks Incremental Rems and cards together by priority (dismissed Rems left out); the Card Shield is unchanged, and the history graph adds an IncRems + Cards universe line while keeping the IncRem-only value as a dashed line.
 
-📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield)
+**Flashcard Bar Shield**: The flashcard bar shows one shield at a time with new icons; click it to switch between the Card Shield and the Priority Shield for the rest of the queue, and choose the default in Settings.
+
+📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield) · [Switching shields on flashcards](Prioritization-&-Sorting.md#flashcard-bar-shield)
 
 ## v1.0.192 - November 4th, 2026
 

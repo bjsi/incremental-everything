@@ -480,8 +480,8 @@ You can find it displayed below the answer buttons in the queue (this can be tog
 
 The shield displays the priority of the **most important due item that you have not yet reviewed**. It provides separate metrics for your entire **Knowledge Base (KB)** and the current **Document** (if you are studying a specific document). There are two shields:
 
-* **🛡️ Priority Shield** — Incremental Rems and flashcards ranked together. Shown under the answer buttons on IncRems, and as the **Priority** row above them on flashcards.
-* **Card Shield** — flashcards only. Shown above the answer buttons on flashcards.
+* **Priority Shield** (a shield with a ring around it) — Incremental Rems and flashcards ranked together. Shown under the answer buttons on IncRems.
+* **Card Shield** (a shield with a stack of cards) — flashcards only. Shown above the answer buttons on flashcards.
 
 ### IncRems and cards together { #unified-priority-shield }
 
@@ -490,6 +490,10 @@ Since v1.0.193 the Priority Shield counts **every Incremental Rem and every card
 * **Absolute:** the higher-priority of the two sides' top missed items — the most important due IncRem you haven't reviewed, or the most important overdue card you haven't reviewed, whichever comes first. Each side keeps its own rules: IncRems count when due now; cards use the start-of-today boundary below and skip [cooling](Priority-Review-Document.md) Rems.
 * **Percentile:** the share of the joint universe (IncRems + cards) ranked above that item.
 * **Hover** a value to see both sides and the universe size. Next to it, a small **IncRem: …** readout still shows the IncRem-only absolute.
+
+### Switching shields on flashcards { #flashcard-bar-shield }
+
+The flashcard bar shows one shield at a time, the **Card Shield** by default. **Click it** to switch to the **Priority Shield**, and click again to switch back. The ⚖️ Weighted value and its breakdown popup follow the shield on screen, and so does the pulse when the card you're reviewing sets it. The switch lasts until you close the queue; the next queue opens with the shield chosen in **Settings › Queue Display › Shield Shown on Flashcards**.
 
 Ranking both kinds together answers a question neither shield could alone: *is my most important unprocessed material an article or a card, and how much of everything I value is protected?* A low IncRem priority no longer looks safe while hundreds of higher-priority cards are overdue, and vice versa.
 

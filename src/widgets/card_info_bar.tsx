@@ -14,6 +14,9 @@ import {
   queueSessionCacheKey,
   displayPriorityShieldId,
   displayWeightedShieldId,
+  flashcardBarShieldId,
+  flashcardBarShieldModeKey,
+  FlashcardBarShield,
   cardPriorityCacheRefreshKey,
   pendingCardPriorityKey,
   seenCardInSessionKey,
@@ -35,9 +38,10 @@ import {
   estimateCardRemPercentile,
 } from '../lib/card_priority';
 import type { IncrementalRem } from '../lib/incremental_rem';
-import { computeLiveShields } from '../lib/live_shield';
+import { JointItem, computeLiveShields, perCardUniverse } from '../lib/live_shield';
 import { UnifiedShieldEntry } from '../lib/unified_shield';
-import { PriorityShieldValue } from '../components/PriorityShieldValue';
+import { priorityShieldTitle } from '../components/PriorityShieldValue';
+import { ShieldIcon } from '../components/ShieldIcon';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PendingCardPriority, pendingCardPriorityFor } from '../lib/card_priority/pending_priority';
 import { reportCardInfoBarHeight } from '../lib/card_info_bar_dock';
@@ -62,9 +66,12 @@ type ShieldSlice = {
 type ShieldStatus = {
   kb: ShieldSlice | null;
   doc: ShieldSlice | null;
-  /** The Priority Shield (IncRems + cards). */
+  /** The Priority Shield (IncRems + cards); null while the bar shows the Card Shield. */
   unifiedKb: UnifiedShieldEntry | null;
   unifiedDoc: UnifiedShieldEntry | null;
+  /** Joint items for the Priority Weighted Shield popup ([] unless asked for). */
+  jointKb: JointItem[];
+  jointDoc: JointItem[] | null;
 } | null;
 
 /**
@@ -79,7 +86,9 @@ function computeShieldStatus(
   seenCardIds: string[],
   seenRemIds: string[],
   scopeRemIds: string[] | null | undefined,
-  coolingRemIds: ReadonlySet<string> = new Set()
+  coolingRemIds: ReadonlySet<string>,
+  withUnified: boolean,
+  computeWeighted: boolean
 ): ShieldStatus {
   if (!remId || !sessionCache) return null;
 
@@ -97,6 +106,8 @@ function computeShieldStatus(
     coolingRemIds,
     scopeRemIds: scopeRemIds ? new Set(scopeRemIds) : null,
     currentCardRemId: remId,
+    unified: withUnified && !!allPrioritizedCardInfo,
+    computeWeighted,
   });
 
   return {
@@ -108,10 +119,14 @@ function computeShieldStatus(
       : null,
     unifiedKb: allPrioritizedCardInfo ? live.kb.unified : null,
     unifiedDoc: allPrioritizedCardInfo ? live.doc?.unified ?? null : null,
+    jointKb: live.jointKb,
+    jointDoc: live.jointDoc,
   };
 }
 
 const EMPTY_INCREMS: IncrementalRem[] = [];
+const EMPTY_IDS: string[] = [];
+const isJointDue = (x: JointItem) => x.due;
 
 export function CardInfoBar() {
   // console.log('[CardInfoBar] Mounting/Rendering');
@@ -132,6 +147,16 @@ export function CardInfoBar() {
   // ✅ Get the display weighted shield setting
   const displayWeightedShield = useIESetting(displayWeightedShieldId);
 
+  // Which shield the bar shows: the setting is the default, a click on the
+  // shield switches it for the rest of the queue session (reset at QueueEnter).
+  const shieldSetting = useIESetting(flashcardBarShieldId);
+  const shieldSessionMode = useTrackerPlugin(
+    (rp) => rp.storage.getSession<FlashcardBarShield>(flashcardBarShieldModeKey),
+    []
+  );
+  const shieldMode: FlashcardBarShield = shieldSessionMode ?? shieldSetting ?? 'card';
+  const showPriorityShield = shieldMode === 'priority';
+
   // 2. Add a new tracker to listen for the refresh signal.
   const refreshSignal = useTrackerPlugin(
     (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
@@ -149,15 +174,18 @@ export function CardInfoBar() {
     [refreshSignal]
   ) ?? [];
 
-  // The IncRem side of the Priority Shield.
+  // The IncRem side of the Priority Shield, read only while it is on screen.
   const seenRemIds = useTrackerPlugin(
-    (rp) => rp.storage.getSession<string[]>(seenRemInSessionKey),
-    []
-  ) ?? [];
-  const allIncRems = useTrackerPlugin(
-    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
-    []
-  ) ?? EMPTY_INCREMS;
+    async (rp) => (showPriorityShield ? rp.storage.getSession<string[]>(seenRemInSessionKey) : undefined),
+    [showPriorityShield]
+  ) ?? EMPTY_IDS;
+  const allIncRemsRaw = useTrackerPlugin(
+    async (rp) => (showPriorityShield ? (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) ?? EMPTY_INCREMS : undefined),
+    [showPriorityShield]
+  );
+  const allIncRems = allIncRemsRaw ?? EMPTY_INCREMS;
+  // Until the IncRem list has loaded, a Priority value would be cards-only.
+  const priorityReady = showPriorityShield && allIncRemsRaw !== undefined;
 
   // Rems cooling as of the last cooling scan (published at QueueExit and on
   // every Priority Queue refresh). Read from the session cache only — no scan
@@ -481,8 +509,11 @@ export function CardInfoBar() {
   // --- REWRITTEN: The Shield calculation is now ultra-fast ---
   const shieldStatus = useMemo(() => {
     if (useLightMode || !rem || !sessionCache) return null;
-    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, allIncRems, seenCardIds, seenRemIds, scopeRemIds, coolingRemIds);
-  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, allIncRems, seenCardIds, seenRemIds, scopeRemIds, coolingRemIds]);
+    return computeShieldStatus(
+      rem._id, sessionCache, allPrioritizedCardInfo, allIncRems, seenCardIds, seenRemIds, scopeRemIds, coolingRemIds,
+      priorityReady, priorityReady && !!displayWeightedShield
+    );
+  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, allIncRems, seenCardIds, seenRemIds, scopeRemIds, coolingRemIds, priorityReady, displayWeightedShield]);
 
   // --- Weighted Shield: per-CARD bucketing (matches Card Priority × Memory
   // Analytics). Expand each CardPriorityInfo into one item per card and use
@@ -499,8 +530,9 @@ export function CardInfoBar() {
     [seenCardSet, rem?._id]
   );
 
+  // Cards-only; the Priority Shield's weighted value comes with shieldStatus.
   const weightedShieldStatus = useMemo(() => {
-    if (!displayWeightedShield || useLightMode || !rem || !allPrioritizedCardInfo || allPrioritizedCardInfo.length === 0) return null;
+    if (!displayWeightedShield || showPriorityShield || useLightMode || !rem || !allPrioritizedCardInfo || allPrioritizedCardInfo.length === 0) return null;
 
     const allCardItems = expandCardInfosToCards(allPrioritizedCardInfo);
     const kbWeighted = calculateWeightedShield(allCardItems, weightedIsDuePredicate);
@@ -517,8 +549,22 @@ export function CardInfoBar() {
     }
 
     return { kb: kbWeighted, doc: docWeighted, allItems: allCardItems, docItems };
-  }, [displayWeightedShield, useLightMode, rem, allPrioritizedCardInfo, weightedIsDuePredicate, scopeRemIds]);
+  }, [displayWeightedShield, showPriorityShield, useLightMode, rem, allPrioritizedCardInfo, weightedIsDuePredicate, scopeRemIds]);
 
+
+  // The Priority popup's Queue Selection Odds panel: the joint universe is not
+  // one the queue draws from, so it offers the card universe this queue does.
+  const priorityOdds = useMemo(() => {
+    if (!priorityReady || !displayWeightedShield || !allPrioritizedCardInfo) return undefined;
+    const all = perCardUniverse(allPrioritizedCardInfo);
+    const scope = scopeRemIds ? new Set(scopeRemIds) : null;
+    return {
+      kind: 'card' as const,
+      allItems: all,
+      docItems: scope ? all.filter((c) => scope.has(c.remId)) : null,
+      isDuePredicate: weightedIsDuePredicate,
+    };
+  }, [priorityReady, displayWeightedShield, allPrioritizedCardInfo, scopeRemIds, weightedIsDuePredicate]);
 
   // --- 🔌 ON-DEMAND PATH (Light Mode OR Full Mode fallback when cache not ready) ---
   const lightCardInfo = useTrackerPlugin(async (rp) => {
@@ -622,9 +668,41 @@ export function CardInfoBar() {
   // Pulse if the card's absolute priority is <= the shield value:
   // this covers both the exact shield card and intra-day relearning/learning-step
   // cards that reappear with a priority lower than (i.e. higher importance than) the shield.
-  const isKbShieldActive = shieldStatus?.kb != null && finalCardInfo.priority <= shieldStatus.kb.absolute;
-  const isDocShieldActive = shieldStatus?.doc != null && finalCardInfo.priority <= shieldStatus.doc.absolute;
+  // The values on screen: the Card Shield, or the Priority Shield (IncRems + cards).
+  type ShownValue = { absolute: number; percentile: number | undefined; title?: string };
+  const fromUnified = (e: UnifiedShieldEntry | null, scope: string): ShownValue | null =>
+    e && e.absolute !== null
+      ? { absolute: e.absolute, percentile: e.percentile ?? undefined, title: priorityShieldTitle(e, scope) }
+      : null;
+  const shownKb: ShownValue | null = showPriorityShield
+    ? fromUnified(shieldStatus?.unifiedKb ?? null, 'KB')
+    : shieldStatus?.kb ?? null;
+  const shownDoc: ShownValue | null = showPriorityShield
+    ? fromUnified(shieldStatus?.unifiedDoc ?? null, 'Doc')
+    : shieldStatus?.doc ?? null;
+  // The Card Shield's own hover text says what clicking does; the Priority values carry their breakdown.
+  const shieldSwitchTitle = showPriorityShield
+    ? 'Priority Shield: IncRems and cards ranked together. Click to show the Card Shield (flashcards only).'
+    : 'Card Shield: flashcards only. Click to show the Priority Shield (IncRems + cards).';
+
+  const isKbShieldActive = shownKb != null && finalCardInfo.priority <= shownKb.absolute;
+  const isDocShieldActive = shownDoc != null && finalCardInfo.priority <= shownDoc.absolute;
   const isAnyShieldActive = isKbShieldActive || isDocShieldActive;
+
+  const toggleShield = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    void plugin.storage.setSession(flashcardBarShieldModeKey, showPriorityShield ? 'card' : 'priority');
+  };
+
+  // Weighted value of the shield on screen.
+  const priorityWeighted = showPriorityShield && displayWeightedShield && shieldStatus?.unifiedKb?.weightedShield != null
+    ? {
+        kb: shieldStatus.unifiedKb.weightedShield,
+        doc: shieldStatus.unifiedDoc?.weightedShield ?? null,
+        allItems: shieldStatus.jointKb,
+        docItems: shieldStatus.jointDoc && shieldStatus.jointDoc.length > 0 ? shieldStatus.jointDoc : null,
+      }
+    : null;
 
 
   const handleClick = async () => {
@@ -702,52 +780,48 @@ export function CardInfoBar() {
           )}
         </div>
 
-        {/* Shield */}
-        {displayPriorityShield && !useLightMode && cacheReady && shieldStatus && (shieldStatus.kb || shieldStatus.doc || shieldStatus.unifiedKb?.absolute != null || shieldStatus.unifiedDoc?.absolute != null) && (
+        {/* Shield — one at a time; a click switches Card ⇄ Priority for this session */}
+        {displayPriorityShield && !useLightMode && cacheReady && shieldStatus && (
           <>
             <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-            <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-2"
+              role="button"
+              tabIndex={0}
+              onClick={toggleShield}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleShield(e); } }}
+              style={{ cursor: 'pointer', borderRadius: '4px', padding: '1px 4px' }}
+              title={shieldSwitchTitle}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.75'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            >
               <span className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
                 <span style={{
-                  display: 'inline-block',
+                  display: 'inline-flex',
                   animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
-                }}>🛡️</span>
-                <span>Card Shield:</span>
+                }}><ShieldIcon kind={showPriorityShield ? 'priority' : 'card'} /></span>
+                <span>{showPriorityShield ? 'Priority Shield:' : 'Card Shield:'}</span>
               </span>
               <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-                {shieldStatus.kb && (
-                  <span style={{
-                    animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
-                    fontWeight: isKbShieldActive ? 700 : 'inherit',
-                    color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
-                  }}>
-                    KB: <strong style={{ color: percentileToHslColor(shieldStatus.kb.percentile ?? shieldStatus.kb.absolute) }}>{shieldStatus.kb.absolute}</strong>
-                    {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile.toFixed(1)}%)`}
-                  </span>
+                {([['KB', shownKb, isKbShieldActive], ['Doc', shownDoc, isDocShieldActive]] as const).map(([label, v, active]) =>
+                  v && (
+                    <span key={label} title={v.title} style={{
+                      animation: active ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                      fontWeight: active ? 700 : 'inherit',
+                      color: active ? 'var(--rn-clr-blue)' : 'inherit'
+                    }}>
+                      {label}: <strong style={{ color: percentileToHslColor(v.percentile ?? v.absolute) }}>{v.absolute}</strong>
+                      {v.percentile !== undefined && ` (${v.percentile.toFixed(1)}%)`}
+                    </span>
+                  )
                 )}
-                {shieldStatus.doc && (
-                  <span style={{
-                    animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
-                    fontWeight: isDocShieldActive ? 700 : 'inherit',
-                    color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
-                  }}>
-                    Doc: <strong style={{ color: percentileToHslColor(shieldStatus.doc.percentile ?? shieldStatus.doc.absolute) }}>{shieldStatus.doc.absolute}</strong>
-                    {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile.toFixed(1)}%)`}
-                  </span>
+                {!shownKb && !shownDoc && (
+                  showPriorityShield && !priorityReady
+                    ? <span>…</span>
+                    : <span title="No due item has been missed in this scope">✓ nothing missed</span>
                 )}
               </div>
             </div>
-            {(shieldStatus.unifiedKb?.absolute != null || shieldStatus.unifiedDoc?.absolute != null) && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                  Priority:
-                </span>
-                <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-                  <PriorityShieldValue label="KB" entry={shieldStatus.unifiedKb} />
-                  <PriorityShieldValue label="Doc" entry={shieldStatus.unifiedDoc} />
-                </div>
-              </div>
-            )}
             <style>{`
             @keyframes shieldPulse {
               0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(59, 130, 246, 0)); }
@@ -761,18 +835,30 @@ export function CardInfoBar() {
           </>
         )}
 
-        {/* Weighted Shield */}
-        {displayWeightedShield && !useLightMode && cacheReady && weightedShieldStatus && allPrioritizedCardInfo && (
+        {/* Weighted Shield — of the shield on screen */}
+        {displayWeightedShield && !useLightMode && cacheReady && allPrioritizedCardInfo && (priorityWeighted || weightedShieldStatus) && (
           <>
             <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-            <WeightedShieldTooltip
-              kbValue={weightedShieldStatus.kb}
-              docValue={weightedShieldStatus.doc}
-              allItems={weightedShieldStatus.allItems}
-              isDuePredicate={weightedIsDuePredicate}
-              docItems={weightedShieldStatus.docItems}
-              itemLabel="Cards"
-            />
+            {priorityWeighted ? (
+              <WeightedShieldTooltip
+                kbValue={priorityWeighted.kb}
+                docValue={priorityWeighted.doc}
+                allItems={priorityWeighted.allItems}
+                isDuePredicate={isJointDue}
+                docItems={priorityWeighted.docItems}
+                itemLabel="Priority"
+                odds={priorityOdds}
+              />
+            ) : weightedShieldStatus && (
+              <WeightedShieldTooltip
+                kbValue={weightedShieldStatus.kb}
+                docValue={weightedShieldStatus.doc}
+                allItems={weightedShieldStatus.allItems}
+                isDuePredicate={weightedIsDuePredicate}
+                docItems={weightedShieldStatus.docItems}
+                itemLabel="Cards"
+              />
+            )}
           </>
         )}
 

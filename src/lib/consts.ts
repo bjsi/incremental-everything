@@ -519,6 +519,12 @@ export const debugHistoryBackupPrefix = 'debug_history_backup_';
 // they were removed as dead code.
 export const displayWeightedShieldId = 'display-weighted-shield';
 
+// Which shield the flashcard bar shows: the setting gives the default, a click on
+// the shield switches it, and the session key keeps that switch until QueueEnter.
+export const flashcardBarShieldId = 'flashcard-bar-shield';
+export type FlashcardBarShield = 'card' | 'priority';
+export const flashcardBarShieldModeKey = 'flashcard-bar-shield-mode';
+
 // --- Keys for Open Editor in a new tab/window (PDFs) ---
 export const remnoteEnvironmentId = 'remnote-environment';
 
