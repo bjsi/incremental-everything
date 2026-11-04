@@ -121,6 +121,7 @@ import {
   setCardPriority,
 } from '../lib/card_priority';
 import { createOpTimer, OpTimer } from '../lib/op_timer';
+import dayjs from 'dayjs';
 import { createTurnQueue } from '../lib/turn_queue';
 import { holdCardPriorityCacheEntry, loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist } from '../lib/card_priority/cache';
 import {
@@ -1163,7 +1164,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           cardsCreatedAt: [clozeCreatedAt],
         } as any);
         rereadCardPriorityCacheWhenCardsExist(plugin, clozeRem._id);
-        console.log(`[Cloze] created in ${timer.report()}`);
+        console.log(`[Cloze] pressed at ${dayjs(timer.startedAt).format('HH:mm:ss.SSS')}, created in ${timer.report()}`);
 
         return { clozeRem, parentRem: rem, autoPriority };
       } finally {
@@ -3212,7 +3213,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       // Pull the prioritized universes from the session cache and compute breakdowns
-      // for both Incremental Rems and Cards. Respect the queue's seen-in-session lists
+      // for the Priority Shield (IncRems + Cards) and for Cards. Respect the queue's seen-in-session lists
       // when present so this matches what the in-queue tooltip shows.
       const [allIncRems, allCardInfos, seenRemIds, seenCardIds, cachedScopeIds] = await Promise.all([
         plugin.storage.getSession<IncrementalRemType[]>(allIncrementalRemKey).then((v) => v ?? []),
@@ -3239,36 +3240,55 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         }
       }
 
-      const groups: { title: string; itemLabel: string; kb: any; doc: any }[] = [];
+      const groups: { title: string; itemLabel: string; kb: any; doc: any; odds?: any }[] = [];
 
       const scope = docScope;
-      if (allIncRems.length > 0) {
-        const docItems = scope ? allIncRems.filter((r) => scope.has(r.remId)) : [];
+      // Per-CARD bucketing: one item per card, so the deciles, due counts and
+      // the headline value are over cards (matching the Card Priority × Memory
+      // Analytics tab) instead of over Rems-with-cards.
+      const nowMs = Date.now();
+      const perCardDuePredicate = (item: {
+        remId: string;
+        nextRepetitionTime?: number | null;
+        paused?: boolean;
+      }) =>
+        isPerCardDue(item, nowMs) && !seenCardSet.has(item.remId);
+      const allCardItems = expandCardInfosToCards(allCardInfos);
+      const docCardItems = scope
+        ? expandCardInfosToCards(allCardInfos.filter((c) => scope.has(c.remId)))
+        : [];
+      const docIncRems = scope ? allIncRems.filter((r) => scope.has(r.remId)) : [];
+
+      // The Priority Shield's joint universe: IncRems and cards, one element each.
+      const joint = (incRems: IncrementalRemType[], cards: typeof allCardItems) => [
+        ...incRems.map((r) => ({ priority: r.priority, remId: r.remId, due: incRemDuePredicate(r) })),
+        ...cards.map((c) => ({ priority: c.priority, remId: c.remId, due: perCardDuePredicate(c) })),
+      ];
+      const jointKb = joint(allIncRems, allCardItems);
+      const jointDoc = scope ? joint(docIncRems, docCardItems) : [];
+      const jointDue = (x: { due: boolean }) => x.due;
+
+      if (jointKb.length > 0) {
         groups.push({
-          title: 'Incremental Rems',
-          itemLabel: 'IncRem',
-          kb: computeWeightedShieldBreakdown(allIncRems, incRemDuePredicate),
-          doc: docItems.length > 0 ? computeWeightedShieldBreakdown(docItems, incRemDuePredicate) : null,
+          title: 'Priority (IncRems + Cards)',
+          itemLabel: 'Priority',
+          kb: computeWeightedShieldBreakdown(jointKb, jointDue),
+          doc: jointDoc.length > 0 ? computeWeightedShieldBreakdown(jointDoc, jointDue) : null,
+          // The queue draws IncRems on their own, so the odds panel gets the
+          // IncRem universe rather than the joint one.
+          odds: allIncRems.length > 0
+            ? {
+                kind: 'incRem',
+                kb: computeWeightedShieldBreakdown(allIncRems, incRemDuePredicate).sortedItems,
+                doc: docIncRems.length > 0
+                  ? computeWeightedShieldBreakdown(docIncRems, incRemDuePredicate).sortedItems
+                  : undefined,
+              }
+            : undefined,
         });
       }
 
-      if (allCardInfos.length > 0) {
-        // Per-CARD bucketing: expand each CardPriorityInfo into one item per
-        // card so the deciles, due counts and the headline shield value are
-        // computed over cards (matching the Card Priority × Memory Analytics
-        // tab) instead of over rems-with-cards.
-        const nowMs = Date.now();
-        const perCardDuePredicate = (item: {
-          remId: string;
-          nextRepetitionTime?: number | null;
-          paused?: boolean;
-        }) =>
-          isPerCardDue(item, nowMs) && !seenCardSet.has(item.remId);
-
-        const allCardItems = expandCardInfosToCards(allCardInfos);
-        const docCardItems = scope
-          ? expandCardInfosToCards(allCardInfos.filter((c) => scope.has(c.remId)))
-          : [];
+      if (allCardItems.length > 0) {
         groups.push({
           title: 'Cards',
           itemLabel: 'Cards',
@@ -3280,7 +3300,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       // Use the wide variant only when there's something to put side-by-side
-      // (both Incremental Rems and Cards). Otherwise the standard narrow popup
+      // (both Priority and Cards). Otherwise the standard narrow popup
       // is enough and avoids a half-empty wide canvas.
       const popupId = groups.length >= 2 ? 'weighted_shield_popup_wide' : 'weighted_shield_popup';
       await plugin.widget.openPopup(popupId, {

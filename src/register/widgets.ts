@@ -274,7 +274,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('priority_shield_graph', WidgetLocation.Popup, {
     dimensions: {
       width: 1075,
-      height: 1050,
+      height: screenFittedHeight(600),
     },
   });
 

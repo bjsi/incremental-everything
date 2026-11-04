@@ -48,6 +48,7 @@ import { PriorityBadge, PrioritySlider, PrioritySliderRef } from '../components'
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import * as _ from 'remeda';
 import { useIESettingOptional } from '../lib/settings';
+import { buildUnifiedRanking, unifiedPercentileAt } from '../lib/unified_percentile';
 
 type Scope = { remId: string | null; name: string; };
 type ScopeMode = 'all' | 'document';
@@ -479,6 +480,21 @@ function Priority() {
     const total = others.length + 1;
     return Math.round((rank / total) * 1000) / 10;
   }, [performanceMode, derivedData, rem, cardAbsPriority, defaultCardPriority]);
+
+  // The headline "Relative" is on the unified scale: the item among all IncRems
+  // and cards in the scope (each card one element), the scale every priority
+  // colour uses. The per-kind rank above stays in its hover text.
+  const unifiedScopeRanking = useMemo(() => {
+    if (performanceMode === PERFORMANCE_MODE_LIGHT || !derivedData) return null;
+    const ranking = buildUnifiedRanking(derivedData.scopedIncRems, derivedData.scopedCardRems);
+    return ranking.total > 0 ? ranking : null;
+  }, [performanceMode, derivedData]);
+  const incRelUnified = unifiedScopeRanking
+    ? unifiedPercentileAt(unifiedScopeRanking, incAbsPriority ?? defaultIncPriority ?? 50)
+    : null;
+  const cardRelUnified = unifiedScopeRanking
+    ? unifiedPercentileAt(unifiedScopeRanking, cardAbsPriority ?? defaultCardPriority ?? 50)
+    : null;
 
   // Synchronous Derived Data Hooks (Memoization)
   const documentScopes = useMemo(() => scopeHierarchy.filter(s => s.remId !== null), [scopeHierarchy]);
@@ -1210,9 +1226,15 @@ function Priority() {
                   <span>Loading relative priority...</span>
                 ) : (
                   <>
-                    <span>Relative: <strong>{incRelPriority}%</strong></span>
+                    <span title={`Among IncRems only: ${incRelPriority}% of ${scopedIncRems.length.toLocaleString()}`}>
+                      Relative: <strong>{incRelUnified ?? incRelPriority}%</strong>
+                    </span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
-                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedIncRems.length.toLocaleString()} items</span>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                      {unifiedScopeRanking
+                        ? `${unifiedScopeRanking.total.toLocaleString()} IncRems + cards`
+                        : `${scopedIncRems.length.toLocaleString()} items`}
+                    </span>
                   </>
                 )}
               </div>
@@ -1327,9 +1349,15 @@ function Priority() {
                       <span>Loading relative priority...</span>
                     ) : (
                       <>
-                        <span>Relative: <strong>{cardRelPriority}%</strong></span>
+                        <span title={`Among cards only: ${cardRelPriority}% of ${scopedCardRems.length.toLocaleString()} Rems with cards`}>
+                          Relative: <strong>{cardRelUnified ?? cardRelPriority}%</strong>
+                        </span>
                         <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
-                        <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
+                        <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                          {unifiedScopeRanking
+                            ? `${unifiedScopeRanking.total.toLocaleString()} IncRems + cards`
+                            : `${scopedCardRems.length.toLocaleString()} cards`}
+                        </span>
                       </>
                     )}
                   </div>
@@ -1444,9 +1472,15 @@ function Priority() {
                   <span>Loading relative priority...</span>
                 ) : (
                   <>
-                    <span>Relative: <strong>{cardRelPriority}%</strong></span>
+                    <span title={`Among cards only: ${cardRelPriority}% of ${scopedCardRems.length.toLocaleString()} Rems with cards`}>
+                      Relative: <strong>{cardRelUnified ?? cardRelPriority}%</strong>
+                    </span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
-                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                      {unifiedScopeRanking
+                        ? `${unifiedScopeRanking.total.toLocaleString()} IncRems + cards`
+                        : `${scopedCardRems.length.toLocaleString()} cards`}
+                    </span>
                   </>
                 )}
               </div>

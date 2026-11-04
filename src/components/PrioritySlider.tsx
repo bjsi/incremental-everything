@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { percentileToHslColor, priorityRampGradient } from '../lib/utils';
+import { priorityColor, usePriorityColorScale } from './priorityColor';
 
 interface PrioritySliderProps {
   value: number;
@@ -70,7 +71,9 @@ export const PrioritySlider = forwardRef<PrioritySliderRef, PrioritySliderProps>
   const colorValue = useAbsoluteColoring
     ? percentage
     : (relativePriority !== undefined ? relativePriority : percentage);
-  const thumbColor = percentileToHslColor(colorValue);
+  // The value's colour on the unified scale when the map exists, like every badge.
+  const colorScale = usePriorityColorScale();
+  const thumbColor = colorScale ? priorityColor(colorScale, value) : percentileToHslColor(colorValue);
 
   const handleTrackClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {

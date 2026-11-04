@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { EditorReviewJob } from '../lib/incremental_rem/review_jobs';
 import { determineIncRemType } from '../lib/incRemHelpers';
 import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
-import { openAndScrollToHighlight, openAndFocusRem } from '../lib/remHelpers';
+import { openAndScrollToHighlight, openAndFocusRem, openRemInNewPane } from '../lib/remHelpers';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
@@ -354,12 +354,19 @@ function EditorReviewTimer() {
     if (timerData) await dismissEditorReview(plugin, timerData, closing());
   };
 
-  const handleGoToRem = async () => {
+  // Shift+click opens the Rem in a new pane beside the current document
+  // (or focuses the pane already showing it) instead of replacing it.
+  const handleGoToRem = async (e: React.MouseEvent) => {
     if (!timerData) return;
 
     const rem = await plugin.rem.findOne(timerData.remId);
     if (!rem) {
       await plugin.app.toast('Error: Rem not found');
+      return;
+    }
+
+    if (e.shiftKey) {
+      await openRemInNewPane(plugin, rem._id);
       return;
     }
 
@@ -767,6 +774,7 @@ function EditorReviewTimer() {
         </button>
         <button
           onClick={handleGoToRem}
+          title="Open the Rem in this pane. Shift+click: open it in a new pane beside this document"
           style={{
             padding: '6px 14px',
             fontSize: '13px',

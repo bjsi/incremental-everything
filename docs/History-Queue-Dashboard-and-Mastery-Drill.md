@@ -202,14 +202,14 @@ Both modes affect only the Practiced Queues dashboard. The [Study Dashboard](Stu
 
 ### Monthly Higher Shield Catch-Up
 
-The live session card has a small **📈 Monthly Higher Shield** block at the bottom that ties the current session back to your recent [Priority Shield](Prioritization-&-Sorting.md#priority-shield) history. Up to four rows appear — Knowledge Base × Document, each split between Incremental Rems and Cards — using the same line format as the threshold-slider caption in the [Weighted Shield popup](Prioritization-&-Sorting.md#weighted-shield):
+The live session card has a small **📈 Monthly Higher Shield** block at the bottom that ties the current session back to your recent [Priority Shield](Prioritization-&-Sorting.md#priority-shield) history. Up to four rows appear — Knowledge Base × Document, each split between the Priority Shield (IncRems + cards) and the Card Shield — using the same line format as the threshold-slider caption in the [Weighted Shield popup](Prioritization-&-Sorting.md#weighted-shield):
 
 > 🌐 **KB · Cards** — priority ≤ **N** → **X** due to catch up
-> 📄 **Doc · IncRem** — ✓ At monthly higher priority shield (≤ **N**)
+> 📄 **Doc · Priority** — ✓ At monthly higher priority shield (≤ **N**)
 
 **What it tells you.** "Monthly higher shield" is the **highest absolute-priority cutoff your shield reached in the last 30 days** — the deepest into your low-number, high-importance priorities your processing kept up with, recorded once per day on the [Priority Shield Graph](Plugin-Widgets-Reference.md#44-priority-shield-graph). The catch-up count is then the number of items currently due at-or-above that historical cutoff (`priority ≤ N`), excluding items you have already reviewed in the current session — so this number **drains live** as you clear the top of the queue.
 
-**How to read it.** A non-zero count is the smallest top-priority backlog you would need to clear, in this session or soon, to put the shield back at the highest level it has touched in the last month. When the count reaches 0 the row collapses to the `✓ At monthly higher priority shield` form — meaning the scope's most important items are already processed and the next shield record could match or exceed the recent high. Rows are shown only when shield history exists for that scope/item-kind combination, so a fresh KB or a never-visited document will simply have fewer (or no) rows.
+**How to read it.** A non-zero count is the smallest top-priority backlog you would need to clear, in this session or soon, to put the shield back at the highest level it has touched in the last month. When the count reaches 0 the row collapses to the `✓ At monthly higher priority shield` form — meaning the scope's most important items are already processed and the next shield record could match or exceed the recent high. Rows are shown only when shield history exists for that scope and shield, so a fresh KB or a never-visited document will simply have fewer (or no) rows.
 
 This is intentionally a passive readout — it doesn't gate or sort the queue. It's there so you can see, at a glance, how much top-priority work stands between you and your best recent protection level without opening the Weighted Shield popup.
 

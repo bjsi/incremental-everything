@@ -1,5 +1,6 @@
 import React from 'react';
 import { percentileToHslColor } from '../lib/utils';
+import { priorityColor, priorityScalePercentile, usePriorityColorScale } from './priorityColor';
 
 interface PriorityBadgeProps {
   priority: number;
@@ -11,11 +12,18 @@ interface PriorityBadgeProps {
 }
 
 export function PriorityBadge({ priority, percentile, compact = false, useAbsoluteColoring = false, source, isCardPriority = false }: PriorityBadgeProps) {
-  // Use percentile for color if available (including 0), otherwise fallback to gray
-  // If useAbsoluteColoring is true, we use the priority itself (0-100) for color mapping
-  const bgColor = useAbsoluteColoring
-    ? percentileToHslColor(priority)
-    : (percentile !== undefined ? percentileToHslColor(percentile) : '#6b7280');
+  // The colour is the priority's place on the unified IncRems + cards scale, the
+  // same for every badge in the plugin (lib/priority_color_scale). Until a map
+  // exists: the caller's percentile, the absolute value, or gray.
+  const scale = usePriorityColorScale();
+  const bgColor = scale
+    ? priorityColor(scale, priority)
+    : useAbsoluteColoring
+      ? percentileToHslColor(priority)
+      : (percentile !== undefined ? percentileToHslColor(percentile) : '#6b7280');
+  // The hover text names the same scale the colour comes from.
+  const shown = scale ? priorityScalePercentile(scale, priority) : percentile;
+  const title = `Priority: ${priority}${shown !== undefined ? ` (top ${shown}%${scale ? ' of IncRems and cards' : ''})` : ''}`;
 
   const isBoldNumber = isCardPriority && (source === 'manual' || source === 'incremental');
   const numberNode = isBoldNumber ? <strong className="font-extrabold">{priority}</strong> : priority;
@@ -29,7 +37,7 @@ export function PriorityBadge({ priority, percentile, compact = false, useAbsolu
           color: 'white',
           minWidth: '36px',
         }}
-        title={`Priority: ${priority}${percentile ? ` (top ${percentile}%)` : ''}`}
+        title={title}
       >
         P{numberNode}
       </span>
@@ -44,7 +52,7 @@ export function PriorityBadge({ priority, percentile, compact = false, useAbsolu
         color: 'white',
         minWidth: '44px',
       }}
-      title={`Priority: ${priority}${percentile ? ` (top ${percentile}%)` : ''}`}
+      title={title}
     >
       P{numberNode}
     </span>

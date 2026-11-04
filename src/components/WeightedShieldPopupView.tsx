@@ -12,10 +12,19 @@ import { HoverTipLayer } from './HoverTipLayer';
 import { IE_DOCS_BASE_URL } from '../lib/settings';
 
 interface MonthlyBests {
+  kbUnified: number | null;
+  docUnified: number | null;
   kbIncRem: number | null;
   docIncRem: number | null;
   kbCard: number | null;
   docCard: number | null;
+}
+
+/** A universe for the Queue Selection Odds panel other than the breakdown's own. */
+interface OddsSource {
+  kind: 'incRem' | 'card';
+  kb?: { priority: number; isDue: boolean }[];
+  doc?: { priority: number; isDue: boolean }[];
 }
 
 interface WeightedShieldGroup {
@@ -23,13 +32,27 @@ interface WeightedShieldGroup {
   itemLabel: string;
   kb: WeightedShieldBreakdown;
   doc?: WeightedShieldBreakdown | null;
+  /** Set on the Priority group, whose joint universe the queue never draws from. */
+  odds?: OddsSource;
 }
+
+/** 'Priority' = the Priority Shield's joint universe (IncRems + cards). */
+type GroupKind = 'incRem' | 'card' | 'unified';
+const kindOfLabel = (label: string): GroupKind => {
+  const l = label.toLowerCase();
+  if (l === 'cards') return 'card';
+  if (l === 'priority') return 'unified';
+  return 'incRem';
+};
+const titleOfKind = (kind: GroupKind): string =>
+  kind === 'card' ? 'Cards' : kind === 'unified' ? 'Priority (IncRems + Cards)' : 'Incremental Rems';
 
 interface WeightedShieldPopupContext {
   // Single-item-type form used by the in-queue WeightedShieldTooltip.
   kbBreakdown?: WeightedShieldBreakdown;
   docBreakdown?: WeightedShieldBreakdown | null;
   itemLabel?: string;
+  odds?: OddsSource;
   // Multi-section form used by the `wsh` command: one group per item type
   // (Incremental Rems, Cards), each with its own KB and optional Doc breakdowns.
   groups?: WeightedShieldGroup[];
@@ -316,7 +339,7 @@ function BreakdownSection({
       }}>
         <div>
           <span style={{ fontWeight: 600 }}>Total: </span>
-          {breakdown.totalItems.toLocaleString()} {itemLabel.toLowerCase() === 'cards' ? 'Cards' : 'Incremental Rems'}
+          {breakdown.totalItems.toLocaleString()} {kindOfLabel(itemLabel) === 'card' ? 'Cards' : kindOfLabel(itemLabel) === 'unified' ? 'IncRems + Cards' : 'Incremental Rems'}
         </div>
         <div>
           <span style={{ fontWeight: 600, color: breakdown.dueItems > 0 ? '#ef4444' : 'inherit' }}>Due: </span>
@@ -486,13 +509,15 @@ export function WeightedShieldPopup() {
       const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
       const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
       const docScopeId = originalScopeId || subQueueId || null;
-      const [kbIncRem, docIncRem, kbCard, docCard] = await Promise.all([
+      const [kbUnified, docUnified, kbIncRem, docIncRem, kbCard, docCard] = await Promise.all([
+        getMonthlyBestAbsolutePriorityShield(plugin, 'unified', 'kb', null),
+        getMonthlyBestAbsolutePriorityShield(plugin, 'unified', 'doc', docScopeId),
         getMonthlyBestAbsolutePriorityShield(plugin, 'incRem', 'kb', null),
         getMonthlyBestAbsolutePriorityShield(plugin, 'incRem', 'doc', docScopeId),
         getMonthlyBestAbsolutePriorityShield(plugin, 'card', 'kb', null),
         getMonthlyBestAbsolutePriorityShield(plugin, 'card', 'doc', docScopeId),
       ]);
-      if (!cancelled) setMonthlyBests({ kbIncRem, docIncRem, kbCard, docCard });
+      if (!cancelled) setMonthlyBests({ kbUnified, docUnified, kbIncRem, docIncRem, kbCard, docCard });
     })();
     return () => { cancelled = true; };
   }, []);
@@ -509,7 +534,8 @@ export function WeightedShieldPopup() {
   const itemLabel = ctx.itemLabel || 'items';
   const blurbSubject = hasGroups
     ? 'each prioritized item'
-    : itemLabel.toLowerCase() === 'cards' ? 'card' : 'incremental rem';
+    : kindOfLabel(itemLabel) === 'card' ? 'card'
+    : kindOfLabel(itemLabel) === 'unified' ? 'incremental rem and card' : 'incremental rem';
 
   // The Card Priority × Memory Analytics tab is only meaningful in the wide
   // popup (where both Incremental Rems and Cards groups are present). The
@@ -520,35 +546,48 @@ export function WeightedShieldPopup() {
   // scope) pair that actually has a breakdown, in the order they're displayed.
   const oddsUniverses: OddsUniverse[] = [];
   const pushUniverse = (
-    breakdown: WeightedShieldBreakdown | null | undefined,
+    sortedItems: { priority: number; isDue: boolean }[] | undefined,
     label: string,
     kind: 'incRem' | 'card',
     scope: 'kb' | 'doc'
   ) => {
-    if (!breakdown?.sortedItems || breakdown.sortedItems.length === 0) return;
-    oddsUniverses.push({
-      key: `${kind}-${scope}`,
-      label,
-      kind,
-      scope,
-      sortedItems: breakdown.sortedItems,
-    });
+    if (!sortedItems || sortedItems.length === 0) return;
+    if (oddsUniverses.some((u) => u.key === `${kind}-${scope}`)) return;
+    oddsUniverses.push({ key: `${kind}-${scope}`, label, kind, scope, sortedItems });
   };
-  const kindOf = (label: string): 'incRem' | 'card' =>
-    label.toLowerCase() === 'cards' ? 'card' : 'incRem';
-  const iconOf = (kind: 'incRem' | 'card') => (kind === 'card' ? '🃏' : '📘');
+  const iconOf = (kind: GroupKind) => (kind === 'card' ? '🃏' : kind === 'unified' ? '🧩' : '📘');
+  // The queue draws IncRems and cards separately, so the joint Priority
+  // universe offers its IncRem universe (odds) to the odds panel instead.
+  const pushGroupUniverses = (
+    kind: GroupKind,
+    kb: WeightedShieldBreakdown | null | undefined,
+    doc: WeightedShieldBreakdown | null | undefined,
+    odds: OddsSource | undefined
+  ) => {
+    if (kind === 'unified') {
+      if (!odds) return;
+      const t = titleOfKind(odds.kind);
+      pushUniverse(odds.kb, `${iconOf(odds.kind)} ${t} · 🌐 Knowledge Base`, odds.kind, 'kb');
+      pushUniverse(odds.doc, `${iconOf(odds.kind)} ${t} · 📄 Document Scope`, odds.kind, 'doc');
+      return;
+    }
+    const t = titleOfKind(kind);
+    pushUniverse(kb?.sortedItems, `${iconOf(kind)} ${t} · 🌐 Knowledge Base`, kind, 'kb');
+    pushUniverse(doc?.sortedItems, `${iconOf(kind)} ${t} · 📄 Document Scope`, kind, 'doc');
+  };
   if (hasGroups) {
     for (const group of ctx.groups!) {
-      const kind = kindOf(group.itemLabel);
-      pushUniverse(group.kb, `${iconOf(kind)} ${group.title} · 🌐 Knowledge Base`, kind, 'kb');
-      pushUniverse(group.doc, `${iconOf(kind)} ${group.title} · 📄 Document Scope`, kind, 'doc');
+      pushGroupUniverses(kindOfLabel(group.itemLabel), group.kb, group.doc, group.odds);
     }
   } else if (ctx.kbBreakdown) {
-    const kind = kindOf(itemLabel);
-    const title = kind === 'card' ? 'Cards' : 'Incremental Rems';
-    pushUniverse(ctx.kbBreakdown, `${iconOf(kind)} ${title} · 🌐 Knowledge Base`, kind, 'kb');
-    pushUniverse(ctx.docBreakdown, `${iconOf(kind)} ${title} · 📄 Document Scope`, kind, 'doc');
+    pushGroupUniverses(kindOfLabel(itemLabel), ctx.kbBreakdown, ctx.docBreakdown, ctx.odds);
   }
+  const bestsFor = (label: string): { kb: number | null; doc: number | null } => {
+    const kind = kindOfLabel(label);
+    if (kind === 'card') return { kb: monthlyBests?.kbCard ?? null, doc: monthlyBests?.docCard ?? null };
+    if (kind === 'unified') return { kb: monthlyBests?.kbUnified ?? null, doc: monthlyBests?.docUnified ?? null };
+    return { kb: monthlyBests?.kbIncRem ?? null, doc: monthlyBests?.docIncRem ?? null };
+  };
 
   const tabBtnStyle = (active: boolean): React.CSSProperties => ({
     padding: '8px 14px',
@@ -648,15 +687,14 @@ export function WeightedShieldPopup() {
           const iconForLabel = (label: string): string | null => {
             const l = label.toLowerCase();
             if (l === 'cards') return 'https://cdn-icons-png.flaticon.com/512/9145/9145670.png';
+            if (l === 'priority') return null;
             if (l === 'increm' || l === 'incrementalrem' || l === 'incremental rems') {
               return 'https://cdn-icons-png.flaticon.com/512/3626/3626838.png';
             }
             return null;
           };
           const renderGroup = (group: WeightedShieldGroup, i: number) => {
-            const isCard = group.itemLabel.toLowerCase() === 'cards';
-            const kbBest = isCard ? (monthlyBests?.kbCard ?? null) : (monthlyBests?.kbIncRem ?? null);
-            const docBest = isCard ? (monthlyBests?.docCard ?? null) : (monthlyBests?.docIncRem ?? null);
+            const { kb: kbBest, doc: docBest } = bestsFor(group.itemLabel);
             return (
             <div
               key={i}
@@ -719,9 +757,7 @@ export function WeightedShieldPopup() {
         })()
       ) : ctx.kbBreakdown ? (
         (() => {
-          const isCard = itemLabel.toLowerCase() === 'cards';
-          const kbBest = isCard ? (monthlyBests?.kbCard ?? null) : (monthlyBests?.kbIncRem ?? null);
-          const docBest = isCard ? (monthlyBests?.docCard ?? null) : (monthlyBests?.docIncRem ?? null);
+          const { kb: kbBest, doc: docBest } = bestsFor(itemLabel);
           return (
         <>
           <BreakdownSection

@@ -519,6 +519,19 @@ export const debugHistoryBackupPrefix = 'debug_history_backup_';
 // they were removed as dead code.
 export const displayWeightedShieldId = 'display-weighted-shield';
 
+// Which shield the flashcard bar shows: the setting gives the default, a click on
+// the shield switches it, and the session key keeps that switch until QueueEnter.
+export const flashcardBarShieldId = 'flashcard-bar-shield';
+export type FlashcardBarShield = 'card' | 'priority';
+export const flashcardBarShieldModeKey = 'flashcard-bar-shield-mode';
+
+// The priority colour map (lib/priority_color_scale.ts): percentile on the
+// unified IncRems + cards scale for each priority 0–100. Session key for the
+// widgets to read; the local copy gives the next startup colours before the
+// caches are warm.
+export const priorityColorScaleKey = 'priority-color-scale';
+export const priorityColorScaleLocalKey = 'priority-color-scale-local';
+
 // --- Keys for Open Editor in a new tab/window (PDFs) ---
 export const remnoteEnvironmentId = 'remnote-environment';
 

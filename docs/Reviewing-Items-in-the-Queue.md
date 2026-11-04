@@ -554,7 +554,7 @@ Before you adopt a new set of FSRS weights — a fresh result from RemNote's **O
 | Short dashes | **If Good** |
 | Staircase (bottom panel) | The stability after each repetition, and after a Good answer now |
 
-Each one keeps the dash of the line it shadows, so the same pattern means the same thing in both sets. Again, Hard and Easy get no comparison line, to keep the chart readable.
+Each one keeps the dash length of the line it shadows but leaves out every other dash, so it reads as the same kind of line while standing apart from the forecast's other dashed lines. Again, Hard and Easy get no comparison line, to keep the chart readable.
 
 A line under the legend sums up the difference for the card on screen, current → comparison: its stability now, its retrievability now, when it would fall to your target retention (roughly when it is due), and the interval a Good answer would earn.
 

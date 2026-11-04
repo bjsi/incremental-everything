@@ -108,18 +108,26 @@ const strokeFor = (grade: CurveGrade) => (grade === 'good' ? CURVE_STROKE.good :
 /**
  * The comparison weights' lines: a faint overlay on the configured weights'
  * chart, never part of it. One colour for all of them, outside the grade and
- * retrievability palettes, so "the magenta lines" is the whole comparison; each
- * keeps the dash of the line it shadows, so the same pattern means the same
- * thing in both sets. Thin and translucent, because the configured weights are
+ * retrievability palettes, so "the magenta lines" is the whole comparison. A
+ * forecast line keeps the dash length of the line it shadows but drops every
+ * other dash (gap = dash + 2 × gap), so the same dash means the same thing in
+ * both sets while the sparse rhythm sets it apart from the forecast's other
+ * dashed lines, where the colour alone was not enough. Thin and translucent, because the configured weights are
  * what the card is really scheduled with — and they alone size the axes, so a
  * comparison line that leaves the view is clipped rather than rescaling it.
  */
+/** `"14 6"` → `"14 26"`: the same dash, with every other one left out. */
+function sparseDash(dash: string): string {
+    const [on, off] = dash.split(' ').map(Number);
+    return `${on} ${on + 2 * off}`;
+}
+
 const COMPARISON_COLOR = '#d946ef';
 const COMPARISON_OPACITY = 0.55;
 const COMPARISON_STROKE = {
     history: { width: 1.2, dash: undefined as string | undefined },
-    noReview: { width: 1.2, dash: CURVE_STROKE.noReview.dash },
-    good: { width: 1.1, dash: CURVE_STROKE.good.dash },
+    noReview: { width: 1.2, dash: sparseDash(CURVE_STROKE.noReview.dash!) },
+    good: { width: 1.1, dash: sparseDash(CURVE_STROKE.good.dash!) },
 };
 
 /** Compact date for the comparison summary: the year only when it is not this one. */
@@ -1122,7 +1130,7 @@ export function ForgettingCurveChart({
                             width={COMPARISON_STROKE.history.width}
                             opacity={COMPARISON_OPACITY}
                         />
-                        <span title="The same history replayed with the FSRS Comparison Weights from the plugin settings. Each magenta line shadows the line with the same dash: solid = history, long dash = if not reviewed, short dash = if Good. For comparison only; the chart is scaled to your configured weights.">
+                        <span title="The same history replayed with the FSRS Comparison Weights from the plugin settings. Each magenta line shadows the line with the same dash length, with every other dash left out: solid = history, long dash = if not reviewed, short dash = if Good. For comparison only; the chart is scaled to your configured weights.">
                             Comparison weights
                         </span>
                     </span>
