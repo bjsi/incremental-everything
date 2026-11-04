@@ -6,13 +6,15 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ New
 
-**Priority Shield**: The IncRem Shield is replaced by a Priority Shield that ranks Incremental Rems and cards together by priority (dismissed Rems left out); the Card Shield is unchanged, and the history graph adds an IncRems + Cards universe line while keeping the IncRem-only value as a dashed line.
+**Priority Shield**: The IncRem Shield is replaced by a Priority Shield that ranks Incremental Rems and cards together by priority (dismissed Rems left out); the Card Shield is unchanged.
+
+**Priority Shield History**: The history popup now has three charts per scope, Priority Shield (IncRems + Cards), Card Shield and IncRem Shield, with days before this version rebuilt from the older histories, and two tabs when a document scope is open.
 
 **Flashcard Bar Shield**: The flashcard bar shows one shield at a time with new icons; click it to switch between the Card Shield and the Priority Shield for the rest of the queue, and choose the default in Settings.
 
 **Priority Colours**: Every priority colour in the plugin (editor, tables, highlights, queue bars and toolbar, priority popup, sidebar lists) now uses one scale, IncRems and cards ranked together, so the same priority is the same colour everywhere; the queue bars' percentages follow the shield on screen, and the popup's **Relative** ranks among IncRems + cards.
 
-📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield) · [Switching shields on flashcards](Prioritization-&-Sorting.md#flashcard-bar-shield) · [The priority ramp](Colour-Coding-Reference.md#the-priority-ramp)
+📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield) · [Priority Shield History](Prioritization-&-Sorting.md#priority-shield-history) · [Switching shields on flashcards](Prioritization-&-Sorting.md#flashcard-bar-shield) · [The priority ramp](Colour-Coding-Reference.md#the-priority-ramp)
 
 ## v1.0.192 - November 4th, 2026
 

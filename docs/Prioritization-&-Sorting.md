@@ -761,49 +761,59 @@ W_A / W_B = e^(k × (p_B − p_A)/100)
 
 You can track your performance over time by accessing the **"Priority Shield History"** graph from the queue menu (the three-dot icon). This graph plots your daily shield values, helping you identify trends and adjust your workload or priorities accordingly.
 
+Try it below with example data: hover a chart for its tooltip, drag across one to zoom, and switch between the two tabs.
+
+<iframe src="../demos/priority-shield-history.html" title="Priority Shield History demo" loading="lazy" style="width:100%;height:1250px;border:0;display:block"></iframe>
+
+**Three charts, one per universe.** Each scope gets the same three charts, top to bottom. Their titles say who is counted, so they can't be confused when they sit one above the other:
+
+1.  **Priority Shield — IncRems + Cards:** the [Priority Shield](#unified-priority-shield). Incremental Rems and cards are ranked together by absolute priority, and the chart plots the absolute value, the relative percentile and the [Weighted Shield](#weighted-shield). The tooltip also shows the two sides the absolute value comes from: the IncRem side and the card side.
+2.  **Card Shield — Cards only:** cards ranked on their own, the retention view.
+3.  **IncRem Shield — IncRems only:** the top missed Incremental Rem, with your reading backlog underneath. It has no percentile: dismissing an IncRem takes it out of this universe, so its rank would move without any review.
+
+**Rebuilt days.** The Priority Shield has been recorded since v1.0.193. For earlier days, the chart rebuilds it from the other two charts' histories:
+
+*   its absolute value is the lower of the IncRem and Card Shields that day;
+*   its universe is their two universes added up.
+
+A rebuilt day needs both shields recorded, since a missing side could have held the lower priority. Rebuilt days are drawn as a thinner dashed line, and their tooltip says "rebuilt". The relative and weighted values can't be rebuilt, because they need the whole priority distribution of that day, so those lines start at v1.0.193.
+
+**Scope tabs.** When the queue has a document scope, the popup opens with two tabs, **🌐 Knowledge Base** and **📄 the document**, on the document tab. Press **←** / **→** to switch between them. Without a document scope, it shows the Knowledge Base charts only.
+
 **Interactivity & Features:**
 
-*   **Priority Shield charts:** The absolute, percentile and weighted lines plot the [Priority Shield](#unified-priority-shield) (IncRems + cards). A faint dashed line keeps the **IncRem-only absolute**, so you can see which side set the shield. Days recorded before v1.0.193 have only that dashed line.
-*   **Dismissed Rems Tracking:** The Priority Shield graph tracks your process progression with a stacked area chart: 
-    *   The **green line** plots your active Incremental Rems universe.
-    *   The **black dashed line** on top plots IncRems + those marked with the `dismissed` powerup.
-    *   The **yellow shaded area** visually represents your volume of dismissed material.
-    *   The **blue dotted line** plots the Priority Shield's own universe, **IncRems + Cards** (dismissed excluded). It has its own hidden scale, since cards usually outnumber IncRems many times over.
-*   **Detailed Tooltips**: Hover over a Priority Shield graph to see the IncRem side and the card side, then Incremental Rems, Dismissed Rems, IncRems + Dismissed, Cards and the IncRems + Cards universe, with a **Processing Percentage** showing how much of IncRems + Dismissed has been dismissed.
+*   **Detailed Tooltips:** Hover over any chart to see that day's values in the same colours as the lines.
 *   **Drag-to-Zoom:** Click and drag your mouse horizontally over any chart to zoom into a specific time period. This is helpful for examining detailed progress over short durations.
-*   **Optimize Priorities Zoom:** A button automatically scales the absolute and relative priority Y-Axes to perfectly frame the visible data in your current zoom window. Highly beneficial for viewing subtle metric changes over time!
+*   **Optimize Priorities Zoom:** This button scales the absolute and relative Y-axes to frame the visible data in your current zoom window, so small changes become visible.
 *   **Reset Data Range:** A button appears when zoomed in, allowing you to quickly return to the full historical view.
-*   **Scope Organization:** Charts are organized into **Knowledge Base-wide** progress first (Card, then Priority), followed by **Document-level** progress for your current study context (Card, then Priority), separated by a visual divider.
-*   **Automatic Y-Scaling:** As you zoom or pan, the Universe Size axis adapts to the peak values in your visible range, providing maximum visual resolution.
+*   **Period and Weighted Shield:** The period (1M to All) and the **Show Weighted Shield** checkbox at the top apply to every chart, and are remembered on this device.
+*   **Axis colours:** Each axis has the colour of the line it measures. An axis that measures a stack of bands is grey.
 
 **Understanding the Metrics:**
 
-*   **Priority Shield:** This metric represents your processing capacity for high-priority items. A higher shield value (closer to 100) means you are successfully reviewing your most important material on time.
-*   **Document Shield:** Shows your priority protection within the current document/folder scope (or original scope for Priority Review Documents). This helps you track how well you're keeping up with the most important items in specific contexts.
-*   **Weighted Shield (⚖️):** Plots the historical trajectory of your Weighted Shield parameter over time. A rising line indicates you are actively clearing out high-priority debt, while a dropping line means high-priority material is accumulating faster than you can review it. Toggle this line on and off using the global "Show Weighted Shield" checkbox at the top of the history widget.
-*   **Universe Size:** This metric is represented differently depending on the graph type:
-    *   **For the Priority Shield:** The **IncRems + Cards** line (blue, dotted) is the universe the percentile is computed over. The other three layers track your *IncRem processing lifecycle*:
-        *   **Total Universe (Black dashed line):** Represents the absolute maximum volume of material you have interacted with in this scope (Active IncRems + Dismissed Rems). It illustrates your global learning footprint.
-        *   **Active Universe (Green line):** Represents the actual volume of IncRems currently sitting in your queue to be processed. 
-        *   **Dismissed Area (Yellow shading):** Represents the physical volume of material you have permanently processed and marked with the `dismissed` powerup. The wider this area gets, the more material you have successfully cleared out of your queue.
-    *   **For Cards:** It simply shows the **Universe Size (Dashed line)** representing the total number of active Rems with Cards. Note that the Universe shown in the Card Shield is the number of *Rems* with Cards, which is different from the total number of *flashcards* shown in other RemNote UI (since a single Rem can generate several flashcards). The `cardPriority` powerup is assigned per rem, not per flashcard.
-*   **Absolute Priority:** Refers to the hard number set in the Incremental Rem or Flashcard priority property.
-*   **Relative Priority (%)** is the Rem's relative percentile rank within the scope (% of the scope or KB). This gives you a clearer metric for managing your learning load.
+*   **Shield:** The priority of the most important item still due. A higher shield value (closer to 100) means you are successfully reviewing your most important material on time.
+*   **Document scope:** Your priority protection within the current document/folder scope (or the original scope, for Priority Review Documents). This helps you track how well you're keeping up with the most important items in specific contexts.
+*   **Absolute Priority:** The number set in the Incremental Rem or Flashcard priority property.
+*   **Relative Priority (%):** The shield's percentile rank within the chart's universe and scope. This gives you a clearer metric for managing your learning load.
     *   The higher the percentile of your Relative Priority shield, the more your top priority material is safeguarded and processed.
     *   If your graph oscillates around a priority of 4%, you know that only the top 4% of your learning material is guaranteed a timely repetition.
     *   You can increase that number by doing more work, reducing the inflow of new material, deprioritizing less important items, or reducing the randomization degree in your **Sorting Criteria**.
+*   **Weighted Shield (⚖️):** The historical trajectory of your Weighted Shield. A rising line indicates you are clearing out high-priority debt, while a dropping line means high-priority material is accumulating faster than you can review it.
+*   **Universe Size** (the far-right axis):
+    *   **Priority Shield:** stacked bands, from the largest to the smallest. **Cards** are at the bottom and **IncRems** above them; the top of the IncRems band is the shield's own universe. **Dismissed Rems** are on top. They are outside the shield: they need no more reading, and their remaining work is in their cards, which are already counted.
+    *   **Card Shield:** the **Universe Size (dashed line)** is the total number of *cards* in scope (a Rem owning N cards contributes N). Points stored before v1.0.65 (2026-08-28) used a per-Rem-with-cards universe, so expect a one-time step on the day you upgraded to it.
+    *   **IncRem Shield:** your IncRem processing lifecycle.
+        *   **Active Universe (green line):** the IncRems currently awaiting review.
+        *   **Dismissed Area (yellow shading):** the material you have marked with the `dismissed` powerup, stacked on the green line. The wider it gets, the more material you have cleared out of your queue.
+        *   **Total Universe (black dashed line):** the top of the stack, Active IncRems + Dismissed Rems: everything you have managed in this scope.
 
 **Understanding Universe Size Changes:**
 
 *   For **Incremental Rems**, observing your layers change over time paints a clear picture of your workflow:
     *   If your **Active Universe (Green)** drops but your **Total Universe (Black)** remains steady and your **Dismissed Area (Yellow)** expands, you are successfully processing and dismissing items faster than you are adding them! You are burning through your backlog!
     *   If your **Active Universe (Green)** increases while the **Dismissed Area (Yellow)** stays flat, you are actively adding new IncRems to your queue without clearing out old ones. This influx expands your active workload, and will likely drop your priority percentiles because each remaining item becomes a smaller percentage of the larger expanding whole.
-    *   If your **Total Universe (Black)** drops, it means you have physically deleted IncRems from your Knowledge Base entirely, or completely stripped their `Incremental` tag rather than using the `Dismissed` powerup.
+    *   If your **Total Universe (Black)** drops, it means you have deleted IncRems from your Knowledge Base, or removed their `Incremental` tag rather than using the `Dismissed` powerup.
 *   For **Flashcards**, this number will usually only increase (unless you delete cards). The evolution will show you the total size of your knowledge base over time.
-
-![priority-shield-history](assets/uploaded/1a1591e2-7aaf-4304-be75-48f4e1260fc9.png){ width="900" }
-
-![Priority Shield Graph Zoom](assets/priority-shield-graph-zoom.gif){ width="800" }
 
 
 ---
