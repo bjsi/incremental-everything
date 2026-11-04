@@ -121,6 +121,7 @@ import {
   setCardPriority,
 } from '../lib/card_priority';
 import { createOpTimer, OpTimer } from '../lib/op_timer';
+import dayjs from 'dayjs';
 import { createTurnQueue } from '../lib/turn_queue';
 import { holdCardPriorityCacheEntry, loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist } from '../lib/card_priority/cache';
 import {
@@ -1163,7 +1164,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           cardsCreatedAt: [clozeCreatedAt],
         } as any);
         rereadCardPriorityCacheWhenCardsExist(plugin, clozeRem._id);
-        console.log(`[Cloze] created in ${timer.report()}`);
+        console.log(`[Cloze] pressed at ${dayjs(timer.startedAt).format('HH:mm:ss.SSS')}, created in ${timer.report()}`);
 
         return { clozeRem, parentRem: rem, autoPriority };
       } finally {

@@ -164,7 +164,7 @@ Both commands automatically assign a **Card Priority** to every new cloze, imple
    - The new **cloze child Rem** is tagged with the **Remove Parent** powerup, so the parent (the extract) is hidden from queue display *only* while reviewing this specific cloze. Other flashcard descendants of the same parent (e.g. Descriptor children) still see the parent normally — see [Remove Parent](Utilities-Queue-Display.md#remove-parent-rp-new) in Queue Display Utilities.
    - The child Rem receives a **`cloze-extract` tag**. In the Queue, this tag renders a small violet **↑** badge (hover for a tooltip) to identify its origin. **In the Editor**, these tagged clozes — and any Rems nested under them — deliberately appear **less conspicuous** (faded, grayscaled, and zoomed out; hover or focus to read at full strength). This visual cue signals that the Rem merely contains material copied from a parent Rem for priority scheduling purposes, so you can safely skip past it when reviewing your notes.
 
-The new Rem and the highlight appear first. Its faded `cloze-extract` look and its Card Priority follow moments later. Views built from the plugin's priority data, such as the Priority Graph, usually pick up the new cloze about 2 seconds later, or up to about 22 seconds if RemNote is slow to create its card.
+The new Rem and the highlight appear first. Its faded `cloze-extract` look and its Card Priority follow moments later. Views built from the plugin's priority data, such as the Priority Graph, pick up new clozes together about 12 seconds after your last one, so that saving them doesn't slow down the next cloze.
 
 ### Visual result in the child Rem
 
