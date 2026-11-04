@@ -10,7 +10,7 @@ This page documents the major changes and improvements for each version of the I
 
 **Flashcard Bar Shield**: The flashcard bar shows one shield at a time with new icons; click it to switch between the Card Shield and the Priority Shield for the rest of the queue, and choose the default in Settings.
 
-**Editor Priority Colours**: The Priority Editor badge, table badges and highlight badges now colour IncRems and flashcards on one shared scale (the Priority Shield's), so the same priority is the same colour everywhere in the editor; the queue keeps its per-kind scales.
+**Priority Colours**: Every priority colour in the plugin (editor, tables, highlights, queue bars and toolbar, priority popup, sidebar lists) now uses one scale, IncRems and cards ranked together, so the same priority is the same colour everywhere; the queue bars' percentages follow the shield on screen, and the popup's **Relative** ranks among IncRems + cards.
 
 📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield) · [Switching shields on flashcards](Prioritization-&-Sorting.md#flashcard-bar-shield) · [The priority ramp](Colour-Coding-Reference.md#the-priority-ramp)
 

@@ -17,9 +17,6 @@
 
 import { BuiltInPowerupCodes, PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import {
-  allCardPriorityInfoKey,
-  allIncrementalRemKey,
-  allIncrementalRemSlimKey,
   dismissedHistorySlotCode,
   dismissedPowerupCode,
   powerupCode,
@@ -33,7 +30,7 @@ import {
 // classic script and dies on `import.meta` (see the note atop register/tracker.ts).
 import { CARD_PRIORITY_CODE } from './card_priority/types';
 import { getRawCardPriorityString } from './card_priority/slot_access';
-import { UnifiedCardInfo, UnifiedRanking, buildUnifiedRanking, unifiedPercentileAt } from './unified_percentile';
+import { readPriorityColorScale } from './priority_color_scale';
 
 export const BAND_COUNT = 10;
 
@@ -727,17 +724,13 @@ export async function syncAllHighlightBands(
   return { scanned: highlights.length, changed, noPriority, alreadyCorrect };
 }
 
-/** Below this many samples the distribution is noise; fall back to absolute. */
-const MIN_PERCENTILE_SAMPLE = 20;
-
 /**
  * Band→percentile mapping on the UNIFIED scale (IncRems + cards ranked
- * together, see lib/unified_percentile.ts) — the scale the Priority Editor
- * badge uses, so a band is the same colour on an IncRem, a flashcard and a
- * highlight.
+ * together): each band's colour is its midpoint priority read from the
+ * priority colour map (lib/priority_color_scale.ts), the same map every badge
+ * uses — so a band is one colour on an IncRem, a flashcard and a highlight.
  *
- * Null when the universe is too small to rank meaningfully; callers then fall
- * back to the absolute value.
+ * Null while no map has been built; callers then fall back to the absolute value.
  */
 export type BandSyncStats = {
   /** Rems whose own table badge changed. */
@@ -754,57 +747,13 @@ export type BandPercentiles = {
   unified: number[] | null;
 };
 
-/** Each band's colour is its midpoint priority's place on the unified scale. */
-function percentilesFor(ranking: UnifiedRanking): number[] | null {
-  if (ranking.total < MIN_PERCENTILE_SAMPLE) return null;
-  return Array.from({ length: BAND_COUNT }, (_, band) => unifiedPercentileAt(ranking, band * 10 + 5) ?? band * 10 + 5);
-}
-
-/**
- * Samples both caches to build the mappings. CSS cannot compute, so this is
- * resolved once and baked into the generated stylesheets — necessarily a
- * snapshot, recomputed at startup and after a badge refresh.
- */
 export async function computeBandPercentiles(plugin: RNPlugin): Promise<BandPercentiles> {
-  const t0 = Date.now();
-  let ranking: UnifiedRanking;
-  try {
-    // The SLIM IncRem projection, not the full cache: only `priority` is read
-    // here, and the full cache is multi-megabyte to drag across the bridge. Both
-    // are written together by writeIncRemCaches, so the slim key is never the
-    // staler of the two; the fallback covers a realm holding only the full key.
-    const [incSlim, cardInfos] = await Promise.all([
-      plugin.storage.getSession<Array<{ priority?: number }>>(allIncrementalRemSlimKey),
-      plugin.storage.getSession<UnifiedCardInfo[]>(allCardPriorityInfoKey),
-    ]);
-    const incRems =
-      incSlim?.length
-        ? incSlim
-        : await plugin.storage.getSession<Array<{ priority?: number }>>(allIncrementalRemKey);
-    // One element per IncRem and one per SCHEDULED card: a Rem whose cards are
-    // all unscheduled owns nothing the user intends to practise.
-    ranking = buildUnifiedRanking(incRems || [], cardInfos || []);
-  } catch (err) {
-    console.error('[PriorityBands] percentile sampling failed', err);
-    return { unified: null };
-  }
-
-  const result = { unified: percentilesFor(ranking) };
-  const describe = `${result.unified ? 'RELATIVE' : 'ABSOLUTE FALLBACK'} (${ranking.total} IncRems + cards)`;
-
+  const scale = await readPriorityColorScale(plugin);
+  const unified = scale ? Array.from({ length: BAND_COUNT }, (_, band) => scale[band * 10 + 5]) : null;
   if (await bandVerboseLogsEnabled(plugin)) {
-    console.log(
-      `[PriorityBands] computeBandPercentiles: unified pool=${describe}, ` +
-        `min sample=${MIN_PERCENTILE_SAMPLE}, sampled in ${Date.now() - t0}ms`
-    );
-  } else if (!result.unified) {
-    // Not gated: a pool too small to rank means the badges built from it fall
-    // back to the absolute midpoint scale and quietly disagree with the Priority
-    // Editor — and nothing in the UI reveals it. One line, and only when
-    // actually degraded. Expected while the caches are still loading.
-    console.warn(`[PriorityBands] band colours degraded to the absolute scale — unified pool ${describe}`);
+    console.log(`[PriorityBands] computeBandPercentiles: ${unified ? 'RELATIVE (unified colour map)' : 'ABSOLUTE FALLBACK (no colour map yet)'}`);
   }
-  return result;
+  return { unified };
 }
 
 /**

@@ -3,7 +3,14 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildUnifiedRanking, scheduledCardCount, unifiedPercentileAt, unifiedRankingFor } from './unified_percentile';
+import {
+  buildPriorityColorScale,
+  buildUnifiedRanking,
+  scalePercentile,
+  scheduledCardCount,
+  unifiedPercentileAt,
+  unifiedRankingFor,
+} from './unified_percentile';
 
 describe('scheduledCardCount', () => {
   it('counts scheduled cards only, and falls back to cardCount', () => {
@@ -48,5 +55,20 @@ describe('unifiedPercentileAt', () => {
     const cards = [{ priority: 2, cardCount: 1 }];
     assert.equal(unifiedRankingFor(inc, cards), unifiedRankingFor(inc, cards));
     assert.notEqual(unifiedRankingFor(inc, cards), unifiedRankingFor([...inc], cards));
+  });
+});
+
+describe('buildPriorityColorScale', () => {
+  it('maps every priority 0–100, and is null for a tiny universe', () => {
+    const big = buildUnifiedRanking(
+      Array.from({ length: 30 }, (_, i) => ({ priority: i * 3 })),
+      []
+    );
+    const scale = buildPriorityColorScale(big)!;
+    assert.equal(scale.length, 101);
+    assert.equal(scalePercentile(scale, 0), unifiedPercentileAt(big, 0));
+    assert.equal(scalePercentile(scale, 250), scale[100]);
+    assert.ok(scale.every((v, i) => i === 0 || v >= scale[i - 1]));
+    assert.equal(buildPriorityColorScale(buildUnifiedRanking([{ priority: 1 }], [])), null);
   });
 });

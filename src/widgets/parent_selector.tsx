@@ -39,6 +39,7 @@ import { RemTextSegments } from '../components';
 import { applyHeadingLevel, getHeadingLevel } from '../lib/outline_restructure';
 import { HeadingBadge } from '../components/HeadingBadge';
 import { startParentPick } from '../lib/parent_pick';
+import { priorityColor, usePriorityColorScale } from '../components/priorityColor';
 
 // ============================================================================
 // STYLES
@@ -192,9 +193,12 @@ const PriorityBadge: React.FC<PriorityBadgeProps> = ({
   percentile,
   isIncremental,
 }) => {
+  const scale = usePriorityColorScale();
   if (!isIncremental || priority === null) return null;
 
-  const color = percentile !== null ? percentileToHslColor(percentile) : '#6b7280';
+  const color = scale
+    ? priorityColor(scale, priority)
+    : percentile !== null ? percentileToHslColor(percentile) : '#6b7280';
 
   return (
     <span

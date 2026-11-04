@@ -1,5 +1,5 @@
 import React from 'react';
-import { percentileToHslColor } from '../lib/utils';
+import { priorityColor, usePriorityColorScale } from './priorityColor';
 import type { UnifiedShieldEntry } from '../lib/unified_shield';
 
 /** Hover text for one Priority Shield value: both sides and the universe. */
@@ -24,10 +24,11 @@ export function PriorityShieldValue({
   entry: UnifiedShieldEntry | null | undefined;
   style?: React.CSSProperties;
 }) {
+  const scale = usePriorityColorScale();
   if (!entry || entry.absolute === null) return null;
   return (
     <span style={style} title={priorityShieldTitle(entry, label)}>
-      {label}: <strong style={{ color: percentileToHslColor(entry.percentile ?? entry.absolute) }}>{entry.absolute}</strong>
+      {label}: <strong style={{ color: priorityColor(scale, entry.absolute, entry.percentile) }}>{entry.absolute}</strong>
       {entry.percentile !== null && ` (${entry.percentile.toFixed(1)}%)`}
     </span>
   );

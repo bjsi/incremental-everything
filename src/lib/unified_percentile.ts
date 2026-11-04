@@ -116,3 +116,25 @@ export function unifiedRankingFor(
   }
   return ranking;
 }
+
+/** Below this many elements the distribution is noise; colours stay absolute. */
+export const MIN_SCALE_SAMPLE = 20;
+
+/**
+ * The colour map: percentile on the unified scale for every priority 0–100.
+ * Null when the universe is too small to rank. A snapshot by design: built when
+ * the caches are warm (and on Refresh priority badges); mid-session edits move
+ * a many-thousand-element distribution too little to matter for colour.
+ */
+export type PriorityColorScale = number[];
+
+export function buildPriorityColorScale(ranking: UnifiedRanking): PriorityColorScale | null {
+  if (ranking.total < MIN_SCALE_SAMPLE) return null;
+  return Array.from({ length: 101 }, (_, p) => unifiedPercentileAt(ranking, p) ?? p);
+}
+
+/** A priority's percentile on the scale (rounded and clamped to 0–100). */
+export function scalePercentile(scale: PriorityColorScale, priority: number): number {
+  const i = Math.max(0, Math.min(100, Math.round(priority)));
+  return scale[i] ?? i;
+}

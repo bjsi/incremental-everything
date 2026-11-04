@@ -31,7 +31,7 @@ import {
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, cardInfoBarHeightKey, queueBeautifulBarWidthKey, editorReviewTimerHeightsKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, queueBeautifulBarWidthKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
 import { registerQueueBeautifulBarFitCss } from '../lib/queue_beautiful_bar_fit';
 import { registerEditorReviewTimerHeadersCss } from '../lib/editor_review_timer_sticky';
@@ -48,6 +48,7 @@ import { registerImageSizeSession } from '../lib/image_size_session';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
+import { refreshPriorityColorScale, restorePriorityColorScale } from '../lib/priority_color_scale';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS, registerHasImageCSS, registerPinReferenceCSS } from '../lib/ui_helpers';
 import { getIESetting } from '../lib/settings';
 import { StartupTaskBoard, waitForSessionFlag } from '../lib/startup_status';
@@ -161,11 +162,15 @@ async function onActivate(plugin: ReactRNPlugin) {
   // key and re-registers here in the index widget. It also runs once on activation
   // (key undefined) to do the initial registration. registerPdfHighlightCSS reads
   // the persisted local flag itself to decide whether to draw the marker borders.
+  // The priority colour map saved by the last run, so badges and bands colour on
+  // the unified scale before this run's caches are warm (lib/priority_color_scale).
+  await restorePriorityColorScale(plugin);
+
   plugin.track(async (rp) => {
     await rp.storage.getSession(pdfHighlightBordersReloadKey); // reactive trigger
-    // Also re-runs when the band→percentile colour mapping changes: the PDF
-    // marker tint is emitted inside this stylesheet.
-    await rp.storage.getSession(priorityBandColorsReloadKey);
+    // Also re-runs when the priority colour map changes: the PDF marker tint is
+    // emitted inside this stylesheet.
+    await rp.storage.getSession(priorityColorScaleKey);
     await registerPdfHighlightCSS(plugin);
   });
 
@@ -213,6 +218,8 @@ async function onActivate(plugin: ReactRNPlugin) {
         }`
       );
     }
+    // Rebuild the colour map first: every badge, bar and band colours from it.
+    await refreshPriorityColorScale(plugin);
     await registerTableBandBadgeCSS(plugin);
     await registerHighlightBandBadgeCSS(plugin);
     if (cachesWarm) startup.settle('priorityBands', 'done');

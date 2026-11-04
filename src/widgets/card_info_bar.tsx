@@ -42,10 +42,12 @@ import { JointItem, computeLiveShields, perCardUniverse } from '../lib/live_shie
 import { UnifiedShieldEntry } from '../lib/unified_shield';
 import { priorityShieldTitle } from '../components/PriorityShieldValue';
 import { ShieldIcon } from '../components/ShieldIcon';
+import { priorityColor as colorForPriority, usePriorityColorScale } from '../components/priorityColor';
+import { buildUnifiedRanking, unifiedPercentileAt, unifiedRankingFor } from '../lib/unified_percentile';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PendingCardPriority, pendingCardPriorityFor } from '../lib/card_priority/pending_priority';
 import { reportCardInfoBarHeight } from '../lib/card_info_bar_dock';
-import { PERFORMANCE_MODE_LIGHT, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
 import { CardSchedulerLabel } from '../components/OtherSchedulers';
@@ -610,6 +612,24 @@ export function CardInfoBar() {
     return estimateCardRemPercentile(allPrioritizedCardInfo, rem._id, finalCardInfo.priority);
   }, [rem, cardInfo, finalCardInfo, allPrioritizedCardInfo]);
 
+  // While the Priority Shield is on screen, the written "% KB / % Doc" are on its
+  // unified scale (IncRems + cards), so the card's rank and the shield's compare
+  // directly. The ranking does not depend on the card, so it is built once per
+  // cache version and scope, not per card.
+  const unifiedRankings = useMemo(() => {
+    if (!priorityReady || !allPrioritizedCardInfo) return null;
+    const kb = unifiedRankingFor(allIncRems, allPrioritizedCardInfo);
+    if (!scopeRemIds) return { kb, doc: null };
+    const scope = new Set(scopeRemIds);
+    const doc = buildUnifiedRanking(
+      allIncRems.filter((r) => scope.has(r.remId)),
+      allPrioritizedCardInfo.filter((c) => scope.has(c.remId))
+    );
+    return { kb, doc: doc.total > 0 ? doc : null };
+  }, [priorityReady, allIncRems, allPrioritizedCardInfo, scopeRemIds]);
+
+  const colorScale = usePriorityColorScale();
+
   // Detect whether the stats separator `|` has flex-wrapped to a new line.
   // CSS cannot observe line-breaks in a flex-wrap container, so we compare the
   // vertical position of the separator span against the stats div with a ResizeObserver.
@@ -658,11 +678,24 @@ export function CardInfoBar() {
   // KB percentile is read directly from the main cache, which is already fast.
   // Only show relative data when the cache is actually populated
   const cacheReady = !!(cardInfo && allPrioritizedCardInfo && allPrioritizedCardInfo.length > 0);
-  const kbPercentile = (!useLightMode && cacheReady && cardInfo)
-    ? (estimatedKbPercentile ?? cardInfo.kbPercentile)
-    : undefined;
+  // Card Shield on screen: ranked among cards. Priority Shield: among IncRems + cards.
+  const shownKbPercentile = unifiedRankings
+    ? unifiedPercentileAt(unifiedRankings.kb, finalCardInfo.priority) ?? undefined
+    : (!useLightMode && cacheReady && cardInfo)
+      ? (estimatedKbPercentile ?? cardInfo.kbPercentile)
+      : undefined;
+  const shownDocPercentile = unifiedRankings
+    ? (unifiedRankings.doc ? unifiedPercentileAt(unifiedRankings.doc, finalCardInfo.priority) : null)
+    : docPercentile;
+  const kbPercentile = shownKbPercentile;
+  const percentScaleTitle = unifiedRankings
+    ? 'Rank among all IncRems and cards, the Priority Shield’s scale'
+    : 'Rank among cards, the Card Shield’s scale';
 
-  const priorityColor = kbPercentile !== undefined ? percentileToHslColor(kbPercentile) : '#6b7280';
+  // The colour is the priority's, on the plugin-wide colour map.
+  const priorityColor = colorScale || kbPercentile !== undefined
+    ? colorForPriority(colorScale, finalCardInfo.priority, kbPercentile)
+    : '#6b7280';
 
   // --- Check if current card is directly impacting (or within) the shield boundary ---
   // Pulse if the card's absolute priority is <= the shield value:
@@ -765,12 +798,12 @@ export function CardInfoBar() {
           <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
           <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode || !cacheReady} source={finalCardInfo.source} isCardPriority={true} />
           {!useLightMode && cacheReady && kbPercentile !== undefined && (
-            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }} title={percentScaleTitle}>
               ({kbPercentile}% KB
-              {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
+              {shownDocPercentile !== undefined && shownDocPercentile !== null && `, ${shownDocPercentile}% Doc`})
             </span>
           )}
-          {!useLightMode && cacheReady && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
+          {!useLightMode && cacheReady && !unifiedRankings && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
             <span
               className="text-sm opacity-60 cursor-help"
               title="Doc percentile will be recalculated when you start a new queue session"
@@ -810,7 +843,7 @@ export function CardInfoBar() {
                       fontWeight: active ? 700 : 'inherit',
                       color: active ? 'var(--rn-clr-blue)' : 'inherit'
                     }}>
-                      {label}: <strong style={{ color: percentileToHslColor(v.percentile ?? v.absolute) }}>{v.absolute}</strong>
+                      {label}: <strong style={{ color: colorForPriority(colorScale, v.absolute, v.percentile) }}>{v.absolute}</strong>
                       {v.percentile !== undefined && ` (${v.percentile.toFixed(1)}%)`}
                     </span>
                   )

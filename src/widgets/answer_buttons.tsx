@@ -33,6 +33,8 @@ import { computeLiveShields } from '../lib/live_shield';
 import { CoolingCache, shieldExclusionIds } from '../lib/priority_review_document/cooling_store';
 import { PriorityShieldValue } from '../components/PriorityShieldValue';
 import { ShieldIcon } from '../components/ShieldIcon';
+import { priorityColor as colorForPriority, usePriorityColorScale } from '../components/priorityColor';
+import { buildUnifiedRanking, unifiedPercentileAt, unifiedRankingFor } from '../lib/unified_percentile';
 import { getIncrementalRemFromRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import {
   queueNextRepetition,
@@ -43,7 +45,7 @@ import {
 } from '../lib/incremental_rem/review_jobs';
 import { openRemInBrowserTab } from '../lib/remHelpers';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
+import { calculateRelativePercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, getPageHistory, getDescendantsToDepth } from '../lib/pdfUtils';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
@@ -249,15 +251,39 @@ export function AnswerButtons() {
 
 
   // ✅ MEMOIZE CALCULATIONS (but they must run every render, not conditionally)
+  // The written "% KB / % Doc" follow the shield on screen: with the Priority
+  // Shield (IncRems + cards) they are on its unified scale, so the IncRem's rank
+  // and the shield's compare directly; with no shield, IncRems only.
+  const unifiedRankings = useMemo(() => {
+    if (!allCardInfos || allIncRems.length + allCardInfos.length === 0) return null;
+    const kb = unifiedRankingFor(allIncRems, allCardInfos);
+    if (!scopeRemIds) return { kb, doc: null };
+    const scope = new Set(scopeRemIds);
+    const doc = buildUnifiedRanking(
+      allIncRems.filter((r) => scope.has(r.remId)),
+      allCardInfos.filter((c) => scope.has(c.remId))
+    );
+    return { kb, doc: doc.total > 0 ? doc : null };
+  }, [allIncRems, allCardInfos, scopeRemIds]);
+
   const percentiles = useMemo(() => {
-    if (!coreData) return { kb: null, doc: null };
+    if (!coreData) return { kb: null, doc: null, unified: false };
 
     const { incRemInfo, sessionCache } = coreData;
+    if (unifiedRankings) {
+      return {
+        kb: unifiedPercentileAt(unifiedRankings.kb, incRemInfo.priority),
+        doc: unifiedRankings.doc ? unifiedPercentileAt(unifiedRankings.doc, incRemInfo.priority) : null,
+        unified: true,
+      };
+    }
     const kbPercentile = calculateRelativePercentile(allIncRems, incRemInfo.remId);
     const docPercentile = sessionCache?.incRemDocPercentiles?.[incRemInfo.remId] ?? null;
 
-    return { kb: kbPercentile, doc: docPercentile };
-  }, [coreData, allIncRems]);
+    return { kb: kbPercentile, doc: docPercentile, unified: false };
+  }, [coreData, allIncRems, unifiedRankings]);
+
+  const colorScale = usePriorityColorScale();
 
   // Calculate history stats for display (must be before early returns)
   const historyStats = useMemo(() => {
@@ -344,7 +370,10 @@ export function AnswerButtons() {
     await queueManualOffset(plugin, rem._id, mode === 'tomorrow' ? 1 : 0);
   };
 
-  const priorityColor = percentiles.kb ? percentileToHslColor(percentiles.kb) : '#6b7280';
+  // The colour is the priority's, on the plugin-wide colour map.
+  const priorityColor = colorScale || percentiles.kb
+    ? colorForPriority(colorScale, incRemInfo.priority, percentiles.kb)
+    : '#6b7280';
   const buttonStyles = getButtonStyles();
 
   // When both a reader bookmark and an outline read point exist, the reader
@@ -902,7 +931,12 @@ export function AnswerButtons() {
                 <span>{incRemInfo.priority}</span>
                 {/* Show KB percentile (always current). Doc percentile removed from cache after priority change. */}
                 {percentiles.kb !== null && (
-                  <span style={{ opacity: 0.9, fontSize: '11px' }}>
+                  <span
+                    style={{ opacity: 0.9, fontSize: '11px' }}
+                    title={percentiles.unified
+                      ? 'Rank among all IncRems and cards, the Priority Shield’s scale'
+                      : 'Rank among IncRems'}
+                  >
                     ({percentiles.kb}% KB
                     {/* 🔌 Conditionally show Doc percentile */}
                     {!useLightMode && percentiles.doc !== null && `, ${percentiles.doc}% Doc`})
@@ -910,7 +944,7 @@ export function AnswerButtons() {
                 )}
               </div>
               {/* Show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
-              {percentiles.kb !== null && percentiles.doc === null && (
+              {!percentiles.unified && percentiles.kb !== null && percentiles.doc === null && (
                 <span
                   style={{
                     fontSize: '16px',

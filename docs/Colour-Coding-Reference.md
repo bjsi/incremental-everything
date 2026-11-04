@@ -6,7 +6,7 @@ Every colour the plugin draws in one place. Nothing here is configurable per-col
 
 ## The priority ramp
 
-One scale underlies every priority colour in the plugin. An item's **percentile** maps onto a hue. In the editor (the Priority Editor badge, table badges, highlight badges and PDF markers) Incremental Rems and flashcards are ranked **together**, on the [Priority Shield's](Prioritization-&-Sorting.md#unified-priority-shield) universe; in the queue (the flashcard bar, the IncRem bar and the queue toolbar) each is ranked against its own kind. The hue is drawn as `hsl(hue, 80%, 55%)`:
+One scale underlies every priority colour in the plugin. A priority's **percentile** among **all your Incremental Rems and flashcards together** — the [Priority Shield's](Prioritization-&-Sorting.md#unified-priority-shield) universe, one element per IncRem and per card — maps onto a hue, so the same priority is the same colour everywhere: editor badges, table and highlight badges, the queue bars and toolbar, the priority popup and the sidebar lists. The mapping is a snapshot, rebuilt once the priority caches are warm and after **Refresh priority badges**, and remembered for the next start. The hue is drawn as `hsl(hue, 80%, 55%)`:
 
 | Percentile | Hue | Reads as |
 |---|---|---|
@@ -20,6 +20,8 @@ One scale underlies every priority colour in the plugin. An item's **percentile*
 | 100 | 240° | blue |
 
 Between two rows the hue shifts evenly, so a percentile of 31 sits halfway between lime and green.
+
+**Colours and written percentages answer different questions.** A colour only says where the priority sits overall. A written percentage says where it ranks in a particular scope: the flashcard bar's `(51.9% KB, 99% Doc)` ranks the card among cards while the Card Shield is on screen, and among IncRems + cards while the Priority Shield is; the IncRem bar's ranks among IncRems + cards; the priority popup's **Relative** ranks among the IncRems + cards of the scope you picked, with the IncRem-only or card-only rank on hover.
 
 ### More colour where it matters { #steeper-at-the-top }
 

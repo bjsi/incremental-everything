@@ -19,10 +19,11 @@ import { setCardPriority } from '../lib/card_priority';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, writeIncRemCaches } from '../lib/incremental_rem/cache';
-import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
+import { calculateRelativePercentile } from '../lib/utils';
 import { remToActionItemType } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import dayjs from 'dayjs';
+import { priorityColor, usePriorityColorScale } from '../components/priorityColor';
 
 // Types for our operations
 type OperationType = 'increase' | 'decrease' | 'spread' | 'adjust';
@@ -54,6 +55,7 @@ interface PrioritizedItemData {
 }
 
 function BatchPriority() {
+  const colorScale = usePriorityColorScale();
   console.log('🚀 BatchPriority: Component rendering');
   const plugin = usePlugin();
 
@@ -1313,8 +1315,13 @@ function BatchPriority() {
 
               const hasChildNodes = hasChildren(remData.remId);
               const isExpanded = expandedNodes.has(remData.remId);
-              const incColor = remData.incPercentile ? percentileToHslColor(remData.incPercentile) : 'transparent';
-              const cardColor = remData.cardPercentile ? percentileToHslColor(remData.cardPercentile) : 'transparent';
+              // Colours on the unified scale when the map exists, like every badge.
+              const incColor = remData.currentIncPriority !== null && (colorScale || remData.incPercentile)
+                ? priorityColor(colorScale, remData.currentIncPriority, remData.incPercentile)
+                : 'transparent';
+              const cardColor = remData.currentCardPriority !== null && (colorScale || remData.cardPercentile)
+                ? priorityColor(colorScale, remData.currentCardPriority, remData.cardPercentile)
+                : 'transparent';
 
               return (
                 <div
