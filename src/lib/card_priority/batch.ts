@@ -9,6 +9,7 @@ import {
   cardShieldCleanupBackupIndexKey,
   orphanRemIdsKey,
   flashcardResponseTimeLimitId,
+  defaultCardPriorityId,
 } from '../consts';
 import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { isPowerupPropertySafe } from '../powerupSlotFilter';
@@ -520,6 +521,94 @@ export async function pruneCardPriorityCopies(plugin: RNPlugin, removedIds: Set<
   );
 }
 
+/**
+ * A rem whose inherited priority has no anchor left above it, held back from
+ * the bulk pass until the user decides what to do with the whole set.
+ */
+interface OrphanedInheritedPriority {
+  rem: PluginRem;
+  hasPowerupTag: boolean;
+  /** What the rem holds now (null when untagged). */
+  oldPriority: number | null;
+  oldSource: PrioritySource | null;
+  /** What it would keep if left as is (its own value, or an orphaned ancestor's). */
+  inheritedPriority: number;
+}
+
+/**
+ * Asks once what to do with every inherited priority that lost its anchor, then
+ * writes the answer. "Leave as is" writes exactly what the bulk pass would have
+ * written without this step, so declining changes nothing about the old
+ * behaviour.
+ *
+ * The prior values go to the console before anything is written: a reset is not
+ * undoable from the UI, and that list is how a value can be found again.
+ */
+async function resolveOrphanedInheritedPriorities(
+  plugin: RNPlugin,
+  orphans: OrphanedInheritedPriority[]
+): Promise<{ tagged: number; changed: number; reset: boolean }> {
+  if (orphans.length === 0) return { tagged: 0, changed: 0, reset: false };
+
+  const defaultPriority = Number(await getIESetting(plugin, defaultCardPriorityId));
+
+  const byValue = new Map<number, number>();
+  for (const o of orphans) byValue.set(o.inheritedPriority, (byValue.get(o.inheritedPriority) || 0) + 1);
+  const valueSummary = Array.from(byValue.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([value, count]) => `P${value} ×${count}`)
+    .join(', ');
+  const atDefault = byValue.get(defaultPriority) || 0;
+
+  const examples: string[] = [];
+  for (const o of orphans.slice(0, 3)) {
+    const name = (await safeRemTextToString(plugin, o.rem.text)) || o.rem._id;
+    examples.push(`  • ${name.slice(0, 60)}${name.length > 60 ? '…' : ''}`);
+  }
+
+  console.log(
+    `[CardPriority update] ${orphans.length} inherited priorities without an anchor (remId → value):\n` +
+      orphans.map((o) => `${o.rem._id} → ${o.inheritedPriority}`).join('\n')
+  );
+
+  const reset = confirm(
+    `🔗 ${orphans.length} inherited Card ${orphans.length === 1 ? 'Priority has' : 'Priorities have'} lost their anchor\n\n` +
+      `No ancestor of ${orphans.length === 1 ? 'this Rem' : 'these Rems'} has a manual card priority or is an ` +
+      `Incremental Rem anymore, so the inherited value is left over from an anchor that was removed or moved away.\n\n` +
+      `Values: ${valueSummary}${atDefault > 0 ? ` (${atDefault} already at the default P${defaultPriority})` : ''}\n` +
+      `Examples:\n${examples.join('\n')}${orphans.length > examples.length ? `\n  … and ${orphans.length - examples.length} more (full list in the console)` : ''}\n\n` +
+      `➡️ OK = reset them to the default: P${defaultPriority}, source "default"\n` +
+      `➡️ Cancel = leave them as they are: inherited, same value`
+  );
+
+  let tagged = 0;
+  let changed = 0;
+  const batchSize = 50;
+  for (let i = 0; i < orphans.length; i += batchSize) {
+    await Promise.all(
+      orphans.slice(i, i + batchSize).map(async (o) => {
+        const priority = reset ? defaultPriority : o.inheritedPriority;
+        const source: PrioritySource = reset ? 'default' : 'inherited';
+        if (o.hasPowerupTag && o.oldPriority === priority && o.oldSource === source) return;
+        try {
+          await setCardPriority(plugin, o.rem, priority, source);
+          tagged++;
+          if (o.hasPowerupTag && o.oldPriority !== null && o.oldPriority !== priority) changed++;
+        } catch (error) {
+          console.error(`[CardPriority update] Could not write orphaned priority for ${o.rem._id}:`, error);
+        }
+      })
+    );
+  }
+
+  console.log(
+    `[CardPriority update] Orphaned inherited priorities ${reset ? `reset to default P${defaultPriority}` : 'left as is'}: ` +
+      `${tagged} written, ${changed} with changed value.`
+  );
+  return { tagged, changed, reset };
+}
+
 export async function updateAllCardPriorities(plugin: RNPlugin) {
   const confirmed = confirm(
     '📊 Update All Inherited Card Priorities\n\n' +
@@ -571,6 +660,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
     let skippedManual = 0;
     let errors = 0;
     const errorDetails: Array<{ remId: string; reason: string; error?: any }> = [];
+    const orphans: OrphanedInheritedPriority[] = [];
 
     const batchSize = 50;
 
@@ -620,6 +710,20 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
 
             const calculatedPriority = await calculateNewPriority(plugin, rem, existingPriority);
 
+            // Held back: written after the scan, once the user has chosen
+            // between keeping the orphaned value and resetting to default.
+            if (calculatedPriority.orphaned) {
+              orphans.push({
+                rem,
+                hasPowerupTag,
+                oldPriority: oldPriorityValue,
+                oldSource: oldPrioritySource,
+                inheritedPriority: calculatedPriority.priority,
+              });
+              processed++;
+              return;
+            }
+
             if (
               !hasPowerupTag ||
               calculatedPriority.priority !== oldPriorityValue ||
@@ -662,6 +766,11 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
+
+    // Before the cache build, so the cache reflects whichever answer is given.
+    const orphanOutcome = await resolveOrphanedInheritedPriorities(plugin, orphans);
+    tagged += orphanOutcome.tagged;
+    priorityChanged += orphanOutcome.changed;
 
     const totalTime = Math.round((Date.now() - startTime) / 1000);
 
@@ -713,6 +822,9 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
       `• Total rems processed: ${processed}\n` +
       `• Newly tagged: ${tagged}${priorityChanged > 0 ? ` (${priorityChanged} with changed priority)` : ''}\n` +
       `• Preserved manual priorities: ${skippedManual}\n` +
+      (orphans.length > 0
+        ? `• Inherited without an anchor: ${orphans.length} (${orphanOutcome.reset ? 'reset to default' : 'left as is'})\n`
+        : '') +
       `• Errors: ${errors}${errorBreakdown}\n` +
       `• Total time: ${totalTime}s\n` +
       `• Cache build time: ${cacheTime}s\n\n` +

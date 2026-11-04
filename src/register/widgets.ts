@@ -353,6 +353,23 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Warning that another Incremental or Dismissed Rem has the same web page as a
+  // source (lib/duplicate_source).
+  plugin.app.registerWidget('duplicate_source_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 460,
+      height: 'auto',
+    },
+  });
+
+  // Incremental and Dismissed Rems grouped by the website of their source.
+  plugin.app.registerWidget('source_sites_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 560,
+      height: 'auto',
+    },
+  });
+
   // Generic message dialog for failures the user must read (lib/message_dialog.ts).
   plugin.app.registerWidget('message_popup', WidgetLocation.Popup, {
     dimensions: {
@@ -394,6 +411,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   // The timer's controls over RemNote's video page; opened by lib/video_review_bar.ts.
   plugin.app.registerWidget('video_review_bar', WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+
+  // Shows that a window follows the queue, with its controls; opened by lib/follow_queue_sources.ts.
+  plugin.app.registerWidget('follow_queue_bar', WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 'auto' },
   });
 
@@ -572,6 +594,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: {
       width: 1000,
       height: screenFittedHeight(600),
+    },
+  });
+
+  // True/False: Judge by Emoji, asking first when the Rem has descendants or a card
+  // was judged by a word.
+  plugin.app.registerWidget('true_false_judge_confirm', WidgetLocation.Popup, {
+    dimensions: {
+      width: 620,
+      height: 'auto',
     },
   });
 

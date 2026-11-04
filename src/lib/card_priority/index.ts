@@ -1,3 +1,4 @@
+import { OpTimer } from '../op_timer';
 import { cardLastSeenAt, cardTypeTag } from '../priority_review_document/cooling';
 import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
@@ -67,13 +68,14 @@ export async function mayWriteCardPrioritySource(
 async function findClosestAncestorWithPriority(
   plugin: RNPlugin,
   rem: PluginRem
-): Promise<{ priority: number; source: 'incremental' | 'card' } | null> {
+): Promise<{ priority: number; source: 'incremental' | 'card'; anchored: boolean } | null> {
   const result = await findClosestAncestorWithAnyPriority(plugin, rem);
 
   if (result) {
     return {
       priority: result.priority,
-      source: result.sourceType === 'IncRem' ? 'incremental' : 'card'
+      source: result.sourceType === 'IncRem' ? 'incremental' : 'card',
+      anchored: result.anchored,
     };
   }
 
@@ -245,6 +247,10 @@ export interface SetCardPriorityOptions {
    * would discard anyway. Not a way to hide a real change.
    */
   skipHistory?: boolean;
+  /** The rem was created by the caller a moment ago, so it cannot have the powerup yet. Saves a read. */
+  isNewRem?: boolean;
+  /** Receives this write's steps, for a command timing itself. */
+  timer?: OpTimer;
 }
 
 /**
@@ -274,10 +280,12 @@ export async function setCardPriority(
     return;
   }
 
-  const hasPowerup = knownHasPowerup || (await rem.hasPowerup(CARD_PRIORITY_CODE));
+  const hasPowerup =
+    knownHasPowerup || (!options?.isNewRem && (await rem.hasPowerup(CARD_PRIORITY_CODE)));
   if (!hasPowerup) {
     await rem.addPowerup(CARD_PRIORITY_CODE);
   }
+  options?.timer?.lap('addCardPriority');
 
   // Parallelize the property updates for maximum speed (Fire and Forget style).
   // The value goes through writeRawCardPriority, which writes the hidden slot and
@@ -288,6 +296,7 @@ export async function setCardPriority(
     rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]),
     rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()])
   ]);
+  options?.timer?.lap('slots');
 
   // Record what just happened. Deliberately AFTER the value write and not folded
   // into the Promise.all above: it reads the existing history first, and a
@@ -312,6 +321,8 @@ export async function setCardPriority(
     });
   }
 
+  options?.timer?.lap('history');
+
   // Keep the table-cell badge in step. Static import: a dynamic import() here
   // emits a chunk the RemNote index sandbox cannot evaluate ("Cannot use
   // 'import.meta' outside a module"). priority_bands only pulls constants from
@@ -322,6 +333,7 @@ export async function setCardPriority(
   } catch (err) {
     console.error('[CardPriority] band sync failed', err);
   }
+  options?.timer?.lap('band');
 }
 
 /**
@@ -384,12 +396,18 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
 /**
  * Calculate what the priority should be without actually saving it
  * Used for optimization to avoid unnecessary updates
+ *
+ * `orphaned` is set on an 'inherited' result that has no anchor above it: no
+ * ancestor holds a manual/incremental card priority or is an Incremental Rem,
+ * so the value is either the rem's own leftover or copied from an ancestor that
+ * is itself an orphan. The value is still returned unchanged (inheritance is
+ * sticky by design); the flag only lets the bulk update offer a reset.
  */
 export async function calculateNewPriority(
   plugin: RNPlugin,
   rem: PluginRem,
   existingPriority: CardPriorityInfo | null = null
-): Promise<{ priority: number; source: PrioritySource }> {
+): Promise<{ priority: number; source: PrioritySource; orphaned?: boolean }> {
   if (existingPriority && (existingPriority.source === 'manual' || existingPriority.source === 'incremental')) {
     return { priority: existingPriority.priority, source: existingPriority.source };
   }
@@ -402,11 +420,15 @@ export async function calculateNewPriority(
   const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
 
   if (ancestorPriority) {
-    return { priority: ancestorPriority.priority, source: 'inherited' };
+    return {
+      priority: ancestorPriority.priority,
+      source: 'inherited',
+      ...(ancestorPriority.anchored ? {} : { orphaned: true }),
+    };
   }
 
   if (existingPriority && existingPriority.source === 'inherited') {
-    return { priority: existingPriority.priority, source: 'inherited' };
+    return { priority: existingPriority.priority, source: 'inherited', orphaned: true };
   }
 
   const defaultPriority = await getIESetting(plugin, defaultCardPriorityId);

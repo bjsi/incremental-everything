@@ -63,6 +63,15 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Routes to the right view: **Single History** for an Incremental Rem, **[Flashcard History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)** (all of the Rem's cards) for a flashcard, **Aggregated History** for a folder with incremental descendants. A Rem that is both offers a button across. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
 | `Ctrl` + `Shift` + `I` | [Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities) | Adds/removes the `#ignore` tag on the focused Rem **or a multi-rem selection** (run from the Omnibar). Ignored rems are shrunk and dimmed (full opacity on hover/focus) and the tag chip is hidden — used during IR to mark already-read snippets that don't deserve becoming Incremental. | Editor Only |
 
+### Chrome Companion Extension
+
+On web pages, with the [Chrome Companion Extension](Chrome-Companion-Extension.md) installed and text selected:
+
+| Shortcut | Command Name | Function | Context |
+| :--- | :--- | :--- | :--- |
+| `Alt` + `X` | [Add Extract](Chrome-Companion-Extension.md#extracts) | Makes the selection an Incremental Rem | Web page, text selected |
+| `Alt` + `Shift` + `X` | [Add Extract with priority](Chrome-Companion-Extension.md#setting-a-priority) | Asks for a priority first | Web page, text selected |
+
 ### Editing Utilities
 
 | Shortcut | Command Name | Function | Context |
@@ -71,6 +80,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | `Ctrl` + `Shift` + `F8` | [Inlinize Detected List](Utilities-Text-and-Lists.md#inlinize-detected-list-inl) | Rebuilds a list that a PDF highlight flattened onto one line: a line break + `• ` before each detected item (`1 2 3`, `a) b)`, `( )` blanks, `•`/`-`), still in the focused rem. Press again to switch to a blank line between items with no bullets. `Ctrl` on macOS too. | Editor Only |
 | `Ctrl` + `Shift` + `T` | [True/False: Mark as True](Utilities-True-or-False-Cards.md#mark-as-true-or-false) | Turns the statement into a [True or False card](Utilities-True-or-False-Cards.md) answered ✅, keeping whatever the back already holds. Works on a multi-Rem selection, and on the card on screen while you practise. | Editor and Queue |
 | `Ctrl` + `Shift` + `F` | [True/False: Mark as False](Utilities-True-or-False-Cards.md#mark-as-true-or-false) | The same, answered ❌; on a card marked true it flips the verdict. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
+| `Ctrl` + `Alt` + `Shift` + `J` | [True/False: Judge by Emoji](Utilities-True-or-False-Cards.md#judge-by-emoji) | Marks question cards without clozes as true or false from the mark on their back (✅ ✔️ ☑️ ✓ or ❌ ✖️), or else the words true, false, verdadeiro/a or falso/a, which you confirm one by one. On a single Rem it also covers its descendants, asking first with the counts. `Ctrl` on macOS too. | Editor and Queue |
 | `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open) | Floating picker that finds Rems RemNote's `[[` search can't surface (all-common-word names). Enter/click inserts a reference at the cursor (cloze-aware, accent-insensitive); Ctrl/Cmd+Enter inserts it as a pin (no text); Opt/Alt+Enter inserts the Rem's text then a pin ("Text with Pin", preserving formatting/images); Shift+Enter/Shift+click opens the Rem in a new pane; Ctrl/Cmd+Shift+Enter appends a pin at the end of the Rem while keeping the selected text (linking a card to its source). | Editor Only |
 | `Shift` + `F3` | [Text Case Converter](Utilities-Text-and-Lists.md#text-case-converter) | Cycles the selection through **Title Case** → **UPPERCASE** → **lowercase**, auto-detecting the current case. Rich-text safe; also works on multi-rem selections. | Editor Only |
 | `Alt` + `Shift` + `M` | [Convert Extracted Markup to Rich Text](Plugin-Commands-Reference.md#convert-extracted-markup-to-rich-text) | Turns literal `\[…\]`, `$…$`, `**bold**`, `*italic*` and `--` left by PDF highlight extraction into real formulas, formatting and dashes, in the focused Rem and all its descendants. | Editor Only |
@@ -87,6 +97,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | `Ctrl` + `Shift` + `F1` | [Copy Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Copies all sources of the **focused Rem** into a session clipboard (and registers it in the PDF index). | Editor Only |
 | `Alt` + `Shift` + `V` | [Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Adds the copied sources to **every selected Rem** (or the focused Rem). Sources already present are skipped, so it is safe to re-run. | Editor Only |
 | `Alt` + `Shift` + `Q` | [Pin Source Quote](Source-Pins.md) | Finds the focused Rem's text in the open PDF or article, reuses the highlight that covers it or creates one, and pins it to the Rem. | Editor Only |
+| `Ctrl` + `Alt` + `Shift` + `Q` | [Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants) | Runs Pin Source Quote on every Quote Rem in the focused Rem and its descendants (or in each selected Rem's subtree). `Ctrl` on macOS too. | Editor Only |
 | `Alt` + `Shift` + `Enter` | [Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | After **📍 Pick in editor** in the Select Parent popup, creates the new Rem under the Rem that has the cursor. Outside the IncRem under review, press it twice to confirm. *(Not `Cmd/Ctrl+Shift+Enter`: that is RemNote's Add Portal.)* | Editor Only |
 
 ### In Logos Bible Software (LogosBridge helper)
@@ -194,6 +205,13 @@ Function keys carry the utilities whose natural letter combination was already t
 | `Cmd` + `L` / `Ctrl` + `L` | [Learn - Practice Priority Queue (Full Knowledge Base)](Priority-Review-Document.md#practise-it) | Global |
 | `Cmd` + `→` / `Ctrl` + `→` | [Next Item in Queue](Reviewing-Items-in-the-Queue.md#next) | Queue |
 
+### Ctrl + Alt (Opt) + Shift + key
+
+| Shortcut | Command | Context |
+| :--- | :--- | :--- |
+| `Ctrl` + `Alt` + `Shift` + `J` | [True/False: Judge by Emoji](Utilities-True-or-False-Cards.md#judge-by-emoji) | Editor and Queue |
+| `Ctrl` + `Alt` + `Shift` + `Q` | [Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants) | Editor |
+
 ### Not bound by default
 
 These commands ship **without** a shortcut, so nothing collides with your own bindings. Run them from the Command Palette (`Cmd/Ctrl+K`) or by their quick code, or assign a key in RemNote's keyboard-shortcut settings:
@@ -235,6 +253,11 @@ These keys are active **while a plugin popup or floating window is open** — th
 | [Image Scan popup](Utilities-Finding-and-Navigating.md#filter-a-document-by-images) | `↑` / `↓` | Move between the two scopes (this Rem / whole knowledge base) |
 | | `Enter` | Run the selected scope — or, on the report, close the popup |
 | | `Esc` | Cancel and close (ignored **while a scan is running**, so a reflex Esc can't abort it) |
+| [Judge by Emoji confirmation](Utilities-True-or-False-Cards.md#judge-by-emoji) | `↑` / `↓` | Move through the cards and buttons |
+| | `Space` | Tick or untick the card |
+| | `←` / `→` | Go to the buttons, and between them |
+| | `Enter` | Mark the ticked cards (or press the button you are on) |
+| | `Esc` | Cancel and close |
 | [Floating source window](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing) | `Esc` | Close the window **without** closing the queue |
 | [Select Parent popup](Create-Incremental-Rem-from-PDF-Highlights.md#keyboard-shortcuts) | `E` | Close the list and [pick the parent in the editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) |
 | [Pick-in-editor card](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | `Esc` | Cancel the pick, **even while typing in the editor** |

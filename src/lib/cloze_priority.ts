@@ -5,6 +5,7 @@ import { getIncrementalRemFromRem } from './incremental_rem';
 import { CARD_PRIORITY_CODE, SOURCE_SLOT } from './card_priority/types';
 import { getRawCardPriorityString } from './card_priority/slot_access';
 import { getIESetting } from './settings';
+import { OpTimer } from './op_timer';
 
 // Cap on how many step-size decrements (= priority-number increments)
 // can be auto-applied to a new cloze. Even on the 12th cloze, we apply 10 steps.
@@ -31,6 +32,8 @@ export interface ClozeAutoPriorityInfo {
   decrementsApplied: number;
   /** Step size used (from settings). */
   stepSize: number;
+  /** The `cloze-extract` tag, so the caller need not look it up again. Null if the KB has none yet. */
+  clozeExtractTagId: string | null;
 }
 
 /**
@@ -49,18 +52,38 @@ export interface ClozeAutoPriorityInfo {
  *     which does NOT include descendants' cards, so there's no double-counting with the
  *     cloze-extract children.
  *
- * The caller must invoke this BEFORE creating/parenting the new cloze rem, so the count
- * reflects only PRIOR clozes (not the one about to be created).
+ * The caller must invoke this BEFORE tagging the new cloze rem, so the count reflects only
+ * PRIOR clozes. An untagged new child is not counted, and it adds no card to the parent.
  *
  * Final priority = clamp(parentPriority + min(totalCount, 10) × stepSize, 0, 100).
  * Higher number = less important, so each subsequent cloze becomes less important than the previous.
  */
 export async function computeClozeAutoPriority(
   plugin: RNPlugin,
-  parentRem: PluginRem
+  parentRem: PluginRem,
+  timer?: OpTimer
 ): Promise<ClozeAutoPriorityInfo> {
-  const defaultPriority = await getIESetting(plugin, defaultPriorityId);
-  const stepSize = await getIESetting(plugin, priorityStepSizeId);
+  const track = <T,>(label: string, work: Promise<T>) => (timer ? timer.track(label, work) : work);
+
+  // These reads are independent, so they share one wait: Alt+Z shows nothing until they finish.
+  const [
+    defaultPriority,
+    stepSize,
+    ownPriorityValue,
+    ownSource,
+    clozeExtractTag,
+    children,
+    parentOwnCardCount,
+  ] = await Promise.all([
+    track('settings', getIESetting(plugin, defaultPriorityId)),
+    getIESetting(plugin, priorityStepSizeId),
+    track('ownPriority', getRawCardPriorityString(parentRem)),
+    parentRem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT),
+    track('findTag', plugin.rem.findByName(['cloze-extract'], null)),
+    track('children', parentRem.getChildrenRem()),
+    // Native clozes inside the text plus front/back-direction cards. Falls back to 0 on error.
+    track('parentCards', parentRem.getCards().then((cards) => cards?.length ?? 0).catch(() => 0)),
+  ]);
 
   let parentPriority: number;
   let parentPrioritySource: 'incremental' | 'card-or-inherited';
@@ -77,8 +100,6 @@ export async function computeClozeAutoPriority(
   //      makes the grandparent's manual cardPriority=8 win over its own IncRem=13.
   //      Note: NOT getInitialPriority, which walks with 'IncRem' precedence.
   //   4. Plugin default.
-  const ownPriorityValue = await getRawCardPriorityString(parentRem);
-  const ownSource = await parentRem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
   const parsedManual =
     ownPriorityValue && ownSource === 'manual' ? parseInt(ownPriorityValue as string) : NaN;
 
@@ -86,12 +107,15 @@ export async function computeClozeAutoPriority(
     parentPriority = parsedManual;
     parentPrioritySource = 'card-or-inherited';
   } else {
-    const incInfo = await getIncrementalRemFromRem(plugin, parentRem);
+    const incInfo = await track('incRem', getIncrementalRemFromRem(plugin, parentRem));
     if (incInfo) {
       parentPriority = incInfo.priority;
       parentPrioritySource = 'incremental';
     } else {
-      const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, parentRem, 'Card');
+      const ancestorInfo = await track(
+        'ancestors',
+        findClosestAncestorWithAnyPriority(plugin, parentRem, 'Card')
+      );
       if (ancestorInfo) {
         parentPriority = ancestorInfo.priority;
         parentPrioritySource = ancestorInfo.sourceType === 'IncRem' ? 'incremental' : 'card-or-inherited';
@@ -103,26 +127,15 @@ export async function computeClozeAutoPriority(
   }
 
   // Count existing cloze-extract children (live count — robust to manual deletions)
-  const clozeExtractTag = await plugin.rem.findByName(['cloze-extract'], null);
   let clozeChildCount = 0;
   if (clozeExtractTag) {
-    const children = await parentRem.getChildrenRem();
-    for (const child of children) {
-      const tags = await child.getTagRems();
-      if (tags.some((t) => t._id === clozeExtractTag._id)) {
-        clozeChildCount++;
-      }
-    }
-  }
-
-  // Count cards the parent rem already owns itself — native clozes inside its text plus
-  // front/back-direction cards if it is a flashcard. Safely fall back to 0 on error.
-  let parentOwnCardCount = 0;
-  try {
-    const parentCards = await parentRem.getCards();
-    parentOwnCardCount = parentCards?.length ?? 0;
-  } catch {
-    parentOwnCardCount = 0;
+    const childTags = await track(
+      'childTags',
+      Promise.all(children.map((child) => child.getTagRems()))
+    );
+    clozeChildCount = childTags.filter((tags) =>
+      tags.some((t) => t._id === clozeExtractTag._id)
+    ).length;
   }
 
   const totalExistingCount = clozeChildCount + parentOwnCardCount;
@@ -139,5 +152,6 @@ export async function computeClozeAutoPriority(
     totalExistingCount,
     decrementsApplied,
     stepSize,
+    clozeExtractTagId: clozeExtractTag?._id ?? null,
   };
 }

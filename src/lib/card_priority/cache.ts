@@ -7,7 +7,7 @@ import {
   PrioritySource,
   calculateCardRemPercentilesFromCards,
 } from './types';
-import { getRawCardPriorityString } from './slot_access';
+import { getRawCardPriorityString, isHiddenSlotMigrated } from './slot_access';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
 import {
   writeCardPriorityCache,
@@ -287,10 +287,23 @@ async function drainRatedCards(plugin: RNPlugin) {
 }
 
 /**
+ * Holds an entry for a new Rem until rereadCardPriorityCacheWhenCardsExist flushes it. Flushing
+ * now as well would rewrite the whole cache (over 2 s) twice per new Rem, with the entry about
+ * to be replaced anyway. Readers in this realm see it through getPendingCacheUpdate, and it is
+ * marked dirty so that a reload before the flush still re-reads the Rem.
+ */
+export function holdCardPriorityCacheEntry(plugin: RNPlugin, info: CardPriorityInfo) {
+  markCardPriorityDirty(plugin, info.remId);
+  pendingUpdates.set(info.remId, { info, isLight: true });
+  lightModeOptimisticOverrides.set(info.remId, { info, expiresAt: Date.now() + 5000 });
+}
+
+/**
  * Replaces an optimistic entry with one read from the Rem's real cards, once
  * those cards exist. A command that writes the text a card is made from (Alt+Z)
  * cannot read that card straight away, so it stores what it knows and calls
  * this; each attempt waits longer, and the first one that finds cards wins.
+ * If no attempt finds cards, what the command stored is flushed as it is.
  */
 export function rereadCardPriorityCacheWhenCardsExist(
   plugin: RNPlugin,
@@ -300,7 +313,11 @@ export function rereadCardPriorityCacheWhenCardsExist(
   const attempt = async (i: number) => {
     try {
       const rem = await plugin.rem.findOne(remId);
-      if (!rem) return;
+      if (!rem) {
+        // Deleted while the entry was held: it must not reach the cache.
+        pendingUpdates.delete(remId);
+        return;
+      }
       if (((await rem.getCards()) || []).length > 0) {
         await updateCardPriorityCache(plugin, remId);
         return;
@@ -308,7 +325,11 @@ export function rereadCardPriorityCacheWhenCardsExist(
     } catch (e) {
       console.warn('[Cache] Deferred card re-read failed for Rem:', remId, e);
     }
-    if (i + 1 < delaysMs.length) setTimeout(() => void attempt(i + 1), delaysMs[i + 1]);
+    if (i + 1 < delaysMs.length) {
+      setTimeout(() => void attempt(i + 1), delaysMs[i + 1]);
+    } else {
+      flushCacheUpdates(plugin).catch((e) => console.error('[Cache] Flush of held entry failed:', e));
+    }
   };
   setTimeout(() => void attempt(0), delaysMs[0]);
 }
@@ -592,11 +613,26 @@ async function tryWarmPhase1(
       sample.push(reusable[i]);
     }
 
+    // Same slot-retirement settling getCardPriority does first, so the sample
+    // reads exactly the slots the cold build read.
+    await isHiddenSlotMigrated(plugin);
     const mismatches = (
       await Promise.all(
         sample.map(async (rem) => {
           const live = await getRawCardPriorityString(rem);
           const stored = store.byRem.get(rem._id)!;
+          // A tagged rem with NO stored value is not a disagreement: getCardPriority
+          // synthesises an 'inherited' or 'default' entry for it, and that is what
+          // the cold build saved. Comparing '' against that number failed every
+          // such rem — and a KB restored from a backup can have nearly all its
+          // values in that state (RemNote keeps the old slot values in the rem's
+          // `bpc` field, which getPowerupProperty does not read), so the check
+          // failed 200/200 on every launch, right after the cold build that wrote
+          // the copy. Like is compared with like: no live value must mean a
+          // synthesised stored entry.
+          if (!live) {
+            return stored.source === 'inherited' || stored.source === 'default' ? null : rem._id;
+          }
           const liveNum = parseInt(live);
           return !isNaN(liveNum) && liveNum === stored.priority ? null : rem._id;
         })

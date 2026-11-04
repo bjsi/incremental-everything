@@ -263,6 +263,26 @@ export interface CurveRow {
      * forgetting paused there, and the branches have nothing to be compared to.
      */
     noReview?: number | null;
+    /**
+     * The same history replayed with the comparison weights (see
+     * `BuildCurveOptions.comparisonWeights`): its past curve, its stability
+     * staircase, its own projection if never reviewed, and its Good branch.
+     *
+     * Overlay only: nothing that sizes the chart — the y fit, the opening view,
+     * the presets, the horizon — reads these keys. The chart is the configured
+     * weights' chart, and the comparison is drawn over it, clipped if it runs
+     * outside.
+     *
+     * Only Good gets a comparison branch. Four more hypothetical lines would
+     * bury the history; Good is the normal trajectory, and "how far the next
+     * Good answer would carry the card" is the question new weights answer.
+     */
+    rCmp?: number | null;
+    sCmp?: number | null;
+    sLogCmp?: number | null;
+    noReviewCmp?: number | null;
+    goodCmp?: number | null;
+    goodSLogCmp?: number | null;
 }
 
 /** Row key carrying each grade's forecast stability. */
@@ -298,6 +318,26 @@ export interface CurveRepMarker {
     optimumDays: number;
     /** log10(s) — see `CurveRow.sLog`. */
     sLog: number;
+    /** Stability after this review under the comparison weights, null without them. */
+    sCmp: number | null;
+}
+
+/** Where one weight set leaves the card today. */
+export interface CurveWeightSummary {
+    /** Stability now (days). */
+    stability: number;
+    /** Retrievability now, 0–100. */
+    r: number;
+    /** When the card reaches the target retention if left alone (ms). */
+    dueT: number;
+    /** Interval a Good answer now would earn, at the target retention (days). */
+    goodIntervalDays: number;
+}
+
+/** The configured weights against the comparison set, on this card. */
+export interface CurveComparison {
+    current: CurveWeightSummary;
+    comparison: CurveWeightSummary;
 }
 
 export interface CurveBranch {
@@ -350,10 +390,18 @@ export interface ForgettingCurveSeries {
     floorDays: number;
     /** The full extent in days — what `xFullDomain` maps to. */
     axisMaxDays: number;
+    /** Present when comparison weights were given and differ from `weights`. */
+    comparison: CurveComparison | null;
 }
 
 export interface BuildCurveOptions {
     weights?: number[] | null;
+    /**
+     * A second weight set to replay the same history with, drawn beside the
+     * configured one so a user can judge new weights before adopting them. Null,
+     * or the same weights as `weights`, draws no comparison.
+     */
+    comparisonWeights?: number[] | null;
     /** 0–1. Defaults to the FSRS 90%. */
     targetRetention?: number;
     /** Overridable for tests. */
@@ -747,6 +795,21 @@ function buildEvents(
     return events;
 }
 
+/** Whether two weight settings replay identically (blank = the defaults). */
+function sameWeights(a?: number[] | null, b?: number[] | null): boolean {
+    const wa = resolveWeights(a).w;
+    const wb = resolveWeights(b).w;
+    return wa.length === wb.length && wa.every((v, i) => v === wb[i]);
+}
+
+/** The decay constants one weight set implies. */
+function curveConstants(weights: number[] | null | undefined, targetRetention: number) {
+    const { w } = resolveWeights(weights);
+    const decay = -w[20];
+    const factor = Math.pow(0.9, 1 / decay) - 1;
+    return { decay, factor, intervalFactor: intervalFactorForRetention(targetRetention, decay, factor) };
+}
+
 /**
  * Evenly spaced samples between two days-since-first values, in the plotted
  * coordinate rather than in raw time — the point of the module (see the header).
@@ -784,6 +847,7 @@ export function buildForgettingCurveSeries(
 ): ForgettingCurveSeries | null {
     const {
         weights = null,
+        comparisonWeights = null,
         targetRetention = DEFAULT_REQUESTED_RETENTION,
         now = Date.now(),
         scale = 'log',
@@ -799,10 +863,37 @@ export function buildForgettingCurveSeries(
     const state = computeFSRSState(history, weights, targetRetention);
     if (!state) return null;
 
-    const { w } = resolveWeights(weights);
-    const decay = -w[20];
-    const factor = Math.pow(0.9, 1 / decay) - 1;
-    const intervalFactor = intervalFactorForRetention(targetRetention, decay, factor);
+    const { decay, factor, intervalFactor } = curveConstants(weights, targetRetention);
+
+    // The comparison replay. Which entries count does not depend on the
+    // weights, so its events line up one for one with `events`.
+    let cmp: {
+        events: CurveEvent[];
+        state: FSRSState;
+        decay: number;
+        factor: number;
+        intervalFactor: number;
+        last: Extract<CurveEvent, { kind: 'review' }>;
+    } | null = null;
+    if (comparisonWeights && !sameWeights(comparisonWeights, weights)) {
+        const cmpEvents = buildEvents(history, comparisonWeights);
+        const cmpState = computeFSRSState(history, comparisonWeights, targetRetention);
+        const cmpReviews = cmpEvents.filter(
+            (e): e is Extract<CurveEvent, { kind: 'review' }> => e.kind === 'review',
+        );
+        if (cmpState && cmpEvents.length === events.length && cmpReviews.length > 0) {
+            cmp = {
+                events: cmpEvents,
+                state: cmpState,
+                ...curveConstants(comparisonWeights, targetRetention),
+                last: cmpReviews[cmpReviews.length - 1],
+            };
+        }
+    }
+    const cmpReviewAt = (i: number) => {
+        const e = cmp?.events[i];
+        return e && e.kind === 'review' ? e : null;
+    };
 
     // The curve is anchored on the first *counted* review, so a card whose
     // history opens with a Reset does not start with a dead stretch.
@@ -894,12 +985,27 @@ export function buildForgettingCurveSeries(
         const event = events[i];
         if (event.kind === 'reset') {
             // Break the line: everything the card had is gone.
-            pushRow(toDays(event.t), { r: null, s: null, sLog: null });
+            pushRow(toDays(event.t), {
+                r: null,
+                s: null,
+                sLog: null,
+                ...(cmp ? { rCmp: null, sCmp: null, sLogCmp: null } : {}),
+            });
             continue;
         }
 
         repIndex += 1;
         const startDays = toDays(event.t);
+        const cmpEvent = cmpReviewAt(i);
+        // The comparison keys for a row `elapsed` days into this segment.
+        const cmpAt = (elapsed: number): Partial<CurveRow> =>
+            cmp && cmpEvent
+                ? {
+                      rCmp: forgettingCurve(elapsed, cmpEvent.s, cmp.decay, cmp.factor) * 100,
+                      sCmp: cmpEvent.s,
+                      sLogCmp: toSLog(cmpEvent.s),
+                  }
+                : {};
         reps.push({
             index: repIndex,
             t: event.t,
@@ -913,6 +1019,7 @@ export function buildForgettingCurveSeries(
             rAtReview: event.rAtReview,
             optimumDays: event.s * intervalFactor,
             sLog: toSLog(event.s),
+            sCmp: cmpEvent ? cmpEvent.s : null,
         });
 
         const next = events[i + 1];
@@ -924,12 +1031,14 @@ export function buildForgettingCurveSeries(
             sLog: toSLog(event.s),
             repSLog: toSLog(event.s),
             repIndex,
+            ...cmpAt(0),
         });
         for (const d of sampleDays(startDays, endDays, SAMPLES_PER_SEGMENT, scale, floorDays)) {
             pushRow(d, {
                 r: forgettingCurve(d - startDays, event.s, decay, factor) * 100,
                 s: event.s,
                 sLog: toSLog(event.s),
+                ...cmpAt(d - startDays),
             });
         }
         // Close the segment on its own last point so the drop is drawn in full
@@ -939,6 +1048,7 @@ export function buildForgettingCurveSeries(
                 r: forgettingCurve(endDays - startDays, event.s, decay, factor) * 100,
                 s: event.s,
                 sLog: toSLog(event.s),
+                ...cmpAt(endDays - startDays),
             });
         }
     }
@@ -952,6 +1062,18 @@ export function buildForgettingCurveSeries(
     const lastReviewDays = toDays(lastReview.t);
     const noReviewAt = (d: number) =>
         forgettingCurve(d - lastReviewDays, lastReview.s, decay, factor) * 100;
+
+    const cmpGoodS = cmp ? cmp.state.nextS.good : 0;
+    /** The comparison keys for a forecast row `d` days since the first review. */
+    const cmpForecastAt = (d: number): Partial<CurveRow> =>
+        cmp
+            ? {
+                  noReviewCmp:
+                      forgettingCurve(d - toDays(cmp.last.t), cmp.last.s, cmp.decay, cmp.factor) * 100,
+                  goodCmp: forgettingCurve(d - nowDays, cmpGoodS, cmp.decay, cmp.factor) * 100,
+                  goodSLogCmp: toSLog(cmpGoodS),
+              }
+            : {};
 
     // --- Forecast branches ------------------------------------------------
     if (forecast) {
@@ -973,6 +1095,14 @@ export function buildForgettingCurveSeries(
         // clock, so on any clock but the live one it lands a hair off the point
         // the history segment actually closed on, and the seam shows.
         junction.noReview = noReviewAt(nowDays);
+        if (cmp) {
+            // Closes the comparison's past line on the same seam as the main one.
+            Object.assign(junction, cmpForecastAt(nowDays), {
+                rCmp: forgettingCurve(nowDays - toDays(cmp.last.t), cmp.last.s, cmp.decay, cmp.factor) * 100,
+                sCmp: cmp.state.s,
+                sLogCmp: toSLog(cmp.state.s),
+            });
+        }
         rows.push(junction);
 
         for (const d of sampleBranchDays(nowDays, horizonDays, SAMPLES_PER_BRANCH)) {
@@ -982,6 +1112,7 @@ export function buildForgettingCurveSeries(
                 row[STABILITY_BRANCH_KEY[b.grade]] = toSLog(b.stability);
             }
             row.noReview = noReviewAt(d);
+            Object.assign(row, cmpForecastAt(d));
             rows.push(row);
         }
 
@@ -995,6 +1126,7 @@ export function buildForgettingCurveSeries(
             tail[STABILITY_BRANCH_KEY[b.grade]] = toSLog(b.stability);
         }
         tail.noReview = noReviewAt(horizonDays);
+        Object.assign(tail, cmpForecastAt(horizonDays));
         rows.push(tail);
     }
 
@@ -1019,6 +1151,8 @@ export function buildForgettingCurveSeries(
     const observed: number[] = [];
     for (const row of rows) {
         if (row.x > xMax) continue;
+        // The configured weights only: the comparison is laid over this chart,
+        // never allowed to resize it.
         for (const key of ['r', ...CURVE_GRADES] as const) {
             const v = row[key];
             if (typeof v === 'number' && Number.isFinite(v)) observed.push(v);
@@ -1049,6 +1183,22 @@ export function buildForgettingCurveSeries(
         scale,
         floorDays,
         axisMaxDays,
+        comparison: cmp
+            ? {
+                  current: {
+                      stability: state.s,
+                      r: nowR,
+                      dueT: lastReview.t + lastReview.s * intervalFactor * MS_PER_DAY,
+                      goodIntervalDays: state.nextInterval.good,
+                  },
+                  comparison: {
+                      stability: cmp.state.s,
+                      r: cmp.state.r * 100,
+                      dueT: cmp.last.t + cmp.last.s * cmp.intervalFactor * MS_PER_DAY,
+                      goodIntervalDays: cmp.state.nextInterval.good,
+                  },
+              }
+            : null,
     };
 }
 

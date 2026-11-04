@@ -649,3 +649,10 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 | `` Cmd + Opt + Shift + ` `` / `` Ctrl + Alt + Shift + ` `` | Operating System: Quick Add | Global | desktop global |
 | `Cmd + Opt + Shift + ↑` / `Ctrl + Alt + Shift + ↑` | Collapse Children to 1st Level | Editor Scope Showing / Hiding |  |
 | `Cmd + Opt + Shift + Backspace` / `Ctrl + Alt + Shift + Backspace` | Delete Bullet | Bullet-Level Editing |  |
+
+### Ctrl + Opt/Alt + Shift + key
+
+| Keys | Command | Where | Notes |
+| :--- | :--- | :--- | :--- |
+| `Ctrl + Opt + Shift + J` / `Ctrl + Alt + Shift + J` | [True/False: Judge by Emoji](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
+| `Ctrl + Opt + Shift + Q` / `Ctrl + Alt + Shift + Q` | [Pin Source Quote (Quote Rems in descendants)](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |

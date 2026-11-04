@@ -191,6 +191,37 @@ While it's waiting, click the button again to cancel. The request also expires a
 - **The other window doesn't come to the front by itself;** switch to it yourself.
 - **The viewer stays open** in the first window, so you can keep peeking at it.
 
+### Follow the queue
+
+One RemNote window can show the sources of the cards you practice in another, so you can read them on a second screen, or beside the queue, without opening anything. Desktop app only.
+
+There are two ways to start it:
+
+- **From a queue:** open the Source viewer on a card and click **🧭 Follow the Queue in another window** in its header. Another open window starts following. If none is open, the button changes to **⏳ Waiting**: press **`⌘⇧N` / `Ctrl+Shift+N`** and the new window starts following. While it's waiting, click the button again to cancel. The request also expires after a minute. The button appears only while a queue is open.
+- **From the second window:** open it with **`⌘⇧N` / `Ctrl+Shift+N`**, then run **Follow the Queue's Sources in This Window** from the Omnibar there, before or during a queue.
+
+Place the second window where you want the sources. Each card's sources then open there a moment after the card appears.
+
+**The Following the queue bar** appears at the lower right of the following window:
+
+- **🔖 Scroll to Highlight** returns to the highlight. It appears when the card has a single source and its pin is a highlight.
+- **■ Stop** stops following and closes the bar. Running the command again in that window does the same.
+- **To move the bar,** drag it by any part outside its buttons. If you drag it out of the window, stop and start following again to bring it back to its usual spot.
+
+**What it opens:**
+
+- **The card's source pins.** It looks at the front and back of the card's Rem. If there are no pins, it looks at the parent, then the grandparent, and uses the first one that has any. A Rem that is itself a highlight counts as a pin to that highlight. A reference to a whole PDF or article counts only if it's pinned.
+- **Up to 4 different sources,** in the order the card mentions them: one fills the window, two sit side by side, the first of three takes the left half, and four form a grid.
+- **Each source once,** scrolled to its first pin. If the next card uses the same sources, the readers stay as they are and just scroll to the new highlight.
+
+**Good to know:**
+
+- **The panes are replaced.** When the sources change, every pane in that window's current tab gives way to them, so keep your notes in another tab or window.
+- **A card with no pins** leaves the last sources up.
+- **A queue started in the following window** pauses following until you leave that queue.
+- **Following ends when that window reloads or RemNote restarts;** run the command again to resume.
+- **Only one window follows at a time.** Running the command in another window moves it there.
+
 ### Floating window — interaction & closing
 
 The floating variant is designed so the source sits **beside** your card while you study, which is why it behaves a little differently from the modal:
@@ -324,6 +355,35 @@ What identifies one is that the Rem holds an image **and nothing else** — no c
 Two consequences worth knowing: caption an area highlight and the next scan swaps its tags — `PdfAreaHighlight` off, `HasImage` on — and the ring turns blue; and a Rem holding only an image that did **not** come from a PDF, a figure pasted into your own notes, gets `HasImage` and stays blue, since the yellow means "this leads into the source document".
 
 > **Only image pins.** Pins to ordinary Rems are left alone. Ringing *every* pin was tried and says nothing — a marker that appears on all of them carries no information.
+
+---
+
+## Incremental Rems by Website
+
+Everything you are reading from one website, in one list. Run **`Incremental Rems by Website`** (quick code `irw`) to see your Incremental and Dismissed Rems grouped by the website of their source, largest group first.
+
+![The Incremental Rems by Website popup, listing websites with their Incremental and Dismissed counts](assets/increms-by-website.png)
+
+### How to use it
+
+- **↑/↓** choose · **Enter** shows the website's Rems · **Esc** closes.
+- In a website's list, each Rem shows its priority and next date, or *Dismissed*, along with its address. Incremental Rems come first, by priority. **Enter** opens the Rem, and **Esc** goes back to all websites.
+- **Type** at either level to filter: websites by name, or a website's Rems by name or address.
+
+If the focused Rem has a web source, the popup opens directly on that website. So does a Rem inside such a Rem, which means an extract leads to the website of the article it came from.
+
+### What counts as one website
+
+- **Subdomains join their parent:** `en.wikipedia.org` and `pt.wikipedia.org` are both `wikipedia.org`.
+- **Different domains stay apart:** `supermemo.guru` and `supermemo.org` are two websites.
+- **Country domains group on the name before the ending:** `www.totalsimulation.co.uk` is `totalsimulation.co.uk`, and `www1.folha.uol.com.br` is `uol.com.br`.
+- **Blogging hosts keep each site apart:** `alice.github.io` and `bob.github.io` are two websites. The same goes for `substack.com`, `medium.com`, `wordpress.com`, `blogspot.com` and `notion.site`.
+
+### When the list updates
+
+The list shares its data with the [duplicate web page warning](Getting-Started.md#duplicate-web-page-warning). A Rem joins it when you make it Incremental or use Paste Sources. A source added through RemNote's own menu appears after the next refresh, which runs about once a week, a couple of minutes after RemNote starts on a computer.
+
+---
 
 ## Readable Breadcrumbs in Rem Preview
 

@@ -15,6 +15,7 @@ import {
 } from '../lib/consts';
 import { safeRemTextToString, getActivePdfForIncRem, getAllPDFsInRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
+import { confirmNoDuplicateSource } from '../lib/duplicate_source';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import { createRemFromHighlight } from '../lib/highlightActions';
 
@@ -70,6 +71,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         // Removed setHighlightColor -> CSS handles cleanup when tag is removed
         await plugin.app.toast('❌ Removed Incremental tag');
       } else {
+        if (!(await confirmNoDuplicateSource(plugin, [rem])).length) return;
         await initIncrementalRem(plugin, rem);
         // Removed setHighlightColor -> CSS handles styling via "incremental" tag
         await plugin.app.toast('✅ Tagged as Incremental Rem');

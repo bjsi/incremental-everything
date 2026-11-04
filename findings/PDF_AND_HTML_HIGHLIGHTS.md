@@ -86,3 +86,21 @@ None of it is in the SDK.
 The PDF reader (the `PDFWebReader` embed, drawn by the drawing canvas) changed its zoom buttons in RemNote 1.28.48 (October 2026). In 1.28.45 `zoomIn`/`zoomOut` added or removed 0.25. In 1.28.48 they snap to the next preset in `[0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8]`, with an animated transition, so one click goes from 100% straight to 200%. The `⌘+` / `⌘−` shortcuts use the same steps. Zooming with Cmd, Ctrl or Option held while scrolling (or pinching) is still continuous.
 
 The SDK's `PDFWebReader` component takes no zoom props, and the toolbar is a host layer above the plugin iframe, so a plugin cannot change the steps.
+
+## The Highlights tab is gone from the queue
+
+The right sidebar's Highlights, Summary, Contents and Learn PDF tabs no longer appear for a PDF on the Flashcards routes, so they are missing beside a PDF IncRem in the queue. Read in the bundle of RemNote 1.29.1 in November 2026, not run.
+
+`tt()` in the right-sidebar module starts from the open learning page and drops it for a PDF outside a document route:
+
+```js
+g = getOpenLearningPage()
+f = g?.pdf && (!isDocumentRoute() || (isPhone() && isInteractiveLearnPane())) ? undefined : g
+T = !!f && (a ?? hasHighlights(f))     // T && { tabId: "Highlights", ... }
+```
+
+`isDocumentRoute` (`Sl`) accepts only `Document.show`, `Document.showTwo`, `WithTabIdDocumentTree.show`, `WithoutTabIdDocumentTree.show` and `PublishedDocument.show`. The gate tests `g.pdf` only, so by this code a web article, video or recording in the queue keeps the tab.
+
+The gate is absent in 1.28.45 (October 11, 2026) and present from 1.28.46 (October 12, 2026). Older builds download from `https://download2.remnote.io/remnote-desktop2/RemNote-<ver>-beta-arm64-mac.zip`.
+
+**A plugin cannot force the tab.** The check runs in the host against `FlowRouter`, the iframe has an opaque origin, and the marketplace rejects `requestNative`. `openRightSidebar("Highlights")` only searches the same `tt()` list. A queue on a document route means a `<Queue>` embed, which hard-codes `inArticle` and so shows no plugin widgets. A plugin `RightSidebar` widget can show the same Rems: the container is the PDF's direct child named "Highlights" (see above).

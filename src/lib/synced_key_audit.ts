@@ -14,6 +14,8 @@ import {
   cardShieldCleanupBackupIndexKey,
   debugHistoryBackupPrefix,
   noIncRemTimerKey,
+  sourceUrlIndexKey,
+  sourceUrlIndexScannedAtKey,
   ieKbSettingsKeyPrefix,
   lastDetectedOSKey,
   lastDetectedPlatformKey,
@@ -39,6 +41,7 @@ import {
   authoritativeShardKey,
 } from './authoritative_aggregates';
 import { flashcardHistorySpec, remHistorySpec, shardKey } from './history_shards';
+import { COMPANION_SHARD_COUNT, companionShardKey } from './companion/rules';
 import { MAX_SCHEDULER_SHARDS, schedulerManifestKey, schedulerShardKey } from './scheduler_cards';
 
 // ---------------------------------------------------------------------------
@@ -490,7 +493,16 @@ async function buildCandidates(
       REVIEW_GRAPH_INDEX_KEY,
       lastDetectedOSKey,
       lastDetectedPlatformKey,
+      sourceUrlIndexKey,
+      sourceUrlIndexScannedAtKey,
     ],
+  });
+
+  families.push({
+    family: 'Chrome companion pages',
+    pattern: 'companion_pages_{0..31}',
+    coverage: 'full',
+    keys: Array.from({ length: COMPANION_SHARD_COUNT }, (_, shard) => companionShardKey(shard)),
   });
 
   // 2. Legacy pre-KB-partition globals. Still read by sorting.ts as a fallback,

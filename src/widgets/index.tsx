@@ -6,6 +6,8 @@ import { allCardPriorityInfoKey } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
+import { refreshSourceUrlIndexIfDue } from '../lib/duplicate_source';
+import { startCompanionListener } from '../lib/companion';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { writeCardPriorityCache } from '../lib/card_priority/persistence';
 import { checkFlashcardPrioritisationOptOut } from '../lib/card_priority/opt_out';
@@ -40,6 +42,7 @@ import { registerLogosBridge } from '../lib/logos_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { registerOpenInWindowListener } from '../lib/open_in_window';
+import { registerFollowQueueSources, startFollowingQueueSources } from '../lib/follow_queue_sources';
 import { registerVideoReviewBar } from '../lib/video_review_bar';
 import { registerImageSizeSession } from '../lib/image_size_session';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
@@ -142,7 +145,9 @@ async function onActivate(plugin: ReactRNPlugin) {
   // RemNote window can find them.
   registerWindowSourcesPresence(plugin);
   // Opens a source another window asks this one to show.
-  void registerOpenInWindowListener(plugin);
+  void registerOpenInWindowListener(plugin, startFollowingQueueSources);
+  // Shows the sources of the queue's cards in the window that asks to follow it.
+  void registerFollowQueueSources(plugin);
   await registerWidgets(plugin);
   // The review timer's floating bar over RemNote's video page.
   registerVideoReviewBar(plugin);
@@ -239,6 +244,9 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   await registerMenus(plugin);
 
+  // Answers the Chrome companion extension when it runs in this frame; idle otherwise.
+  startCompanionListener(plugin);
+
   // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
 
@@ -327,6 +335,17 @@ async function onActivate(plugin: ReactRNPlugin) {
   );
   hiddenSlotCheck.catch((err) => console.warn('Card priority hidden-slot migration check failed', err));
   startup.track('hiddenSlotCheck', hiddenSlotCheck);
+
+  // Keeps the duplicate-source index current. Well after startup, since it is the
+  // lowest-priority work here, and not in light mode, where the Synced index built
+  // by a full-mode device is used as it stands.
+  if (!useLightMode) {
+    setTimeout(() => {
+      refreshSourceUrlIndexIfDue(plugin).catch((err) =>
+        console.warn('[DuplicateSource] Index scan failed', err)
+      );
+    }, 120000);
+  }
 
   // The band stylesheets are normally re-registered warm by the caches' own
   // bumps. Two paths never get there: an IncRem cache with no IncRems (which

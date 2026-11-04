@@ -25,10 +25,12 @@ const SCROLL_DELAYS_MS = [1200, 2500, 4000, 6000];
 
 interface OpenRequest {
   id: string;
-  /** The source to open. */
-  remId: string;
+  /** The source to open; null when the window is asked to follow the queue instead. */
+  remId: string | null;
   /** The highlight to scroll to, if any. */
   highlightRemId: string | null;
+  /** Asks the window to follow the queue (lib/follow_queue_sources.ts). */
+  follow?: boolean;
   from: string;
   at: number;
   claimedBy?: string;
@@ -38,6 +40,9 @@ interface OpenRequest {
 // the button and the listener of one window. The listener's is the window's id,
 // and it publishes it in session storage, which is per window.
 const WINDOW_ID = Math.random().toString(36).slice(2, 10);
+
+/** True on a page that practices cards. */
+export const isQueueUrl = (url: string | undefined) => !!url && /\/(flashcards|need_to_learn)/.test(url);
 
 const readRequest = (plugin: ReactRNPlugin) =>
   plugin.storage.getLocal<OpenRequest>(openInWindowRequestKey).catch(() => undefined);
@@ -53,10 +58,22 @@ export async function requestOpenInAnotherWindow(
   remId: string,
   highlightRemId: string | null
 ): Promise<string> {
+  return leaveRequest(plugin, { remId, highlightRemId });
+}
+
+/** Leaves a request for another window to start following the queue. Returns its id too. */
+export async function requestFollowInAnotherWindow(plugin: ReactRNPlugin): Promise<string> {
+  return leaveRequest(plugin, { remId: null, highlightRemId: null, follow: true });
+}
+
+async function leaveRequest(
+  plugin: ReactRNPlugin,
+  fields: Pick<OpenRequest, 'remId' | 'highlightRemId' | 'follow'>
+): Promise<string> {
   const id = Math.random().toString(36).slice(2, 10);
   const from = await plugin.storage.getSession<string>(openInWindowOwnIdKey);
   if (!from) throw new Error('[OpenInWindow] this window has no listener');
-  const request: OpenRequest = { id, remId, highlightRemId, from, at: Date.now() };
+  const request: OpenRequest = { ...fields, id, from, at: Date.now() };
   await plugin.storage.setLocal(openInWindowRequestKey, request);
   return id;
 }
@@ -73,6 +90,7 @@ export async function cancelOpenRequest(plugin: ReactRNPlugin, id: string): Prom
 }
 
 async function openRequested(plugin: ReactRNPlugin, request: OpenRequest) {
+  if (!request.remId) return;
   const rem = await plugin.rem.findOne(request.remId);
   if (!rem) return;
   await plugin.window.openRem(rem);
@@ -86,7 +104,10 @@ async function openRequested(plugin: ReactRNPlugin, request: OpenRequest) {
   }
 }
 
-export async function registerOpenInWindowListener(plugin: ReactRNPlugin) {
+export async function registerOpenInWindowListener(
+  plugin: ReactRNPlugin,
+  startFollowing: (plugin: ReactRNPlugin) => Promise<void>
+) {
   if (!(await canOpenInAnotherWindow(plugin))) return;
   await plugin.storage.setSession(openInWindowOwnIdKey, WINDOW_ID);
 
@@ -96,13 +117,16 @@ export async function registerOpenInWindowListener(plugin: ReactRNPlugin) {
       const request = await readRequest(plugin);
       if (!request || request.claimedBy || request.from === WINDOW_ID) return;
       if (handled.has(request.id) || Date.now() - request.at > OPEN_REQUEST_TTL_MS) return;
+      // A window running its own queue can't follow one; another window may take the request.
+      if (request.follow && isQueueUrl(await plugin.window.getURL())) return;
       handled.add(request.id);
 
       await new Promise((resolve) => setTimeout(resolve, Math.random() * MAX_CLAIM_JITTER_MS));
       const latest = await readRequest(plugin);
       if (latest?.id !== request.id || latest.claimedBy) return;
       await plugin.storage.setLocal(openInWindowRequestKey, { ...latest, claimedBy: WINDOW_ID });
-      await openRequested(plugin, latest);
+      if (latest.follow) await startFollowing(plugin);
+      else await openRequested(plugin, latest);
     } catch (e) {
       console.warn('[OpenInWindow] poll failed', e);
     }

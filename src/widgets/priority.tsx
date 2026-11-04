@@ -1350,8 +1350,27 @@ function Priority() {
                       </div>
                       <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
                         {cardInfo?.source === 'inherited' ? 'Inherits from' : 'Ancestor'} • {ancestorPriorityInfo.levelDescription}
+                        {!ancestorPriorityInfo.anchored && ' • itself inherited, no anchor above'}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* `null` = the walk finished and found nothing (`undefined` is still
+                    loading). An 'inherited' source with nothing above it is a leftover
+                    from an anchor that was removed or moved away — say so instead of
+                    leaving "inherited" unexplained. */}
+                {performanceMode === PERFORMANCE_MODE_FULL && ancestorPriorityInfo === null && cardInfo?.source === 'inherited' && (
+                  <div
+                    className="p-2 rounded text-xs"
+                    style={{
+                      backgroundColor: 'var(--rn-clr-background-primary)',
+                      border: '1px solid var(--rn-clr-border-primary)',
+                      color: 'var(--rn-clr-content-tertiary)',
+                    }}
+                  >
+                    No ancestor holds a priority anymore — this inherited value has lost its anchor.
+                    Convert it to manual to keep it, or run "Update all inherited Card Priorities" to reset orphans to the default.
                   </div>
                 )}
               </>

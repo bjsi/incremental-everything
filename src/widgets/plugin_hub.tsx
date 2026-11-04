@@ -321,37 +321,24 @@ function iconAttrs(size: number, strokePx = 1.3): React.SVGProps<SVGSVGElement> 
 }
 
 /**
- * The plugin's own mark, drawn as line art: a desk globe on a stand.
- *
- * A bare wireframe sphere (Feather's globe, which this replaces) is the icon
- * every app uses for "language" or "web", and it shares nothing with
- * `public/logo.png` but the ball. What makes that logo recognisable at a glance
- * is the *silhouette* around it — the meridian ring standing off to the right,
- * the pedestal and the foot — so the row identifies itself as this plugin's
- * rather than as a generic globe button.
- *
- * Two measurements do the work at 18px:
- *
- * - **The ring stands 3 units clear of the sphere** (r6 against r9). A wider
- *   sphere looks better on its own, but the two strokes are ~0.6px each once
- *   scaled down, so a narrower gap closes up and the pair renders as one thick
- *   smudged circle.
- * - **The stroke is 1.5, not the row's 1.75.** Six paths in the space the other
- *   icons spend on three; at the shared weight they thicken into a blob.
+ * The plugin's own mark, the same drawing as the Chrome extension's icon
+ * (`companion/icons/icon.svg`). It keeps its colours, unlike the row's line icons,
+ * so the panel identifies itself as this plugin's at a glance. An image rather than
+ * inline, as the drawing's gradient ids would clash when it appears twice on a page.
  */
-const GlobeIcon = ({ size = 18 }: IconProps) => (
-  <svg {...iconAttrs(size, 1.125)} aria-hidden>
-    {/* sphere, with a meridian and the equator so it reads as a globe */}
-    <circle cx="10.5" cy="10.5" r="6" />
-    <ellipse cx="10.5" cy="10.5" rx="2.5" ry="6" />
-    <line x1="4.5" y1="10.5" x2="16.5" y2="10.5" />
-    {/* the mounting ring, open to the left exactly as the logo's is */}
-    <path d="M10.5 1.5a9 9 0 0 1 0 18" />
-    {/* pedestal and foot */}
-    <path d="M10.5 19.5v2.2" />
-    <path d="M7 21.7h7" />
-  </svg>
-);
+const GlobeIcon = ({ size = 18 }: IconProps) => {
+  const plugin = usePlugin();
+  return (
+    <img
+      src={`${plugin.rootURL}globe-icon.svg`}
+      alt=""
+      aria-hidden
+      width={size}
+      height={size}
+      style={{ display: 'block', width: size, height: size }}
+    />
+  );
+};
 
 const TargetIcon = ({ size = 18 }: IconProps) => (
   <svg {...iconAttrs(size)} aria-hidden>
@@ -1125,7 +1112,7 @@ export function PluginHub() {
               cursor: 'pointer',
             }}
           >
-            <img src={`${plugin.rootURL}globe-icon.png`} alt="" style={{ width: 16, height: 16 }} />
+            <GlobeIcon size={16} />
           </button>
           <PanelTitle />
         </div>

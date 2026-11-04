@@ -148,6 +148,31 @@ Read from the 1.28.19 bundle (`renderSR`, `SwipeQueueHOC`, the insight scroll la
 - **On a phone the buttons leave the box.** When Beautiful + `Env.mobile.mode.isPhone` (and not showcase, preview or in-article), the answer buttons are portaled into `div.queue-beautiful-mobile-bottom-controls`, a sibling below the box (`relative min-h-[112px] w-full shrink-0 p-2`). The HOC gets no children, so it renders no overlay and no fade mask, and `--beautiful-queue-bottom-controls-height` stays `0px`. The Explanation spacer is computed from the scroll surface's `clientHeight` (ResizeObserver), so padding the bottom of `.spacedRepetition` shrinks the surface and moves the Explanation up. `.spacedRepetition` is `overflow-hidden`, which clips anything placed below its bottom edge.
 - **The suggested-grade tab.** After a type-in answer is graded, RemNote highlights one button (`suggestedAnswerButton()`: Good or Easy if right, Again if wrong). It hangs an absolute "↵ Enter" tab above it (height 25, `top: -25px`; "Say 'Done'" while voice-listening). On desktop only that button gets `border-t-transparent rounded-t-none`, so `.rn-queue__answer-btn.border-t-transparent.rounded-t-none` detects it. With swipe gestures on (`tF.t()`), every button instead shows a 25px "← Left"/"→ Right" label above it, with no class hook.
 
+## When the Beautiful queue draws a basic card with the divider
+
+Read from the 1.29.6-beta bundle and the local database (2026-11-03). The helpers are module 552780 (predicates `ex` basic, `ET` concept, `VS` descriptor; divider `aQ`, `data-test="Beautiful Queue Card Answer Divider"`), and the row renderer is the QueueHierarchyRem subclass's `renderKey`/`renderValue`.
+
+A basic card is drawn as question / short divider / answer only when **all** of these hold. Otherwise it is drawn as one "question → answer" line.
+
+1. **It is the last Rem of the stack and has a back.** The `value` must be non-empty, or the Rem must be a multi-line card (`Zd`).
+2. **`rem.type === RemType.DEFAULT_TYPE`, and DEFAULT_TYPE is `undefined`.** The check is strict, on the raw field.
+   - Concept (`1`) gets the concept layout.
+   - Descriptor (`2`) gets the descriptor layout, with the answer inline after the arrow or a "Recall the description" pill.
+   - A stored `"type": null` matches neither predicate and falls through to the classic `super.renderKey()`/`renderValue()`.
+3. **No child has the Card Item powerup** (`w`, multi-line items).
+4. **The indentation mode is not `"complex"`.** The mode comes from `z(mode, remStack)`. `remStack` comes from `partitionQueueHierarchyTreeStack`: the Rems below the nearest document (findLastIndex of `isTaggedAsDocument`, or below a HideQueueAncestors Rem) down to the card, the card included.
+   - Length 1 (the card sits directly under the document) → no mode → divider.
+   - Length 2 (one parent line) → `"flat"` → divider. The card row is rendered as a detached leaf.
+   - Length 3 or more → `"complex"` → a compact `queue-beautiful-basic-card-prompt-line--compact` line under the parent bullets, with the answer inline after the delimiter.
+
+The partition counts Rems before `shouldSkipRenderingQueueHierarchyRem` drops hidden ones (tables, AI flashcard sections, empty-key table rows). So an invisible ancestor can push a card into `"complex"`.
+
+**`null` types come from RemNote itself.** "Unset as Concept/Descriptor" (Opt+Cmd+Q, `SetTypeToQuestion`) saves `null`, while Rems that were never typed have no field. Rem `Am6k9j4o9cTmKU4fM` was still `null` after an unset (its `type,u` updated).
+
+The main knowledge base has 845 `null` Rems, 152 of them with a back side. Rems with a back side break down as 36k with no type, 54k Descriptors and 11k Concepts. Children of Concept parents are mostly Descriptors, so they never get the divider either.
+
+**A plugin cannot clear the `null`.** See PLUGIN_BRIDGE_AND_SDK.md: `rem.setType(DEFAULT_TYPE)` is rejected by the bridge. Reported in [support-reports/REMNOTE_SUPPORT_REPORT_beautiful_queue_null_rem_type.md](support-reports/REMNOTE_SUPPORT_REPORT_beautiful_queue_null_rem_type.md).
+
 ## Images in the queue are drawn by the drawing canvas
 
 Read from the 1.28.19 bundle and a real knowledge base (2026-09-30). The exact cause of the crop below was **not** proven; the data shapes are.

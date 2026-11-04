@@ -10,6 +10,11 @@
 import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import { ExcludeOtherSchedulersToggle, useSchedulerManifest } from './OtherSchedulers';
+import {
+  ComparisonWeightsNote,
+  ComparisonWeightsToggle,
+  loadFsrsWeights,
+} from './ComparisonWeightsToggle';
 import { SchedulerCardsManifest, getOtherSchedulerCardIds } from '../lib/scheduler_cards';
 import {
   CardAnalyticsBreakdown,
@@ -31,10 +36,8 @@ import {
   allCardPriorityInfoKey,
   cardAnalyticsCacheKey,
   cardAnalyticsLastPeriodKey,
-  fsrsWeightsId,
   flashcardResponseTimeLimitId,
 } from '../lib/consts';
-import { parseWeightsString } from '../lib/fsrs';
 import {
   PausedDeckScan,
   getCachedPausedDeckScan,
@@ -130,7 +133,8 @@ interface ProgressInfo {
 
 // --- Column tooltips -------------------------------------------------------
 //
-// Native `title` attribute — rendered by the OS as a hover tooltip.
+// Written as `title` attributes but drawn by HoverTipLayer (mounted at the
+// popup root): the OS tooltip often fails to appear inside the plugin iframe.
 // Multi-line via "\n". Kept terse so hover doesn't take a paragraph to read.
 
 const GROUP_TOOLTIPS = {
@@ -180,9 +184,9 @@ const COL_TOOLTIPS = {
   lapses:
     'Average count of Again responses per non-new card. New cards are excluded from the denominator so never-reviewed cards don\'t dilute the average. Period-filtered.',
   retention:
-    'Observed pass rate at the bucket level = (gradeableReps − Again) / gradeableReps. Period-filtered. Same definition as the Study Dashboard / Practiced Queues.',
+    'Observed pass rate = (scored reps − Again) / scored reps, over exactly the reps Avg pR averages, so R-dev compares like with like. Period-filtered.\nScored reps leave out the first rep of each card / each post-RESET lifetime (a new card\'s first answer is not forgetting) and any rep on the same calendar day as the previous one (learning and relearning steps, Mastery Drill passes). This is therefore higher than the Study Dashboard\'s pass rate, which counts every rep.',
   avgPR:
-    'Average FSRS-predicted retrievability across every gradeable rep in the period, EXCEPT the first rep of each card / each post-RESET lifetime (the model has no prior state to predict from).\nFor learning/relearning reps where FSRS leaves r undefined, the forgetting curve is computed locally using the previous gradeable rep\'s stability — so Avg pR\'s denominator matches Retention\'s.',
+    'Average FSRS-predicted retrievability at the moment of each scored rep in the period: every gradeable rep EXCEPT the first of each card / each post-RESET lifetime (no prior state to predict from) and any rep on the same calendar day as the previous one (a minutes-old prediction near 100%, not a test of the model — fsrs-optimizer leaves these out too). Those reps still drive the FSRS replay.\nFor learning/relearning reps where FSRS leaves r undefined, the forgetting curve is computed locally using the previous gradeable rep\'s stability.',
   rDev:
     'Retention − Avg pR (percentage points).\nPositive: you remember better than FSRS expected (schedule could be relaxed).\nNegative: you forget more than predicted (schedule may be stale, or grading has been too generous).',
   grade:
@@ -984,18 +988,22 @@ function StatusBar({
   schedulerManifest,
   excludeOtherSchedulers,
   onToggleExcludeOtherSchedulers,
+  useComparisonWeights,
+  onToggleComparisonWeights,
   onRecompute,
   onExport,
   onScanPaused,
   pausedScan,
   disabled,
 }: {
-  breakdown: CardAnalyticsBreakdown;
+  breakdown: CachedBreakdown;
   ignorePreReset: boolean;
   onToggleIgnorePreReset: (next: boolean) => void;
   schedulerManifest: SchedulerCardsManifest | null;
   excludeOtherSchedulers: boolean;
   onToggleExcludeOtherSchedulers: (next: boolean) => void;
+  useComparisonWeights: boolean;
+  onToggleComparisonWeights: (next: boolean) => void;
   onRecompute: () => void;
   onExport: () => void;
   onScanPaused: () => void;
@@ -1051,8 +1059,14 @@ function StatusBar({
             · Paused decks not scanned — their cards are counted as due.
           </span>
         )}
+        <ComparisonWeightsNote used={!!breakdown.usedComparisonWeights} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <ComparisonWeightsToggle
+          checked={useComparisonWeights}
+          disabled={disabled}
+          onChange={onToggleComparisonWeights}
+        />
         <label
           style={{
             display: 'flex',
@@ -1400,11 +1414,17 @@ function ExportDiagnosisPanel({
 
 // --- Main view -------------------------------------------------------------
 
+/**
+ * The session cache, marked with the weight set that produced it, so a view
+ * reopened on a comparison run says so and its checkbox matches the figures.
+ */
+type CachedBreakdown = CardAnalyticsBreakdown & { usedComparisonWeights?: boolean };
+
 export function CardMemoryAnalyticsView() {
   const plugin = usePlugin();
 
   const [state, setState] = React.useState<ComputeState>('idle');
-  const [cache, setCache] = React.useState<CardAnalyticsBreakdown | null>(null);
+  const [cache, setCache] = React.useState<CachedBreakdown | null>(null);
   const [progress, setProgress] = React.useState<ProgressInfo>({ done: 0, total: 0 });
   const [error, setError] = React.useState<string | null>(null);
   // Default ignorePreReset → OFF (matches Study Dashboard).
@@ -1432,6 +1452,9 @@ export function CardMemoryAnalyticsView() {
   const [excludeOtherSchedulers, setExcludeOtherSchedulers] = React.useState<boolean>(false);
   // Read by compute, whose signature every period and RESET handler already shares.
   const excludeOtherSchedulersRef = React.useRef(false);
+  // Same arrangement. Not persisted across openings — see ComparisonWeightsToggle.
+  const [useComparisonWeights, setUseComparisonWeights] = React.useState<boolean>(false);
+  const useComparisonWeightsRef = React.useRef(false);
 
   const compute = React.useCallback(
     async (flag: boolean, p: Period, cs: string, ce: string) => {
@@ -1439,14 +1462,13 @@ export function CardMemoryAnalyticsView() {
       setState('computing');
       setProgress({ done: 0, total: 0 });
       try {
-        const [infos, weightsRaw, capSec] = await Promise.all([
+        const [infos, { weights, usedComparison }, capSec] = await Promise.all([
           plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-          getIESetting(plugin, fsrsWeightsId),
+          loadFsrsWeights(plugin as any, useComparisonWeightsRef.current),
           // Per-rep responseTime cap (seconds). Same setting the Study Dashboard
           // and Practiced Queues read so per-rep outliers don't dominate CPM.
           getIESetting(plugin, flashcardResponseTimeLimitId),
         ]);
-        const weights = parseWeightsString(weightsRaw);
         const cardCapMs = ((capSec ?? 180) as number) * 1000;
         const { startMs, endMs } = resolvePeriod(p, cs, ce);
         const pausedRemIds = await getPausedRemIds(plugin);
@@ -1462,7 +1484,8 @@ export function CardMemoryAnalyticsView() {
           pausedRemIds,
           excludeOtherSchedulersRef.current ? await getOtherSchedulerCardIds(plugin as any) : null,
         );
-        await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
+        const cached: CachedBreakdown = { ...breakdown, usedComparisonWeights: usedComparison };
+        await plugin.storage.setSession(cardAnalyticsCacheKey, cached);
         // Persist user prefs (period + ignorePreReset) across app restarts
         // (device-local). Stored independently from the session cache so it
         // survives full RemNote restarts when the in-memory cache is gone.
@@ -1475,7 +1498,7 @@ export function CardMemoryAnalyticsView() {
             excludeOtherSchedulers: excludeOtherSchedulersRef.current,
           })
           .catch(() => {});
-        setCache(breakdown);
+        setCache(cached);
         setState('ready');
       } catch (e: any) {
         console.error('[CardMemoryAnalytics] compute failed', e);
@@ -1499,12 +1522,11 @@ export function CardMemoryAnalyticsView() {
     setProgress({ done: 0, total: 0 });
     setPhaseLabel('Replaying FSRS and collecting one row per card…');
     try {
-      const [infos, weightsRaw, capSec] = await Promise.all([
+      const [infos, { weights, usedComparison }, capSec] = await Promise.all([
         plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-        getIESetting(plugin, fsrsWeightsId),
+        loadFsrsWeights(plugin as any, useComparisonWeightsRef.current),
         getIESetting(plugin, flashcardResponseTimeLimitId),
       ]);
-      const weights = parseWeightsString(weightsRaw);
       const cardCapMs = ((capSec ?? 180) as number) * 1000;
       const { startMs, endMs } = resolvePeriod(period, customStart, customEnd);
 
@@ -1535,7 +1557,9 @@ export function CardMemoryAnalyticsView() {
       // Summarize after enrichment so the cause breakdown can use the context.
       const summary = summarizeRows(rows, context, !!pausedRemIds);
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-      const meta = `period=${period}, ignorePreReset=${ignorePreReset}, ${rows.length} cards`;
+      const meta =
+        `period=${period}, ignorePreReset=${ignorePreReset}, ` +
+        `weights=${usedComparison ? 'comparison' : 'global'}, ${rows.length} cards`;
       const summaryText = summaryToText(summary, meta);
       console.log(`[CardMemoryAnalytics] export\n${summaryText}`);
       // Only the CSV downloads here — this click is its user gesture. The
@@ -1544,8 +1568,9 @@ export function CardMemoryAnalyticsView() {
       downloadText(rowsToCsv(rows, context), `card-analytics-cards-${stamp}.csv`);
       setExportSummaryText(summaryText);
 
-      await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
-      setCache(breakdown);
+      const cached: CachedBreakdown = { ...breakdown, usedComparisonWeights: usedComparison };
+      await plugin.storage.setSession(cardAnalyticsCacheKey, cached);
+      setCache(cached);
       setExportSummary(summary);
       setState('ready');
     } catch (e: any) {
@@ -1602,6 +1627,10 @@ export function CardMemoryAnalyticsView() {
     excludeOtherSchedulersRef.current = next;
     setExcludeOtherSchedulers(next);
   };
+  const applyComparisonWeights = (next: boolean) => {
+    useComparisonWeightsRef.current = next;
+    setUseComparisonWeights(next);
+  };
 
   // Mount: prefer the in-memory session cache (instant). If absent, fall back
   // to the last-selected period saved in device-local storage so that re-opens
@@ -1610,7 +1639,7 @@ export function CardMemoryAnalyticsView() {
   React.useEffect(() => {
     let cancelled = false;
     Promise.all([
-      plugin.storage.getSession<CardAnalyticsBreakdown | null>(cardAnalyticsCacheKey),
+      plugin.storage.getSession<CachedBreakdown | null>(cardAnalyticsCacheKey),
       plugin.storage.getLocal<{
         period?: Period;
         customStart?: string;
@@ -1625,6 +1654,8 @@ export function CardMemoryAnalyticsView() {
           setCache(c);
           setIgnorePreReset(c.ignorePreReset ?? false);
           applyExcludeOtherSchedulers((c.excludedOtherSchedulerCards ?? 0) > 0);
+          // The session cache shows a comparison run as one, with the box ticked to match.
+          applyComparisonWeights(!!c.usedComparisonWeights);
           setPeriod(((c.period as Period) ?? 'thisYear'));
           setCustomStart(c.periodCustomStart ?? '');
           setCustomEnd(c.periodCustomEnd ?? '');
@@ -1664,6 +1695,10 @@ export function CardMemoryAnalyticsView() {
   };
   const handleToggleExcludeOtherSchedulers = (next: boolean) => {
     applyExcludeOtherSchedulers(next);
+    compute(ignorePreReset, period, customStart, customEnd);
+  };
+  const handleToggleComparisonWeights = (next: boolean) => {
+    applyComparisonWeights(next);
     compute(ignorePreReset, period, customStart, customEnd);
   };
   const handlePeriodChange = (p: Period) => {
@@ -1724,6 +1759,8 @@ export function CardMemoryAnalyticsView() {
             schedulerManifest={schedulerManifest}
             excludeOtherSchedulers={excludeOtherSchedulers}
             onToggleExcludeOtherSchedulers={handleToggleExcludeOtherSchedulers}
+            useComparisonWeights={useComparisonWeights}
+            onToggleComparisonWeights={handleToggleComparisonWeights}
             onRecompute={() => compute(ignorePreReset, period, customStart, customEnd)}
             onExport={runExport}
             onScanPaused={runPausedScan}
@@ -1768,12 +1805,15 @@ export function CardMemoryAnalyticsView() {
             <strong>Export cards</strong> for the cause behind each one. <strong>Cost</strong> is
             expressed in <em>minutes per year (min/y)</em>: lifetime per-card coverage when
             period = All; otherwise annualized as <em>time-in-period / period-length</em>{' '}
-            averaged across cards with reps in the period. <strong>Avg pR</strong> averages the FSRS-predicted retrievability at the moment
-            of every gradeable rep (skipping only the first rep of each card / each
-            post-RESET lifetime, which has no prior model state). For learning and
-            relearning reps — where FSRS leaves <em>r</em> undefined — the forgetting
-            curve is computed from the previous gradeable rep's stability so that Avg pR
-            and Retention share the same denominator.{' '}
+            averaged across cards with reps in the period. <strong>Retention</strong> and{' '}
+            <strong>Avg pR</strong> are taken over the same <em>scored</em> reps: every
+            gradeable rep except the first of each card / each post-RESET lifetime (no
+            prior model state) and any rep on the same calendar day as the previous one
+            (learning and relearning steps, Mastery Drill passes — a test minutes after
+            the last answer, which fsrs-optimizer also leaves out). Those reps still drive
+            the FSRS replay. For learning and relearning reps — where FSRS leaves{' '}
+            <em>r</em> undefined — the forgetting curve is computed from the previous
+            gradeable rep's stability.{' '}
             <strong>R-dev = Retention − Avg pR</strong> in percentage points:
             positive means you remember better than FSRS expected, negative means worse.{' '}
             <strong>Lapses</strong> are averaged only over non-new cards.

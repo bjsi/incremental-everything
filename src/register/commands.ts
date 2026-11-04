@@ -12,7 +12,8 @@ import {
 import { openMasteryDrill } from '../lib/mastery_drill_launch';
 import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
-import { pinSourceQuote } from '../lib/pdf_source_pins';
+import { pinSourceQuote, pinSourceQuotesInTree } from '../lib/pdf_source_pins';
+import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { localizeMediaInRems } from '../lib/localize_media';
 import { showMessageDialog } from '../lib/message_dialog';
 import {
@@ -46,6 +47,7 @@ import {
   aiTranscribeHighlightCommandId,
   restoreHighlightBeforeAiCommandId,
   pinSourceQuoteCommandId,
+  pinSourceQuotesInTreeCommandId,
   localizeMediaCommandId,
   localizeMediaTreeCommandId,
   currentIncrementalRemTypeKey,
@@ -118,7 +120,9 @@ import {
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
-import { loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist, updateCardPriorityCache } from '../lib/card_priority/cache';
+import { createOpTimer, OpTimer } from '../lib/op_timer';
+import { createTurnQueue } from '../lib/turn_queue';
+import { holdCardPriorityCacheEntry, loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist } from '../lib/card_priority/cache';
 import {
   isHiddenSlotMigrated,
   isVisiblePrioritySlotRetired,
@@ -172,6 +176,12 @@ import {
   getEffectiveSelection,
 } from '../lib/editor_selection';
 import { createExtract } from '../lib/extract';
+import {
+  confirmNoDuplicateSource,
+  registerRemPagesIfTracked,
+  SOURCE_SITES_POPUP,
+  websiteOfRem,
+} from '../lib/duplicate_source';
 import { bulletizeSelection } from '../lib/bulletize';
 import {
   inlinizeListSelection,
@@ -366,6 +376,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'opt+shift+q',
     action: async () => {
       await pinSourceQuote(plugin);
+    },
+  });
+
+  // Same, for every Quote Rem in the focused Rem's subtree (the Rem included).
+  await plugin.app.registerCommand({
+    id: pinSourceQuotesInTreeCommandId,
+    name: 'Pin Source Quote (Quote Rems in descendants)',
+    quickCode: 'psqd',
+    keyboardShortcut: 'ctrl+opt+shift+q',
+    action: async () => {
+      await pinSourceQuotesInTree(plugin);
     },
   });
 
@@ -669,12 +690,36 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  const createClozeDeletion = async (): Promise<{
+  type ClozeResult = {
     clozeRem: PluginRem;
     parentRem: PluginRem;
     autoPriority: ClozeAutoPriorityInfo;
-  } | undefined> => {
-      const selection = await plugin.editor.getSelection();
+  };
+
+  // Clozes made in quick succession from one Rem overlap. Each must see the previous one's
+  // highlight in the parent's text, or its own write erases it, and the previous one's tag, or
+  // both count the same earlier clozes and get the same priority.
+  const takeClozeTurn = createTurnQueue();
+
+  const createClozeDeletion = async (): Promise<ClozeResult | undefined> => {
+    const timer = createOpTimer();
+    // Read at the key press, since the selection moves on while this press waits its turn.
+    const selectionRead = plugin.editor.getSelection();
+    const turn = takeClozeTurn();
+    try {
+      await turn.ready;
+      timer.lap('wait');
+      return await createClozeInTurn(await selectionRead, turn.release, timer);
+    } finally {
+      turn.release();
+    }
+  };
+
+  const createClozeInTurn = async (
+    selection: Awaited<ReturnType<typeof plugin.editor.getSelection>>,
+    releaseTurn: () => void,
+    timer: OpTimer
+  ): Promise<ClozeResult | undefined> => {
       if (!selection || selection.type !== SelectionType.Text) return;
       if (selection.range.start === selection.range.end) {
         await plugin.app.toast('Please select some text to create a cloze deletion.');
@@ -684,9 +729,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const rem = await plugin.rem.findOne(selection.remId);
       if (!rem) return;
 
-      // Compute auto-priority BEFORE creating the new cloze rem, so the count of existing
-      // cloze-extract children reflects only prior clozes (not the one we're about to create).
-      const autoPriority = await computeClozeAutoPriority(plugin, rem);
+      timer.lap('read');
 
       const r_start = Math.min(selection.range.start, selection.range.end);
 
@@ -1020,23 +1063,30 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         if (!clozeRem) return;
 
         await clozeRem.setText(buildChildText());
+        // Before the parent's own write below, as this one changes the parent too.
         await clozeRem.setParent(rem);
+        timer.lap('create');
 
-        let clozeExtractTag = await plugin.rem.findByName(['cloze-extract'], null);
-        if (!clozeExtractTag) {
-          clozeExtractTag = await plugin.rem.createRem();
-          if (clozeExtractTag) await clozeExtractTag.setText(['cloze-extract']);
-        }
-        if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
+        const tagClozeChild = async (existingTagId: string | null) => {
+          let clozeExtractTagId = existingTagId;
+          if (!clozeExtractTagId) {
+            const newTag = await plugin.rem.createRem();
+            if (newTag) {
+              await newTag.setText(['cloze-extract']);
+              clozeExtractTagId = newTag._id;
+            }
+          }
+          if (clozeExtractTagId) await clozeRem.addTag(clozeExtractTagId);
 
-        // 2. Apply the Remove Parent powerup to the cloze rem so its parent is hidden
-        // from queue display only when this specific cloze is the current card.
-        // Tagging the parent with Remove from Queue (the previous behavior) would
-        // also hide it for sibling/descendant flashcards (e.g. descriptor children),
-        // breaking their context. Scoping the effect to the cloze itself avoids that.
-        await clozeRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
+          // Apply the Remove Parent powerup to the cloze rem so its parent is hidden
+          // from queue display only when this specific cloze is the current card.
+          // Tagging the parent with Remove from Queue (the previous behavior) would
+          // also hide it for sibling/descendant flashcards (e.g. descriptor children),
+          // breaking their context. Scoping the effect to the cloze itself avoids that.
+          await clozeRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
+        };
 
-        // 3. Mark selected text in parent with yellow highlight + red font.
+        // Mark selected text in parent with yellow highlight + red font.
         // Uses the same section-relative positions (sect_r_start/sect_r_end).
         const processParentSection = (richText: RichTextInterface, localStart: number, localEnd: number): RichTextInterface => {
           const arr: any[] = [];
@@ -1076,21 +1126,31 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return arr;
         };
 
+        // The new Rem and this mark are what the user is waiting for, so they come before every
+        // read and write that only the priority needs. It also means a second Alt+Z pressed
+        // soon after reads the parent with this mark in place.
         if (isBack) {
           await rem.setBackText(processParentSection(backText, sect_r_start, sect_r_end));
         } else {
           await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
         }
+        timer.lap('parentMark');
 
-        // Apply the auto-priority computed at the top (before the new cloze existed,
-        // so the existing-cloze count was correct).
-        await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual', false, { event: 'cloze' });
+        // Before tagging the new cloze, so that the count covers only earlier ones.
+        const autoPriority = await computeClozeAutoPriority(plugin, rem, timer);
+        timer.lap('priority');
+
+        await tagClozeChild(autoPriority.clozeExtractTagId);
+        timer.lap('tag');
+        releaseTurn();
+
+        await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual', false, { event: 'cloze', isNewRem: true, timer });
         // The new cloze card cannot be read yet, but its facts are known: due now,
         // created now, never shown. Writing them keeps the entry usable by the
         // Priority Queue's cooling (which reads the per-card arrays, not the
         // counts); the deferred re-read then replaces them with the real card.
         const clozeCreatedAt = Date.now();
-        await updateCardPriorityCache(plugin, clozeRem._id, true, {
+        holdCardPriorityCacheEntry(plugin, {
           remId: clozeRem._id,
           priority: autoPriority.priority,
           source: 'manual',
@@ -1103,6 +1163,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           cardsCreatedAt: [clozeCreatedAt],
         } as any);
         rereadCardPriorityCacheWhenCardsExist(plugin, clozeRem._id);
+        console.log(`[Cloze] created in ${timer.report()}`);
 
         return { clozeRem, parentRem: rem, autoPriority };
       } finally {
@@ -1225,6 +1286,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         false
       );
       await plugin.storage.setSession(sourceFloatingActiveIdKey, id);
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'follow-queue-sources',
+    name: "Follow the Queue's Sources in This Window",
+    action: async () => {
+      await toggleFollowQueueSources(plugin);
     },
   });
 
@@ -1556,6 +1625,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // 3. Ensure the focused Rem is an incremental Rem, initializing it if necessary.
       if (!(await rem.hasPowerup(powerupCode))) {
+        if (!(await confirmNoDuplicateSource(plugin, [rem])).length) return;
         await initIncrementalRem(plugin, rem);
       }
 
@@ -2399,6 +2469,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerCommand({
+    id: 'incremental-rems-by-website',
+    name: 'Incremental Rems by Website',
+    description: 'List your Incremental and Dismissed Rems by the website of their source, starting at the focused Rem\'s website',
+    quickCode: 'irw',
+    action: async () => {
+      const domain = await websiteOfRem(plugin, await plugin.focus.getFocusedRem());
+      await plugin.widget.openPopup(SOURCE_SITES_POPUP, { domain });
+    },
+  });
+
+  plugin.app.registerCommand({
     id: 'link-local-video',
     name: 'Link Local Video',
     description: 'Pick a video file on this computer for the focused Rem, and make the Rem Incremental',
@@ -2410,6 +2491,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
       try {
+        if (!(await confirmNoDuplicateSource(plugin, [rem])).length) return;
         await plugin.app.toast('🎞️ Choose the video in the dialog…');
         const file = await chooseLocalVideo('file', 'Choose a video for this Rem');
         if (!file) return;
@@ -3510,6 +3592,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             await registerRemsAsPdfKnown(plugin, source._id, [target._id]);
           }
         }
+        await registerRemPagesIfTracked(plugin, target);
       }
 
       const remLabel = targetRems.length === 1 ? '1 Rem' : `${targetRems.length} Rems`;

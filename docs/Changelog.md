@@ -2,6 +2,106 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.192 - November 4th, 2026
+
+### ⚡ Improved
+
+**Mastery Drill Card List**: Added **Due now**, **Cooling** and **Unplayable** filters (keys `1`–`3`), so a due card that never came up in the drill is easy to spot; due cards now sort above cooling ones.
+
+📖 [Filtering the Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list-filters)
+
+## v1.0.191 - November 3rd, 2026
+
+### ✨ New
+
+**FSRS Comparison Weights**: Added a setting for a second set of FSRS weights, drawn as faint magenta lines over every forgetting curve, with a one-line summary of what it would change for the card on screen.
+
+**Memory Analytics and FSRS Calibration**: Added a **Use comparison weights** checkbox that recomputes them with that second set, so you can judge new weights before adopting them.
+
+**FSRS Optimizer Scripts**: Added `export_fsrs_revlog.py`, which exports every review for an external FSRS optimizer — including the same-day reviews RemNote's **Download revlog.csv** drops — and `run_fsrs_optimizer.py`, which runs fsrs-optimizer without its SM-2 comparison crash.
+
+📖 [Comparing two weight sets](Reviewing-Items-in-the-Queue.md#comparison-weights) · [Optimizing weights outside RemNote](Reviewing-Items-in-the-Queue.md#export-revlog)
+
+### 🐛 Fixed
+
+**Memory Analytics**: Fixed Retention counting the first answer of each card, which Avg pR leaves out, so R-dev read too low.
+
+**Memory Analytics and FSRS Calibration**: Same-day reviews (learning and relearning steps, Mastery Drill passes) are no longer scored, as fsrs-optimizer does; they had filled the Again row of Calibration's Grid C with predictions near 100%.
+
+📖 [Card Priority × Memory Analytics](Prioritization-&-Sorting.md#card-memory-analytics) · [FSRS Calibration](Prioritization-&-Sorting.md#fsrs-calibration)
+
+## v1.0.190 - November 3rd, 2026
+
+### ✨ New
+
+**Pin Source Quote**: Added **Quote Rems in descendants** (`Ctrl+Opt+Shift+Q`, `psqd`), which pins the source of every Quote Rem in the focused Rem and its descendants at once.
+
+📖 [Pinning every quote in a subtree](Source-Pins.md#quote-rems-in-descendants)
+
+### ⚡ Improved
+
+**Update all inherited Card Priorities**: Now finds inherited flashcard priorities whose ancestor no longer holds a priority, and asks whether to reset them to the default or leave them as they are.
+
+**Priority popup**: Now says when a flashcard's inherited priority has lost its anchor, instead of showing "inherited" with no ancestor.
+
+📖 [Inherited priorities that lost their anchor](Priorities-for-Flashcards.md#orphaned-inherited) · [How Inheritance Works](Priorities-for-Flashcards.md#inheritance)
+
+## v1.0.189 - November 2nd, 2026
+
+### ⚡ Improved
+
+**Create Cloze**: Changed `Alt+Z` and `Alt+Shift+Z` to show the new Rem and the highlight before doing the priority work, so you see the result sooner, especially when RemNote is busy.
+
+📖 [Create Cloze](IR-Flow--Reading-Extracting-and-Clozing.md#create-cloze-altz-altshiftz)
+
+## v1.0.188 - November 2nd, 2026
+
+### ⚡ Improved
+
+**Create Cloze**: Reduced the work `Alt+Z` and `Alt+Shift+Z` do on each cloze, so the new Rem and the highlight should appear sooner and quick clozes in a row hold up RemNote less.
+
+📖 [Create Cloze](IR-Flow--Reading-Extracting-and-Clozing.md#create-cloze-altz-altshiftz)
+
+## v1.0.187 - November 2nd, 2026
+
+### ✨ New
+
+**True or False Cards**: Added **Judge by Emoji** (`Ctrl+Opt+Shift+J`, `tfj`), which marks question cards without clozes as true or false from the mark on their back (✅ ✔️ ☑️ ✓ or ❌ ✖️), on a selection or on a Rem and its descendants; cards with only the word true, false, verdadeiro/a or falso/a are listed for you to confirm.
+
+📖 [Judge by Emoji](Utilities-True-or-False-Cards.md#judge-by-emoji)
+
+## v1.0.186 - November 2nd, 2026
+
+### ✨ New
+
+**Follow the Queue**: Added a mode that makes a second RemNote window show the sources pinned on the cards you practice in the first, up to 4 at a time, each scrolled to its first pin. Start it from the Source viewer's new **🧭 Follow the Queue in another window** button during a queue, or by running **Follow the Queue's Sources in This Window** in the second window. A small bar there shows it's on, with **Scroll to Highlight** and **Stop**.
+
+📖 [Follow the queue](Utilities-Finding-and-Navigating.md#follow-the-queue)
+
+**Chrome Companion Extension**: Added support for a new Chrome extension that turns text selected on web pages into Incremental Rems, with a priority per extract, highlights that stay on the page and stay separate per knowledge base, read points, and sections imported from the page's headings.
+
+![Extracts marked blue on a Wikipedia page, and the same text in the panel with its image and LaTeX imported](assets/companion-assets/extracted-image-latex.png){ width="900" }
+
+![The priority field below a selected passage, with 16 typed in](assets/companion-assets/priority-set.png){ width="500" }
+
+![A page's headings imported as nested Rems in the panel, matching the page's contents](assets/companion-assets/headings-imported.png){ width="900" }
+
+📖 [Chrome Companion Extension](Chrome-Companion-Extension.md)
+
+## v1.0.184 - November 1st, 2026
+
+### ✨ New
+
+**Incremental Rems**: Added a warning when a Rem you are making Incremental has the same web page as a source as another Incremental or Dismissed Rem, with the choice to open that Rem instead.
+
+📖 [Duplicate web page warning](Getting-Started.md#duplicate-web-page-warning)
+
+**Incremental Website Rems list**: Added Incremental Rems by Website, a list of your Incremental and Dismissed Rems grouped by the website of their source.
+
+![The Incremental Rems by Website popup, listing websites with their Incremental and Dismissed counts](assets/increms-by-website.png){ width="500" }
+
+📖 [Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website)
+
 ## v1.0.183 - November 1st, 2026
 
 ### ✨ New

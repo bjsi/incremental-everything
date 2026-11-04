@@ -26,7 +26,12 @@ import {
     useTrackerPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
-import { forgettingCurveScaleKey, fsrsRequestedRetentionId, fsrsWeightsId } from '../lib/consts';
+import {
+    forgettingCurveScaleKey,
+    fsrsComparisonWeightsId,
+    fsrsRequestedRetentionId,
+    fsrsWeightsId,
+} from '../lib/consts';
 import { CurveScale, buildForgettingCurveSeries } from '../lib/forgetting_curve';
 import { parseWeightsString } from '../lib/fsrs';
 import { useIESetting } from '../lib/settings';
@@ -75,6 +80,8 @@ export function CardForgettingCurve({
     const [scale, setScale] = useLocalStorageState<CurveScale>(forgettingCurveScaleKey, 'log');
 
     const weights = useMemo(() => parseWeightsString(weightsRaw), [weightsRaw]);
+    const comparisonRaw = useIESetting(fsrsComparisonWeightsId);
+    const comparisonWeights = useMemo(() => parseWeightsString(comparisonRaw), [comparisonRaw]);
     const targetRetention = useMemo(() => {
         const pct = typeof retentionPct === 'number' ? retentionPct : 90;
         return Math.min(Math.max(pct, 50), 99.5) / 100;
@@ -85,11 +92,12 @@ export function CardForgettingCurve({
             history
                 ? buildForgettingCurveSeries(history, {
                       weights,
+                      comparisonWeights,
                       targetRetention,
                       scale: scale === 'linear' ? 'linear' : 'log',
                   })
                 : null,
-        [history, weights, targetRetention, scale],
+        [history, weights, comparisonWeights, targetRetention, scale],
     );
 
     // Nothing asked for, or the lookup has not landed yet.

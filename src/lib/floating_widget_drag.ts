@@ -65,12 +65,15 @@ export function useFloatingWidgetDrag(
         const screenH = window.screen.availHeight;
         const w = window.innerWidth;
         const h = window.innerHeight;
+        // A widget smaller than the visible part just stays on screen whole.
+        const keepW = Math.min(KEEP_VISIBLE_PX, w);
+        const keepH = Math.min(KEEP_VISIBLE_PX, h);
         const next: FloatingPosition = {};
         // The handle sits at the top, so the top edge never leaves the screen.
         if (from.top != null) next.top = clamp(from.top + dy, 0, screenH - KEEP_VISIBLE_PX);
-        if (from.bottom != null) next.bottom = clamp(from.bottom - dy, KEEP_VISIBLE_PX - h, screenH - h);
-        if (from.left != null) next.left = clamp(from.left + dx, KEEP_VISIBLE_PX - w, screenW - KEEP_VISIBLE_PX);
-        if (from.right != null) next.right = clamp(from.right - dx, KEEP_VISIBLE_PX - w, screenW - KEEP_VISIBLE_PX);
+        if (from.bottom != null) next.bottom = clamp(from.bottom - dy, keepH - h, screenH - h);
+        if (from.left != null) next.left = clamp(from.left + dx, keepW - w, screenW - keepW);
+        if (from.right != null) next.right = clamp(from.right - dx, keepW - w, screenW - keepW);
         position.current = next;
         if (frame === null) frame = requestAnimationFrame(send);
       };

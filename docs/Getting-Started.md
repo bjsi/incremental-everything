@@ -150,6 +150,20 @@ The first step is to convert a Rem, PDF, or website into an "Incremental Rem" so
 2. Select **"Toggle Incremental Rem"**
 3. The priority popup will open automatically
 
+### Duplicate web page warning
+
+If the Rem has a web page as a source, and another Incremental or Dismissed Rem has the same page, a popup asks what to do before anything changes:
+
+- **Open** the existing Rem, without making a new one. A Dismissed Rem can be made Incremental again from there.
+- **Make Incremental anyway**.
+- **Cancel** (or `Esc`).
+
+With several Rems selected, you can also skip the duplicates and make only the others Incremental.
+
+The same page is recognized under different addresses: `http` or `https`, with or without `www`, a `#section`, tracking parameters, or the various forms of a YouTube link. Letter case in the path still counts as a difference.
+
+The list behind the warning is refreshed about once a week, a couple of minutes after RemNote starts on a computer. A source added through RemNote's own menu may therefore go unnoticed until the next refresh. Tagging a Rem `#Incremental` by hand skips the warning, as do extracts from selected text and PDF highlights, which are new Rems with no web source of their own.
+
 ### What Happens When You Make a Rem Incremental?
 
 1. The Rem receives the `Incremental` powerup tag

@@ -784,3 +784,78 @@ describe('partial multi-line reps', () => {
         assert.deepEqual(series.reps.map((r) => r.s), plain.reps.map((r) => r.s));
     });
 });
+
+describe('comparison weights', () => {
+    /** Your Nov 2026 optimizer result — far from the defaults on purpose. */
+    const CMP = [
+        4.095, 43.264, 42.194, 100, 6.403, 0.607, 3.373, 0.008, 2.055, 0.11, 1.122, 1.665, 0.036,
+        0.523, 1.075, 0.001, 4.919, 0.444, 0.128, 0.118, 0.12,
+    ];
+    const MIXED: RepetitionStatusInterface[] = [
+        rep(400, QueueInteractionScore.GOOD),
+        rep(399, QueueInteractionScore.AGAIN),
+        rep(398, QueueInteractionScore.GOOD),
+        rep(380, QueueInteractionScore.HARD),
+        rep(300, QueueInteractionScore.RESET),
+        rep(290, QueueInteractionScore.GOOD),
+        rep(250, QueueInteractionScore.EASY),
+        rep(90, QueueInteractionScore.GOOD),
+    ];
+
+    it('draws nothing without comparison weights, or with the configured ones', () => {
+        assert.equal(build(HISTORY)!.comparison, null);
+        assert.equal(build(HISTORY, { weights: CMP, comparisonWeights: CMP })!.comparison, null);
+        // Blank configured weights are the defaults, so comparing the defaults is no comparison.
+        assert.equal(build(HISTORY, { comparisonWeights: FSRS_DEFAULT_WEIGHTS })!.comparison, null);
+        assert.ok(build(HISTORY)!.rows.every((r) => r.rCmp === undefined && r.goodCmp === undefined));
+    });
+
+    for (const scale of ['log', 'linear'] as const) {
+        it(`leaves the ${scale} layout to the configured weights`, () => {
+            const plain = build(MIXED, { scale })!;
+            const withCmp = build(MIXED, { scale, comparisonWeights: CMP })!;
+            assert.ok(withCmp.comparison);
+            assert.deepEqual(withCmp.xDomain, plain.xDomain);
+            assert.deepEqual(withCmp.xFullDomain, plain.xFullDomain);
+            assert.deepEqual(withCmp.xPresets, plain.xPresets);
+            assert.deepEqual(withCmp.yDomain, plain.yDomain);
+            assert.deepEqual(withCmp.ticks, plain.ticks);
+            // Rounded: the junction's R comes from computeFSRSState, which reads
+            // the wall clock, so two builds a few ms apart differ by ~1e-10.
+            const shape = (s: typeof plain) =>
+                s.rows.map((r) => [r.x, r.r, r.good].map((v) => (typeof v === 'number' ? v.toFixed(6) : v)));
+            assert.deepEqual(shape(withCmp), shape(plain));
+        });
+    }
+
+    it('replays the past exactly as the comparison weights would on their own', () => {
+        const withCmp = build(MIXED, { comparisonWeights: CMP })!;
+        const alone = build(MIXED, { weights: CMP })!;
+        const past = (rows: typeof withCmp.rows, key: 'rCmp' | 'r') =>
+            rows.filter((r) => r.days < withCmp.nowDays).map((r) => [r.x, r[key]]);
+        assert.deepEqual(past(withCmp.rows, 'rCmp'), past(alone.rows, 'r'));
+        assert.deepEqual(withCmp.reps.map((r) => r.sCmp), alone.reps.map((r) => r.s));
+    });
+
+    it('summarises both weight sets for the same card', () => {
+        const s = build(MIXED, { comparisonWeights: CMP })!;
+        const alone = build(MIXED, { weights: CMP })!;
+        const { current, comparison } = s.comparison!;
+        assert.equal(current.stability, s.state.s);
+        assert.equal(current.goodIntervalDays, s.state.nextInterval.good);
+        assert.equal(comparison.stability, alone.state.s);
+        assert.equal(comparison.goodIntervalDays, alone.state.nextInterval.good);
+        assert.ok(Math.abs(comparison.r - alone.nowR) < 1e-9);
+        // Due = where the comparison's own projection meets the target.
+        const lastRep = alone.reps[alone.reps.length - 1];
+        assert.ok(Math.abs(comparison.dueT - (lastRep.t + lastRep.optimumDays * DAY)) < 1);
+    });
+
+    it('starts the comparison Good branch at 100% now and breaks its history at a Reset', () => {
+        const s = build(MIXED, { comparisonWeights: CMP })!;
+        const junction = s.rows.find((r) => r.t === NOW && r.good === 100)!;
+        assert.equal(junction.goodCmp, 100);
+        const reset = s.rows.find((r) => r.r === null)!;
+        assert.equal(reset.rCmp, null);
+    });
+});

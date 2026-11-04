@@ -1,8 +1,23 @@
-import { AppEvents, PluginRem, ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
+import { AppEvents, PluginRem, ReactRNPlugin, RemType, SelectionType } from '@remnote/plugin-sdk';
 import { getEffectiveSelection } from '../lib/editor_selection';
 import { getQueueVisibleCard } from '../lib/queue_visible_card';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { backTextWithVerdict, isBareVerdictBack, referencedRemIds, Verdict, VERDICT_MARK } from '../lib/true_false';
+import { collectClozeIds } from '../lib/card_analytics_export';
+import { showMessageDialog } from '../lib/message_dialog';
+import {
+  backTextWithVerdict,
+  isBareVerdictBack,
+  JUDGE_CONFIRM_POPUP,
+  JudgeConfirmAnswer,
+  JudgeConfirmContext,
+  judgeConfirmRequestKey,
+  JudgeWordItem,
+  referencedRemIds,
+  Verdict,
+  VERDICT_MARK,
+  verdictFromMarks,
+  verdictFromWords,
+} from '../lib/true_false';
 
 /* True/False cards: a statement whose answer is "true" or "false".
 
@@ -92,16 +107,16 @@ ${editorRow(slug)} .hierarchy-editor__tag-bar__tag {
 
 const ANY_QUEUE_CARD = `:is(${queueCard('tft')}, ${queueCard('tff')})`;
 
-/* The back keeps its ✅ / ❌: that is what states the verdict in the editor and
+/* The back keeps its mark: that is what states the verdict in the editor and
    wherever this plugin is not installed. In the queue the verdict bar says the
    same, so the mark is hidden there, and only there. It shares a text node with
    the observation that follows, so no selector can reach it; instead the answer's
-   font stack starts with a font holding nothing but those two characters, as empty
+   font stack starts with a font holding nothing but those characters, as empty
    zero-width glyphs (scripts/make_true_false_mark_font.py). A mark in the middle
    of the back goes too, and text never does, whatever the back starts with. */
 const MARK_HIDING_FONT = 'True False Mark Hide';
 const MARK_HIDING_FONT_DATA =
-  'd09GRgABAAAAAAJkAAoAAAAAApQAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAABPUy8yAAABWAAAADEAAABg6+VHq2NtYXAAAAGYAAAANAAAAEQnYSV+Z2x5ZgAAAdgAAAABAAAAAQAAAABoZWFkAAAA9AAAADYAAAA2LS6H9GhoZWEAAAEsAAAAFwAAACQDIf86aG10eAAAAYwAAAAKAAAACgAAAABsb2NhAAABzAAAAAoAAAAKAAAAAG1heHAAAAFEAAAAFAAAACAABQACbmFtZQAAAdwAAABdAAAAb/fUSD5wb3N0AAACPAAAACYAAAA7VnkWtgABAAAAAQAAgcX13F8PPPUAAwPoAAAAAOcMI4oAAAAA5wwjigAAAAAAAAAAAAAAAwACAAAAAAAAeJxjYGRgYFb4b8GAAIwMqIARACjTAV4AeJxjYGRgYGBhgAEmBjQAAADNAAh4nGNgZmBgnMDAysDCQBRoYOCAsuyBgIFBnfUfP7PCfwsGBmYFhhNoihUYGADPngXAAAAAAAAAAAAAAAAAAAAAeJxjYGBgYmBgYAZiESDJCKZZGAyANAcQAuXUWdV9/vH//49g3fhzYxvjF7BaMAAAAjEMJAAAAAAAAAAAAAAAAAAAAAB4nC2JsQqAIABEnxZEEC0tje7tfYK4uIg/ICQhOgn9fxod3PHuDhg5EXQJli+7JFNrA2Kc27Kz/SxZObxWNtSsTLqii/dTQsWjUVgCldzIkLiIuOabh9KfF/j0DkoAAAB4nGNgYsAPWBgYGJkYmRlZWJMzUpOzWZOL8ouLWcqKDc0AM3cFmQAA';
+  'd09GRgABAAAAAAKkAAoAAAAAAvQAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAABPUy8yAAABWAAAADIAAABgKvFHq2NtYXAAAAGYAAAATQAAAGBLHZ1ZZ2x5ZgAAAfQAAAABAAAAAQAAAABoZWFkAAAA9AAAADYAAAA2LTLCAGhoZWEAAAEsAAAAFwAAACQDIf86aG10eAAAAYwAAAALAAAAEgAAAABsb2NhAAAB6AAAAAsAAAASAAAAAG1heHAAAAFEAAAAFAAAACAACQACbmFtZQAAAfgAAABdAAAAb/fUSD5wb3N0AAACWAAAAEkAAABwp3GQPwABAAAAAQAAGjOd618PPPUAAwPoAAAAAOcOQJAAAAAA5w5AkAAAAAAAAAAAAAAAAwACAAAAAAAAeJxjYGRgYFb4b8GAAIwMqIARACjTAV4AeJxjYGRgYOBggAEmBjQAAAE5AAx4nGNgZmBgnMDAysDCQBQ4wMABZdkDAQODmuA/fmaF/xYMDMwKDCfQFCswMAAA3PIGCwAAeJxjYEAHAAASAAEAeJxjYGBgYmBgYAZiESDJCKZZGHyANB8DB1COTU1QnVVdRF1M3ecf////DAxgvjCMf/PTjT8MDDc+3NjJ+AOsm4GBiwEGWBiYAIVIEVMAAAB4nGNgQAcAABIAAQAAAAAAeJwtibEKgCAARJ8WRBAtLY3u7X2CuLiIPyAkIToJ/X8aHdzx7g4YORF0CZYvuyRTawNinNuys/0sWTm8VjbUrEy6oov3U0LFo1FYApXcyJC4iLjmm4fSnxf49A5KAAAAeJxjYGLADzgYGBiZGJkZWRhZGdkY2Rk5WJMzUpOzuTJSE8sqwUzupMScnPwSiHBOZnoGhMmaXJRfXAxVB2KylBUbmgEA1D8W2AAAAA==';
 
 /* The answer is an observation or a quotation, often long, and the verdict is
    already on the card: it reads as a note under the statement, not as a headline. */
@@ -128,7 +143,7 @@ const TRUE_FALSE_CSS = `
 @font-face {
   font-family: "${MARK_HIDING_FONT}";
   src: url("data:font/woff;base64,${MARK_HIDING_FONT_DATA}") format("woff");
-  unicode-range: U+2705, U+274C, U+FE0F;
+  unicode-range: U+2611, U+2705, U+2713, U+2714, U+2716, U+274C, U+FE0F;
   font-display: block;
 }
 /* Queue, both sides. The block has its final box on the front already, so
@@ -420,7 +435,156 @@ async function runMarkCommand(plugin: ReactRNPlugin, verdict: Verdict) {
   );
 }
 
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
+/* A question card: forward and/or backward, nothing clozed, not a concept or a
+   descriptor (those are cards with a back too). A Rem with both directions off has
+   no such card. Cards are looked up last, as they cost a round trip each. */
+async function isQuestionCard(rem: PluginRem): Promise<boolean> {
+  if ((await rem.getType()) !== RemType.DEFAULT_TYPE) return false;
+  if (collectClozeIds(rem.text).size > 0 || collectClozeIds(rem.backText).size > 0) return false;
+  const cards = await rem.getCards();
+  return cards.some((card) => card.type === 'forward' || card.type === 'backward');
+}
+
+interface JudgeScan {
+  byMark: Record<Verdict, string[]>;
+  byWord: JudgeWordItem[];
+  alreadyMarked: number;
+  bothMarks: number;
+}
+
+async function scanForJudgment(plugin: ReactRNPlugin, rems: PluginRem[]): Promise<JudgeScan> {
+  const scan: JudgeScan = { byMark: { true: [], false: [] }, byWord: [], alreadyMarked: 0, bothMarks: 0 };
+  for (const rem of rems) {
+    // The back comes with the Rem, so everything without a verdict costs nothing.
+    if (!rem.backText?.length) continue;
+    const refText = await backReferenceText(plugin, rem);
+    const fromMarks = verdictFromMarks(rem.backText, refText);
+    const stated = fromMarks ?? verdictFromWords(rem.backText, refText);
+    if (!stated || !(await isQuestionCard(rem))) continue;
+    if (stated === 'both') {
+      scan.bothMarks++;
+      continue;
+    }
+    const isMarked =
+      (await rem.hasPowerup(POWERUP_CODE[stated])) &&
+      !(await rem.hasPowerup(POWERUP_CODE[stated === 'true' ? 'false' : 'true']));
+    if (isMarked) scan.alreadyMarked++;
+    else if (fromMarks) scan.byMark[stated].push(rem._id);
+    else {
+      scan.byWord.push({
+        remId: rem._id,
+        verdict: stated,
+        remText: await safeRemTextToString(plugin, rem.text),
+        backText: await safeRemTextToString(plugin, rem.backText),
+      });
+    }
+  }
+  return scan;
+}
+
+const nothingToJudgeMessage = (scan: JudgeScan, scanned: number) => {
+  if (scan.alreadyMarked > 0 && scan.bothMarks === 0) {
+    return `Nothing to change: ${plural(scan.alreadyMarked, 'card')} already marked.`;
+  }
+  if (scan.bothMarks > 0) {
+    return `Nothing marked: ${plural(scan.bothMarks, 'card')} with a back saying both true and false` +
+      (scan.alreadyMarked > 0 ? `, ${scan.alreadyMarked} already marked.` : '.');
+  }
+  return `No question card without clozes and with a verdict on the back (${plural(scanned, 'Rem')} checked).`;
+};
+
+async function applyJudgment(plugin: ReactRNPlugin, remIds: Record<Verdict, string[]>, inQueue: boolean) {
+  const total = remIds.true.length + remIds.false.length;
+  let marked = 0;
+  try {
+    for (const verdict of ['true', 'false'] as Verdict[]) {
+      // Fetched again: markVerdict writes from the Rem's back, which must be current.
+      for (const rem of (await plugin.rem.findMany(remIds[verdict])) || []) {
+        await markVerdict(plugin, rem, verdict);
+        marked++;
+      }
+    }
+  } catch (error) {
+    console.error('[TrueFalse] judge failed', error);
+    await showMessageDialog(plugin, {
+      title: 'Could not finish judging',
+      message: `${marked} of ${plural(total, 'card')} marked before this error: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      tone: 'error',
+    });
+    return;
+  }
+  await plugin.app.toast(
+    `Judged ${plural(total, 'card')}: ${VERDICT_MARK.true} ${remIds.true.length} true, ` +
+      `${VERDICT_MARK.false} ${remIds.false.length} false` +
+      (inQueue ? ' (shows next time you see this card).' : '.')
+  );
+}
+
+const judgmentsToApply = (scan: JudgeScan, rejectedRemIds: string[] = []): Record<Verdict, string[]> => {
+  const accepted = (verdict: Verdict) =>
+    scan.byWord.filter((item) => item.verdict === verdict && !rejectedRemIds.includes(item.remId)).map((item) => item.remId);
+  return {
+    true: [...scan.byMark.true, ...accepted('true')],
+    false: [...scan.byMark.false, ...accepted('false')],
+  };
+};
+
+// Waiting for the popup's answer. The popup holds no ids but those it has to show.
+let pendingJudgment: { id: number; scan: JudgeScan; inQueue: boolean } | null = null;
+
+/* The focused Rem and all below it, or just the Rems of a multi-Rem selection, or
+   just the card on screen. Asks first if there is anything below the Rem, and
+   whenever a card was judged by a word and not by a mark. */
+async function runJudgeCommand(plugin: ReactRNPlugin) {
+  const { rems, inQueue } = await targetRems(plugin);
+  if (rems.length === 0) {
+    await plugin.app.toast('No Rem selected — place your cursor in the statement first.');
+    return;
+  }
+  const descendants = !inQueue && rems.length === 1 ? await rems[0].getDescendants() : [];
+  const scope = [...rems, ...descendants];
+
+  const scan = await scanForJudgment(plugin, scope);
+  const trueByMark = scan.byMark.true.length;
+  const falseByMark = scan.byMark.false.length;
+  if (trueByMark + falseByMark + scan.byWord.length === 0) {
+    await plugin.app.toast(nothingToJudgeMessage(scan, scope.length));
+    return;
+  }
+  if (descendants.length === 0 && scan.byWord.length === 0) {
+    await applyJudgment(plugin, judgmentsToApply(scan), inQueue);
+    return;
+  }
+
+  const id = Date.now();
+  pendingJudgment = { id, scan, inQueue };
+  const context: JudgeConfirmContext = {
+    id,
+    scanned: scope.length,
+    trueByMark,
+    falseByMark,
+    byWord: scan.byWord,
+    alreadyMarked: scan.alreadyMarked,
+    bothMarks: scan.bothMarks,
+  };
+  await plugin.widget.openPopup(JUDGE_CONFIRM_POPUP, context);
+}
+
 export async function registerTrueFalseCommands(plugin: ReactRNPlugin) {
+  // An answer left over from before a plugin reload has no plan to go with.
+  await plugin.storage.setSession(judgeConfirmRequestKey, null);
+  plugin.track(async (rp) => {
+    const answer = await rp.storage.getSession<JudgeConfirmAnswer>(judgeConfirmRequestKey);
+    if (!answer || pendingJudgment?.id !== answer.id) return;
+    const { scan, inQueue } = pendingJudgment;
+    pendingJudgment = null;
+    await applyJudgment(plugin, judgmentsToApply(scan, answer.rejectedRemIds), inQueue);
+  });
+
   await plugin.app.registerCommand({
     id: `${TRUE_FALSE_TRUE_POWERUP_CODE}Cmd`,
     name: 'True/False: Mark as True',
@@ -437,6 +601,16 @@ export async function registerTrueFalseCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'ctrl+shift+f',
     quickCode: 'tff',
     action: async () => runMarkCommand(plugin, 'false'),
+  });
+
+  await plugin.app.registerCommand({
+    id: 'trueFalseJudgeCmd',
+    name: 'True/False: Judge by Emoji',
+    description:
+      'Mark question cards without clozes as true or false from the ✅ (or ✔️ ☑️ ✓) or ❌ (or ✖️) on their back, or else the words true, false, verdadeiro/a or falso/a, which you confirm one by one. Other Rems are skipped. Works on the selected Rems, or on the focused Rem and everything under it, asking first.',
+    keyboardShortcut: 'ctrl+opt+shift+j',
+    quickCode: 'tfj',
+    action: async () => runJudgeCommand(plugin),
   });
 
   await plugin.app.registerCommand({

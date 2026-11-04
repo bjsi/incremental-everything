@@ -211,6 +211,9 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Pin Source Quote](Source-Pins.md#pin-source-quote)** (`Opt+Shift+Q` / `Alt+Shift+Q`) — `quick: psq`
   Pins the source of the focused Rem's text: finds the passage in the PDF or saved web article open in a pane and appends a pin to its highlight, reusing a highlight that already covers it or creating one. Works in a PDF's page view, a saved web article and a PDF's Text Reader view (asking which, when a PDF has both). Needs the local helper — see [Source Pins](Source-Pins.md).
 
+- **[Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants)** (`Ctrl+Opt+Shift+Q` / `Ctrl+Alt+Shift+Q`) — `quick: psqd`
+  Runs Pin Source Quote on every Rem formatted as a Quote in the focused Rem and all its descendants, or in each selected Rem's subtree; other Rems are left alone.
+
 - <a id="store-linked-images-audio-in-remnote"></a>**Store linked images & audio in RemNote** — `quick: slm`
   An image or audio added through **Embed Link** (or **Audio Search**) is saved as the bare web address: nothing is copied, so the Rem breaks the day that server moves or removes the file, and it does not play offline. This command fetches each such file, stores it in RemNote the way an uploaded file is stored, and points the Rem at the stored copy.
   Run it on the focused Rem or on a selection of Rems; front and back are both handled. The Rem itself is edited in place — only the address inside the image or audio changes — so its flashcards and their history are untouched. Files RemNote already stores, and video embeds such as YouTube, are left alone, so it is safe to re-run.
@@ -266,6 +269,9 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 
 - **True/False: Mark as False** (`Ctrl+Shift+F`) — `quick: tff`
   The same with the `TFF` tag and ❌. Running it on a card marked true flips the verdict, swapping only the mark.
+
+- **True/False: Judge by Emoji** (`Ctrl+Opt+Shift+J` / `Ctrl+Alt+Shift+J`) — `quick: tfj`
+  [Marks question cards without clozes](Utilities-True-or-False-Cards.md#judge-by-emoji) as true or false from the mark on their back (✅ ✔️ ☑️ ✓ or ❌ ✖️), or else the words true, false, verdadeiro/a or falso/a, skipping everything else. On a single Rem it also covers its descendants, asking first with the counts; cards judged by a word are always listed for you to tick.
 
 - **True/False: Convert Pasted Tags** — `quick: tfc`
   For cards [imported from text](Utilities-True-or-False-Cards.md#importing-from-text) with `#[[TFT]]` / `#[[TFF]]`: swaps those plain tags for the powerups, writes the mark where it is missing, and deletes the plain tag Rem once unused. Covers the selected Rems, or the focused Rem and everything under it.
@@ -415,6 +421,16 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 
   📖 See [Utilities → Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup).
 
+- **Follow the Queue's Sources in This Window**
+  Makes this window show the sources pinned on the cards you practice in another window, up to 4 at a time. Run it again, or press **Stop** on its bar, to stop. Desktop app only.
+
+  📖 See [Utilities → Follow the queue](Utilities-Finding-and-Navigating.md#follow-the-queue).
+
+- **Incremental Rems by Website** — `quick: irw`
+  Lists your Incremental and Dismissed Rems grouped by the website of their source, starting at the website of the focused Rem when it has one.
+
+  📖 See [Utilities → Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website).
+
 - **Jump to Rem by ID**
   Utility to navigate quickly based on raw IDs.
 
@@ -506,6 +522,8 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 
 - **Update all inherited Card Priorities** — `quick: ucp`
   Crucial maintenance task. Recursively processes every flashcard and tagged Rem in your knowledge base, pre-computing and propagating `cardPriority` tags so that the queue loads instantly on startup.
+
+  If it finds `inherited` priorities that have **lost their anchor** (no ancestor holds a manual or incremental card priority or is an Incremental Rem anymore), it asks once what to do with all of them: **OK** resets them to the default value with source `default`, **Cancel** leaves them as they are. See [Inherited priorities that lost their anchor](Priorities-for-Flashcards.md#orphaned-inherited).
 
   After the update completes, if any **"Rem not found"** errors were detected, the command automatically offers to **remove orphan cards** — flashcards whose parent Rem has since been deleted. The cleanup flow:
 

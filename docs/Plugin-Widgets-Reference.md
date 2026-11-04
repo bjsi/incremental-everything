@@ -528,6 +528,7 @@ A centered **modal** popup that renders the **PDF or web article behind a hovere
 - **Auto-scroll to highlight:** for highlights, the embedded reader scrolls to the highlighted passage once it mounts (retried a few times while the PDF engine initializes).
 - **🔖 Scroll to Highlight button** in the header re-centers on the highlight after you've scrolled around the document.
 - **🪟 Open in Another Window button** in the header shows the source in another RemNote window ([details](Utilities-Finding-and-Navigating.md#open-in-another-window)). Desktop app only.
+- **🧭 Follow the Queue in another window button** in the header makes another RemNote window show the sources of the queue's cards ([details](Utilities-Finding-and-Navigating.md#follow-the-queue)). Desktop app only, and only while a queue is open.
 - **Queue-safe:** uses a modal overlay (not a pane), so the queue, your position, and the rating buttons stay intact underneath.
 - **Screen-fitted height:** 80% of the display's height (600–1500 px), measured when the plugin loads.
 
@@ -689,6 +690,20 @@ The front door to the persistent review document, one per scope.
 - **Size bar:** a floating bar at the bottom-right showing the size just set, the number of images changed and any skipped. Click a size to go straight to it. It hides 4 seconds after the last press.
 
 📖 **Full documentation:** [Cycle Image Size](Utilities-Cleaning-Up.md#cycle-image-size)
+
+### 6.16. Duplicate Web Page Warning
+**Trigger:** making a Rem Incremental when another Incremental or Dismissed Rem has the same web page as a source.
+
+Offers to open the existing Rem, make the Rem Incremental anyway, or cancel. With several Rems selected, it can also skip the duplicates.
+
+📖 **Full documentation:** [Duplicate web page warning](Getting-Started.md#duplicate-web-page-warning)
+
+### 6.17. Incremental Rems by Website Popup
+**Trigger:** command `Incremental Rems by Website` (quick code `irw`).
+
+Lists websites with their Incremental and Dismissed counts, then the Rems of the chosen website, with a filter box at both levels.
+
+📖 **Full documentation:** [Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website)
 
 ## 7. Mastery Drill
 

@@ -22,6 +22,11 @@ export const dismissedPowerupCode = 'dismissed';
 export const dismissedHistorySlotCode = 'dismissedHistory';
 export const dismissedDateSlotCode = 'dismissedDate';
 
+// Duplicate-source warning (lib/duplicate_source)
+export const sourceUrlIndexKey = 'source_url_index'; // synced: page key -> Incremental or Dismissed Rems with that source
+export const sourceUrlIndexScannedAtKey = 'source_url_index_scanned_at'; // synced: when a device last rebuilt it
+export const duplicateSourceDecisionKey = 'duplicate_source_decision'; // session: the popup's answer to the caller
+
 // Marks a "tombstone" rem whose content was removed by the
 // 'Preserve history & remove' command but whose review history was preserved on
 // its Dismissed powerup. Used purely as a CSS hook (data-rem-tags~="preservedhistory")
@@ -190,6 +195,8 @@ export const cardPriorityHiddenSlotStateKey = 'card-priority-hidden-slot-state';
 export const displayFsrsDsrId = 'display-fsrs-dsr';
 export const fsrsWeightsId = 'fsrs-weights';
 export const fsrsRequestedRetentionId = 'fsrs-requested-retention';
+/** A second weight set, drawn faintly over the forgetting curves for comparison only. */
+export const fsrsComparisonWeightsId = 'fsrs-comparison-weights';
 
 // --- Plugin-owned settings store (see lib/settings_migration.ts) ---
 /** Synced blob holding the values of every popup-tier setting. */
@@ -525,6 +532,16 @@ export const openSourcesByWindowKey = 'open-sources-by-window';
 export const openInWindowRequestKey = 'open-in-window-request';
 // Session key: this window's id for those requests.
 export const openInWindowOwnIdKey = 'open-in-window-own-id';
+// Local keys: the window following the queue, and the sources it should show (see lib/follow_queue_sources.ts).
+export const followQueueWindowKey = 'follow-queue-window';
+export const followQueueTargetKey = 'follow-queue-target';
+// Session keys for the following window's bar: its widget id, the sources on show, and a press of Stop.
+export const followQueueBarIdKey = 'follow-queue-bar-id';
+export const followQueueShownKey = 'follow-queue-shown';
+export const followQueueStopKey = 'follow-queue-stop';
+export const followQueueBarPositionKey = 'follow-queue-bar-position';
+// Above the PDF reader's bottom toolbar, and left of its page number and zoom buttons.
+export const followQueueBarDefaultPosition = { bottom: 66, right: 64 };
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // Rem IDs whose cards exist but whose parent rem could not be found during the
@@ -719,6 +736,7 @@ export const aiTranscribeHighlightCommandId = 'ai-transcribe-highlight';
 export const restoreHighlightBeforeAiCommandId = 'restore-highlight-before-ai';
 // Pin the source passage of the focused Rem's text in the open PDF (lib/source_pins).
 export const pinSourceQuoteCommandId = 'pin-source-quote';
+export const pinSourceQuotesInTreeCommandId = 'pin-source-quotes-in-tree';
 // Store externally linked images/audio in RemNote itself (lib/localize_media.ts).
 export const localizeMediaCommandId = 'localize-external-media';
 export const localizeMediaTreeCommandId = 'localize-external-media-tree';

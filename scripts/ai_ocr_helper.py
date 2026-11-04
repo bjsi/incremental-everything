@@ -112,9 +112,12 @@ Formulae, in KaTeX:
 
 Lists: keep each item's own marker exactly as printed (•, –, 1., a), …), one item per line, separated by a single line break — no blank line between items. Never use markdown list syntax (* or - as a bullet): write the printed marker itself, e.g. "• geometrical similarity;".
 
-Emphasis — the reader skims these Rems later, so mark what matters:
-- Put the passage's key terms and key concepts in **bold**, even when the page does not emphasise them: usually one to three per paragraph, each a word or a short phrase, never a whole sentence.
-- Keep the emphasis the page itself prints: italics as *italic*, bold as **bold**.
+Emphasis — the reader skims these Rems later, so bold only what they must not miss:
+- In each paragraph, put its key term in **bold**, even when the page does not emphasise it: the term a sentence defines or introduces, or the concept the paragraph is mainly about. Usually one per paragraph, two when the paragraph has two central concepts, never more than three.
+- Bold nothing else. Not every technical or relevant word: not ordinary nouns, adjectives or adverbs, quantities, numbers, units, names, examples, or terms that only appear in passing. In a definition (glossary entry, "X is …"), bold the term defined, not the words that explain it.
+- Bold a term once, where it is introduced; do not bold it again later in the same Rem.
+- Each bold is a word or a short phrase, never a whole sentence. A list counts as one paragraph.
+- Keep the emphasis the page itself prints, beyond these limits: italics as *italic*, bold as **bold**.
 - An emphasised phrase may contain a formula (**state variables $x_i$**), but never put ** or * inside a formula's $...$.
 
 Use no other markup: no headings, no code, no links.
@@ -141,9 +144,11 @@ Formulae, in KaTeX:
 - numbered equations use \tag with the number shown, and are always written as $$...$$
 - words inside formulae are enclosed in \text{}.
 
-Emphasis, since the reader skims these rems later:
-- Put the key terms and concepts in **bold**, even when the frame does not emphasise them: one to three per line at most, each a word or a short phrase, never a whole sentence.
-- Keep the frame's own emphasis: italics as *italic*, bold as **bold**.
+Emphasis, since the reader skims these rems later — bold only what they must not miss:
+- Put the key terms in **bold**, even when the frame does not emphasise them: the term a line defines or introduces, or the concept the slide is mainly about. At most one per line.
+- Bold nothing else. Not every technical or relevant word: not ordinary words, quantities, numbers, units, names, examples, or terms that only appear in passing. Bold a term once, where it is introduced.
+- Each bold is a word or a short phrase, never a whole sentence.
+- Keep the frame's own emphasis, beyond these limits: italics as *italic*, bold as **bold**.
 - Never put ** or * inside a formula's $...$.
 
 Use no other markup: no headings, no code, no links.
@@ -160,7 +165,7 @@ DEFAULT_TRANSCRIPT_PROMPT = r"""Clean up passages of a speech transcript made by
 - Drop filler sounds that carry no meaning.
 - Keep a time marker at the start of a passage, such as [12:34], exactly as it is.
 - Each passage stays one paragraph: no line breaks. Where YouTube marks a change of speaker with ">>", start the new speaker's words with an em dash (—) instead.
-- Put the passage's key terms and concepts in **bold**: one to three per passage at most, each a word or a short phrase, never a whole sentence. Use no other markup.
+- Put the passage's key terms in **bold**: the term the speaker defines or introduces, or the concept the passage is mainly about. Usually one or two per passage, never more than three. Bold nothing else: not every technical or relevant word, nor quantities, numbers, names, examples or terms mentioned in passing. Each bold is a word or a short phrase, never a whole sentence. Use no other markup.
 """
 
 DEFAULT_EXTRACT_TITLE_PROMPT = r"""Give a title to an excerpt of a video, from its transcript. Do not acknowledge the request, do not comment, and do not ask questions: output the title and nothing else, on one line.
