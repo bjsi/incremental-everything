@@ -495,6 +495,10 @@ Since v1.0.193 the Priority Shield counts **every Incremental Rem and every card
 
 The flashcard bar shows one shield at a time, the **Card Shield** by default. **Click it** to switch to the **Priority Shield**, and click again to switch back. The ⚖️ Weighted value and its breakdown popup follow the shield on screen, and so does the pulse when the card you're reviewing sets it. The switch lasts until you close the queue; the next queue opens with the shield chosen in **Settings › Queue Display › Shield Shown on Flashcards**.
 
+Try it below: click the shield to switch it, and pick the priority of the card on screen to see which shield it pulses for. Hover a Priority Shield value for its breakdown. *(Example numbers.)*
+
+<iframe src="../demos/flashcard-bar-shield.html" title="Flashcard bar shield demo" loading="lazy" style="width:100%;height:190px;border:0;display:block"></iframe>
+
 Ranking both kinds together answers a question neither shield could alone: *is my most important unprocessed material an article or a card, and how much of everything I value is protected?* A low IncRem priority no longer looks safe while hundreds of higher-priority cards are overdue, and vice versa.
 
 > [!NOTE]
