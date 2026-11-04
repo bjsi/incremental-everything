@@ -136,12 +136,12 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
     ? `border-bottom: 1.5px dashed #15803d !important;
       border-right: 3px solid #4baf70 !important;`
     : '';
-  // Same scale as the side-panel badges above: a PDF marker's colour comes from
-  // the IncRem extracted from that highlight.
-  const { inc: incPercentiles } = await computeBandPercentiles(plugin);
+  // Same scale as the side-panel badges and the editor: the unified one
+  // (IncRems + cards). A PDF marker's band comes from the IncRem extracted from it.
+  const { unified } = await computeBandPercentiles(plugin);
   const incColorForBand = (band: number) =>
-    percentileToHslColor(bandColorPercentile(incPercentiles, band));
-  await logBandColorMapping(plugin, 'pdf marker tint (inc scale)', incPercentiles, incColorForBand);
+    percentileToHslColor(bandColorPercentile(unified, band));
+  await logBandColorMapping(plugin, 'pdf marker tint (unified scale)', unified, incColorForBand);
   const highlightBandCSS = buildHighlightBandCSS(incColorForBand);
   const css = `
     /* PDF viewer: keep the highlight's ORIGINAL background and distinguish the tag
@@ -259,10 +259,10 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
  */
 export async function registerHighlightBandBadgeCSS(plugin: ReactRNPlugin) {
   // Highlights are badged with the priority of the IncRem extracted from them,
-  // so they rank on the IncRem scale.
-  const { inc } = await computeBandPercentiles(plugin);
-  const colorForBand = (band: number) => percentileToHslColor(bandColorPercentile(inc, band));
-  await logBandColorMapping(plugin, 'highlight side-panel badges (inc scale)', inc, colorForBand);
+  // coloured on the unified scale like every editor badge.
+  const { unified } = await computeBandPercentiles(plugin);
+  const colorForBand = (band: number) => percentileToHslColor(bandColorPercentile(unified, band));
+  await logBandColorMapping(plugin, 'highlight side-panel badges (unified scale)', unified, colorForBand);
   const { badges } = buildHighlightBandCSS(colorForBand);
   await plugin.app.registerCSS('highlight-priority-band-badges', badges);
 }
@@ -274,22 +274,14 @@ export async function registerHighlightBandBadgeCSS(plugin: ReactRNPlugin) {
  */
 export async function registerTableBandBadgeCSS(plugin: ReactRNPlugin) {
   const enabled = await getIESetting(plugin, showPriorityBandsInTablesId);
-  // Both scales are emitted; the stylesheet picks per rem from the `incremental`
-  // / `cardpriority` tags the rem already carries, so a table mixing IncRems and
-  // flashcards colours each on the scale its own Priority Editor uses.
-  const percentiles = enabled
-    ? await computeBandPercentiles(plugin)
-    : { inc: null, card: null };
-  const incColor = (band: number) => percentileToHslColor(bandColorPercentile(percentiles.inc, band));
-  const cardColor = (band: number) =>
-    percentileToHslColor(bandColorPercentile(percentiles.card, band));
-  if (enabled) {
-    await logBandColorMapping(plugin, 'table badges (inc scale)', percentiles.inc, incColor);
-    await logBandColorMapping(plugin, 'table badges (card scale)', percentiles.card, cardColor);
-  }
+  // One scale for IncRems and flashcards alike — the unified one the Priority
+  // Editor badge uses — so a band is one colour across a mixed table.
+  const { unified } = enabled ? await computeBandPercentiles(plugin) : { unified: null };
+  const color = (band: number) => percentileToHslColor(bandColorPercentile(unified, band));
+  if (enabled) await logBandColorMapping(plugin, 'table badges (unified scale)', unified, color);
   await plugin.app.registerCSS(
     showPriorityBandsInTablesId,
-    enabled ? buildPriorityBandCSS({ inc: incColor, card: cardColor }) : ''
+    enabled ? buildPriorityBandCSS({ inc: color, card: color }) : ''
   );
 }
 

@@ -77,7 +77,11 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
 
       if (updatesToProcess.size === 0 && !runHeavy) break;
 
+      // Timed for the console: a flush blocks RemNote for seconds on a large KB, and its start
+      // time lets a slow command's `[Cloze]` line be matched against it.
+      const roundStartedAt = Date.now();
       const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+      const readAt = Date.now();
 
       let needsHeavyRecalc = runHeavy;
 
@@ -134,6 +138,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
       // Convert map back to array.
       const updatedCache = Array.from(cacheMap.values());
 
+      let writeStartedAt = Date.now();
       if (needsHeavyRecalc) {
         // Per-card universe: kbPercentile is the rem's mean-rank percentile
         // across the expanded card population (matches Weighted Shield).
@@ -142,6 +147,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
           ...info,
           kbPercentile: percentileByRem[info.remId] ?? 0,
         }));
+        writeStartedAt = Date.now();
         await writeCardPriorityCache(plugin, enrichedCache);
       } else {
         await writeCardPriorityCache(plugin, updatedCache);
@@ -149,7 +155,15 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
 
       // Signal all listeners that the cache has been updated
       // This is crucial for UI components to refresh their priority displays
+      const writtenAt = Date.now();
       await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+      const doneAt = Date.now();
+      console.log(
+        `[Cache] flush at ${dayjs(roundStartedAt).format('HH:mm:ss.SSS')}: ${updatesToProcess.size} Rem(s) ` +
+          `in ${doneAt - roundStartedAt} ms (read ${readAt - roundStartedAt}, ` +
+          `${needsHeavyRecalc ? 'percentiles' : 'merge'} ${writeStartedAt - readAt}, ` +
+          `write ${writtenAt - writeStartedAt}, signal ${doneAt - writtenAt})`
+      );
     }
   } catch (err) {
     console.error(`[Cache] Error inside while loop:`, err);
@@ -298,40 +312,62 @@ export function holdCardPriorityCacheEntry(plugin: RNPlugin, info: CardPriorityI
   lightModeOptimisticOverrides.set(info.remId, { info, expiresAt: Date.now() + 5000 });
 }
 
+/** Held entries are re-read and flushed once no new one has been held for this long. */
+const HELD_FLUSH_IDLE_MS = 12_000;
+/** A long run of clozes still gets its flush this long after the first one. */
+const HELD_FLUSH_MAX_WAIT_MS = 60_000;
+/** A Rem whose cards don't exist yet at the flush is read once more this much later. */
+const HELD_RETRY_MS = 15_000;
+const heldRemIds = new Set<RemId>();
+let heldFlushTimer: ReturnType<typeof setTimeout> | null = null;
+let heldRunStartedAt: number | null = null;
+
 /**
- * Replaces an optimistic entry with one read from the Rem's real cards, once
- * those cards exist. A command that writes the text a card is made from (Alt+Z)
- * cannot read that card straight away, so it stores what it knows and calls
- * this; each attempt waits longer, and the first one that finds cards wins.
- * If no attempt finds cards, what the command stored is flushed as it is.
+ * Replaces an optimistic entry with one read from the Rem's real cards. A command that writes the
+ * text a card is made from (Alt+Z) cannot read that card straight away, so it stores what it
+ * knows and calls this. One flush serves a whole run of clozes, once the run pauses: a flush
+ * blocks RemNote for over 2 s on a large KB, and a press landing in one took 6.7 s instead of
+ * 0.9 s. Until then other views see the new Rem only if another flush writes the held entry.
  */
-export function rereadCardPriorityCacheWhenCardsExist(
-  plugin: RNPlugin,
-  remId: RemId,
-  delaysMs: number[] = [2000, 5000, 15000]
-) {
-  const attempt = async (i: number) => {
+export function rereadCardPriorityCacheWhenCardsExist(plugin: RNPlugin, remId: RemId) {
+  heldRemIds.add(remId);
+  const now = Date.now();
+  heldRunStartedAt ??= now;
+  if (heldFlushTimer) clearTimeout(heldFlushTimer);
+  const delayMs = Math.min(HELD_FLUSH_IDLE_MS, heldRunStartedAt + HELD_FLUSH_MAX_WAIT_MS - now);
+  heldFlushTimer = setTimeout(() => {
+    heldFlushTimer = null;
+    heldRunStartedAt = null;
+    const remIds = [...heldRemIds];
+    heldRemIds.clear();
+    void rereadHeldEntries(plugin, remIds, true);
+  }, Math.max(0, delayMs));
+}
+
+async function rereadHeldEntries(plugin: RNPlugin, remIds: RemId[], retryWithoutCards: boolean) {
+  const withoutCards: RemId[] = [];
+  for (const remId of remIds) {
     try {
       const rem = await plugin.rem.findOne(remId);
       if (!rem) {
-        // Deleted while the entry was held: it must not reach the cache.
-        pendingUpdates.delete(remId);
-        return;
+        // Deleted since: drop its entry, including one another flush already wrote.
+        pendingUpdates.set(remId, { info: null, isLight: false });
+        continue;
       }
-      if (((await rem.getCards()) || []).length > 0) {
-        await updateCardPriorityCache(plugin, remId);
-        return;
+      if (((await rem.getCards()) || []).length === 0) {
+        // Its held entry, if still pending, is flushed below as it is.
+        withoutCards.push(remId);
+        continue;
       }
+      pendingUpdates.set(remId, { info: await getCardPriority(plugin, rem), isLight: false });
     } catch (e) {
       console.warn('[Cache] Deferred card re-read failed for Rem:', remId, e);
     }
-    if (i + 1 < delaysMs.length) {
-      setTimeout(() => void attempt(i + 1), delaysMs[i + 1]);
-    } else {
-      flushCacheUpdates(plugin).catch((e) => console.error('[Cache] Flush of held entry failed:', e));
-    }
-  };
-  setTimeout(() => void attempt(0), delaysMs[0]);
+  }
+  await flushCacheUpdates(plugin).catch((e) => console.error('[Cache] Flush of held entries failed:', e));
+  if (retryWithoutCards && withoutCards.length > 0) {
+    setTimeout(() => void rereadHeldEntries(plugin, withoutCards, false), HELD_RETRY_MS);
+  }
 }
 
 export async function flushCacheUpdatesNow(plugin: RNPlugin) {

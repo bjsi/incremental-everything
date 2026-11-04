@@ -14,9 +14,14 @@ import {
   queueSessionCacheKey,
   displayPriorityShieldId,
   displayWeightedShieldId,
+  flashcardBarShieldId,
+  flashcardBarShieldModeKey,
+  FlashcardBarShield,
   cardPriorityCacheRefreshKey,
   pendingCardPriorityKey,
   seenCardInSessionKey,
+  seenRemInSessionKey,
+  allIncrementalRemKey,
   coolingCacheKey,
   priorityCalcScopeRemIdsKey,
   incrementalQueueActiveKey,
@@ -30,13 +35,19 @@ import {
   expandCardInfosToCards,
   isPerCardDue,
   getCardPriority,
-  PerCardShieldItem,
   estimateCardRemPercentile,
 } from '../lib/card_priority';
+import type { IncrementalRem } from '../lib/incremental_rem';
+import { JointItem, computeLiveShields, perCardUniverse } from '../lib/live_shield';
+import { UnifiedShieldEntry } from '../lib/unified_shield';
+import { priorityShieldTitle } from '../components/PriorityShieldValue';
+import { ShieldIcon } from '../components/ShieldIcon';
+import { priorityColor as colorForPriority, usePriorityColorScale } from '../components/priorityColor';
+import { buildUnifiedRanking, unifiedPercentileAt, unifiedRankingFor } from '../lib/unified_percentile';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PendingCardPriority, pendingCardPriorityFor } from '../lib/card_priority/pending_priority';
 import { reportCardInfoBarHeight } from '../lib/card_info_bar_dock';
-import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
 import { CardSchedulerLabel } from '../components/OtherSchedulers';
@@ -57,104 +68,67 @@ type ShieldSlice = {
 type ShieldStatus = {
   kb: ShieldSlice | null;
   doc: ShieldSlice | null;
+  /** The Priority Shield (IncRems + cards); null while the bar shows the Card Shield. */
+  unifiedKb: UnifiedShieldEntry | null;
+  unifiedDoc: UnifiedShieldEntry | null;
+  /** Joint items for the Priority Weighted Shield popup ([] unless asked for). */
+  jointKb: JointItem[];
+  jointDoc: JointItem[] | null;
 } | null;
 
 /**
- * Compute the shield status using pre-filtered session cache data.
- * Falls back to the main cache only when percentiles are missing.
+ * Card Shield + Priority Shield for the card on screen, through the same
+ * helper as the IncRem bar (lib/live_shield.ts), with the saved shield's rules.
  */
-/**
- * The per-CARD universe the saved shield ranks, built once per cache version.
- * The live shield used to rank Rems-with-cards while the history saved at queue
- * exit ranks cards (see shield_history.ts), so the same shield read P9 · 8.2%
- * live and P9 · 7.3% saved. Keyed by the cache array's identity: a new cache
- * write is a new array, so the expansion never goes stale.
- */
-const perCardUniverseCache = new WeakMap<object, PerCardShieldItem[]>();
-function perCardUniverse(infos: CardPriorityInfo[]): PerCardShieldItem[] {
-  let universe = perCardUniverseCache.get(infos);
-  if (!universe) {
-    universe = expandCardInfosToCards(infos);
-    perCardUniverseCache.set(infos, universe);
-  }
-  return universe;
-}
-
 function computeShieldStatus(
   remId: string | undefined,
   sessionCache: QueueSessionCache | null,
   allPrioritizedCardInfo: CardPriorityInfo[] | null | undefined,
+  allIncRems: IncrementalRem[],
+  seenCardIds: string[],
   seenRemIds: string[],
   scopeRemIds: string[] | null | undefined,
-  coolingRemIds: ReadonlySet<string> = new Set()
+  coolingRemIds: ReadonlySet<string>,
+  withUnified: boolean,
+  computeWeighted: boolean
 ): ShieldStatus {
   if (!remId || !sessionCache) return null;
 
-  // A cooling Rem (priority_review_document/cooling.ts) cannot set the shield:
-  // its sibling was reviewed recently, so it is deliberately not being asked.
-  const filterUnreviewed = (list: CardPriorityInfo[]) =>
-    list.filter(
-      (info) =>
-        (!seenRemIds.includes(info.remId) && !coolingRemIds.has(info.remId)) || info.remId === remId
-    );
-
-  // Use the overdue lists (start-of-today criterion) for the shield.
-  // Falls back to [] when the session cache pre-dates this feature.
-  const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.overdueCardsInKB ?? []), (info) => info.priority);
-  const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.overdueCardsInScope ?? []), (info) => info.priority);
-
-  // Percentile over CARDS, with exactly the saved shield's test (QueueExit →
-  // calculateShieldStatus): a card is still pending when it was due by the start
-  // of today and its Rem has not been reviewed this session (the Rem on screen
-  // always counts, as in the pick above). Cooling decides which Rem sets the
-  // shield, not how the ranking counts — same as the saved one.
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfTodayMs = startOfToday.getTime();
-  const seenSet = new Set(seenRemIds);
-  const perCardPending = (item: PerCardShieldItem) =>
-    isPerCardDue(item, startOfTodayMs) && (!seenSet.has(item.remId) || item.remId === remId);
-
-  let kbPercentile: number | undefined;
-  if (topMissedInKb && allPrioritizedCardInfo) {
-    kbPercentile = calculateVolumeBasedPercentile(
-      perCardUniverse(allPrioritizedCardInfo),
-      topMissedInKb.priority,
-      perCardPending
-    );
-
-  }
-
-  let docPercentile: number | undefined;
-  if (topMissedInDoc && allPrioritizedCardInfo && scopeRemIds) {
-    const scopeSet = new Set(scopeRemIds);
-    const cardsInScope = perCardUniverse(allPrioritizedCardInfo).filter((c) => scopeSet.has(c.remId));
-    if (cardsInScope.length > 0) {
-      docPercentile = calculateVolumeBasedPercentile(
-        cardsInScope,
-        topMissedInDoc.priority,
-        perCardPending
-      );
-
-    }
-  }
+  const live = computeLiveShields({
+    allIncRems,
+    dueIncRemsKb: sessionCache.dueIncRemsInKB ?? [],
+    dueIncRemsDoc: sessionCache.dueIncRemsInScope ?? [],
+    seenRemIds: new Set(seenRemIds),
+    allCardInfos: allPrioritizedCardInfo ?? [],
+    // The overdue lists (start-of-today criterion); [] for a session cache
+    // that pre-dates them.
+    overdueCardsKb: sessionCache.overdueCardsInKB ?? [],
+    overdueCardsDoc: sessionCache.overdueCardsInScope ?? [],
+    seenCardRemIds: new Set(seenCardIds),
+    coolingRemIds,
+    scopeRemIds: scopeRemIds ? new Set(scopeRemIds) : null,
+    currentCardRemId: remId,
+    unified: withUnified && !!allPrioritizedCardInfo,
+    computeWeighted,
+  });
 
   return {
-    kb: topMissedInKb
-      ? {
-        absolute: topMissedInKb.priority,
-        percentile: kbPercentile,
-      }
+    kb: live.kb.card !== null
+      ? { absolute: live.kb.card, percentile: allPrioritizedCardInfo ? live.kb.cardPercentile : undefined }
       : null,
-    doc:
-      topMissedInDoc && docPercentile !== undefined
-        ? {
-          absolute: topMissedInDoc.priority,
-          percentile: docPercentile,
-        }
-        : null,
+    doc: live.doc && live.doc.card !== null && live.doc.cardPercentile !== undefined
+      ? { absolute: live.doc.card, percentile: live.doc.cardPercentile }
+      : null,
+    unifiedKb: allPrioritizedCardInfo ? live.kb.unified : null,
+    unifiedDoc: allPrioritizedCardInfo ? live.doc?.unified ?? null : null,
+    jointKb: live.jointKb,
+    jointDoc: live.jointDoc,
   };
 }
+
+const EMPTY_INCREMS: IncrementalRem[] = [];
+const EMPTY_IDS: string[] = [];
+const isJointDue = (x: JointItem) => x.due;
 
 export function CardInfoBar() {
   // console.log('[CardInfoBar] Mounting/Rendering');
@@ -175,6 +149,16 @@ export function CardInfoBar() {
   // ✅ Get the display weighted shield setting
   const displayWeightedShield = useIESetting(displayWeightedShieldId);
 
+  // Which shield the bar shows: the setting is the default, a click on the
+  // shield switches it for the rest of the queue session (reset at QueueEnter).
+  const shieldSetting = useIESetting(flashcardBarShieldId);
+  const shieldSessionMode = useTrackerPlugin(
+    (rp) => rp.storage.getSession<FlashcardBarShield>(flashcardBarShieldModeKey),
+    []
+  );
+  const shieldMode: FlashcardBarShield = shieldSessionMode ?? shieldSetting ?? 'card';
+  const showPriorityShield = shieldMode === 'priority';
+
   // 2. Add a new tracker to listen for the refresh signal.
   const refreshSignal = useTrackerPlugin(
     (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
@@ -191,6 +175,19 @@ export function CardInfoBar() {
     (rp) => rp.storage.getSession<string[]>(seenCardInSessionKey),
     [refreshSignal]
   ) ?? [];
+
+  // The IncRem side of the Priority Shield, read only while it is on screen.
+  const seenRemIds = useTrackerPlugin(
+    async (rp) => (showPriorityShield ? rp.storage.getSession<string[]>(seenRemInSessionKey) : undefined),
+    [showPriorityShield]
+  ) ?? EMPTY_IDS;
+  const allIncRemsRaw = useTrackerPlugin(
+    async (rp) => (showPriorityShield ? (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) ?? EMPTY_INCREMS : undefined),
+    [showPriorityShield]
+  );
+  const allIncRems = allIncRemsRaw ?? EMPTY_INCREMS;
+  // Until the IncRem list has loaded, a Priority value would be cards-only.
+  const priorityReady = showPriorityShield && allIncRemsRaw !== undefined;
 
   // Rems cooling as of the last cooling scan (published at QueueExit and on
   // every Priority Queue refresh). Read from the session cache only — no scan
@@ -514,8 +511,11 @@ export function CardInfoBar() {
   // --- REWRITTEN: The Shield calculation is now ultra-fast ---
   const shieldStatus = useMemo(() => {
     if (useLightMode || !rem || !sessionCache) return null;
-    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds, scopeRemIds, coolingRemIds);
-  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds, coolingRemIds]);
+    return computeShieldStatus(
+      rem._id, sessionCache, allPrioritizedCardInfo, allIncRems, seenCardIds, seenRemIds, scopeRemIds, coolingRemIds,
+      priorityReady, priorityReady && !!displayWeightedShield
+    );
+  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, allIncRems, seenCardIds, seenRemIds, scopeRemIds, coolingRemIds, priorityReady, displayWeightedShield]);
 
   // --- Weighted Shield: per-CARD bucketing (matches Card Priority × Memory
   // Analytics). Expand each CardPriorityInfo into one item per card and use
@@ -532,8 +532,9 @@ export function CardInfoBar() {
     [seenCardSet, rem?._id]
   );
 
+  // Cards-only; the Priority Shield's weighted value comes with shieldStatus.
   const weightedShieldStatus = useMemo(() => {
-    if (!displayWeightedShield || useLightMode || !rem || !allPrioritizedCardInfo || allPrioritizedCardInfo.length === 0) return null;
+    if (!displayWeightedShield || showPriorityShield || useLightMode || !rem || !allPrioritizedCardInfo || allPrioritizedCardInfo.length === 0) return null;
 
     const allCardItems = expandCardInfosToCards(allPrioritizedCardInfo);
     const kbWeighted = calculateWeightedShield(allCardItems, weightedIsDuePredicate);
@@ -550,8 +551,22 @@ export function CardInfoBar() {
     }
 
     return { kb: kbWeighted, doc: docWeighted, allItems: allCardItems, docItems };
-  }, [displayWeightedShield, useLightMode, rem, allPrioritizedCardInfo, weightedIsDuePredicate, scopeRemIds]);
+  }, [displayWeightedShield, showPriorityShield, useLightMode, rem, allPrioritizedCardInfo, weightedIsDuePredicate, scopeRemIds]);
 
+
+  // The Priority popup's Queue Selection Odds panel: the joint universe is not
+  // one the queue draws from, so it offers the card universe this queue does.
+  const priorityOdds = useMemo(() => {
+    if (!priorityReady || !displayWeightedShield || !allPrioritizedCardInfo) return undefined;
+    const all = perCardUniverse(allPrioritizedCardInfo);
+    const scope = scopeRemIds ? new Set(scopeRemIds) : null;
+    return {
+      kind: 'card' as const,
+      allItems: all,
+      docItems: scope ? all.filter((c) => scope.has(c.remId)) : null,
+      isDuePredicate: weightedIsDuePredicate,
+    };
+  }, [priorityReady, displayWeightedShield, allPrioritizedCardInfo, scopeRemIds, weightedIsDuePredicate]);
 
   // --- 🔌 ON-DEMAND PATH (Light Mode OR Full Mode fallback when cache not ready) ---
   const lightCardInfo = useTrackerPlugin(async (rp) => {
@@ -596,6 +611,24 @@ export function CardInfoBar() {
     if (finalCardInfo.priority === cardInfo.priority) return undefined;
     return estimateCardRemPercentile(allPrioritizedCardInfo, rem._id, finalCardInfo.priority);
   }, [rem, cardInfo, finalCardInfo, allPrioritizedCardInfo]);
+
+  // While the Priority Shield is on screen, the written "% KB / % Doc" are on its
+  // unified scale (IncRems + cards), so the card's rank and the shield's compare
+  // directly. The ranking does not depend on the card, so it is built once per
+  // cache version and scope, not per card.
+  const unifiedRankings = useMemo(() => {
+    if (!priorityReady || !allPrioritizedCardInfo) return null;
+    const kb = unifiedRankingFor(allIncRems, allPrioritizedCardInfo);
+    if (!scopeRemIds) return { kb, doc: null };
+    const scope = new Set(scopeRemIds);
+    const doc = buildUnifiedRanking(
+      allIncRems.filter((r) => scope.has(r.remId)),
+      allPrioritizedCardInfo.filter((c) => scope.has(c.remId))
+    );
+    return { kb, doc: doc.total > 0 ? doc : null };
+  }, [priorityReady, allIncRems, allPrioritizedCardInfo, scopeRemIds]);
+
+  const colorScale = usePriorityColorScale();
 
   // Detect whether the stats separator `|` has flex-wrapped to a new line.
   // CSS cannot observe line-breaks in a flex-wrap container, so we compare the
@@ -645,19 +678,64 @@ export function CardInfoBar() {
   // KB percentile is read directly from the main cache, which is already fast.
   // Only show relative data when the cache is actually populated
   const cacheReady = !!(cardInfo && allPrioritizedCardInfo && allPrioritizedCardInfo.length > 0);
-  const kbPercentile = (!useLightMode && cacheReady && cardInfo)
-    ? (estimatedKbPercentile ?? cardInfo.kbPercentile)
-    : undefined;
+  // Card Shield on screen: ranked among cards. Priority Shield: among IncRems + cards.
+  const shownKbPercentile = unifiedRankings
+    ? unifiedPercentileAt(unifiedRankings.kb, finalCardInfo.priority) ?? undefined
+    : (!useLightMode && cacheReady && cardInfo)
+      ? (estimatedKbPercentile ?? cardInfo.kbPercentile)
+      : undefined;
+  const shownDocPercentile = unifiedRankings
+    ? (unifiedRankings.doc ? unifiedPercentileAt(unifiedRankings.doc, finalCardInfo.priority) : null)
+    : docPercentile;
+  const kbPercentile = shownKbPercentile;
+  const percentScaleTitle = unifiedRankings
+    ? 'Rank among all IncRems and cards, the Priority Shield’s scale'
+    : 'Rank among cards, the Card Shield’s scale';
 
-  const priorityColor = kbPercentile !== undefined ? percentileToHslColor(kbPercentile) : '#6b7280';
+  // The colour is the priority's, on the plugin-wide colour map.
+  const priorityColor = colorScale || kbPercentile !== undefined
+    ? colorForPriority(colorScale, finalCardInfo.priority, kbPercentile)
+    : '#6b7280';
 
   // --- Check if current card is directly impacting (or within) the shield boundary ---
   // Pulse if the card's absolute priority is <= the shield value:
   // this covers both the exact shield card and intra-day relearning/learning-step
   // cards that reappear with a priority lower than (i.e. higher importance than) the shield.
-  const isKbShieldActive = shieldStatus?.kb != null && finalCardInfo.priority <= shieldStatus.kb.absolute;
-  const isDocShieldActive = shieldStatus?.doc != null && finalCardInfo.priority <= shieldStatus.doc.absolute;
+  // The values on screen: the Card Shield, or the Priority Shield (IncRems + cards).
+  type ShownValue = { absolute: number; percentile: number | undefined; title?: string };
+  const fromUnified = (e: UnifiedShieldEntry | null, scope: string): ShownValue | null =>
+    e && e.absolute !== null
+      ? { absolute: e.absolute, percentile: e.percentile ?? undefined, title: priorityShieldTitle(e, scope) }
+      : null;
+  const shownKb: ShownValue | null = showPriorityShield
+    ? fromUnified(shieldStatus?.unifiedKb ?? null, 'KB')
+    : shieldStatus?.kb ?? null;
+  const shownDoc: ShownValue | null = showPriorityShield
+    ? fromUnified(shieldStatus?.unifiedDoc ?? null, 'Doc')
+    : shieldStatus?.doc ?? null;
+  // The Card Shield's own hover text says what clicking does; the Priority values carry their breakdown.
+  const shieldSwitchTitle = showPriorityShield
+    ? 'Priority Shield: IncRems and cards ranked together. Click to show the Card Shield (flashcards only).'
+    : 'Card Shield: flashcards only. Click to show the Priority Shield (IncRems + cards).';
+
+  const isKbShieldActive = shownKb != null && finalCardInfo.priority <= shownKb.absolute;
+  const isDocShieldActive = shownDoc != null && finalCardInfo.priority <= shownDoc.absolute;
   const isAnyShieldActive = isKbShieldActive || isDocShieldActive;
+
+  const toggleShield = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    void plugin.storage.setSession(flashcardBarShieldModeKey, showPriorityShield ? 'card' : 'priority');
+  };
+
+  // Weighted value of the shield on screen.
+  const priorityWeighted = showPriorityShield && displayWeightedShield && shieldStatus?.unifiedKb?.weightedShield != null
+    ? {
+        kb: shieldStatus.unifiedKb.weightedShield,
+        doc: shieldStatus.unifiedDoc?.weightedShield ?? null,
+        allItems: shieldStatus.jointKb,
+        docItems: shieldStatus.jointDoc && shieldStatus.jointDoc.length > 0 ? shieldStatus.jointDoc : null,
+      }
+    : null;
 
 
   const handleClick = async () => {
@@ -720,12 +798,12 @@ export function CardInfoBar() {
           <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
           <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode || !cacheReady} source={finalCardInfo.source} isCardPriority={true} />
           {!useLightMode && cacheReady && kbPercentile !== undefined && (
-            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }} title={percentScaleTitle}>
               ({kbPercentile}% KB
-              {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
+              {shownDocPercentile !== undefined && shownDocPercentile !== null && `, ${shownDocPercentile}% Doc`})
             </span>
           )}
-          {!useLightMode && cacheReady && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
+          {!useLightMode && cacheReady && !unifiedRankings && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
             <span
               className="text-sm opacity-60 cursor-help"
               title="Doc percentile will be recalculated when you start a new queue session"
@@ -735,38 +813,45 @@ export function CardInfoBar() {
           )}
         </div>
 
-        {/* Shield */}
-        {displayPriorityShield && !useLightMode && cacheReady && (shieldStatus?.kb || shieldStatus?.doc) && (
+        {/* Shield — one at a time; a click switches Card ⇄ Priority for this session */}
+        {displayPriorityShield && !useLightMode && cacheReady && shieldStatus && (
           <>
             <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-            <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-2"
+              role="button"
+              tabIndex={0}
+              onClick={toggleShield}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleShield(e); } }}
+              style={{ cursor: 'pointer', borderRadius: '4px', padding: '1px 4px' }}
+              title={shieldSwitchTitle}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.75'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            >
               <span className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
                 <span style={{
-                  display: 'inline-block',
+                  display: 'inline-flex',
                   animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
-                }}>🛡️</span>
-                <span>Card Shield:</span>
+                }}><ShieldIcon kind={showPriorityShield ? 'priority' : 'card'} /></span>
+                <span>{showPriorityShield ? 'Priority Shield:' : 'Card Shield:'}</span>
               </span>
               <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-                {shieldStatus.kb && (
-                  <span style={{
-                    animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
-                    fontWeight: isKbShieldActive ? 700 : 'inherit',
-                    color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
-                  }}>
-                    KB: <strong style={{ color: percentileToHslColor(shieldStatus.kb.percentile ?? shieldStatus.kb.absolute) }}>{shieldStatus.kb.absolute}</strong>
-                    {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile.toFixed(1)}%)`}
-                  </span>
+                {([['KB', shownKb, isKbShieldActive], ['Doc', shownDoc, isDocShieldActive]] as const).map(([label, v, active]) =>
+                  v && (
+                    <span key={label} title={v.title} style={{
+                      animation: active ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                      fontWeight: active ? 700 : 'inherit',
+                      color: active ? 'var(--rn-clr-blue)' : 'inherit'
+                    }}>
+                      {label}: <strong style={{ color: colorForPriority(colorScale, v.absolute, v.percentile) }}>{v.absolute}</strong>
+                      {v.percentile !== undefined && ` (${v.percentile.toFixed(1)}%)`}
+                    </span>
+                  )
                 )}
-                {shieldStatus.doc && (
-                  <span style={{
-                    animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
-                    fontWeight: isDocShieldActive ? 700 : 'inherit',
-                    color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
-                  }}>
-                    Doc: <strong style={{ color: percentileToHslColor(shieldStatus.doc.percentile ?? shieldStatus.doc.absolute) }}>{shieldStatus.doc.absolute}</strong>
-                    {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile.toFixed(1)}%)`}
-                  </span>
+                {!shownKb && !shownDoc && (
+                  showPriorityShield && !priorityReady
+                    ? <span>…</span>
+                    : <span title="No due item has been missed in this scope">✓ nothing missed</span>
                 )}
               </div>
             </div>
@@ -783,18 +868,30 @@ export function CardInfoBar() {
           </>
         )}
 
-        {/* Weighted Shield */}
-        {displayWeightedShield && !useLightMode && cacheReady && weightedShieldStatus && allPrioritizedCardInfo && (
+        {/* Weighted Shield — of the shield on screen */}
+        {displayWeightedShield && !useLightMode && cacheReady && allPrioritizedCardInfo && (priorityWeighted || weightedShieldStatus) && (
           <>
             <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-            <WeightedShieldTooltip
-              kbValue={weightedShieldStatus.kb}
-              docValue={weightedShieldStatus.doc}
-              allItems={weightedShieldStatus.allItems}
-              isDuePredicate={weightedIsDuePredicate}
-              docItems={weightedShieldStatus.docItems}
-              itemLabel="Cards"
-            />
+            {priorityWeighted ? (
+              <WeightedShieldTooltip
+                kbValue={priorityWeighted.kb}
+                docValue={priorityWeighted.doc}
+                allItems={priorityWeighted.allItems}
+                isDuePredicate={isJointDue}
+                docItems={priorityWeighted.docItems}
+                itemLabel="Priority"
+                odds={priorityOdds}
+              />
+            ) : weightedShieldStatus && (
+              <WeightedShieldTooltip
+                kbValue={weightedShieldStatus.kb}
+                docValue={weightedShieldStatus.doc}
+                allItems={weightedShieldStatus.allItems}
+                isDuePredicate={weightedIsDuePredicate}
+                docItems={weightedShieldStatus.docItems}
+                itemLabel="Cards"
+              />
+            )}
           </>
         )}
 

@@ -17,6 +17,7 @@ import { ActionItemType } from "../lib/incremental_rem/types";
 import { determineIncRemType } from "../lib/incRemHelpers";
 import { TypeBadge } from "../components";
 import { allIncrementalRemKey, pendingPrioritySaveKey } from "../lib/consts";
+import { openRemInNewPane } from '../lib/remHelpers';
 
 const NUM_TO_LOAD_IN_BATCH = 30;
 
@@ -428,7 +429,13 @@ function HistoryItem({
         setIncPriority(newPriority);
     };
 
-    const openRem = async (remId: RemId) => {
+    // Shift+click opens the Rem in a new pane beside the current document
+    // (or focuses the pane already showing it) instead of replacing it.
+    const openRem = async (remId: RemId, inNewPane = false) => {
+        if (inNewPane) {
+            await openRemInNewPane(plugin, remId);
+            return;
+        }
         const rem = await plugin.rem.findOne(remId);
         if (rem) {
             plugin.window.openRem(rem);
@@ -491,7 +498,12 @@ function HistoryItem({
                             </span>
                         )}
                     </div>
-                    <div onClick={() => openRem(remId)}>
+                    <div
+                        onClick={(e) => openRem(remId, e.shiftKey)}
+                        // Keep Shift+click from selecting text across the list.
+                        onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
+                        title="Click to open · Shift+click to open in a new pane"
+                    >
                         <RemViewer
                             remId={remId}
                             width="100%"

@@ -4,6 +4,8 @@
  * it started; `lap` times the stretch since the previous lap.
  */
 export interface OpTimer {
+  /** When the command started, to match its line against other timed work. */
+  readonly startedAt: number;
   lap(label: string): void;
   track<T>(label: string, work: Promise<T>): Promise<T>;
   report(): string;
@@ -14,6 +16,7 @@ export function createOpTimer(): OpTimer {
   let lastLapAt = startedAt;
   const parts: string[] = [];
   return {
+    startedAt,
     lap(label) {
       const now = Date.now();
       parts.push(`${label} ${now - lastLapAt}`);

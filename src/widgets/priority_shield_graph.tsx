@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
   ReferenceArea,
 } from 'recharts';
-import { useEffect, useRef, useState } from 'react';
+import { CSSProperties, useEffect, useRef, useState } from 'react';
 import {
   priorityShieldHistoryKey,
   documentPriorityShieldHistoryKey,
@@ -21,6 +21,15 @@ import {
 } from '../lib/consts';
 import dayjs from 'dayjs';
 import { IE_DOCS_BASE_URL } from '../lib/settings';
+import {
+  CardRow,
+  GraphHistory,
+  IncRemRow,
+  PriorityRow,
+  buildCardRows,
+  buildIncRemRows,
+  buildPriorityRows,
+} from '../lib/shield_graph_data';
 
 const DOCS_PATH = 'Prioritization-%26-Sorting/#priority-shield-history';
 
@@ -43,25 +52,6 @@ const openDocs = () => {
   }
 };
 
-interface ShieldHistoryEntry {
-  absolute: number | null;
-  percentile: number | null;
-  universeSize?: number; // NEW: Track the total count of items in scope
-  dismissedCount?: number;
-}
-
-interface ChartData {
-  date: string;
-  originalDate: string;
-  absolute: number | null;
-  relative: number | null;
-  universeSize: number; // NEW: Universe size for the chart
-  dismissedCount?: number;
-  totalUniverse?: number;
-  processingPercentage?: number;
-  weightedShield?: number | null;
-}
-
 type TimePeriod = 'month' | '3m' | '6m' | 'year' | 'all';
 
 const TIME_PERIOD_OPTIONS: { value: TimePeriod; label: string }[] = [
@@ -80,6 +70,45 @@ const PERIOD_TO_DAYS: Record<TimePeriod, number | null> = {
   all: null,
 };
 
+type ChartKind = 'priority' | 'card' | 'incRem';
+type Dated<T> = T & { date: string };
+type AnyRow = Dated<PriorityRow> | Dated<CardRow> | Dated<IncRemRow>;
+type ScopeTab = 'kb' | 'doc';
+
+/**
+ * Every axis takes the colour of the series it measures; an axis holding a
+ * stack of several series (the universes) is neutral grey.
+ */
+const PRIORITY_COLORS = { absolute: '#2b6cb0', relative: '#0d9488' };
+const INCREM_COLORS = { absolute: '#8884d8' };
+const CARD_COLORS = {
+  kb: { absolute: '#c0392b', relative: '#e67e22', universe: '#2980b9' },
+  doc: { absolute: '#d35400', relative: '#f1c40f', universe: '#16a085' },
+};
+const WEIGHTED_COLOR = '#ff6b6b';
+const UNIVERSE_AXIS_COLOR = '#888888';
+const CARDS_BAND = { stroke: '#c8902f', fill: 'rgba(200, 144, 47, 0.18)' };
+const INCREMS_BAND = { stroke: '#10b981', fill: 'rgba(16, 185, 129, 0.18)' };
+const DISMISSED_BAND = { stroke: '#333', fill: 'rgba(250, 204, 21, 0.4)' };
+
+/**
+ * Inline, not Tailwind: `bg-white` has no rule in the popup's CSS, so the box
+ * came out transparent. Opaque theme background, above the next chart.
+ */
+const TOOLTIP_BOX: CSSProperties = {
+  background: 'var(--rn-clr-background-primary, #fff)',
+  border: '1px solid var(--rn-clr-border-opaque, #d1d5db)',
+  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+};
+
+const fmtCount = (v: number | null | undefined) => (v || 0).toLocaleString();
+const fmtP = (v: number | null | undefined) => (v === null || v === undefined ? 'N/A' : v);
+const fmtPct = (v: number | null | undefined) => (v === null || v === undefined ? 'N/A' : `${v}%`);
+
+function withDateLabels<T extends { originalDate: string }>(rows: T[]): Dated<T>[] {
+  return rows.map((r) => ({ ...r, date: dayjs(r.originalDate).format('MMM DD') }));
+}
+
 function PriorityShieldGraph() {
   const plugin = usePlugin();
 
@@ -93,6 +122,7 @@ function PriorityShieldGraph() {
 
   const [showWeightedShield, setShowWeightedShield] = useState(false);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('3m');
+  const [scopeTab, setScopeTab] = useState<ScopeTab>('doc');
 
   // Hydrate { showWeightedShield, timePeriod } from device-local storage on
   // mount, then persist on every change. The ref-gate prevents the persist
@@ -149,18 +179,13 @@ function PriorityShieldGraph() {
   // Get the current subQueueId from context
   const subQueueId = ctx?.contextData?.subQueueId || ctx?.subQueueId;
 
-  // --- NEW: Get the original scope ID for Priority Review Documents ---
+  // In a Priority Review Document, the document scope is the original one.
   const originalScopeId = useTrackerPlugin(
     (rp) => rp.storage.getSession<string | null>('originalScopeId'),
     []
   );
-
-  // --- NEW: Determine which scope to use for document-level data ---
-  // If we're in a Priority Review Document, use the originalScopeId
-  // Otherwise, use the subQueueId
   const effectiveDocScopeId = originalScopeId || subQueueId;
 
-  // Fetch document name - use the effective scope ID
   const documentName = useRunAsync(async () => {
     if (!effectiveDocScopeId) return null;
     const rem = await plugin.rem.findOne(effectiveDocScopeId);
@@ -168,232 +193,160 @@ function PriorityShieldGraph() {
     return await plugin.richText.toString(rem.text) || 'Document';
   }, [effectiveDocScopeId]);
 
-  const processHistoryData = (history: Record<string, ShieldHistoryEntry> | undefined, isIncRemChart: boolean = true) => {
-    if (!history) return [];
-
-    const unsortedData = Object.entries(history)
-      // NEW: Filter out any flawed data where absolute priority is missing
-      .filter(([_, values]) => values.absolute !== null && values.absolute !== undefined)
-      .map(([date, values]) => {
-        const universeSize = values.universeSize || 0;
-        const isIncRem = isIncRemChart && 'dismissedCount' in values;
-
-        const item: any = {
-          date: date,
-          absolute: values.absolute,
-          relative: values.percentile,
-          universeSize: universeSize,
-          weightedShield: (values as any).weightedShield ?? null,
-        };
-
-        if (isIncRem) {
-          const dismissedCount = values.dismissedCount || 0;
-          const totalUniverse = universeSize + dismissedCount;
-          item.dismissedCount = dismissedCount;
-          item.totalUniverse = totalUniverse;
-          item.processingPercentage = totalUniverse > 0 ? (dismissedCount / totalUniverse) * 100 : 0;
-        }
-        return item;
-      });
-
-    const sortedData = unsortedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    return sortedData.map(item => ({
-      ...item,
-      originalDate: item.date,
-      date: dayjs(item.date).format('MMM DD'),
-    }));
+  /**
+   * One KB's history from a KB-partitioned key ({ kbId: { date: entry } }),
+   * or from the legacy unpartitioned shape (date keys at the root), which
+   * belongs to the primary KB only.
+   */
+  const loadKbHistory = async (key: string): Promise<GraphHistory | null> => {
+    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+    const currentKbId = kbData?._id || 'global';
+    const raw = (await plugin.storage.getSynced(key)) as any;
+    if (!raw) return null;
+    if (raw[currentKbId]) return raw[currentKbId];
+    const keys = Object.keys(raw);
+    if (keys.some((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)) && (await plugin.kb.isPrimaryKnowledgeBase())) {
+      const clean: GraphHistory = {};
+      for (const k of keys) if (/^\d{4}-\d{2}-\d{2}$/.test(k)) clean[k] = raw[k];
+      return clean;
+    }
+    return null;
   };
 
-  const filterByPeriod = <T extends { originalDate?: string }>(data: T[] | null | undefined, period: TimePeriod): T[] => {
-    if (!data || data.length === 0) return [];
+  /** One scope's history: { kbId: { scopeId: { date: entry } } }, or legacy { scopeId: { date: entry } }. */
+  const loadDocHistory = async (key: string, scopeId: string): Promise<GraphHistory | null> => {
+    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+    const currentKbId = kbData?._id || 'global';
+    const raw = (await plugin.storage.getSynced(key)) as any;
+    if (!raw) return null;
+    if (raw[currentKbId]) return raw[currentKbId][scopeId] ?? null;
+    const legacy = raw[scopeId];
+    if (
+      legacy &&
+      Object.keys(legacy).some((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)) &&
+      (await plugin.kb.isPrimaryKnowledgeBase())
+    ) {
+      return legacy;
+    }
+    return null;
+  };
+
+  const kbIncHistory = useRunAsync(() => loadKbHistory(priorityShieldHistoryKey), []);
+  const kbCardHistory = useRunAsync(() => loadKbHistory(cardPriorityShieldHistoryKey), []);
+  const docIncHistory = useRunAsync(
+    async () => (effectiveDocScopeId ? loadDocHistory(documentPriorityShieldHistoryKey, effectiveDocScopeId) : null),
+    [effectiveDocScopeId]
+  );
+  const docCardHistory = useRunAsync(
+    async () => (effectiveDocScopeId ? loadDocHistory(documentCardPriorityShieldHistoryKey, effectiveDocScopeId) : null),
+    [effectiveDocScopeId]
+  );
+
+  const filterByPeriod = <T extends { originalDate: string }>(data: T[], period: TimePeriod): T[] => {
+    if (data.length === 0) return [];
     const days = PERIOD_TO_DAYS[period];
     if (days === null) return data;
     const cutoff = dayjs().subtract(days, 'day').startOf('day');
-    const filtered = data.filter(d => d.originalDate && dayjs(d.originalDate).isAfter(cutoff));
+    const filtered = data.filter((d) => dayjs(d.originalDate).isAfter(cutoff));
     // If the period filter removes everything (e.g. very old data), fall back to full data
     return filtered.length > 0 ? filtered : data;
   };
 
-  // --- Incremental Rem Data ---
-  const kbChartData = useRunAsync(async () => {
-    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-    const currentKbId = kbData?._id || 'global';
-    const rawHistory = (await plugin.storage.getSynced(priorityShieldHistoryKey)) as any;
+  const scopeCharts = (inc: GraphHistory | null | undefined, card: GraphHistory | null | undefined) => ({
+    priority: withDateLabels(filterByPeriod(buildPriorityRows(inc, card), timePeriod)),
+    card: withDateLabels(filterByPeriod(buildCardRows(card), timePeriod)),
+    incRem: withDateLabels(filterByPeriod(buildIncRemRows(inc), timePeriod)),
+  });
+  const kb = scopeCharts(kbIncHistory, kbCardHistory);
+  const doc = scopeCharts(effectiveDocScopeId ? docIncHistory : null, effectiveDocScopeId ? docCardHistory : null);
+  const hasAny = (s: typeof kb) => s.priority.length > 0 || s.card.length > 0 || s.incRem.length > 0;
+  const hasKbData = hasAny(kb);
+  const hasDocData = !!effectiveDocScopeId && hasAny(doc);
+  const showTabs = hasKbData && hasDocData;
+  const activeScope: ScopeTab = showTabs ? scopeTab : hasDocData ? 'doc' : 'kb';
 
-    if (!rawHistory) return [];
+  // Focus the container once the tabs appear, so ← → work without a click first.
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showTabs) containerRef.current?.focus({ preventScroll: true });
+  }, [showTabs]);
 
-    // 1. Check for explicit KB partition
-    if (rawHistory[currentKbId]) {
-      return processHistoryData(rawHistory[currentKbId], true);
-    }
+  // --- Tooltips: read straight from the hovered row, in the series' colours ---
 
-    // 2. Fallback to legacy (if keys are dates) - strict Primary KB check
-    const keys = Object.keys(rawHistory);
-    const isLegacy = keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
-
-    if (isLegacy) {
-      const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-      if (isPrimary) {
-        // Filter out non-date keys (e.g. other KB IDs in mixed state)
-        const cleanLegacy: Record<string, ShieldHistoryEntry> = {};
-        for (const k of keys) {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
-            cleanLegacy[k] = rawHistory[k];
-          }
-        }
-        return processHistoryData(cleanLegacy, true);
-      }
-    }
-
-    return [];
-  }, []);
-
-  // --- NEW: Fetch document-level data using effectiveDocScopeId ---
-  const docChartData = useRunAsync(async () => {
-    if (!effectiveDocScopeId) return null;
-    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-    const currentKbId = kbData?._id || 'global';
-    const rawAllDocHistory = (await plugin.storage.getSynced(documentPriorityShieldHistoryKey)) as any;
-
-    if (!rawAllDocHistory) return null;
-
-    // 1. Check for explicit KB partition
-    if (rawAllDocHistory[currentKbId]) {
-      // Structure: { kbId: { scopeId: { date: entry } } }
-      return processHistoryData(rawAllDocHistory[currentKbId][effectiveDocScopeId], true);
-    }
-
-    // 2. Fallback to legacy (keys are scopeIds, values are {date: entry})
-    // Check if our scope ID exists at root
-    const potentialScopeData = rawAllDocHistory[effectiveDocScopeId];
-    if (potentialScopeData) {
-      // Verify it looks like history data (has date keys)
-      const dateKeys = Object.keys(potentialScopeData);
-      if (dateKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
-        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-        if (isPrimary) {
-          return processHistoryData(potentialScopeData, true);
-        }
-      }
-    }
-
-    return null;
-  }, [effectiveDocScopeId]);
-
-  // --- Flashcard Data ---
-  const cardKbChartData = useRunAsync(async () => {
-    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-    const currentKbId = kbData?._id || 'global';
-    const rawHistory = (await plugin.storage.getSynced(cardPriorityShieldHistoryKey)) as any;
-
-    if (!rawHistory) return [];
-
-    // 1. Check for explicit KB partition
-    if (rawHistory[currentKbId]) {
-      return processHistoryData(rawHistory[currentKbId], false);
-    }
-
-    // 2. Fallback to legacy
-    const keys = Object.keys(rawHistory);
-    const isLegacy = keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
-
-    if (isLegacy) {
-      const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-      if (isPrimary) {
-        const cleanLegacy: Record<string, ShieldHistoryEntry> = {};
-        for (const k of keys) {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
-            cleanLegacy[k] = rawHistory[k];
-          }
-        }
-        return processHistoryData(cleanLegacy, false);
-      }
-    }
-
-    return [];
-  }, []);
-
-  // --- NEW: Fetch card document-level data using effectiveDocScopeId ---
-  const cardDocChartData = useRunAsync(async () => {
-    if (!effectiveDocScopeId) return null;
-    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-    const currentKbId = kbData?._id || 'global';
-    const rawAllDocHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) as any;
-
-    if (!rawAllDocHistory) return null;
-
-    // 1. Check for explicit KB partition
-    if (rawAllDocHistory[currentKbId]) {
-      return processHistoryData(rawAllDocHistory[currentKbId][effectiveDocScopeId], false);
-    }
-
-    // 2. Fallback to legacy
-    const potentialScopeData = rawAllDocHistory[effectiveDocScopeId];
-    if (potentialScopeData) {
-      const dateKeys = Object.keys(potentialScopeData);
-      if (dateKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
-        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-        if (isPrimary) {
-          return processHistoryData(potentialScopeData, false);
-        }
-      }
-    }
-
-    return null;
-  }, [effectiveDocScopeId]);
-
-  // Custom tooltip to show all three values clearly
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0]?.payload;
-      const isIncRem = data && 'dismissedCount' in data;
-
-      return (
-        <div className="bg-white p-2 border border-gray-300 rounded shadow text-sm tooltip-container">
-          <p className="font-semibold mb-1">{`Date: ${label}`}</p>
-          {payload.map((entry: any, index: number) => {
-            if (entry.dataKey === 'absolute' || entry.dataKey === 'relative') {
-              return (
-                <p key={index} style={{ color: entry.color }}>
-                  {`${entry.name}: ${entry.value !== null ?
-                    (entry.dataKey === 'relative' ? `${entry.value}%` : entry.value)
-                    : 'N/A'}`}
-                </p>
-              );
-            }
-            if (entry.dataKey === 'weightedShield' && entry.value !== null && entry.value !== undefined) {
-              return (
-                <p key={index} style={{ color: entry.color }}>
-                  {`${entry.name}: ${entry.value}%`}
-                </p>
-              );
-            }
-            if (!isIncRem && entry.dataKey === 'universeSize') {
-              return (
-                <p key={index} style={{ color: entry.color }}>
-                  {`${entry.name}: ${entry.value.toLocaleString()}`}
-                </p>
-              );
-            }
-            return null;
-          })}
-
-          {isIncRem && data && (
-            <div className="mt-1 pt-1 border-t border-gray-100">
-              <p style={{ color: '#10b981' }}>{`Universe of Incremental Rems: ${(data.universeSize || 0).toLocaleString()}`}</p>
-              <p style={{ color: '#d97706' }}>{`Universe of Dismissed Rems: ${(data.dismissedCount || 0).toLocaleString()}`}</p>
-              <p style={{ color: '#333' }} className="font-medium">{`Total Universe: ${(data.totalUniverse || 0).toLocaleString()}`}</p>
-              <p className="text-[11px] text-gray-500 mt-1 uppercase tracking-wider">{`Processing: ${data.processingPercentage ? data.processingPercentage.toFixed(1) : 0}%`}</p>
-            </div>
-          )}
+  const PriorityTooltip = ({ active, payload, label }: any) => {
+    const d: PriorityRow | undefined = active ? payload?.[0]?.payload : undefined;
+    if (!d) return null;
+    const absolute = d.rebuilt ? d.absoluteRebuilt : d.absolute;
+    return (
+      <div className="p-2 rounded text-sm" style={TOOLTIP_BOX}>
+        <p className="font-semibold mb-1">{`Date: ${label}`}</p>
+        <p style={{ color: PRIORITY_COLORS.absolute }}>
+          {`Absolute Priority: ${fmtP(absolute)}`}
+          {d.rebuilt && ' (rebuilt)'}
+        </p>
+        <p className="text-[12px]" style={{ color: PRIORITY_COLORS.absolute, opacity: 0.8 }}>
+          {`IncRem side: ${fmtP(d.incRemAbsolute)} · Card side: ${fmtP(d.cardAbsolute)}`}
+        </p>
+        <p style={{ color: PRIORITY_COLORS.relative }}>{`Relative Priority: ${fmtPct(d.relative)}`}</p>
+        {showWeightedShield && (
+          <p style={{ color: WEIGHTED_COLOR }}>{`Weighted Shield: ${fmtPct(d.weightedShield)}`}</p>
+        )}
+        <div className="mt-1 pt-1 border-t border-gray-100">
+          <p style={{ color: CARDS_BAND.stroke }}>{`Cards: ${fmtCount(d.cardUniverse)}`}</p>
+          <p style={{ color: INCREMS_BAND.stroke }}>{`IncRems: ${fmtCount(d.incRemUniverse)}`}</p>
+          <p className="font-medium" style={{ color: PRIORITY_COLORS.absolute }}>
+            {`Priority Shield universe (IncRems + Cards): ${fmtCount(d.unifiedUniverse)}`}
+          </p>
+          <p style={{ color: DISMISSED_BAND.stroke }}>{`Dismissed Rems (outside the shield): ${fmtCount(d.dismissedCount)}`}</p>
         </div>
-      );
-    }
-    return null;
+        {d.rebuilt && (
+          <p className="text-[11px] text-gray-500 mt-1" style={{ maxWidth: 320 }}>
+            Rebuilt from the IncRem and Card Shield histories: the lower of the two sides, and their universes
+            added up. Relative and weighted values were not recorded before v1.0.193.
+          </p>
+        )}
+      </div>
+    );
   };
 
-  const renderChart = (data: ChartData[], title: string, color1: string, color2: string, color3: string) => {
-    const isIncRemChart = title.includes('IncRem');
+  const CardTooltip = ({ active, payload, label }: any) => {
+    const d: CardRow | undefined = active ? payload?.[0]?.payload : undefined;
+    if (!d) return null;
+    const colors = CARD_COLORS[activeScope];
+    return (
+      <div className="p-2 rounded text-sm" style={TOOLTIP_BOX}>
+        <p className="font-semibold mb-1">{`Date: ${label}`}</p>
+        <p style={{ color: colors.absolute }}>{`Absolute Priority: ${fmtP(d.absolute)}`}</p>
+        <p style={{ color: colors.relative }}>{`Relative Priority (%): ${fmtPct(d.relative)}`}</p>
+        {showWeightedShield && d.weightedShield !== null && (
+          <p style={{ color: WEIGHTED_COLOR }}>{`Weighted Shield (%): ${fmtPct(d.weightedShield)}`}</p>
+        )}
+        <p style={{ color: colors.universe }}>{`Universe Size: ${fmtCount(d.universeSize)}`}</p>
+      </div>
+    );
+  };
+
+  const IncRemTooltip = ({ active, payload, label }: any) => {
+    const d: IncRemRow | undefined = active ? payload?.[0]?.payload : undefined;
+    if (!d) return null;
+    return (
+      <div className="p-2 rounded text-sm" style={TOOLTIP_BOX}>
+        <p className="font-semibold mb-1">{`Date: ${label}`}</p>
+        <p style={{ color: INCREM_COLORS.absolute }}>{`Absolute Priority: ${fmtP(d.absolute)}`}</p>
+        <div className="mt-1 pt-1 border-t border-gray-100">
+          <p style={{ color: INCREMS_BAND.stroke }}>{`Universe of Incremental Rems: ${fmtCount(d.universeSize)}`}</p>
+          <p style={{ color: DISMISSED_BAND.stroke }}>{`Universe of Dismissed Rems: ${fmtCount(d.dismissedCount)}`}</p>
+          <p className="font-medium" style={{ color: DISMISSED_BAND.stroke }}>{`IncRems + Dismissed: ${fmtCount(d.totalUniverse)}`}</p>
+          <p className="text-[11px] text-gray-500 uppercase tracking-wider">{`Processing: ${d.processingPercentage.toFixed(1)}%`}</p>
+        </div>
+      </div>
+    );
+  };
+
+  const kFormatter = (value: number) => (value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toString());
+
+  const renderChart = (kind: ChartKind, data: AnyRow[], title: string) => {
+    if (data.length === 0) return null;
     const zState = getZState(title);
 
     const zoomOut = () => {
@@ -431,7 +384,7 @@ function PriorityShieldGraph() {
       }
 
       if (indexLeft > indexRight) {
-        let temp = indexLeft;
+        const temp = indexLeft;
         indexLeft = indexRight;
         indexRight = temp;
       }
@@ -454,8 +407,12 @@ function PriorityShieldGraph() {
       displayData = data.slice(zState.startIndex, zState.endIndex + 1);
     }
 
-    // Find the maximum universe size for better y-axis scaling based on visible data
-    const maxUniverse = Math.max(...displayData.map(d => isIncRemChart && d.totalUniverse !== undefined ? d.totalUniverse : (d.universeSize || 0)));
+    // The universe axis spans the top of the stack (or the single line).
+    const universeTop = (d: AnyRow): number =>
+      kind === 'priority' ? (d as PriorityRow).unifiedUniverse + (d as PriorityRow).dismissedCount
+      : kind === 'incRem' ? (d as IncRemRow).totalUniverse
+      : (d as CardRow).universeSize;
+    const maxUniverse = Math.max(0, ...displayData.map(universeTop));
     const universeAxisMax = Math.ceil(maxUniverse * 1.1) || 10; // Add 10% padding
 
     let absoluteMin = 0;
@@ -464,10 +421,13 @@ function PriorityShieldGraph() {
     let relativeMax = 100;
 
     if (zState.autoFit && displayData.length > 0) {
-      const absValues = displayData.map(d => d.absolute).filter((v): v is number => v !== null);
-      const relValues = displayData.map(d => d.relative).filter((v): v is number => v !== null);
-
-      const allValues = [...absValues, ...relValues];
+      const values: (number | null | undefined)[] = [];
+      for (const d of displayData) {
+        values.push((d as any).absolute);
+        if (kind === 'priority') values.push((d as PriorityRow).absoluteRebuilt);
+        if (kind !== 'incRem') values.push((d as PriorityRow | CardRow).relative);
+      }
+      const allValues = values.filter((v): v is number => v !== null && v !== undefined);
 
       if (allValues.length > 0) {
         const globalMin = Math.max(0, Math.floor(Math.min(...allValues) - 5));
@@ -490,6 +450,16 @@ function PriorityShieldGraph() {
         [title]: { ...getZState(title), autoFit: !getZState(title).autoFit }
       }));
     };
+
+    const cardColors = CARD_COLORS[activeScope];
+    const absoluteColor =
+      kind === 'priority' ? PRIORITY_COLORS.absolute : kind === 'card' ? cardColors.absolute : INCREM_COLORS.absolute;
+    const relativeColor = kind === 'priority' ? PRIORITY_COLORS.relative : cardColors.relative;
+    const universeAxisColor = kind === 'card' ? cardColors.universe : UNIVERSE_AXIS_COLOR;
+    const hasRebuilt = kind === 'priority' && displayData.some((d) => (d as PriorityRow).rebuilt);
+
+    const tooltip =
+      kind === 'priority' ? <PriorityTooltip /> : kind === 'card' ? <CardTooltip /> : <IncRemTooltip />;
 
     return (
       <div
@@ -551,73 +521,94 @@ function PriorityShieldGraph() {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />
 
-            {/* Left Y-axis for Absolute Priority */}
+            {/* Left Y-axis: Absolute Priority */}
             <YAxis
               yAxisId="left"
               orientation="left"
-              stroke={color1}
+              stroke={absoluteColor}
               domain={[absoluteMin, absoluteMax]}
               allowDataOverflow
               width={30}
             />
 
-            {/* Right Y-axis for Relative Priority % */}
-            <YAxis
-              yAxisId="middle"
-              orientation="right"
-              stroke={color2}
-              domain={[relativeMin, relativeMax]}
-              allowDataOverflow
-              tickFormatter={(tick) => `${tick}%`}
-              width={60}
-            />
+            {/* Right Y-axis: Relative Priority % (and the Weighted Shield) */}
+            {kind !== 'incRem' && (
+              <YAxis
+                yAxisId="middle"
+                orientation="right"
+                stroke={relativeColor}
+                domain={[relativeMin, relativeMax]}
+                allowDataOverflow
+                tickFormatter={(tick) => `${tick}%`}
+                width={60}
+              />
+            )}
 
-            {/* Far-right Y-axis for Universe Size */}
+            {/* Far-right Y-axis: Universe Size */}
             <YAxis
               yAxisId="right"
               orientation="right"
-              stroke={color3}
+              stroke={universeAxisColor}
               domain={[0, universeAxisMax]}
               allowDataOverflow
-              tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toString()}
+              tickFormatter={kFormatter}
               width={45}
               tick={{ fontSize: 11 }}
-              style={{ marginLeft: 60 }}
             />
 
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={tooltip} wrapperStyle={{ zIndex: 1000 }} />
             <Legend wrapperStyle={{ paddingTop: '10px' }} />
 
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="absolute"
-              name="Absolute Priority"
-              stroke={color1}
-              strokeWidth={2}
-              dot={{ r: 3 }}
-            />
+            {/* Universe layers first, so the priority lines draw over them.
+                Stacked bottom to top in the order declared. */}
+            {kind === 'priority' && (
+              <>
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="cardUniverse"
+                  name="Cards"
+                  stackId="universe"
+                  stroke={CARDS_BAND.stroke}
+                  fill={CARDS_BAND.fill}
+                  strokeWidth={1.5}
+                  animationDuration={300}
+                />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="incRemUniverse"
+                  name="IncRems"
+                  stackId="universe"
+                  stroke={INCREMS_BAND.stroke}
+                  fill={INCREMS_BAND.fill}
+                  strokeWidth={1.5}
+                  animationDuration={300}
+                />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="dismissedCount"
+                  name="Dismissed Rems"
+                  stackId="universe"
+                  stroke={DISMISSED_BAND.stroke}
+                  fill={DISMISSED_BAND.fill}
+                  strokeWidth={1.5}
+                  strokeDasharray="5 5"
+                  animationDuration={300}
+                />
+              </>
+            )}
 
-            <Line
-              yAxisId="middle"
-              type="monotone"
-              dataKey="relative"
-              name="Relative Priority (%)"
-              stroke={color2}
-              strokeWidth={2}
-              activeDot={{ r: 6 }}
-              dot={{ r: 3 }}
-            />
-
-            {isIncRemChart ? (
+            {kind === 'incRem' && (
               <>
                 <Area
                   yAxisId="right"
                   type="monotone"
                   dataKey="universeSize"
                   name="Universe Size (IncRems)"
-                  stackId="1"
-                  stroke="#10b981"
+                  stackId="universe"
+                  stroke={INCREMS_BAND.stroke}
                   fill="transparent"
                   strokeWidth={2}
                   animationDuration={300}
@@ -627,21 +618,23 @@ function PriorityShieldGraph() {
                   type="monotone"
                   dataKey="dismissedCount"
                   name="Dismissed Rems"
-                  stackId="1"
-                  stroke="#333"
-                  fill="rgba(250, 204, 21, 0.4)"
+                  stackId="universe"
+                  stroke={DISMISSED_BAND.stroke}
+                  fill={DISMISSED_BAND.fill}
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   animationDuration={300}
                 />
               </>
-            ) : (
+            )}
+
+            {kind === 'card' && (
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="universeSize"
                 name="Universe Size"
-                stroke={color3}
+                stroke={cardColors.universe}
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={{ r: 3 }}
@@ -649,13 +642,51 @@ function PriorityShieldGraph() {
               />
             )}
 
-            {showWeightedShield && (
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="absolute"
+              name="Absolute Priority"
+              stroke={absoluteColor}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+
+            {hasRebuilt && (
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="absoluteRebuilt"
+                name="Absolute Priority (rebuilt)"
+                legendType="none"
+                stroke={absoluteColor}
+                strokeOpacity={0.6}
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+                dot={false}
+              />
+            )}
+
+            {kind !== 'incRem' && (
+              <Line
+                yAxisId="middle"
+                type="monotone"
+                dataKey="relative"
+                name="Relative Priority (%)"
+                stroke={relativeColor}
+                strokeWidth={2}
+                activeDot={{ r: 6 }}
+                dot={{ r: 3 }}
+              />
+            )}
+
+            {kind !== 'incRem' && showWeightedShield && (
               <Line
                 yAxisId="middle"
                 type="monotone"
                 dataKey="weightedShield"
                 name="Weighted Shield (%)"
-                stroke="#ff6b6b"
+                stroke={WEIGHTED_COLOR}
                 strokeWidth={2}
                 strokeDasharray="8 4"
                 dot={{ r: 2 }}
@@ -678,23 +709,31 @@ function PriorityShieldGraph() {
     );
   };
 
-  const filteredKbChartData = filterByPeriod(kbChartData, timePeriod);
-  const filteredDocChartData = filterByPeriod(docChartData, timePeriod);
-  const filteredCardKbChartData = filterByPeriod(cardKbChartData, timePeriod);
-  const filteredCardDocChartData = filterByPeriod(cardDocChartData, timePeriod);
-
-  const hasKbData = filteredKbChartData.length > 0;
-  const hasDocData = filteredDocChartData.length > 0;
-  const hasCardKbData = filteredCardKbChartData.length > 0;
-  const hasCardDocData = filteredCardDocChartData.length > 0;
-
-  if (!hasKbData && !hasDocData && !hasCardKbData && !hasCardDocData) {
+  if (!hasKbData && !hasDocData) {
     return <div className="p-4">No history data found. Start reviewing to build your graph!</div>;
   }
 
-  // Remove the fixed height and scrolling - let the container size naturally
+  const scopeLabel = activeScope === 'doc' ? `📄 ${documentName || 'Document'}` : '🌐 Knowledge Base';
+  const charts = activeScope === 'doc' ? doc : kb;
+  const tabs: { id: ScopeTab; label: string }[] = [
+    { id: 'kb', label: '🌐 Knowledge Base' },
+    { id: 'doc', label: `📄 ${documentName || 'Document'}` },
+  ];
+
   return (
-    <div className="p-4 flex flex-col" style={{ width: '1030px' }}>
+    <div
+      ref={containerRef}
+      className="p-4 flex flex-col"
+      style={{ width: '1030px', outline: 'none' }}
+      tabIndex={-1}
+      onKeyDown={(e) => {
+        // Arrows switch the scope tab; keys live on the container (popups are keyboard-driven).
+        if (!showTabs || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+        if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+        e.preventDefault();
+        setScopeTab((t) => (t === 'kb' ? 'doc' : 'kb'));
+      }}
+    >
       <div className="flex flex-col items-center mb-6 relative">
         <h3 className="text-lg font-bold">Priority Shield History</h3>
         <button
@@ -745,58 +784,84 @@ function PriorityShieldGraph() {
         </div>
       </div>
 
-      {hasCardKbData && renderChart(
-        filteredCardKbChartData,
-        '🌐 Knowledge Base Card Shield',
-        '#c0392b', '#e67e22', '#2980b9'
-      )}
-      {hasKbData && renderChart(
-        filteredKbChartData,
-        '🌐 Knowledge Base IncRem Shield',
-        '#8884d8', '#82ca9d', '#e91e63'
+      {showTabs && (
+        <div
+          role="tablist"
+          aria-label="Scope"
+          className="flex justify-center gap-1 mb-4"
+          style={{ borderBottom: '1px solid var(--rn-clr-border-opaque, rgba(128,128,128,0.3))' }}
+          title="← → to switch"
+        >
+          {tabs.map((t) => {
+            const selected = activeScope === t.id;
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setScopeTab(t.id)}
+                className="px-4 py-1.5 text-sm"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: `2px solid ${selected ? 'var(--rn-clr-content-accent, #3b82f6)' : 'transparent'}`,
+                  marginBottom: '-1px',
+                  fontWeight: selected ? 600 : 400,
+                  color: selected ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-secondary)',
+                  cursor: 'pointer',
+                  maxWidth: 420,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       )}
 
-      {(hasDocData || hasCardDocData) && (hasKbData || hasCardKbData) && (
-        <div style={{ height: '2px', backgroundColor: 'var(--rn-clr-border-opaque)', margin: '32px 0' }} />
-      )}
-
-      {/* Show document-level charts if we have an effective scope (original or current) */}
-      {effectiveDocScopeId && hasCardDocData && renderChart(
-        filteredCardDocChartData,
-        `📄 ${documentName || 'Document'} Card Shield`,
-        '#d35400', '#f1c40f', '#16a085'
-      )}
-      {effectiveDocScopeId && hasDocData && renderChart(
-        filteredDocChartData,
-        `📄 ${documentName || 'Document'} IncRem Shield`,
-        '#e74c3c', '#f39c12', '#9b59b6'
-      )}
+      {renderChart('priority', charts.priority, `${scopeLabel} Priority Shield — IncRems + Cards`)}
+      {renderChart('card', charts.card, `${scopeLabel} Card Shield — Cards only`)}
+      {renderChart('incRem', charts.incRem, `${scopeLabel} IncRem Shield — IncRems only`)}
 
       <div className="mt-4 text-sm rn-clr-content-secondary text-justify">
         <p className="mb-3">
           <b>Graph Controls:</b> Click and drag on any graph to zoom into a specific period. Use the "Optimize Priorities Zoom" button to perfectly frame the vertical priority lines within your zoomed date range. A "Reset" button will appear in the top-right corner to return to the full view.
+          {showTabs && ' The tabs (or ← →) switch between the Knowledge Base and the document.'}
         </p>
 
         <p className="mb-3">
-          <b>Priority Shield:</b> This metric represents your processing capacity for high-priority items. A higher shield value (closer to 100) means you are successfully reviewing your most important material on time.
+          <b>Shields:</b> A shield is the priority of the most important item still due. A higher value (closer to 100) means you are reviewing your most important material on time. Three charts, one per universe:
         </p>
 
-        {effectiveDocScopeId && hasDocData && (
+        <ul className="list-disc pl-5 mb-3">
+          <li className="mb-1">
+            <b>Priority Shield — IncRems + Cards</b> ranks your Incremental Rems and your cards together by absolute priority, one element each (a Rem with three cards counts three), so its percentile says how much of your whole top-priority material is protected. Its absolute value is the lower of two sides, both in the tooltip: the IncRem side and the card side. Days before v1.0.193 are <i>rebuilt</i> from the other two charts (thin dashed line): the lower of their absolute values, and their universes added up. Their relative and weighted values were never recorded, so those lines start at v1.0.193.
+          </li>
+          <li className="mb-1">
+            <b>Card Shield — Cards only</b> ranks only your cards: the retention view on its own.
+          </li>
+          <li>
+            <b>IncRem Shield — IncRems only</b> follows the top missed Incremental Rem and your reading backlog. It shows no percentile: dismissing an IncRem takes it out of this universe, so its rank would move without any review.
+          </li>
+        </ul>
+
+        {hasDocData && (
           <p className="mb-3">
-            <b>Document Shield:</b> Shows your priority protection within {originalScopeId ? 'the original document scope (for Priority Review Documents)' : 'the current document/folder scope'}. This helps you track how well you're keeping up with the most important items in this specific context.
+            <b>Document scope:</b> the same three charts within {originalScopeId ? 'the original document scope (for Priority Review Documents)' : 'the current document/folder scope'}, to track how well you're keeping up with the most important items in this specific context.
           </p>
         )}
 
         <div className="mb-3">
           <p>
-            <b>Universe Size:</b> This metric is represented differently depending on the graph type:
+            <b>Universe Size</b> is drawn on the far-right axis:
           </p>
           <ul className="list-disc pl-5 mt-1">
-            <li><b>For Incremental Rems:</b> The chart tracks your processing lifecycle using three layered components:<br />
-              - <b>Total Universe (Black dashed line):</b> The absolute maximum volume of material you have managed in this scope (Active + Dismissed).<br />
-              - <b>Active Universe (Green line):</b> The physical volume of IncRems currently in your queue awaiting review.<br />
-              - <b>Dismissed Area (Yellow shading):</b> The accumulated volume of material you have permanently marked with the `dismissed` powerup. The wider this area gets, the more backlog you've cleared!</li>
-            <li><b>For Cards:</b> It shows the <b>Universe Size (Dashed line)</b>, which is the total number of <i>cards</i> in scope (each card counts as one item — a Rem owning N cards contributes N to the universe). <i>Note:</i> points stored before v1.0.65 (2026-08-28) used a per-Rem-with-cards universe, so expect a one-time step in the Card shield charts on the day you upgraded to it.</li>
+            <li><b>Priority Shield:</b> stacked bands — <b>Cards</b> at the bottom, <b>IncRems</b> above them (the top of this band is the shield's own universe), and <b>Dismissed Rems</b> on top. Dismissed Rems are outside the shield: they need no more reading, and their remaining work is in their cards, which are already counted.</li>
+            <li><b>IncRem Shield:</b> the <b>Active Universe (green line)</b> is the IncRems awaiting review; the <b>Dismissed Area (yellow)</b> stacked on it is what you have marked with the `dismissed` powerup, and its top (<b>black dashed line</b>) is everything you have managed.</li>
+            <li><b>Card Shield:</b> the <b>Universe Size (dashed line)</b> is the total number of <i>cards</i> in scope (a Rem owning N cards contributes N). <i>Note:</i> points stored before v1.0.65 (2026-08-28) used a per-Rem-with-cards universe, so expect a one-time step on the day you upgraded to it.</li>
           </ul>
         </div>
 
@@ -805,7 +870,7 @@ function PriorityShieldGraph() {
         </p>
 
         <p className="mb-3">
-          <b>Relative Priority</b> <i>percentile</i> is the Rem's relative rank within the {effectiveDocScopeId && hasDocData ? "respective scope" : "Knowledge Base"} (% of {effectiveDocScopeId && hasDocData ? "scope" : "KB"}); this gives you a clearer metric for managing your learning load.
+          <b>Relative Priority</b> <i>percentile</i> is the item's relative rank within the {hasDocData ? 'respective scope' : 'Knowledge Base'}; this gives you a clearer metric for managing your learning load.
           The higher the percentile of your Relative Priority shield, the more your top priority material is safeguarded and processed.
           If your graph oscillates around priority of 4%, you will know that only top 4% of your learning material is guaranteed a timely repetition.
           You can increase that number by doing more work, reducing inflow of new material, deprioritizing less important Incremental Rems / Flashcards, or reducing the randomization degree for the due Incremental Rems queue / Flashcards queue in the <b>Sorting Criteria</b> queue menu (the three-dot icon).
@@ -825,7 +890,7 @@ function PriorityShieldGraph() {
           <ul className="list-disc pl-5 mt-1">
             <li>If the <b>Active Universe (Green)</b> drops but the <b>Total Universe (Black)</b> remains steady and the <b>Dismissed Area (Yellow)</b> expands, you are efficiently processing and dismissing items faster than you add them!</li>
             <li>If the <b>Active Universe (Green)</b> climbs while the <b>Dismissed Area (Yellow)</b> stays flat, you are continuously adding new IncRems without clearing older ones. This influx automatically lowers your priority shield percentiles, as each item is now a smaller percentage of a larger workload.</li>
-            <li>If the <b>Total Universe (Black)</b> drops natively, it means you have physically structurally deleted IncRems from your Knowledge Base, or fully removed the `Incremental` tag spanning outside the `Dismissed` review queue standard logic.</li>
+            <li>If the <b>Total Universe (Black)</b> drops, you have deleted IncRems from your Knowledge Base, or removed the `Incremental` tag without dismissing them.</li>
           </ul>
           <p className="mt-2">
             For <b>Flashcards</b>, this number will usually only increase (unless you delete cards). The evolution will show you the size of your knowledge (considering you keep control of your due cards).

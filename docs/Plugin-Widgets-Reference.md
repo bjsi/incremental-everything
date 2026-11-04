@@ -407,21 +407,17 @@ Plots your daily [Priority Shield](Prioritization-&-Sorting.md#priority-shield) 
 
 **Features:**
 
-- **Logical Organization**: Graphs are grouped by scope, **Knowledge Base-wide first** (Card, then IncRem), then **Document-level** (Card, then IncRem) — the widest and most-consulted view opens first, and Cards lead each pair.
-- **Visual Separator**: A horizontal divider clearly distinguishes between KB-wide and Document data for better scanability.
+- **Three charts per scope**, each titled by who it counts:
+    - **Priority Shield — IncRems + Cards:** absolute, relative and weighted values, over stacked universe bands (Cards, IncRems, and Dismissed Rems on top). Days before v1.0.193 are rebuilt from the other two charts: the lower of their absolute values and their summed universes, drawn as a thinner dashed line.
+    - **Card Shield — Cards only:** absolute, relative and weighted values, and the card universe (each card counts as one item).
+    - **IncRem Shield — IncRems only:** the absolute value, over the IncRem universe with Dismissed Rems stacked on top.
+- **Scope tabs**: In a document queue, the popup opens with two tabs, Knowledge Base and the document, on the document tab; **←** / **→** switch between them.
 - **Interactive Drag-to-Zoom**: Click and drag horizontally on any graph to zoom into a specific date range. A **Reset Data Range** button appears in the top-right corner to return to the full view.
-- **Optimize Priorities Zoom**: A dedicated button automatically scales the absolute and relative priority Y-Axes to perfectly frame the visible data in your current zoom window. Highly beneficial for viewing subtle metric changes over time!
-- **Scoped Scaling**: The Y-axis (Universe Size) for each chart automatically scales based on the visible data range, ensuring a clear view of your progress even in the Knowledge Base charts.
-- **Card universe is per card**: on the Card charts each card counts as one item, so a Rem owning N cards contributes N — the same universe the [Weighted Shield](Prioritization-&-Sorting.md#weighted-shield) and its popup use, and cards in a paused deck are included. Points stored before v1.0.65 used a per-Rem-with-cards universe, so expect a one-time step on the day you upgraded to it. The IncRem charts are Rem-based by design.
-- **Dismissed Rems Tracking (IncRem Graphs):** The IncRem shield graphs track your process progression with a stacked area chart:
-    - **Green Line**: Your active Incremental Rems universe.
-    - **Black Dashed Line**: Your *Total Universe* (IncRems + items marked with the `dismissed` powerup).
-    - **Yellow Area**: The visual volume of your dismissed material.
-- **Detailed Tooltips**: Hover over any IncRem graph to see a breakdown of your Incremental Rems, Dismissed Rems, Total Universe, and an calculated **Processing Percentage** metric showing exactly how much of your total universe has been successfully dismissed.
+- **Optimize Priorities Zoom**: A dedicated button scales the absolute and relative priority Y-axes to frame the visible data in your current zoom window.
+- **Scoped Scaling**: The Universe Size axis of each chart scales to the visible data range.
+- **Detailed Tooltips**: Hover over any chart for that day's values in the colours of their lines, including the two sides behind the Priority Shield and a **Processing Percentage** on the IncRem chart.
 
-![priority-shield-cards](assets/uploaded/206bcc27-a186-42be-9d52-66afccc16b9e.png){ width="1000" }
-
-![Priority Shield Graph Zoom](assets/priority-shield-graph-zoom.gif){ width="800" }
+Try it with example data in the [interactive demo](Prioritization-&-Sorting.md#priority-shield-history).
 
 📖 **Full documentation:** [Priority Shield History](Prioritization-&-Sorting.md#priority-shield-history)
 

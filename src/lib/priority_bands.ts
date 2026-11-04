@@ -17,9 +17,6 @@
 
 import { BuiltInPowerupCodes, PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import {
-  allCardPriorityInfoKey,
-  allIncrementalRemKey,
-  allIncrementalRemSlimKey,
   dismissedHistorySlotCode,
   dismissedPowerupCode,
   powerupCode,
@@ -33,6 +30,7 @@ import {
 // classic script and dies on `import.meta` (see the note atop register/tracker.ts).
 import { CARD_PRIORITY_CODE } from './card_priority/types';
 import { getRawCardPriorityString } from './card_priority/slot_access';
+import { readPriorityColorScale } from './priority_color_scale';
 
 export const BAND_COUNT = 10;
 
@@ -726,19 +724,13 @@ export async function syncAllHighlightBands(
   return { scanned: highlights.length, changed, noPriority, alreadyCorrect };
 }
 
-/** Below this many samples the distribution is noise; fall back to absolute. */
-const MIN_PERCENTILE_SAMPLE = 20;
-
 /**
- * Band→percentile mapping, computed SEPARATELY for the two priority populations.
+ * Band→percentile mapping on the UNIFIED scale (IncRems + cards ranked
+ * together): each band's colour is its midpoint priority read from the
+ * priority colour map (lib/priority_color_scale.ts), the same map every badge
+ * uses — so a band is one colour on an IncRem, a flashcard and a highlight.
  *
- * The Priority Editor ranks an IncRem against other IncRems and a card against
- * other cards — never against a pooled list — so a single blended distribution
- * still mismatched the widget it was meant to agree with. Keeping the pools
- * apart lets each badge use the scale its own UI uses.
- *
- * Either side is null when that pool is too small to rank meaningfully; callers
- * then fall back to the absolute value.
+ * Null while no map has been built; callers then fall back to the absolute value.
  */
 export type BandSyncStats = {
   /** Rems whose own table badge changed. */
@@ -752,98 +744,16 @@ export type BandSyncStats = {
 // the field was structurally always 0 — a number that could only mislead.
 
 export type BandPercentiles = {
-  inc: number[] | null;
-  card: number[] | null;
+  unified: number[] | null;
 };
 
-function percentilesFor(values: number[]): number[] | null {
-  if (values.length < MIN_PERCENTILE_SAMPLE) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-
-  return Array.from({ length: BAND_COUNT }, (_, band) => {
-    const midpoint = band * 10 + 5;
-    // Binary search for the count of priorities <= midpoint. Matches how the
-    // Priority Editor ranks: share of items at or below this value.
-    let lo = 0;
-    let hi = sorted.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (sorted[mid] <= midpoint) lo = mid + 1;
-      else hi = mid;
-    }
-    return Math.round((lo / sorted.length) * 1000) / 10;
-  });
-}
-
-/**
- * Samples both caches to build the mappings. CSS cannot compute, so this is
- * resolved once and baked into the generated stylesheets — necessarily a
- * snapshot, recomputed at startup and after a badge refresh.
- */
 export async function computeBandPercentiles(plugin: RNPlugin): Promise<BandPercentiles> {
-  const incPriorities: number[] = [];
-  const cardPriorities: number[] = [];
-  const t0 = Date.now();
-  try {
-    // The SLIM projection, not the full cache: only `priority` is read here, and
-    // the full cache is multi-megabyte to drag across the bridge. Both are
-    // written together by writeIncRemCaches, so the slim key is never the staler
-    // of the two; the fallback covers a realm holding only the full key.
-    const [incSlim, cardInfos] = await Promise.all([
-      plugin.storage.getSession<Array<{ priority?: number }>>(allIncrementalRemSlimKey),
-      plugin.storage.getSession<Array<{ priority?: number }>>(allCardPriorityInfoKey),
-    ]);
-    const incRems =
-      incSlim?.length
-        ? incSlim
-        : await plugin.storage.getSession<Array<{ priority?: number }>>(allIncrementalRemKey);
-    for (const item of incRems || []) {
-      if (typeof item?.priority === 'number' && !isNaN(item.priority)) {
-        incPriorities.push(item.priority);
-      }
-    }
-    for (const item of cardInfos || []) {
-      if (typeof item?.priority !== 'number' || isNaN(item.priority)) continue;
-      // A rem whose cards are ALL unscheduled owns nothing the user intends to
-      // practise, so it takes no part in the ranking that colours the bands —
-      // same population rule as expandCardInfosToCards. Rems with at least one
-      // schedulable card (paused decks included) still count once, so this
-      // keeps the pool rem-weighted rather than quietly switching it to
-      // card-weighted, which would shift every band colour.
-      const nextReps = (item as { cardsNextRep?: (number | null)[] }).cardsNextRep;
-      if (nextReps && nextReps.length > 0 && nextReps.every((n) => n === null || n === undefined)) {
-        continue;
-      }
-      cardPriorities.push(item.priority);
-    }
-  } catch (err) {
-    console.error('[PriorityBands] percentile sampling failed', err);
-    return { inc: null, card: null };
-  }
-
-  const result = { inc: percentilesFor(incPriorities), card: percentilesFor(cardPriorities) };
-  const describe = (p: number[] | null, n: number) =>
-    `${p ? 'RELATIVE' : 'ABSOLUTE FALLBACK'} (${n} samples)`;
-
+  const scale = await readPriorityColorScale(plugin);
+  const unified = scale ? Array.from({ length: BAND_COUNT }, (_, band) => scale[band * 10 + 5]) : null;
   if (await bandVerboseLogsEnabled(plugin)) {
-    console.log(
-      `[PriorityBands] computeBandPercentiles: inc pool=${describe(result.inc, incPriorities.length)}, ` +
-        `card pool=${describe(result.card, cardPriorities.length)}, ` +
-        `min sample=${MIN_PERCENTILE_SAMPLE}, sampled in ${Date.now() - t0}ms`
-    );
-  } else if (!result.inc || !result.card) {
-    // Not gated: a pool too small to rank means the badges built from it fall
-    // back to the absolute midpoint scale and quietly disagree with the Priority
-    // Editor — the exact failure this instrumentation was added for, and one
-    // nothing in the UI reveals. One line, and only when actually degraded.
-    // Expected while a cache is still loading, or with its feature switched off.
-    console.warn(
-      `[PriorityBands] band colours degraded to the absolute scale — ` +
-        `inc pool ${describe(result.inc, incPriorities.length)}, ` +
-        `card pool ${describe(result.card, cardPriorities.length)}`
-    );
+    console.log(`[PriorityBands] computeBandPercentiles: ${unified ? 'RELATIVE (unified colour map)' : 'ABSOLUTE FALLBACK (no colour map yet)'}`);
   }
-  return result;
+  return { unified };
 }
 
 /**
