@@ -8,7 +8,9 @@ This page documents the major changes and improvements for each version of the I
 
 **Quick Priority**: Fixed `Ctrl+Opt+↑/↓` presses made just before rating a card sometimes changing the next card instead; if the plugin can't tell which card a press was for, it now changes nothing and says so.
 
-📖 [Quick Priority in the queue](Prioritization-&-Sorting.md#quick-priority-in-the-queue)
+**Priority Popup**: Hovering **Relative** now shows the rank among IncRems only or cards only again, and the cards-only rank counts cards rather than Rems with cards, so it matches the Card Shield.
+
+📖 [Quick Priority in the queue](Prioritization-&-Sorting.md#quick-priority-in-the-queue) · [Main Priority Popup](Prioritization-&-Sorting.md#main-priority-popup)
 
 ## v1.0.193 - November 4th, 2026
 

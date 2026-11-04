@@ -598,7 +598,7 @@ The popup header shows two separate figures that often diverge significantly, an
 
 > *Example: `Processed: 7,706 (22.3%)` — but `Weight processed: 36.6% of total weight`*
 
-*   **Processed (22.3%)** is a plain item count: 22.3% of all your Rems with cards have their cards non-due. Every Rem counts equally, regardless of its priority.
+*   **Processed (22.3%)** is a plain item count: 22.3% of the items in the shield's universe are not due. For cards, each card is one item, so a Rem with three cards counts three times. Every item counts equally, regardless of its priority.
 *   **Weight processed (36.6%)** is the priority-weighted fraction: it sums up the exponential weights of processed items and divides by the total weight of *all* items. Because high-priority items weigh so much more, even a relatively small number of processed high-priority items can push this figure well above the raw count percentage.
 
 In this example, the 22.3% of items you've processed happen to be disproportionately *high-priority* ones — so they contribute 36.6% of the total weight. **This gap is actually good news**: it means your study habits are prioritizing the right material. Conversely, if the weight percentage were *lower* than the raw count percentage, it would signal that you've been processing mostly low-priority items while your most valuable material sits unreviewed.

@@ -1,3 +1,4 @@
+import { scheduledCardCount } from '../unified_percentile';
 import { RemId } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem';
 
@@ -204,7 +205,7 @@ export function calculateCardRemPercentilesFromCards(
  * cache's `kbPercentile` was computed from — the window between a popup save and
  * the tracker's cache write — so its colour moves with the number.
  *
- * One pass, no sort: counts the other Rems' cards below and at `priority` and
+ * One pass, no sort, no allocation: counts the other Rems' cards below and at `priority` and
  * places this Rem's cards at the midpoint of that tie band. The real calculation
  * can land elsewhere inside the band (tie order), so this is an estimate.
  */
@@ -213,15 +214,20 @@ export function estimateCardRemPercentile(
   remId: string,
   priority: number,
 ): number | undefined {
+  // Counts per Rem rather than expanding to per-card items: the same cards
+  // (scheduledCardCount = what expandCardInfosToCards emits), without building a
+  // 70k-element array on every call — the priority popup calls this per slider move.
   let below = 0;
   let equal = 0;
   let own = 0;
   let total = 0;
-  for (const item of expandCardInfosToCards(infos)) {
-    total++;
-    if (item.remId === remId) own++;
-    else if (item.priority < priority) below++;
-    else if (item.priority === priority) equal++;
+  for (const info of infos) {
+    const k = scheduledCardCount(info);
+    if (k === 0) continue;
+    total += k;
+    if (info.remId === remId) own += k;
+    else if (info.priority < priority) below += k;
+    else if (info.priority === priority) equal += k;
   }
   if (total === 0) return undefined;
   // 1-based midpoint of ranks below+1 … below+equal+own. With own === 0 this is
