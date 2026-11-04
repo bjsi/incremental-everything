@@ -6,7 +6,7 @@ Every colour the plugin draws in one place. Nothing here is configurable per-col
 
 ## The priority ramp
 
-One scale underlies every priority colour in the plugin. An item's **percentile** within its population — Incremental Rems ranked against Incremental Rems, flashcards against flashcards — maps onto a hue, drawn as `hsl(hue, 80%, 55%)`:
+One scale underlies every priority colour in the plugin. An item's **percentile** maps onto a hue. In the editor (the Priority Editor badge, table badges, highlight badges and PDF markers) Incremental Rems and flashcards are ranked **together**, on the [Priority Shield's](Prioritization-&-Sorting.md#unified-priority-shield) universe; in the queue (the flashcard bar, the IncRem bar and the queue toolbar) each is ranked against its own kind. The hue is drawn as `hsl(hue, 80%, 55%)`:
 
 | Percentile | Hue | Reads as |
 |---|---|---|

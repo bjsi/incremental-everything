@@ -10,7 +10,9 @@ This page documents the major changes and improvements for each version of the I
 
 **Flashcard Bar Shield**: The flashcard bar shows one shield at a time with new icons; click it to switch between the Card Shield and the Priority Shield for the rest of the queue, and choose the default in Settings.
 
-📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield) · [Switching shields on flashcards](Prioritization-&-Sorting.md#flashcard-bar-shield)
+**Editor Priority Colours**: The Priority Editor badge, table badges and highlight badges now colour IncRems and flashcards on one shared scale (the Priority Shield's), so the same priority is the same colour everywhere in the editor; the queue keeps its per-kind scales.
+
+📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield) · [Switching shields on flashcards](Prioritization-&-Sorting.md#flashcard-bar-shield) · [The priority ramp](Colour-Coding-Reference.md#the-priority-ramp)
 
 ## v1.0.192 - November 4th, 2026
 

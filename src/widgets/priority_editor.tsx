@@ -6,13 +6,14 @@ import {
 } from '@remnote/plugin-sdk';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
-import { getCardPriority, CardPriorityInfo, estimateCardRemPercentile } from '../lib/card_priority';
+import { getCardPriority, CardPriorityInfo } from '../lib/card_priority';
 import { allIncrementalRemSlimKey, allCardPriorityInfoKey, pageRangeWidgetId, pendingPriorityDeltaQueueKey, priorityEditorDisplayModeId } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
 import { PriorityDeltaEntry } from '../lib/quick_priority';
 import { IncrementalRem } from '../lib/incremental_rem';
 import type { SlimIncRem } from '../lib/incremental_rem/cache';
-import { calculateRelativePercentileAt, formatDuration } from '../lib/utils';
+import { formatDuration } from '../lib/utils';
+import { unifiedPercentileAt, unifiedRankingFor } from '../lib/unified_percentile';
 import { PriorityBadge, ReadPointIcon } from '../components';
 import {
   getActivePdfForIncRem,
@@ -263,24 +264,29 @@ export function PriorityEditor() {
   const hasReadPoint = remData?.hasReadPoint ?? false;
   const displayMode = remData?.displayMode ?? 'all';
 
-  // Relative priorities, ranked at the values read from the Rem. After a save the
-  // tracker writes the slots first and rewrites the caches seconds later, so in
-  // between the cached ranks belong to the old value; ranking the new one in the
-  // cached universe keeps the colour in step with the number.
-  const incRemRelativePriority = useMemo(() => {
-    const allIncRems = cacheData?.allIncRems;
-    if (!incRemInfo || !allIncRems || allIncRems.length === 0) return incRemInfo ? 50 : null;
-    return calculateRelativePercentileAt(allIncRems, incRemInfo.remId, incRemInfo.priority);
-  }, [incRemInfo, cacheData?.allIncRems]);
+  // Badge colours on the UNIFIED scale (IncRems + cards ranked together, the
+  // Priority Shield's universe): the same priority gets the same colour on an
+  // IncRem and on a flashcard. Ranked at the values read from the Rem, so after a
+  // save the colour moves with the number before the caches catch up.
+  const unifiedRanking = useMemo(() => {
+    const incs = cacheData?.allIncRems;
+    const cards = cacheData?.allPrioritizedCardInfo;
+    if (!incs || !cards || incs.length + cards.length === 0) return null;
+    return unifiedRankingFor(incs, cards);
+  }, [cacheData?.allIncRems, cacheData?.allPrioritizedCardInfo]);
 
+  const incRemRelativePriority = useMemo(() => {
+    if (!incRemInfo) return null;
+    if (!unifiedRanking) return 50;
+    return unifiedPercentileAt(unifiedRanking, incRemInfo.priority);
+  }, [incRemInfo, unifiedRanking]);
+
+  // A Rem that only inherits a priority (no cards) is not in the universe, but
+  // its badge still takes the colour of its priority on the scale.
   const cardRelativePriority = useMemo(() => {
-    const allPrioritizedCardInfo = cacheData?.allPrioritizedCardInfo;
-    if (!remId || !cardInfo || !allPrioritizedCardInfo) return null;
-    const cached = allPrioritizedCardInfo.find((info) => info.remId === remId);
-    if (!cached) return null;
-    if (cached.priority === cardInfo.priority) return cached.kbPercentile ?? null;
-    return estimateCardRemPercentile(allPrioritizedCardInfo, remId, cardInfo.priority) ?? null;
-  }, [remId, cardInfo, cacheData?.allPrioritizedCardInfo]);
+    if (!cardInfo || !unifiedRanking) return null;
+    return unifiedPercentileAt(unifiedRanking, cardInfo.priority);
+  }, [cardInfo, unifiedRanking]);
 
   // Read point (the reading position of a rem-type outline), resolved in full:
   // the path down to it, and the text of every rem along the way. That costs a

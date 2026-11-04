@@ -157,6 +157,7 @@ This widget provides a persistent visual indicator of the item's priority.
 
 *   **Clicking it** opens the full priority popup.
 *   **Expanding it** reveals quick `+` / `-` buttons to adjust priority by 1 or 10 points directly.
+*   **Its colour** shows where the priority ranks among **all your Incremental Rems and flashcards together** — the [Priority Shield's](#unified-priority-shield) universe — so the same priority is the same colour on an IncRem and on a card. Table badges and highlight badges use the same scale. In the queue, the flashcard bar and the queue toolbar still rank a card against cards and an IncRem against IncRems.
 *   **It also carries the Rem's reading state**, when it has any: a [**📄 PDF Range** panel](PDF-Incremental-Reading-Workflow.md#7-inline-pdf-range-management-priority-editor) for a Rem with a PDF source, and a [**🔖 Read Point** panel](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point) for one whose reading position lives in its own outline. Collapsed, each is reduced to a compact marker — `p.67–94 (81)` for the PDF, a green bookmark for the read point — so a glance down the document says which chapters you are part-way through.
 
 **When to use:** When editing a document and you want to manage priorities without using keyboard shortcuts.
@@ -257,7 +258,7 @@ Instead, the plugin writes each Rem's priority band into a hidden tag and draws 
 
 One badge appears per **row**, not per cell: the row's priority belongs to the Rem in the primary column, while the other columns display that Rem's slot values, which have no priority of their own. Scanning that column tells you the shape of a whole table at a glance.
 
-**Colour follows relative priority, per population.** Like the Priority Editor, a badge is coloured by where its priority *ranks*, not by its absolute number — in a knowledge base whose priorities cluster low, `P20` can be the 9th percentile and is drawn accordingly. Incremental Rems are ranked against Incremental Rems and flashcards against flashcards, exactly as the popup does it, so a table mixing both colours each row on its own scale. The mapping is recalculated at startup — once the priority caches have finished loading, which on a large knowledge base is some seconds into the session — and after a *Refresh*, so it is a recent snapshot rather than a live figure.
+**Colour follows relative priority.** Like the Priority Editor, a badge is coloured by where its priority *ranks*, not by its absolute number — in a knowledge base whose priorities cluster low, `P20` can be the 9th percentile and is drawn accordingly. Incremental Rems and flashcards are ranked **together** (one element per IncRem and per card), so a band is the same colour on every row of a mixed table. The mapping is recalculated at startup — once the priority caches have finished loading, which on a large knowledge base is some seconds into the session — and after a *Refresh*, so it is a recent snapshot rather than a live figure.
 
 **Why bands and not the exact number.** The only channel that reaches inside a table cell is a tag, and a tag is a yes/no — it cannot carry a value. Ten band tags give you ten steps; showing `74` exactly would need a tag per possible priority.
 
