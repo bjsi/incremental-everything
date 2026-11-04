@@ -1,4 +1,5 @@
 import { clearSelectionCache } from '../lib/editor_selection';
+import { registerQueueTurnTracking } from '../lib/queue_turn';
 import { AppEvents, ReactRNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
 import { deferDuringNativeDrill, isNativeDrillQueue, registerNativeDrillListeners } from '../lib/mastery_drill_native';
 import { registerClusterRatingReadback } from '../lib/cluster_rating_readback';
@@ -1531,6 +1532,8 @@ export function registerEventListeners(
   plugin: ReactRNPlugin,
   resetSessionItemCounter: ResetSessionItemCounter
 ) {
+  // First, so the turn is bumped before any other queue listener awaits.
+  registerQueueTurnTracking(plugin);
   registerQueueExitListener(plugin, resetSessionItemCounter);
   registerQueueEnterListener(plugin, resetSessionItemCounter);
   registerURLChangeListener(plugin);

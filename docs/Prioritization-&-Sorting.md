@@ -80,6 +80,10 @@ Both priority popups close as soon as you save; the plugin finishes writing the 
 
 For the few seconds the background work takes, the badge **colour** and the Card Info Bar's **"% KB"** figure are an estimate of where the new priority ranks. They then settle on the exact value, which can differ by a fraction of a percent when other items share the same priority.
 
+### Which Rem a Popup Opens On in the Queue { #popup-target-in-queue }
+
+In the queue, `Opt+P` and `Ctrl+Opt+P` open on the card on screen. They open on another Rem only while it is **still selected**, for example in the previewer (`P`). Once you close the previewer, the popup is back on the card, even if you edited another Rem there a moment ago.
+
 ---
 
 ### Main Priority Popup
@@ -147,6 +151,10 @@ The step in which priorities will increase or decrease can be configured in the 
 ![Quick Priority in the Editor](assets/quick-priority-editor.gif){ width="600" }
 
 ![Quick Priority in the Queue](assets/quick-priority-queue.gif){ width="600" }
+
+#### In the Queue { #quick-priority-in-the-queue }
+
+A press changes the card or Incremental Rem on screen, or the Rem selected in the previewer (`P`) if you have one. Every press counts for the card it was **pressed on**, even when the plugin is busy and gets to it after you have rated and the next card is showing. If the plugin can't tell which card a press was for (you rated right after the first press on a card), it changes nothing and shows **Priority not changed**: press again on the card you meant.
 
 ---
 

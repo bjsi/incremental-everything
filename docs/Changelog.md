@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.194 - November 4th, 2026
+
+### 🐛 Fixed
+
+**Quick Priority**: Fixed `Ctrl+Opt+↑/↓` presses made just before rating a card sometimes changing the next card instead; if the plugin can't tell which card a press was for, it now changes nothing and says so.
+
+📖 [Quick Priority in the queue](Prioritization-&-Sorting.md#quick-priority-in-the-queue)
+
 ## v1.0.193 - November 4th, 2026
 
 ### ✨ New
@@ -15,6 +23,12 @@ This page documents the major changes and improvements for each version of the I
 **Priority Colours**: Every priority colour in the plugin (editor, tables, highlights, queue bars and toolbar, priority popup, sidebar lists) now uses one scale, IncRems and cards ranked together, so the same priority is the same colour everywhere; the queue bars' percentages follow the shield on screen, and the popup's **Relative** ranks among IncRems + cards.
 
 📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield) · [Priority Shield History](Prioritization-&-Sorting.md#priority-shield-history) · [Switching shields on flashcards](Prioritization-&-Sorting.md#flashcard-bar-shield) · [The priority ramp](Colour-Coding-Reference.md#the-priority-ramp)
+
+### 🐛 Fixed
+
+**Priority Popups**: Fixed `Opt+P` and `Ctrl+Opt+P` in the queue opening on a Rem you had just edited in the previewer, after closing it, instead of on the card on screen.
+
+📖 [Which Rem a popup opens on](Prioritization-&-Sorting.md#popup-target-in-queue)
 
 ## v1.0.192 - November 4th, 2026
 
