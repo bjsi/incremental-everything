@@ -54,7 +54,7 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Why use it:** Quickly jump back to documents you were just working on without losing your place.
 
-**Interaction:** You can expand and edit the Rem directly in the right sidebar.
+**Interaction:** You can expand and edit the Rem directly in the right sidebar. Click an entry to open it; **Shift+click** opens it in a new pane beside your current document (or switches to the pane already showing it).
 
 **Search:** Includes a search bar to instantly filter your history. Supports multi-word queries (e.g., "Biology Exam") and deep text search across all recorded items.
 
@@ -70,7 +70,7 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Why use it:** If you want to check context or edit a flashcard you just reviewed, you can easily find it here without interrupting your session flow.
 
-**Interaction:** Clicking on a flashcard will open the Rem in the Editor.
+**Interaction:** Clicking on a flashcard will open the Rem in the Editor; **Shift+click** opens it in a new pane beside your current document instead (or switches to the pane already showing it).
 
 **Search & Filter:** Effortlessly find a card you practiced moments or days ago. The search checks both the front (question) and back (answer/context) of your cards. You can also filter the history by rating grade (Again, Hard, Good, Easy) using the radio buttons at the top.
 

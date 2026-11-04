@@ -123,6 +123,7 @@ The timer provides a range of powerful controls to manage your session without t
     * *What happens under the hood*: The plugin records your repetition in the background (logging the time spent and pushing the Next Rep Date forward), saves this reading history to the Incremental Tracker, and instantly teleports you to the editor of the *next* item in your sorted list, with a fresh, unpaused timer.
 5.  **Finish the session**: If you want to stop reviewing before the list is empty, simply click **"End Review"** on the green primary button. The destination sub-label ("and Back to IncRem List") confirms where you will land.
 6.  **Cancel Timer**: Discard the current item's timer and stay in the editor.
+7.  **↗ Go to Rem**: Return to the Rem under review in this pane. **Shift+click** opens it in a new pane beside the current document instead (or switches to the pane already showing it), so whatever you have open stays put.
 
 ### Multi-PDF Support in the Timer
 

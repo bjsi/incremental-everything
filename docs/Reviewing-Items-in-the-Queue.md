@@ -720,7 +720,7 @@ The **Incremental Rem History** widget automatically records and displays the In
 *   **Searchable History:** Easily find previously viewed items using the search bar.
 *   **Context Aware:** Shows history specific to the current Knowledge Base.
 *   **Recency Tracking:** Displays how long ago you viewed each item.
-*   **Quick Navigation:** Click any item to jump back to it.
+*   **Quick Navigation:** Click any item to jump back to it, or **Shift+click** to open it in a new pane beside your current document.
 
 This widget helps you keep track of your reading session and backtrack if needed, complementing the queue's linear flow. It's also a good companion to the **[History and Final Drill](https://www.remnote.com/plugins/final_drill_and_history)** plugin.
 

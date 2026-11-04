@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.194 - November 4th, 2026
 
+### ⚡ Improved
+
+**Open in a New Pane**: Shift+click an entry in the Incremental Rem, Visited Rem or Flashcard History, or the Editor Review Timer's **↗ Go to Rem**, to open the Rem in a new pane beside your document instead of replacing it.
+
+📖 [Visited Rem History](History-Queue-Dashboard-and-Mastery-Drill.md#visited-rem-history) · [Flashcard History](History-Queue-Dashboard-and-Mastery-Drill.md#flashcard-history) · [Editor Review Timer](Reviewing-Items-in-the-Editor.md#the-workflow)
+
 ### 🐛 Fixed
 
 **Quick Priority**: Fixed `Ctrl+Opt+↑/↓` presses made just before rating a card sometimes changing the next card instead; if the plugin can't tell which card a press was for, it now changes nothing and says so.
