@@ -7,6 +7,7 @@ import {
     usePlugin,
     useSyncedStorageState,
 } from "@remnote/plugin-sdk";
+import { withHoverTips } from "../components/HoverTipLayer";
 import { timeSince } from "../lib/utils";
 import { IncrementalHistoryData } from "../lib/history_utils";
 import { safeRemTextToString } from "../lib/pdfUtils";
@@ -549,5 +550,5 @@ function HistoryItem({
     );
 }
 
-renderWidget(IncrementalHistory);
+renderWidget(withHoverTips(IncrementalHistory));
 

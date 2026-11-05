@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType, RICH_TEXT_FORMATTING, BuiltInPowerupCodes, MoveUnit } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { resolveRemTextForBreadcrumb, buildAncestorBreadcrumb } from '../lib/richTextRemRefs';
 import { sanitizeRichTextForSetText, isHintNode } from '../lib/richTextSanitize';
@@ -1181,4 +1182,4 @@ function ReferenceFinder() {
   );
 }
 
-renderWidget(ReferenceFinder);
+renderWidget(withHoverTips(ReferenceFinder));

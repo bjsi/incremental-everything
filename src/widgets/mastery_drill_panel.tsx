@@ -6,6 +6,7 @@ import {
   useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React from 'react';
 import '../style.css';
 import '../App.css';
@@ -93,4 +94,4 @@ function MasteryDrillPanel() {
   );
 }
 
-renderWidget(MasteryDrillPanel);
+renderWidget(withHoverTips(MasteryDrillPanel));

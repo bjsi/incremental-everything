@@ -1,4 +1,5 @@
 import { renderWidget } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { NoIncTimerIndicator } from '../components/NoIncTimerIndicator';
 import { useHostShown } from '../components/useHostShown';
 
@@ -9,4 +10,4 @@ function NoIncTimerIndicatorWidget() {
   return <NoIncTimerIndicator active={shown} />;
 }
 
-renderWidget(NoIncTimerIndicatorWidget);
+renderWidget(withHoverTips(NoIncTimerIndicatorWidget));

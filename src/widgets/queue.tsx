@@ -5,6 +5,7 @@ import {
   useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useEffect, useState } from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
@@ -424,4 +425,4 @@ export function QueueComponent() {
   );
 }
 
-renderWidget(QueueComponent);
+renderWidget(withHoverTips(QueueComponent));

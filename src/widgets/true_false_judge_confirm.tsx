@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -237,4 +238,4 @@ export function TrueFalseJudgeConfirm() {
   );
 }
 
-renderWidget(TrueFalseJudgeConfirm);
+renderWidget(withHoverTips(TrueFalseJudgeConfirm));

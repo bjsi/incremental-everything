@@ -1,5 +1,6 @@
 import React from 'react';
 import { renderWidget, usePlugin, WidgetLocation, useRunAsync, RNPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import dayjs from 'dayjs';
@@ -1579,4 +1580,4 @@ function RepetitionHistoryPopup() {
     );
 }
 
-renderWidget(RepetitionHistoryPopup);
+renderWidget(withHoverTips(RepetitionHistoryPopup));

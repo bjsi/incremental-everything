@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useSyncedStorageState, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React from 'react';
 import '../style.css';
 import '../App.css';
@@ -53,4 +54,4 @@ function MasteryDrillList() {
   );
 }
 
-renderWidget(MasteryDrillList);
+renderWidget(withHoverTips(MasteryDrillList));

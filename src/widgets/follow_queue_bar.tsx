@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   followQueueBarDefaultPosition,
@@ -97,4 +98,4 @@ function FollowQueueBar() {
   );
 }
 
-renderWidget(FollowQueueBar);
+renderWidget(withHoverTips(FollowQueueBar));

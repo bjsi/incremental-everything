@@ -7,6 +7,7 @@ import {
     useSessionStorageState,
     useLocalStorageState,
 } from "@remnote/plugin-sdk";
+import { withHoverTips } from "../components/HoverTipLayer";
 import '../style.css';
 import '../App.css';
 import { timeSince, formatStabilityDays } from "../lib/utils";
@@ -1372,4 +1373,4 @@ function QueueSessionItem({ session, onDelete, isLive, thresholds }: { session: 
     )
 }
 
-renderWidget(PracticedQueues);
+renderWidget(withHoverTips(PracticedQueues));

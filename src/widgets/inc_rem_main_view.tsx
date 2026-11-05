@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useMemo, useRef } from 'react';
 import { allIncrementalRemKey, allCardPriorityInfoKey, powerupCode, prioritySlotCode } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
@@ -904,4 +905,4 @@ export function IncRemMainView() {
   );
 }
 
-renderWidget(IncRemMainView);
+renderWidget(withHoverTips(IncRemMainView));

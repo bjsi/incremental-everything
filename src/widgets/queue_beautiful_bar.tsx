@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React from 'react';
 import { QueuePriorityBadge } from '../components/QueuePriorityBadge';
 import { NoIncTimerIndicator } from '../components/NoIncTimerIndicator';
@@ -53,4 +54,4 @@ function QueueBeautifulBar() {
   );
 }
 
-renderWidget(QueueBeautifulBar);
+renderWidget(withHoverTips(QueueBeautifulBar));

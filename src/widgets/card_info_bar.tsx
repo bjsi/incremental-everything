@@ -6,6 +6,7 @@ import {
   QueueInteractionScore,
   AppEvents,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useMemo, useCallback } from 'react';
 import '../rn_theme_vars.css';
 import {
@@ -985,4 +986,4 @@ export function CardInfoBar() {
   );
 }
 
-renderWidget(CardInfoBar);
+renderWidget(withHoverTips(CardInfoBar));

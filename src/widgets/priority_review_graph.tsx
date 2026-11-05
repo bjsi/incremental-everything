@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState } from 'react';
 import {
   BarChart,
@@ -157,4 +158,4 @@ function PriorityReviewGraph() {
   );
 }
 
-renderWidget(PriorityReviewGraph);
+renderWidget(withHoverTips(PriorityReviewGraph));

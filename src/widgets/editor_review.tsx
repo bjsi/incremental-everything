@@ -5,6 +5,7 @@ import {
   WidgetLocation,
   RNPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
@@ -1263,4 +1264,4 @@ export function EditorReview() {
   );
 }
 
-renderWidget(EditorReview);
+renderWidget(withHoverTips(EditorReview));

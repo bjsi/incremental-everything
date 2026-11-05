@@ -5,6 +5,7 @@ import {
   WidgetLocation,
   PluginRem,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -513,4 +514,4 @@ const OutlineRestructurePreview = () => {
   );
 };
 
-renderWidget(OutlineRestructurePreview);
+renderWidget(withHoverTips(OutlineRestructurePreview));

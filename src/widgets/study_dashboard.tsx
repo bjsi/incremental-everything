@@ -10,6 +10,7 @@ import {
     useRunAsync,
     WidgetLocation,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import {
   dismissedHistorySlotCode,
@@ -2680,4 +2681,4 @@ function StudyDashboardPopup() {
     );
 }
 
-renderWidget(StudyDashboardPopup);
+renderWidget(withHoverTips(StudyDashboardPopup));

@@ -7,6 +7,7 @@ import {
   PluginRem,
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useMemo, useRef, useState, useLayoutEffect, useEffect } from 'react';
 import { repCountsForScheduling } from '../lib/incremental_rem/types';
 import { NextRepTime } from '../components/NextRepTime';
@@ -1091,4 +1092,4 @@ export function AnswerButtons() {
   );
 }
 
-renderWidget(AnswerButtons);
+renderWidget(withHoverTips(AnswerButtons));

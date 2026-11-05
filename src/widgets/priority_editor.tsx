@@ -4,6 +4,7 @@ import {
   useRunAsync,
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority, CardPriorityInfo } from '../lib/card_priority';
@@ -1141,4 +1142,4 @@ export function PriorityEditor() {
   );
 }
 
-renderWidget(PriorityEditor);
+renderWidget(withHoverTips(PriorityEditor));

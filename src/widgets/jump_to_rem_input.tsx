@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { useState, useRef, useEffect } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
 
@@ -117,4 +118,4 @@ export function JumpToRemInput() {
   );
 }
 
-renderWidget(JumpToRemInput);
+renderWidget(withHoverTips(JumpToRemInput));

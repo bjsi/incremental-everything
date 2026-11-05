@@ -14,7 +14,9 @@ This page documents the major changes and improvements for each version of the I
 
 **Queue Dashboard**: The previous card in the Live Session and the forgetting curve's **Previous** view is now the last card you saw, not one that the Mastery Drill, cooling or Recognition First skipped as it loaded.
 
-📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+**Hover Hints**: Hover hints in plugin popups, sidebars and floating windows show reliably again in the desktop app, which stopped drawing them in RemNote 1.29.x; the plugin now draws them itself.
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) · [Hover hints missing in the desktop app](Troubleshooting.md#hover-hints-desktop)
 
 ## v1.0.194 - November 4th, 2026
 

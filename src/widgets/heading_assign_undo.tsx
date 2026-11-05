@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -95,4 +96,4 @@ export const HeadingAssignUndo = () => {
   );
 };
 
-renderWidget(HeadingAssignUndo);
+renderWidget(withHoverTips(HeadingAssignUndo));

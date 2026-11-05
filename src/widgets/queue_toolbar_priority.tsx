@@ -1,4 +1,5 @@
 import { renderWidget } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { QueuePriorityBadge } from '../components/QueuePriorityBadge';
 import { useHostShown } from '../components/useHostShown';
 
@@ -9,4 +10,4 @@ function QueueToolbarPriority() {
   return <QueuePriorityBadge active={shown} />;
 }
 
-renderWidget(QueueToolbarPriority);
+renderWidget(withHoverTips(QueueToolbarPriority));

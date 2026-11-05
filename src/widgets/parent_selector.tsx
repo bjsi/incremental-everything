@@ -9,6 +9,7 @@ import {
   RemId,
   ReactRNPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   powerupCode,
@@ -1653,4 +1654,4 @@ function ParentSelectorWidget() {
   );
 }
 
-renderWidget(ParentSelectorWidget);
+renderWidget(withHoverTips(ParentSelectorWidget));

@@ -3,6 +3,7 @@ import {
   usePlugin,
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useCallback, useEffect, useState } from 'react';
 import { EditorReviewJob } from '../lib/incremental_rem/review_jobs';
 import { determineIncRemType } from '../lib/incRemHelpers';
@@ -858,4 +859,4 @@ function EditorReviewTimerWidget() {
   return primary ? <EditorReviewTimer /> : null;
 }
 
-renderWidget(EditorReviewTimerWidget);
+renderWidget(withHoverTips(EditorReviewTimerWidget));

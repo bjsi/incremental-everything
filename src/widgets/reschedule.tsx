@@ -5,6 +5,7 @@ import {
   WidgetLocation,
   RNPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect, useRef } from 'react';
 import { getIncrementalRemFromRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import { captureQueueReviewSeconds, enqueueReviewJob, newReviewJobId } from '../lib/incremental_rem/review_jobs';
@@ -461,4 +462,4 @@ export function Reschedule() {
   );
 }
 
-renderWidget(Reschedule);
+renderWidget(withHoverTips(Reschedule));

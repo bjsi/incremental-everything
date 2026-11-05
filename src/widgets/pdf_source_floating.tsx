@@ -6,6 +6,7 @@ import {
   PluginRem,
   AppEvents,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SourceReaderView } from '../components/SourceReaderView';
 import { useFloatingWidgetDrag, FloatingPosition } from '../lib/floating_widget_drag';
@@ -196,4 +197,4 @@ export function PdfSourceFloating() {
   );
 }
 
-renderWidget(PdfSourceFloating);
+renderWidget(withHoverTips(PdfSourceFloating));

@@ -6,6 +6,7 @@ import {
   PluginRem,
   RemId,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getPowerupSlotByCodeSafe } from '../lib/powerup_slot_compat';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
@@ -50,7 +51,6 @@ import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import * as _ from 'remeda';
 import { useIESettingOptional } from '../lib/settings';
 import { buildUnifiedRanking, scheduledCardCount, unifiedPercentileAt } from '../lib/unified_percentile';
-import { HoverTipLayer } from '../components/HoverTipLayer';
 
 type Scope = { remId: string | null; name: string; };
 type ScopeMode = 'all' | 'document';
@@ -1508,10 +1508,8 @@ function Priority() {
       >
         Save & Close
       </button>
-      {/* Native `title` tooltips rarely show in plugin iframes; this draws them. */}
-      <HoverTipLayer />
     </div>
   );
 }
 
-renderWidget(Priority);
+renderWidget(withHoverTips(Priority));

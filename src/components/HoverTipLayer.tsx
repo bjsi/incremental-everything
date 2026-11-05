@@ -11,20 +11,84 @@ interface Tip {
   mouseX: number;
 }
 
+// Only one layer may be live per iframe: two would each draw the same tip.
+// The first mounted one is live; when it unmounts, the next one takes over.
+const layers: Array<(live: boolean) => void> = [];
+const announce = () => layers.forEach((set, i) => set(i === 0));
+
+// Rough size of the tip box, to decide whether it fits in the iframe at all.
+// Matches the box style below: 11px text, 1.4 line height, 6/9px padding.
+const LINE_PX = 15.4;
+const BOX_PAD_Y = 14;
+const BOX_PAD_X = 20;
+const CHAR_PX = 6;
+
+function estimateTipHeight(text: string, viewportWidth: number): number {
+  const inner = Math.max(40, Math.min(MAX_WIDTH, viewportWidth - 2 * EDGE) - BOX_PAD_X);
+  const perLine = Math.max(1, Math.floor(inner / CHAR_PX));
+  const lines = text
+    .split('\n')
+    .reduce((n, para) => n + Math.max(1, Math.ceil(para.length / perLine)), 0);
+  return lines * LINE_PX + BOX_PAD_Y;
+}
+
+/** True when a tip under or above `anchor` fits inside this iframe. */
+function tipFits(text: string, anchor: DOMRect): boolean {
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  const h = estimateTipHeight(text, vw);
+  return anchor.bottom + GAP + h <= vh - EDGE || anchor.top - GAP - h >= EDGE;
+}
+
 /**
  * Draws hover tooltips in the page for every element carrying a `title`
  * (or `data-tip`) attribute, replacing the OS tooltip.
  *
- * Native `title` tooltips are unreliable inside RemNote's plugin iframes on
- * desktop: the help cursor appears but the tooltip often never does, or shows
- * once and not again until the mouse leaves the element. Nothing in the page
- * can make the native one appear, so this layer takes over. On first hover it
- * moves the element's `title` into `data-tip`, so the native tooltip can no
- * longer race it and show a second copy.
+ * Native `title` tooltips are unreliable inside plugin iframes in RemNote's
+ * desktop app (the web app in Chrome is fine): the help cursor appears but
+ * the tooltip often never does, or shows once and not again until the mouse
+ * leaves the element. Nothing in the page can make the native one appear, so
+ * this layer takes over. On first hover it moves the element's `title` into
+ * `data-tip`, so the native tooltip can no longer race it and show a second
+ * copy.
  *
- * Mount once per widget, at its root. Multi-line text ("\n") is kept.
+ * A tip can't leave the iframe, so in a strip too thin to hold it (queue
+ * bars, editor badges) the `title` is left alone for the OS to draw.
+ *
+ * Every widget gets one through `withHoverTips` at its `renderWidget` call;
+ * extra mounts are harmless (only one is live). Multi-line text ("\n") is kept.
  */
 export function HoverTipLayer() {
+  const [live, setLive] = React.useState(false);
+
+  React.useLayoutEffect(() => {
+    layers.push(setLive);
+    announce();
+    return () => {
+      const i = layers.indexOf(setLive);
+      if (i >= 0) layers.splice(i, 1);
+      announce();
+    };
+  }, []);
+
+  return live ? <LiveHoverTips /> : null;
+}
+
+/** Wraps a widget's root so every `title` in it gets a drawn tooltip. */
+export function withHoverTips(Widget: React.ComponentType) {
+  function WithHoverTips() {
+    return (
+      <>
+        <Widget />
+        <HoverTipLayer />
+      </>
+    );
+  }
+  WithHoverTips.displayName = `WithHoverTips(${Widget.displayName || Widget.name || 'Widget'})`;
+  return WithHoverTips;
+}
+
+function LiveHoverTips() {
   const [tip, setTip] = React.useState<Tip | null>(null);
   const [pos, setPos] = React.useState<{ left: number; top: number } | null>(null);
   const boxRef = React.useRef<HTMLDivElement>(null);
@@ -54,6 +118,8 @@ export function HoverTipLayer() {
       if (!el) return;
       const native = el.getAttribute('title');
       if (native != null) {
+        // Too thin an iframe for a drawn tip: leave it to the OS tooltip.
+        if (native && !tipFits(native, el.getBoundingClientRect())) return;
         el.removeAttribute('title');
         if (native) el.setAttribute('data-tip', native);
       }
@@ -61,7 +127,14 @@ export function HoverTipLayer() {
       if (!text) return;
       timer = window.setTimeout(() => {
         if (current !== el || !el.isConnected) return;
-        setTip({ text, anchor: el.getBoundingClientRect(), mouseX });
+        const anchor = el.getBoundingClientRect();
+        if (!tipFits(text, anchor)) {
+          // Moved here earlier when it fitted; hand it back to the OS.
+          el.removeAttribute('data-tip');
+          el.setAttribute('title', text);
+          return;
+        }
+        setTip({ text, anchor, mouseX });
       }, SHOW_DELAY_MS);
     };
     const onMove = (e: MouseEvent) => {
