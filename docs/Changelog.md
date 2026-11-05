@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.195 - November 5th, 2026
+
+### ⚡ Improved
+
+**Mastery Drill**: The regular-queue drill now opens the Queue Dashboard when **Auto-focus Queue Dashboard** is on; the popup drill still never does.
+
+📖 [Auto-focus Queue Dashboard](Plugin-Settings-Reference.md#queue-display) · [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill)
+
+### 🐛 Fixed
+
+**Queue Dashboard**: The previous card in the Live Session and the forgetting curve's **Previous** view is now the last card you saw, not one that the Mastery Drill, cooling or Recognition First skipped as it loaded.
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
+
 ## v1.0.194 - November 4th, 2026
 
 ### ⚡ Improved

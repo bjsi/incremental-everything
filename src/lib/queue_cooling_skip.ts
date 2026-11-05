@@ -8,6 +8,7 @@ import { CoolingScanner } from './priority_review_document/cooling_gather';
 import { getCoolingParams } from './priority_review_document/cooling_store';
 import { loadCardSource } from './priority_review_document/card_source';
 import { hasCardClusterPowerup } from './priority_review_document/cluster';
+import { noteCardSkipped } from './queue_skipped_cards';
 
 /**
  * Cooling inside RemNote's own queues: a card whose Rem is cooling is skipped
@@ -164,6 +165,7 @@ export function claimCardRemoval(cardId: string): boolean {
   if (lastClaim?.cardId === cardId && now - lastClaim.at < CLAIM_MS) return false;
   lastClaim = { cardId, at: now };
   session?.skipped.add(cardId);
+  noteCardSkipped(cardId);
   return true;
 }
 

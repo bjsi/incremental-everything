@@ -13,6 +13,7 @@ import { PRACTICED_QUEUES_HISTORY_KEY, rollOverOldSessions } from './queue_aggre
 import { computeFSRSState, parseWeightsString } from './fsrs';
 import { getIESetting } from './settings';
 import { isNativeDrillActive, isNativeDrillQueue } from './mastery_drill_native';
+import { wasCardSkippedSince } from './queue_skipped_cards';
 
 const ACTIVE_SESSION_KEY = 'activeQueueSession';
 
@@ -32,6 +33,8 @@ const cardStartTimes = new Map<string, number>();
 let responseTimeLimitSec: number | undefined;
 /** The last flashcard QueueLoadCard named, for a QueueEnter that arrives after it. */
 let lastCardLoad: { cardId: string; at: number } | null = null;
+/** When the Live Session's current card loaded, to tell whether it was skipped since. */
+let currentCardLoadedAt = 0;
 const FIRST_CARD_CARRY_MS = 5000;
 
 // Open IncRem engagement timer. Replaces the old currentIncRemStart variable
@@ -345,13 +348,24 @@ async function loadCardStats(
  * the panel in between and copy the current card over the previous one. Callers run this ahead
  * of other work: a rating's bookkeeping can hold the plugin bridge for seconds right after.
  */
-async function moveLivePanelTo(plugin: RNPlugin, session: PracticedQueueSession, cardId: string) {
+async function moveLivePanelTo(
+  plugin: RNPlugin,
+  session: PracticedQueueSession,
+  cardId: string,
+  loadedAt: number
+) {
   if (session.currentCardId !== cardId) {
-    session.prevCardFirstRep = session.currentCardFirstRep;
-    session.prevCardTotalTime = session.currentCardTotalTime;
-    session.prevCardRepCount = session.currentCardRepCount;
-    session.prevCardId = session.currentCardId;
+    // A card the drill, cooling or Recognition First removed as it loaded was never shown:
+    // the card before it stays the previous one.
+    const leaving = session.currentCardId;
+    if (!leaving || !wasCardSkippedSince(leaving, currentCardLoadedAt)) {
+      session.prevCardFirstRep = session.currentCardFirstRep;
+      session.prevCardTotalTime = session.currentCardTotalTime;
+      session.prevCardRepCount = session.currentCardRepCount;
+      session.prevCardId = leaving;
+    }
     session.currentCardId = cardId;
+    currentCardLoadedAt = loadedAt;
   }
   await loadCardStats(plugin, session, cardId);
   if (currentSession === session && session.currentCardId === cardId) await syncLiveSession(plugin);
@@ -419,7 +433,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       if (session.currentCardId !== cardBeforeRead) return;
       if (!vis || vis === session.currentCardId) return;
 
-      await moveLivePanelTo(plugin, session, vis);
+      await moveLivePanelTo(plugin, session, vis, Date.now());
     } catch (error) {
       console.error('ERROR in cluster sibling-transition poll:', error);
     }
@@ -529,7 +543,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       // session: without its start time its rating would not count.
       if (lastCardLoad && Date.now() - lastCardLoad.at < FIRST_CARD_CARRY_MS && currentSession === session) {
         cardStartTimes.set(lastCardLoad.cardId, lastCardLoad.at);
-        await moveLivePanelTo(plugin, session, lastCardLoad.cardId);
+        await moveLivePanelTo(plugin, session, lastCardLoad.cardId, lastCardLoad.at);
       }
       incRemEngagementStart = null;
       incRemEngagementRemId = null;
@@ -540,13 +554,14 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
       // Auto-focus the Practiced Queues dashboard in the right sidebar so the
       // user always has a live session view while reviewing. Opt-in via setting.
-      // Skip when triggered from the Mastery Drill: opening the right sidebar
-      // resizes the popup which re-mounts the embedded Queue, fires QueueEnter
-      // again, and creates a resize loop.
+      // Skip for the popup Mastery Drill: the popup hides the sidebar anyway, and
+      // opening it resizes the popup, which re-mounts the embedded Queue, fires
+      // QueueEnter again, and creates a resize loop. The regular-queue drill runs
+      // in RemNote's own queue, so it follows the setting like any other queue.
       const autoFocus = await getIESetting(plugin, autoFocusQueueDashboardId);
       const isMobile = await isMobileDevice(plugin);
-      const isMasteryDrill = scopeName === 'Mastery Drill';
-      if (autoFocus && !isMobile && !isMasteryDrill) {
+      const isPopupDrill = scopeName === 'Mastery Drill' && !isNativeDrill;
+      if (autoFocus && !isMobile && !isPopupDrill) {
         // The open has to happen here: we are the only thing that spawns the
         // right sidebar in the queue, so there is nothing else to trigger it.
         // (Deferring it entirely to QueueLoadCard does not work — the first card
@@ -595,7 +610,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       const movePanelNow = !!data?.cardId && !!currentSession;
       if (movePanelNow) {
         cardStartTimes.set(data.cardId, now);
-        await moveLivePanelTo(plugin, currentSession!, data.cardId);
+        await moveLivePanelTo(plugin, currentSession!, data.cardId, now);
       }
 
       // Defensive: when a flashcard loads (data.cardId is set; IncRems load
@@ -658,7 +673,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
         // Only when the session was created above; otherwise the panel moved first.
         if (!movePanelNow) {
           cardStartTimes.set(data.cardId, now);
-          if (currentSession) await moveLivePanelTo(plugin, currentSession, data.cardId);
+          if (currentSession) await moveLivePanelTo(plugin, currentSession, data.cardId, now);
         }
 
         // Verify Mastery Drill scope: if we labeled this session as Mastery Drill but the

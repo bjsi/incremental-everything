@@ -1,5 +1,6 @@
 import { AppEvents, PluginRem, QueueInteractionScore, QueueItemType, RemId, RNPlugin } from '@remnote/plugin-sdk';
 import { masteryDrillRevealDelayId } from './consts';
+import { forgetCardSkip, noteCardSkipped } from './queue_skipped_cards';
 import { getIESetting } from './settings';
 import {
   DrillCooling,
@@ -483,9 +484,11 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     if (s.tripped) return;
     // No getCurrentCard check first: it doubled the skip time. A misplaced removal would show
     // as a drill card vanishing unrated; the tests saw none once id-less loads were ignored.
+    noteCardSkipped(cardId);
     try {
       await plugin.queue.removeCurrentCardFromQueue(false);
     } catch (e) {
+      forgetCardSkip(cardId);
       console.error(`${LOG} skip failed for ${cardId}:`, e);
     }
     s.skipMs.push(Date.now() - receivedAt);
