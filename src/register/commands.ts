@@ -3434,7 +3434,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             id: newReviewJobId(r._id),
             kind: 'dismiss' as const,
             remId: r._id,
-            cardPriorityInheritance: false,
+            // Same anchor as every other Dismiss: the Incremental powerup takes
+            // the priority with it, so the cardPriority tag must keep it.
+            cardPriorityInheritance: true,
             confirmedAt,
           }))
         );

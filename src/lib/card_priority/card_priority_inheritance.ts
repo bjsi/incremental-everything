@@ -38,6 +38,7 @@ export const handleCardPriorityInheritance = async (
             event: 'incremental',
         });
     } catch (error) {
-        // Silently handle errors
+        // Not fatal for the dismissal, but a lost anchor must be traceable.
+        console.error('[CardPriority] Failed to stamp the incremental anchor on dismiss for', rem._id, error);
     }
 };

@@ -16,7 +16,9 @@ This page documents the major changes and improvements for each version of the I
 
 **Hover Hints**: Hover hints in plugin popups, sidebars and floating windows show reliably again in the desktop app, which stopped drawing them in RemNote 1.29.x; the plugin now draws them itself.
 
-📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) · [Hover hints missing in the desktop app](Troubleshooting.md#hover-hints-desktop)
+**Dismiss**: Dismissing Incremental Rems with `Ctrl+D` in the editor (focused Rem or a selection) now leaves their priority behind as an `incremental` card priority, like every other Dismiss, so cards under them inherit it.
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) · [Hover hints missing in the desktop app](Troubleshooting.md#hover-hints-desktop) · [Priority Sources](Priorities-for-Flashcards.md#priority-sources)
 
 ## v1.0.194 - November 4th, 2026
 
