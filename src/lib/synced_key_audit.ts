@@ -1,11 +1,12 @@
 import { RNPlugin, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { localVideoUrl, readLocalVideo } from './local_video_ref';
+import { localVideoUrl, readCardVideo, readLocalVideo } from './local_video_ref';
 import { extractPositionKey } from './video_position';
 import {
   powerupCode,
   dismissedPowerupCode,
   videoExtractPowerupCode,
   localVideoPowerupCode,
+  cardVideoPowerupCode,
   videoExtractUrlSlotCode,
   priorityShieldHistoryKey,
   documentPriorityShieldHistoryKey,
@@ -738,6 +739,15 @@ async function buildCandidates(
   for (const r of await taggedRems(plugin, localVideoPowerupCode)) {
     try {
       const file = await readLocalVideo(r);
+      if (file) videoUrls.add(localVideoUrl(file));
+    } catch {
+      /* ignore */
+    }
+  }
+  // Card videos keep only a speed under their URL.
+  for (const r of await taggedRems(plugin, cardVideoPowerupCode)) {
+    try {
+      const file = await readCardVideo(r);
       if (file) videoUrls.add(localVideoUrl(file));
     } catch {
       /* ignore */

@@ -709,6 +709,10 @@ export const videoExtractEndSlotCode = 'endTime';
 export const localVideoPowerupCode = 'localVideo';
 export const localVideoLibrarySlotCode = 'library';
 export const localVideoPathSlotCode = 'path';
+// A local video that explains a flashcard, on the card's own Rem: shown under
+// its answer once revealed (widgets/card_video.tsx) and under the Rem's title
+// in the editor. Not Incremental. Same slots as the Local Video powerup.
+export const cardVideoPowerupCode = 'cardVideo';
 
 // The floating review bar over RemNote's video page (lib/video_review_bar.ts).
 export const videoReviewBarIdKey = 'video-review-bar-id';

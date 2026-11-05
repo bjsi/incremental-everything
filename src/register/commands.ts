@@ -25,7 +25,7 @@ import {
   TranscriptTarget,
 } from '../lib/video_transcript';
 import { TranscriptSource } from '../lib/youtube_transcript';
-import { chooseLocalVideo, localVideoTitle, setLocalVideo } from '../lib/local_video';
+import { chooseLocalVideo, localVideoTitle, setCardVideo, setLocalVideo } from '../lib/local_video';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import { isHintNode } from '../lib/richTextSanitize';
 import {
@@ -2502,6 +2502,38 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         const wasIncremental = await rem.hasPowerup(powerupCode);
         if (!wasIncremental) await initIncrementalRem(plugin, rem);
         await plugin.app.toast(`🎞️ Linked “${name}”${wasIncremental ? '' : ', and made it Incremental'}`);
+      } catch (e) {
+        await localVideoFailure(e);
+      }
+    },
+  });
+
+  // A video that explains a flashcard, on the card's own Rem: shown under the
+  // answer after Show Answer (widgets/card_video.tsx) and under the Rem's title
+  // in the editor. The Rem stays as it is: nothing is made Incremental.
+  plugin.app.registerCommand({
+    id: 'link-local-video-card-extra',
+    name: 'Link Local Video as Card Extra',
+    description: 'Pick a video file on this computer that explains the focused flashcard, shown with its answer',
+    quickCode: 'llce',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('Focus the flashcard the video explains first.');
+        return;
+      }
+      try {
+        await plugin.app.toast('🎞️ Choose the video in the dialog…');
+        const file = await chooseLocalVideo('file', 'Choose the video that explains this card');
+        if (!file) return;
+        await setCardVideo(rem, file);
+        const name = localVideoTitle(file.path);
+        const hasCards = (await rem.getCards()).length > 0;
+        await plugin.app.toast(
+          hasCards
+            ? `🎞️ “${name}” will show with this card's answer`
+            : `🎞️ Linked “${name}”: it will show with the answer once this Rem has a flashcard`
+        );
       } catch (e) {
         await localVideoFailure(e);
       }

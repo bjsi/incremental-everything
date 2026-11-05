@@ -1,5 +1,10 @@
 import { PluginRem } from '@remnote/plugin-sdk';
-import { localVideoLibrarySlotCode, localVideoPathSlotCode, localVideoPowerupCode } from './consts';
+import {
+  cardVideoPowerupCode,
+  localVideoLibrarySlotCode,
+  localVideoPathSlotCode,
+  localVideoPowerupCode,
+} from './consts';
 
 /**
  * Video files on this computer, which RemNote has no interface for. The local
@@ -56,18 +61,31 @@ export const localVideoMediaPath = encodePath;
 /** The file's name without its folders or extension: a Rem's text when there is none. */
 export const localVideoTitle = (path: string) => (path.split('/').pop() ?? path).replace(/\.[^.]+$/, '');
 
-export async function readLocalVideo(rem: PluginRem): Promise<LocalVideoFile | null> {
-  if (!(await rem.hasPowerup(localVideoPowerupCode))) return null;
+// The Local Video powerup (an Incremental video) and the Card Video powerup
+// (a video explaining a flashcard) hold a file the same way.
+type VideoPowerup = typeof localVideoPowerupCode | typeof cardVideoPowerupCode;
+
+async function readVideoFile(rem: PluginRem, code: VideoPowerup): Promise<LocalVideoFile | null> {
+  if (!(await rem.hasPowerup(code))) return null;
   const [library, path] = await Promise.all([
-    rem.getPowerupProperty(localVideoPowerupCode, localVideoLibrarySlotCode),
-    rem.getPowerupProperty(localVideoPowerupCode, localVideoPathSlotCode),
+    rem.getPowerupProperty(code, localVideoLibrarySlotCode),
+    rem.getPowerupProperty(code, localVideoPathSlotCode),
   ]);
   return library && path ? { library, path } : null;
 }
 
-export async function setLocalVideo(rem: PluginRem, file: LocalVideoFile) {
-  await rem.addPowerup(localVideoPowerupCode);
-  await rem.setPowerupProperty(localVideoPowerupCode, localVideoLibrarySlotCode, [file.library]);
-  await rem.setPowerupProperty(localVideoPowerupCode, localVideoPathSlotCode, [file.path]);
+async function setVideoFile(rem: PluginRem, code: VideoPowerup, file: LocalVideoFile) {
+  await rem.addPowerup(code);
+  await rem.setPowerupProperty(code, localVideoLibrarySlotCode, [file.library]);
+  await rem.setPowerupProperty(code, localVideoPathSlotCode, [file.path]);
 }
+
+export const readLocalVideo = (rem: PluginRem) => readVideoFile(rem, localVideoPowerupCode);
+export const setLocalVideo = (rem: PluginRem, file: LocalVideoFile) =>
+  setVideoFile(rem, localVideoPowerupCode, file);
+
+/** The video that explains a card Rem, shown with its answer (Link Local Video as Card Extra). */
+export const readCardVideo = (rem: PluginRem) => readVideoFile(rem, cardVideoPowerupCode);
+export const setCardVideo = (rem: PluginRem, file: LocalVideoFile) =>
+  setVideoFile(rem, cardVideoPowerupCode, file);
 

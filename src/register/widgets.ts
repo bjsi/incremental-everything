@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
@@ -390,6 +390,16 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('card_info_bar', WidgetLocation.FlashcardUnder, {
     powerupFilter: 'cardPriority',
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
+  // The video that explains a card (Link Local Video as Card Extra). The slot
+  // is mounted only after Show Answer, where Extra Card Details show.
+  plugin.app.registerWidget('card_video', WidgetLocation.FlashcardExtraDetail, {
+    powerupFilter: cardVideoPowerupCode,
     dimensions: {
       width: '100%',
       height: 'auto',
