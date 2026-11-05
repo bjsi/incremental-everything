@@ -249,6 +249,7 @@ Happy learning! 📚✨
     * **Purpose:** Connect the incremental workflow to other applications.
     * **Content:**
         * **[Logos Bible Software](Logos-Bible-Software-Integration.md)**: Read Logos books incrementally — import a book, send passages as extracts and keep a bookmark with keyboard shortcuts pressed in Logos (macOS).
+        * **[Local Media Bridge](Local-Media-Bridge.md)**: Lets outside tools (scripts, an AI assistant through the RemNote MCP) insert local images that RemNote stores itself.
         * **[Priority Bridge for Other Plugins](Priority-Bridge-for-Other-Plugins.md)**: How other plugins, such as importers, read the priority a new flashcard would inherit and set card priorities.
 
 * **7. [Utilities](Utilities.md)**

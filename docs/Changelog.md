@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.195 - November 5th, 2026
 
+### ✨ New
+
+**Local Media Bridge**: Tools outside RemNote — scripts, or an AI assistant writing through the RemNote MCP — can insert local images again, and RemNote stores its own copy. Since RemNote 1.29 an image written from outside as a `file://` link is never uploaded and shows *"Unable to find this image"*. A small helper (`scripts/media_bridge/media_bridge.py`) serves the image at a local address, and with **Settings → Integrations → Local Media Bridge** on, the plugin runs **Store linked images & audio in RemNote** on the rems the tool names. A toast confirms each job. Off by default.
+
+📖 [Local Media Bridge](Local-Media-Bridge.md)
+
 ### ⚡ Improved
 
 **Mastery Drill**: The regular-queue drill now opens the Queue Dashboard when **Auto-focus Queue Dashboard** is on; the popup drill still never does.

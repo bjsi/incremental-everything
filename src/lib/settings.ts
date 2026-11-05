@@ -80,6 +80,7 @@ import {
   enableHideInQueueIntegrationId,
   logosBridgeEnabledId,
   logosAutoOpenId,
+  mediaBridgeEnabledId,
   enableFlashcardPrioritisationId,
   performanceModeId,
   alwaysUseLightModeOnMobileId,
@@ -184,6 +185,7 @@ export interface IESettings {
   [enableHideInQueueIntegrationId]: boolean;
   [logosBridgeEnabledId]: boolean;
   [logosAutoOpenId]: boolean;
+  [mediaBridgeEnabledId]: boolean;
   [enableFlashcardPrioritisationId]: boolean;
   [performanceModeId]: PerformanceMode;
   [alwaysUseLightModeOnMobileId]: boolean;
@@ -281,6 +283,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [enableHideInQueueIntegrationId]: false,
   [logosBridgeEnabledId]: false,
   [logosAutoOpenId]: false,
+  [mediaBridgeEnabledId]: false,
   [enableFlashcardPrioritisationId]: false,
   [performanceModeId]: 'light',
   [alwaysUseLightModeOnMobileId]: true,
@@ -1332,6 +1335,18 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'When an Incremental Rem comes up — in the queue, or when an Editor Review timer starts — ' +
       'run "Open in Logos" for it: Logos comes forward at its bookmark (or, for an extract, at its ' +
       'passage). Incremental Rems with no Logos link are left alone.',
+  },
+  [mediaBridgeEnabledId]: {
+    kind: 'boolean',
+    group: 'integrations',
+    helpPath: 'Local-Media-Bridge/',
+    title: 'Local Media Bridge',
+    description:
+      'Uploads into RemNote the images that outside tools (such as Claude through the RemNote MCP) ' +
+      'write as links to the local media-bridge helper (scripts/media_bridge/media_bridge.py, ' +
+      'http://127.0.0.1:3460). Since RemNote 1.29 a file:// image written from outside is never ' +
+      'uploaded; this does it, the same way as "Store linked images & audio in RemNote". Leave off ' +
+      'unless you use the helper.',
   },
 
   // --- Misc ---

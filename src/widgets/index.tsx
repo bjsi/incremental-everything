@@ -39,6 +39,7 @@ import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerLogosBridge } from '../lib/logos_bridge';
+import { registerMediaBridge } from '../lib/media_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { registerOpenInWindowListener } from '../lib/open_in_window';
@@ -140,6 +141,9 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerPrefetchTrackers(plugin);
   // Long-polls the local Logos helper while the Logos Bridge setting is on.
   registerLogosBridge(plugin);
+  // Long-polls the local media-bridge helper while its setting is on, and stores
+  // in RemNote the images outside tools wrote as links to it (lib/media_bridge.ts).
+  registerMediaBridge(plugin);
   // Answers card-priority requests from other plugins (docs/Priority-Bridge-for-Other-Plugins.md).
   registerExternalPriorityBridge(plugin);
   // Publishes this window's open PDFs/articles so a command run in another
