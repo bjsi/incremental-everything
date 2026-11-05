@@ -4,6 +4,10 @@ Read web pages incrementally right in Chrome. **Incremental RemNote Companion** 
 
 It works together with the plugin, through RemNote open in Chrome's side panel.
 
+**[Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/incremental-remnote-compa/jdmbkbchgkfmipijdolpkhehjmehaagf)**
+
+![A Wikipedia page with an extract highlighted in blue and the bar at the bottom right, beside the Companion panel showing the page's document with that extract and the imported headings](assets/companion-assets/companion-usage.png){ width="900" }
+
 ## What you need
 
 - **Chrome on a computer**, or another Chromium browser. It doesn't work on phones.
@@ -12,7 +16,10 @@ It works together with the plugin, through RemNote open in Chrome's side panel.
 
 ## Setting it up
 
-1. Install the extension. It is on its way to the Chrome Web Store. Until then, download this repository, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and choose the `companion` folder.
+1. Install the extension from the **[Chrome Web Store](https://chromewebstore.google.com/detail/incremental-remnote-compa/jdmbkbchgkfmipijdolpkhehjmehaagf)**: click **Add to Chrome**.
+
+    ![The Incremental RemNote Companion page in the Chrome Web Store, with its Add to Chrome button](assets/companion-assets/companion-webstore.png){ width="700" }
+
 2. Pin it to the toolbar, and reload any pages you already had open.
 3. Open a web page and click the extension's globe icon. The panel opens with RemNote on that page's document, the same one the RemNote Clipper uses, and says **Connected** at the top once the plugin is ready.
 

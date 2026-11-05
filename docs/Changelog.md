@@ -16,6 +16,14 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [A video that explains a card](Incremental-Video.md#card-video) · [Card videos for other plugins](Priority-Bridge-for-Other-Plugins.md#card-videos)
 
+**Chrome Companion Extension**: Incremental RemNote Companion is now published in the **[Chrome Web Store](https://chromewebstore.google.com/detail/incremental-remnote-compa/jdmbkbchgkfmipijdolpkhehjmehaagf)**: install it with **Add to Chrome**, no developer mode needed.
+
+![The Incremental RemNote Companion page in the Chrome Web Store](assets/companion-assets/companion-webstore.png){ width="700" }
+
+![A Wikipedia page read with the Companion: extracts highlighted on the page, and the page's document in the panel](assets/companion-assets/companion-usage.png){ width="900" }
+
+📖 [Chrome Companion Extension](Chrome-Companion-Extension.md#setting-it-up)
+
 ### ⚡ Improved
 
 **Mastery Drill**: The regular-queue drill now opens the Queue Dashboard when **Auto-focus Queue Dashboard** is on; the popup drill still never does.
