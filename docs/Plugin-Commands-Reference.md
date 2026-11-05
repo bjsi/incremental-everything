@@ -179,6 +179,9 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Link Local Video](Incremental-Video.md#link-local-video)** — `quick: llv`
   Pick one video file for the focused Rem and make the Rem Incremental.
 
+- **[Link Local Video as Card Extra](Incremental-Video.md#card-video)** — `quick: llce`
+  Pick a video file that explains the focused flashcard. It shows under the answer after Show Answer, and under the Rem's title in the editor; nothing is made Incremental. Desktop on macOS, with the [helper](Incremental-Video.md#setup).
+
 ---
 
 ## Utilities

@@ -174,6 +174,18 @@ It creates a document named after the folder, a Rem per subfolder and one per vi
 
 **Link Local Video** (`llv`) picks one file for the focused Rem, names the Rem after the file if it is empty, and makes it Incremental.
 
+### A video that explains a card { #card-video }
+
+**Link Local Video as Card Extra** (`llce`) links a video file to a **flashcard** instead: a recorded explanation of the question, a worked solution. The Rem stays an ordinary card and nothing is made Incremental.
+
+- **In the queue**, the video appears **under the answer once you press Show Answer**, where Extra Card Details show (on a list card, at its last step). It doesn't play by itself: press play, or **🔄 From the start**.
+- **In the editor**, opening the card's Rem shows the same player under its title, as for an Incremental video.
+- It always starts at the beginning and keeps no position, so one lecture can explain many cards. It keeps the speed you chose for that file.
+- In the queue the player has no extract, screenshot or transcript buttons. In the editor, screenshots and transcripts are added under the card's Rem. Extracts are never offered, since they would be Incremental Rems.
+- To change the video, run the command again. To remove it, remove the **Card Video** tag from the Rem.
+
+Other plugins can link card videos too, for example an importer that has a video per question: see [Card videos](Priority-Bridge-for-Other-Plugins.md#card-videos).
+
 ### Libraries, disks and formats { #libraries }
 
 - Each folder you pick becomes a **library**, and each video remembers its library and its path inside it. Videos can live in several places.
