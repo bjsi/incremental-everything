@@ -280,7 +280,8 @@ function describeEntry(rep: IncrementalRep): string {
         case 'priorityChange':
             return `Priority change (${priorityEventLabel(rep.priorityEvent)}) — ${when}`;
         case 'importedRep': return `Imported flashcard review — ${when}`;
-        case 'externalRep': return `External session — ${when}`;
+        case 'externalRep':
+            return rep.context?.webUrl ? `Web page session (Companion) — ${when}` : `External session — ${when}`;
         case 'transferred':
             return `Transferred from "${displayTransferredFrom(rep)}" — ${when}`;
         default: return `Review — ${when}`;
@@ -1396,7 +1397,7 @@ function RepetitionHistoryPopup() {
                             if (rep.eventType === 'rescheduledInQueue') return '📅 ';
                             if (rep.eventType === 'executeRepetition') return '⌨️ ';
                             if (rep.eventType === 'importedRep') return '🃏 ';
-                            if (rep.eventType === 'externalRep') return '📖 ';
+                            if (rep.eventType === 'externalRep') return rep.context?.webUrl ? '🌐 ' : '📖 ';
                             return '';
                         };
 

@@ -201,6 +201,8 @@ export interface ExternalSessionInput {
    * backdated session never touches the schedule.
    */
   nextRepDate?: number;
+  /** Machine context for the entry, such as the web page a Companion session read. */
+  context?: IncrementalRep['context'];
 }
 
 /**
@@ -252,6 +254,7 @@ export async function addExternalSessionRep(
       reviewTimeSeconds: input.reviewTimeSeconds > 0 ? input.reviewTimeSeconds : undefined,
       eventType: 'externalRep',
       ...(incRem ? { priority: incRem.priority } : {}),
+      ...(input.context ? { context: input.context } : {}),
     },
     input.date
   );

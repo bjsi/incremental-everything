@@ -95,7 +95,9 @@ const EditorReviewInput: React.FC<{
    * queue handoff sets both, and the queue turn is the one that owns the clock.
    */
   editorTimerRemId?: string;
-}> = ({ plugin, remId, queueIncRemId, editorTimerRemId }) => {
+  /** Minutes to start the review time field with: the Companion's unrecorded reading time. */
+  initialReviewMinutes?: number;
+}> = ({ plugin, remId, queueIncRemId, editorTimerRemId, initialReviewMinutes }) => {
   // One concept, whichever surface it came from. The queue wins if both are
   // set: a handoff timer is the same review continued, not a second one.
   const activeReviewKind: ActiveReviewInfo['kind'] | null = queueIncRemId
@@ -107,7 +109,9 @@ const EditorReviewInput: React.FC<{
   const [days, setDays] = useState<string>('1');
   const [priority, setPriority] = useState<number>(10);
   const [note, setNote] = useState<string>('');
-  const [reviewTimeMinutes, setReviewTimeMinutes] = useState<string>('');
+  const [reviewTimeMinutes, setReviewTimeMinutes] = useState<string>(
+    initialReviewMinutes && initialReviewMinutes > 0 ? String(initialReviewMinutes) : ''
+  );
   const [futureDate, setFutureDate] = useState('');
   const [ancestorInfo, setAncestorInfo] = useState<any>(null);
   const [remName, setRemName] = useState<string>('');
@@ -1247,6 +1251,8 @@ export function EditorReview() {
   // Set by the editor branch of Ctrl+Shift+J when the Editor Review Timer is
   // already running for a different rem.
   const editorTimerRemId = ctx?.contextData?.editorTimerRemId as string | undefined;
+  // Set by the Chrome Companion's Shift+Enter on its reading clock.
+  const initialReviewMinutes = ctx?.contextData?.reviewMinutes as number | undefined;
 
   if (!remId) {
     return null;
@@ -1259,6 +1265,7 @@ export function EditorReview() {
         remId={remId}
         queueIncRemId={queueIncRemId}
         editorTimerRemId={editorTimerRemId}
+        initialReviewMinutes={initialReviewMinutes}
       />
     </div>
   );

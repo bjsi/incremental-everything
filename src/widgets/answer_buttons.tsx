@@ -713,7 +713,7 @@ export function AnswerButtons() {
 
 
 
-        {/* Open URL for Clipper - Only for HTML type rems */}
+        {/* Open URL for the Companion - Only for HTML type rems */}
         {(remType === 'html' || remType === 'html-highlight') && htmlSourceUrl && (
           <>
             <div style={dividerStyle} />
@@ -735,7 +735,7 @@ export function AnswerButtons() {
                   }
 
                   // Show a helpful toast
-                  await plugin.app.toast('📎 URL opened! Use RemNote Clipper in the browser to take notes.');
+                  await plugin.app.toast('📎 URL opened! Use the Incremental RemNote Companion in Chrome to read and extract.');
                 } catch (error) {
                   console.error('Error opening URL:', error);
                   await plugin.app.toast('Error opening URL');
@@ -750,13 +750,13 @@ export function AnswerButtons() {
                 fontWeight: 600,
                 minWidth: '110px',
               }}
-              title="Open URL for Web Clipper 📎: Open original URL in a new tab"
+              title="Open URL for the Companion 📎: Open the original page in a new tab, to read it with the Chrome Companion Extension"
             >
               <div style={{ ...buttonStyles.label, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span>📎</span>
                 <span>Open URL</span>
               </div>
-              <div style={buttonStyles.sublabel}>Use Clipper</div>
+              <div style={buttonStyles.sublabel}>Use Companion</div>
             </Button>
             <style>{`
               @keyframes clipperPulse {

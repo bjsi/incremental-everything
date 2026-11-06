@@ -44,6 +44,16 @@ function runInRemNoteFrame() {
   window.addEventListener('storage', (event) => {
     if (event.key === KB_KEY) port.postMessage({ kind: 'kbChanged' });
   });
+  // Working in the panel is reading the page too, for the reading clock.
+  let reportedAt = 0;
+  const reportActivity = () => {
+    if (Date.now() - reportedAt < 5000) return;
+    reportedAt = Date.now();
+    port.postMessage({ kind: 'activity' });
+  };
+  for (const type of ['keydown', 'mousedown', 'wheel', 'mousemove', 'scroll']) {
+    window.addEventListener(type, reportActivity, { capture: true, passive: true });
+  }
   window.addEventListener('load', () => {
     // An embedded /clipper page waits for this before starting the app. The
     // Clipper's own content script sends it the same way.
@@ -537,6 +547,115 @@ function runInPage() {
     menuTimer = setTimeout(placeMenu, 150);
   }
 
+  // ---- The reading clock: time on a page whose document is Incremental ----
+
+  const C = globalThis.IEClock;
+  /** The document this page is counted for, and its time not yet saved. */
+  let clock = null;
+  let lastActivity = Date.now();
+  let lastTick = null;
+  let lastSave = Date.now();
+  let panelFocused = false;
+  let panelActiveAt = 0;
+  let countedUrl = location.href;
+
+  const noteActivity = () => (lastActivity = Date.now());
+  const mediaPlaying = () =>
+    [...document.querySelectorAll('video, audio')].some((media) => !media.paused && !media.ended && media.readyState > 2);
+
+  /** Running, or why not: in a background tab, in another app, or idle for 3 minutes. */
+  function clockState(now) {
+    if (document.visibilityState !== 'visible') return { running: false, reason: 'background' };
+    if (!document.hasFocus() && !panelFocused) return { running: false, reason: 'unfocused' };
+    if (now - Math.max(lastActivity, panelActiveAt) > C.IDLE_MS && !mediaPlaying()) return { running: false, reason: 'idle' };
+    return { running: true };
+  }
+
+  /** Adds this page's new time to what is stored, so two tabs on one document both count. */
+  async function saveClock() {
+    const current = clock;
+    if (!current?.pending.length || extensionIsGone()) return;
+    const pending = current.pending;
+    current.pending = [];
+    lastSave = Date.now();
+    try {
+      const stored = (await chrome.storage.local.get(current.key))[current.key];
+      let segments = stored?.segments ?? [];
+      for (const [from, to] of pending) segments = C.addTime(segments, from, to);
+      await chrome.storage.local.set({ [current.key]: { url: location.href, title: document.title, segments } });
+      current.base = segments;
+    } catch {
+      current.pending = [...pending, ...current.pending];
+    }
+  }
+
+  /** The document the panel said this page belongs to, if it is Incremental. */
+  async function findClockTarget() {
+    if (extensionIsGone()) return;
+    const { readingTargets } = await chrome.storage.local.get('readingTargets');
+    const docId = kb && readingTargets?.[C.targetKey(kb.id, location.href)];
+    if (clock && clock.docId === docId && clock.kbId === kb?.id) return;
+    await saveClock();
+    if (!docId) {
+      clock = null;
+      return;
+    }
+    const key = C.clockKey(kb.id, docId);
+    const coverKey = C.coverKey(kb.id, docId);
+    const stored = await chrome.storage.local.get([key, coverKey]);
+    clock = { kbId: kb.id, docId, key, coverKey, base: stored[key]?.segments ?? [], pending: [], cover: stored[coverKey] ?? null };
+    lastTick = null;
+  }
+
+  function tickClock() {
+    if (location.href !== countedUrl) {
+      countedUrl = location.href;
+      findClockTarget();
+    }
+    if (!clock || extensionIsGone()) return;
+    const now = Date.now();
+    const state = clockState(now);
+    // A gap means the tab slept or the computer did: none of it was reading.
+    if (state.running && lastTick && now - lastTick < 5000) clock.pending = C.addTime(clock.pending, lastTick, now);
+    lastTick = state.running ? now : null;
+    if (now - lastSave > 15000) saveClock();
+    const segments = C.uncovered([...clock.base, ...clock.pending], clock.cover);
+    send({
+      ie: 'clock',
+      kbId: clock.kbId,
+      docId: clock.docId,
+      running: state.running,
+      reason: state.reason,
+      unrecordedMs: C.totalMs(segments),
+      lastReadAt: C.lastEnd(segments),
+      firstReadAt: C.firstStart(segments),
+    });
+  }
+
+  function startClock() {
+    for (const type of ['scroll', 'wheel', 'mousemove', 'mousedown', 'keydown', 'touchstart', 'selectionchange']) {
+      addEventListener(type, noteActivity, { capture: true, passive: true });
+    }
+    document.addEventListener('visibilitychange', () => {
+      noteActivity();
+      if (document.visibilityState !== 'visible') saveClock();
+    });
+    addEventListener('focus', noteActivity);
+    addEventListener('pagehide', () => saveClock());
+    chrome.storage.local.get(['panelFocus', 'panelActiveAt']).then((stored) => {
+      panelFocused = !!stored.panelFocus;
+      panelActiveAt = stored.panelActiveAt ?? 0;
+    });
+    chrome.storage.onChanged.addListener((changes) => {
+      if (changes.panelFocus) panelFocused = !!changes.panelFocus.newValue;
+      if (changes.panelActiveAt) panelActiveAt = changes.panelActiveAt.newValue ?? 0;
+      if (changes.readingTargets || changes.kb) findClockTarget();
+      if (clock && changes[clock.key]) clock.base = changes[clock.key].newValue?.segments ?? [];
+      if (clock && changes[clock.coverKey]) clock.cover = changes[clock.coverKey].newValue ?? null;
+    });
+    setInterval(tickClock, 1000);
+  }
+
   function showCollapsed(collapsed) {
     $('bar').classList.toggle('collapsed', collapsed);
     $('toggle').textContent = collapsed ? '‹' : '›';
@@ -690,6 +809,8 @@ function runInPage() {
       kb = stored.kb ?? null;
       knownKbs = stored.kbKnown ?? {};
       showKbs();
+      startClock();
+      findClockTarget();
       await loadBrowserCopy();
       loadFromPlugin();
     });

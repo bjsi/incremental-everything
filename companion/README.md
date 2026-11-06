@@ -50,7 +50,7 @@ Plugin development from `localhost` does not load in the panel, so the plugin si
 Raise `version` in `manifest.json`, then from this folder:
 
 ```
-rm -f ../companion-store.zip && zip -X ../companion-store.zip manifest.json background.js content.js anchors.js panel.html panel.js page.css icons/icon-16.png icons/icon-32.png icons/icon-48.png icons/icon-128.png
+rm -f ../companion-store.zip && zip -X ../companion-store.zip manifest.json background.js content.js anchors.js clock.js panel.html panel.js page.css icons/icon-16.png icons/icon-32.png icons/icon-48.png icons/icon-128.png
 ```
 
 ## Icons

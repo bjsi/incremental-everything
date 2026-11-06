@@ -242,6 +242,8 @@ export const IncrementalRep = z.object({
        * later renamed or deleted).
        */
       transferredFromName: z.string().optional(),
+      /** The web page read, for a session the Chrome Companion recorded ('externalRep'). */
+      webUrl: z.string().optional(),
     })
     .optional(),
 });

@@ -5,7 +5,10 @@
 // where the extension is not installed, including the desktop app.
 
 import { AppEvents, PluginRem, ReactRNPlugin, RichTextInterface } from '@remnote/plugin-sdk';
-import { dismissedPowerupCode, powerupCode } from '../consts';
+import { dismissedPowerupCode, editorReviewTimerRemIdKey, powerupCode } from '../consts';
+import { addExternalSessionRep } from '../history_edit';
+import { repCountsForStats } from '../incremental_rem/types';
+import { getNextSpacingDateForRem } from '../scheduler';
 import { canonicalUrlKey } from '../duplicate_source/url_key';
 import { markRemsAsFreshlyCreated } from '../incRemHelpers';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../incremental_rem';
@@ -37,8 +40,9 @@ const pageKeyOf = (url: string) => canonicalUrlKey(url) ?? url;
 
 // ---- Telling the extension what changed in RemNote ----
 
+type DocumentStatus = Awaited<ReturnType<typeof documentStatus>>;
 /** The document the panel's header shows, and what it last said of it. */
-let watchedDoc: { docId: string; incremental: boolean; priority?: number } | undefined;
+let watchedDoc: DocumentStatus | undefined;
 type WatchedExtract = { parentId?: string; kind?: 'highlight'; incremental: boolean };
 /** The extracts of each page a tab has shown here, with the Rem each sits under. */
 const watchedPages = new Map<string, Map<string, WatchedExtract>>();
@@ -79,12 +83,42 @@ async function isAliveExtract(plugin: ReactRNPlugin, remId: string, kind?: 'high
   return { alive, incremental, rem };
 }
 
-/** The page's document, as the panel's header shows it. */
-async function documentStatus(plugin: ReactRNPlugin, doc: PluginRem) {
+/**
+ * The page's document, as the panel's header shows it: whether it is Incremental,
+ * the reading time its history holds, and the reviews since `since`, which the
+ * Companion's clock takes out of its own unrecorded time.
+ */
+async function documentStatus(plugin: ReactRNPlugin, doc: PluginRem, since?: number) {
   const incremental = await doc.hasPowerup(powerupCode);
   const incRem = incremental ? await getIncrementalRemFromRem(plugin, doc) : undefined;
-  return { docId: doc._id, incremental, priority: incRem?.priority };
+  const reviews = (incRem?.history ?? []).filter((rep) => repCountsForStats(rep.eventType));
+  const totalSeconds = reviews.reduce((sum, rep) => sum + (rep.reviewTimeSeconds ?? 0), 0);
+  const timerRemId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
+  return {
+    docId: doc._id,
+    incremental,
+    /** Was Incremental, and was dismissed: Make Incremental brings it back. */
+    dismissed: !incremental && (await doc.hasPowerup(dismissedPowerupCode)),
+    priority: incRem?.priority,
+    totalSeconds,
+    lastReviewAt: reviews.length ? Math.max(...reviews.map((rep) => rep.date)) : undefined,
+    reviewsSince:
+      since === undefined
+        ? []
+        : reviews
+            .filter((rep) => rep.date >= since)
+            .map((rep) => ({ date: rep.date, reviewTimeSeconds: rep.reviewTimeSeconds ?? 0, eventType: rep.eventType })),
+    editorTimerRunning: !!timerRemId && timerRemId === doc._id,
+  };
 }
+
+const sameStatus = (a: DocumentStatus, b: DocumentStatus) =>
+  a.incremental === b.incremental &&
+  a.dismissed === b.dismissed &&
+  a.priority === b.priority &&
+  a.totalSeconds === b.totalSeconds &&
+  a.lastReviewAt === b.lastReviewAt &&
+  a.editorTimerRunning === b.editorTimerRunning;
 
 async function currentKbId(plugin: ReactRNPlugin): Promise<string> {
   const knowledgeBase = await plugin.kb.getCurrentKnowledgeBaseData();
@@ -256,10 +290,45 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
     return { kbId: await currentKbId(plugin), extracts: shown, readPoint: state.readPoint };
   },
 
-  async documentStatus(plugin, { docId }) {
-    const status = await documentStatus(plugin, await findDocument(plugin, docId));
+  async documentStatus(plugin, { docId, since }) {
+    const status = await documentStatus(plugin, await findDocument(plugin, docId), since);
     watchDocument(status);
     return status;
+  },
+
+  /**
+   * The Companion's reading clock, recorded as a review dated when the reading
+   * stopped. The scheduler's interval runs from that moment, so a session
+   * recorded the next morning still lands on the evening it was read.
+   */
+  async recordPageReview(plugin, { docId, reviewTimeSeconds, endedAt, url }) {
+    await guardTestPlugin(plugin);
+    const doc = await findDocument(plugin, docId);
+    if (!(await doc.hasPowerup(powerupCode))) throw new Error("The page's document is not an Incremental Rem.");
+    const seconds = Math.round(Number(reviewTimeSeconds));
+    const ended = Math.min(Number(endedAt), Date.now());
+    if (!(seconds > 0) || !Number.isFinite(ended)) throw new Error('There is no reading time to record.');
+    const spacing = await getNextSpacingDateForRem(plugin, docId, false);
+    if (!spacing) throw new Error('The scheduler could not compute the next repetition.');
+    const nextRepDate = ended + Math.max(0, spacing.newNextRepDate - Date.now());
+    const result = await addExternalSessionRep(plugin, docId, {
+      date: ended,
+      reviewTimeSeconds: seconds,
+      nextRepDate,
+      ...(typeof url === 'string' && /^https?:/.test(url) ? { context: { webUrl: url } } : {}),
+    });
+    if (!result.ok) throw new Error(result.error || 'Could not record the session.');
+    const status = await documentStatus(plugin, doc);
+    watchDocument(status);
+    return { ...status, rescheduled: result.rescheduled, nextRepDate: result.rescheduled ? nextRepDate : undefined };
+  },
+
+  /** Shift+Enter on the clock: the Execute Repetition popup, with the time filled in. */
+  async openReviewPopup(plugin, { docId, minutes }) {
+    await guardTestPlugin(plugin);
+    await findDocument(plugin, docId);
+    await plugin.widget.openPopup('editor_review', { remId: docId, reviewMinutes: Math.max(0, Math.round(minutes)) });
+    return { opened: true };
   },
 
   async makeDocumentIncremental(plugin, { docId, priority }) {
@@ -324,16 +393,20 @@ export function startCompanionListener(plugin: ReactRNPlugin) {
         break;
       }
     }
+    if (watchedDoc && ids.includes(watchedDoc.docId)) await checkDocument();
+  };
+  const checkDocument = async () => {
     const shown = watchedDoc;
-    if (shown && ids.includes(shown.docId)) {
-      const doc = await plugin.rem.findOne(shown.docId);
-      const status = doc ? await documentStatus(plugin, doc) : undefined;
-      if (status && (status.incremental !== shown.incremental || status.priority !== shown.priority)) {
-        watchDocument(status);
-        toExtension({ kind: 'documentChanged', status });
-      }
+    if (!shown) return;
+    const doc = await plugin.rem.findOne(shown.docId);
+    const status = doc ? await documentStatus(plugin, doc) : undefined;
+    if (status && !sameStatus(status, shown)) {
+      watchDocument(status);
+      toExtension({ kind: 'documentChanged', status });
     }
   };
+  // The Editor Review Timer starting or ending on the document changes no Rem.
+  plugin.event.addListener(AppEvents.StorageSessionChange, editorReviewTimerRemIdKey, () => void checkDocument());
   plugin.event.addListener(AppEvents.GlobalRemChanged, undefined, (data) => {
     const remId = data?.remId;
     if (!remId || !watchedIds.has(remId)) return;

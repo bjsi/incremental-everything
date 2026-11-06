@@ -179,6 +179,8 @@ chrome.runtime.onConnect.addListener((port) => {
     port.onMessage.addListener((message) => {
       if (message.kind === 'kbSet') {
         reloadFrame();
+      } else if (message.kind === 'activity') {
+        markPanelActive();
       } else if (message.kind === 'kbChanged' && !switchingTo) {
         note('The knowledge base was changed in another tab.');
         whenIdle(() => reloadFrame());
@@ -208,7 +210,8 @@ chrome.runtime.onConnect.addListener((port) => {
       notifyTabs({ ie: 'pluginReady' });
       refreshDocument();
     } else if (message.kind === 'documentChanged') {
-      if (message.status?.docId === shownDocId) showDocument(message.status);
+      // Asked again, for the reviews since the clock began.
+      if (message.status?.docId === shownDocId) refreshStatus();
     } else if (message.kind === 'pageChanged' && typeof message.url === 'string') {
       // An extract's Rem was deleted: the page drops its highlight now, not on reload.
       notifyTabs({ ie: 'pageChanged' }, message.url);
@@ -223,6 +226,7 @@ chrome.runtime.onConnect.addListener((port) => {
       panelKbId = null;
       showPageOffer();
       showDocument(null);
+      closeClockBar();
       if (!switchingTo) showStatus('The plugin disconnected. Waiting for it to return…');
       // Their answers will never come. Not a refusal, so a write stays queued.
       for (const answer of [...waiting.values()]) answer({ ok: false, lost: true, error: 'The plugin disconnected.' });
@@ -348,6 +352,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       (result) => chrome.tabs.sendMessage(sender.tab.id, { ie: 'readDone', id: message.id, ok: true, result }),
       (err) => chrome.tabs.sendMessage(sender.tab.id, { ie: 'readDone', id: message.id, ok: false, error: err.message })
     ).catch(() => {});
+  } else if (message.ie === 'clock' && sender.tab) {
+    liveClocks.set(sender.tab.id, { message, at: Date.now() });
   } else if (message.ie === 'log') {
     note(`[${message.host}] ${message.text}`);
   } else if (message.ie === 'frameAlive') {
@@ -367,13 +373,34 @@ let shownDocId = null;
 let documentAsked = 0;
 
 function showDocument(status) {
+  const changedDoc = (status?.docId ?? null) !== shownDocId;
   shownDocId = status?.docId ?? null;
+  shownStatus = status ?? null;
   docStatus.hidden = !status;
-  if (!status) return;
-  document.getElementById('docIncremental').hidden = !status.incremental;
-  document.getElementById('docPriority').textContent = status.priority === undefined ? '' : `P${status.priority}`;
-  makeButton.hidden = status.incremental || !makeField.hidden;
-  if (status.incremental) closeMakeField();
+  if (changedDoc) loadClock();
+  if (status) {
+    document.getElementById('docIncremental').hidden = !status.incremental;
+    document.getElementById('docDismissed').hidden = !status.dismissed;
+    document.getElementById('docPriority').textContent = status.priority === undefined ? '' : `P${status.priority}`;
+    makeButton.textContent = status.dismissed ? 'Make Incremental again' : 'Make Incremental';
+    makeButton.hidden = status.incremental || !makeField.hidden;
+    if (status.incremental) closeMakeField();
+    applyReviews(status);
+    setReadingTarget(status);
+  }
+  renderClock();
+}
+
+/** Asks the plugin again about the document shown, with the reviews since the clock's time began. */
+async function refreshStatus() {
+  if (!pluginPort || !shownDocId) return;
+  const docId = shownDocId;
+  try {
+    const status = await callPlugin('documentStatus', { docId, since: clockSince() });
+    if (docId === shownDocId) showDocument(status);
+  } catch (err) {
+    note(`Document status: ${err.message}`);
+  }
 }
 
 /** Asks for the document of the page RemNote shows, which opening the panel already created. */
@@ -385,7 +412,8 @@ async function refreshDocument() {
     const title = tab && withoutFragment(tab.url) === withoutFragment(focusedUrl) ? tab.title : undefined;
     const doc = await callRemNote('getOrCreatePageDocument', { url: focusedUrl, title: title || focusedUrl });
     if (!doc?._id) throw new Error('RemNote returned no document for this page');
-    const status = await callPlugin('documentStatus', { docId: doc._id });
+    if (doc._id !== shownDocId) await loadClock(doc._id);
+    const status = await callPlugin('documentStatus', { docId: doc._id, since: clockSince(doc._id) });
     if (asked === documentAsked) showDocument(status);
   } catch (err) {
     note(`Document status: ${err.message}`);
@@ -443,6 +471,311 @@ makePriority.addEventListener('keydown', async (event) => {
     showStatus(`Could not make the document Incremental: ${err.message}`);
   }
 });
+
+// ---- The reading clock ----
+//
+// The page counts (content.js); this shows the time, records it, and keeps the
+// cover: what of that time is no longer unrecorded. See clock.js.
+
+const C = globalThis.IEClock;
+const clockButton = document.getElementById('clock');
+const clockBar = document.getElementById('clockBar');
+let shownStatus = null;
+/** Per tab, the last report of a page counting for some document. */
+const liveClocks = new Map();
+/** The shown document's stored clock and cover. */
+let clockDoc = null;
+let clockStored = null;
+let clockCover = null;
+/** Shift+Enter opened the popup: a review recorded after this clears the time it was opened for. */
+let awaitingPopup = null;
+let barMode = null;
+
+const clockKeys = (docId = shownDocId) =>
+  panelKbId && docId ? { clock: C.clockKey(panelKbId, docId), cover: C.coverKey(panelKbId, docId) } : null;
+
+async function loadClock(docId = shownDocId) {
+  const keys = clockKeys(docId);
+  clockDoc = docId;
+  if (!keys) {
+    clockStored = clockCover = null;
+    return;
+  }
+  const stored = await chrome.storage.local.get([keys.clock, keys.cover]);
+  if (clockDoc !== docId) return;
+  clockStored = stored[keys.clock] ?? null;
+  clockCover = stored[keys.cover] ?? null;
+}
+
+async function writeCover(cover) {
+  const keys = clockKeys();
+  if (!keys) return;
+  clockCover = cover;
+  await chrome.storage.local.set({ [keys.cover]: cover });
+  renderClock();
+}
+
+/** The pages tell which documents to count for: the Incremental ones the panel has shown. */
+async function setReadingTarget(status) {
+  if (!panelKbId || !focusedUrl) return;
+  const key = C.targetKey(panelKbId, focusedUrl);
+  const { readingTargets = {} } = await chrome.storage.local.get('readingTargets');
+  const wanted = status.incremental ? status.docId : undefined;
+  if (readingTargets[key] === wanted) return;
+  if (wanted) readingTargets[key] = wanted;
+  else delete readingTargets[key];
+  await chrome.storage.local.set({ readingTargets });
+}
+
+/** The clock as it stands: from a page counting it now, or from what is stored. */
+function clockNow(docId = shownDocId) {
+  const now = Date.now();
+  const live = [...liveClocks.values()].filter(
+    ({ message, at }) => now - at < 3000 && message.docId === docId && message.kbId === panelKbId
+  );
+  const report = live.find(({ message }) => message.running) ?? live[0];
+  if (report) {
+    const { message } = report;
+    return {
+      unrecordedMs: message.unrecordedMs,
+      lastReadAt: message.lastReadAt,
+      firstReadAt: message.firstReadAt,
+      running: message.running,
+      reason: message.reason,
+    };
+  }
+  const segments = docId === clockDoc ? C.uncovered(clockStored?.segments, clockCover) : [];
+  return {
+    unrecordedMs: C.totalMs(segments),
+    lastReadAt: C.lastEnd(segments),
+    firstReadAt: C.firstStart(segments),
+    running: false,
+    reason: 'closed',
+  };
+}
+
+const clockSince = (docId = shownDocId) => clockNow(docId).firstReadAt;
+
+/** Reviews recorded in RemNote while the page was read: their time is not counted twice. */
+function applyReviews(status) {
+  if (!status.incremental || !status.reviewsSince?.length) return;
+  let cover = C.withWindows(clockCover, C.windowsOf(status.reviewsSince)) ?? clockCover;
+  if (awaitingPopup?.docId === status.docId && status.reviewsSince.some((review) => review.date >= awaitingPopup.since)) {
+    cover = { ...cover, clearedUntil: Math.max(cover?.clearedUntil ?? 0, awaitingPopup.endedAt) };
+    awaitingPopup = null;
+  }
+  if (cover !== clockCover) writeCover(cover);
+}
+
+const PAUSED = {
+  background: 'Paused: the page is in a background tab',
+  unfocused: 'Paused: Chrome is not the window in use',
+  idle: 'Paused: no scrolling, typing or clicking for 3 minutes',
+  closed: 'Paused: the page is not open',
+};
+
+function renderClock() {
+  const shown = !!shownStatus?.incremental;
+  clockButton.hidden = !shown;
+  if (!shown) {
+    if (barMode !== 'notice') closeClockBar();
+    return;
+  }
+  const now = clockNow();
+  const totalMs = (shownStatus.totalSeconds ?? 0) * 1000 + now.unrecordedMs;
+  document.getElementById('clockTime').textContent = C.format(now.unrecordedMs);
+  document.getElementById('clockTotal').textContent = totalMs > now.unrecordedMs ? ` · Σ ${C.formatShort(totalMs)}` : '';
+  clockButton.classList.toggle('paused', !now.running);
+  clockButton.title = [
+    now.running ? 'Reading time not yet recorded' : PAUSED[now.reason] ?? 'Paused',
+    `Total, with the reviews in its history: ${C.formatShort(totalMs)}`,
+    shownStatus.editorTimerRunning
+      ? 'The Editor Review Timer is running on this page: End Review there records the review'
+      : 'Click to record it as a review',
+  ].join('\n');
+
+  // A past session nobody recorded is offered once, until more reading is added.
+  const isPast =
+    !now.running &&
+    now.unrecordedMs >= C.PAST_MIN_MS &&
+    now.lastReadAt &&
+    Date.now() - now.lastReadAt > C.PAST_AFTER_MS &&
+    clockCover?.keptAt !== now.lastReadAt;
+  if (isPast && !barMode && !shownStatus.editorTimerRunning) showPastSession(now);
+}
+
+// The bar under the header: keys on the bar itself, arrows move the selection.
+let barButtons = [];
+let barSelected = 0;
+let barTimer;
+
+function setClockBar(mode, text, buttons = [], hint = '') {
+  barMode = mode;
+  clearTimeout(barTimer);
+  clockBar.hidden = false;
+  document.getElementById('clockText').textContent = text;
+  document.getElementById('clockHint').textContent = hint;
+  barButtons = buttons.map(({ label, run }) => {
+    const button = document.createElement('button');
+    button.textContent = label;
+    button.tabIndex = -1;
+    button.addEventListener('mousedown', (event) => event.preventDefault());
+    button.addEventListener('click', () => run());
+    return button;
+  });
+  document.getElementById('clockButtons').replaceChildren(...barButtons);
+  barSelected = 0;
+  paintBarSelection();
+  if (buttons.length) clockBar.focus();
+}
+
+function paintBarSelection() {
+  barButtons.forEach((button, index) => button.classList.toggle('selected', index === barSelected));
+}
+
+function closeClockBar() {
+  barMode = null;
+  clearTimeout(barTimer);
+  clockBar.hidden = true;
+  barButtons = [];
+}
+
+function flashClockBar(text, ms = 6000) {
+  setClockBar('notice', text);
+  barTimer = setTimeout(closeClockBar, ms);
+}
+
+clockBar.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    if (barMode === 'past') writeCover({ ...clockCover, keptAt: clockNow().lastReadAt });
+    closeClockBar();
+  } else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+    event.preventDefault();
+    if (!barButtons.length) return;
+    barSelected = (barSelected + (event.key === 'ArrowRight' ? 1 : barButtons.length - 1)) % barButtons.length;
+    paintBarSelection();
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    if (event.shiftKey && barMode === 'confirm') return recordClock(true);
+    barButtons[barSelected]?.click();
+  }
+});
+
+function showPastSession(now) {
+  const when = new Date(now.lastReadAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  setClockBar('past', `Unrecorded session: ${C.formatShort(now.unrecordedMs)}, last read ${when}.`, [
+    { label: 'Record it', run: () => recordClock(false) },
+    {
+      label: 'Keep counting',
+      run: () => {
+        writeCover({ ...clockCover, keptAt: now.lastReadAt });
+        closeClockBar();
+      },
+    },
+  ]);
+}
+
+function openRecordConfirm() {
+  if (!shownStatus?.incremental) return;
+  if (shownStatus.editorTimerRunning) {
+    return flashClockBar('The Editor Review Timer is running on this page. End Review there records the review.');
+  }
+  const now = clockNow();
+  if (now.unrecordedMs < 1000) return flashClockBar('No reading time to record yet.', 3000);
+  const until = new Date(now.lastReadAt).toLocaleTimeString(undefined, { timeStyle: 'short' });
+  setClockBar(
+    'confirm',
+    `Record ${C.formatShort(now.unrecordedMs)} of reading, until ${until}, as a review?`,
+    [
+      { label: 'Record', run: () => recordClock(false) },
+      { label: 'Choose interval…', run: () => recordClock(true) },
+      { label: 'Discard', run: () => confirmDiscard() },
+    ],
+    'Enter · Shift+Enter: choose · Esc'
+  );
+}
+
+function confirmDiscard() {
+  const now = clockNow();
+  setClockBar('confirm', `Discard ${C.formatShort(now.unrecordedMs)}? It won't be recorded anywhere.`, [
+    { label: 'Cancel', run: () => openRecordConfirm() },
+    {
+      label: 'Discard',
+      run: async () => {
+        await writeCover({ ...clockCover, clearedUntil: Math.max(clockCover?.clearedUntil ?? 0, now.lastReadAt) });
+        flashClockBar('Discarded.', 3000);
+      },
+    },
+  ]);
+}
+
+/** Enter: the scheduler picks the date. Shift+Enter: the Execute Repetition popup, in the panel. */
+async function recordClock(withPopup) {
+  const docId = shownDocId;
+  const now = clockNow();
+  if (!docId || !pluginPort || now.unrecordedMs < 1000) return closeClockBar();
+  const reviewTimeSeconds = Math.round(now.unrecordedMs / 1000);
+  const endedAt = now.lastReadAt;
+  setClockBar('busy', withPopup ? 'Opening the review popup…' : 'Recording…');
+  try {
+    if (withPopup) {
+      await callPlugin('openReviewPopup', { docId, minutes: Math.max(1, Math.round(reviewTimeSeconds / 60)) });
+      awaitingPopup = { docId, since: Date.now(), endedAt };
+      closeClockBar();
+      window.focus();
+      frame.focus();
+      return;
+    }
+    const result = await callPlugin('recordPageReview', { docId, reviewTimeSeconds, endedAt, url: focusedUrl });
+    note(`Recorded the page's review: ${JSON.stringify(result)}`);
+    await writeCover({ ...clockCover, clearedUntil: Math.max(clockCover?.clearedUntil ?? 0, endedAt) });
+    if (docId === shownDocId) showDocument(result);
+    const next = result.nextRepDate
+      ? ` Next review: ${new Date(result.nextRepDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}.`
+      : '';
+    flashClockBar(`✓ Recorded ${C.formatShort(reviewTimeSeconds * 1000)} of reading.${next}`);
+  } catch (err) {
+    setClockBar('error', `Could not record it: ${err.message}`, [{ label: 'OK', run: closeClockBar }]);
+  }
+}
+
+clockButton.addEventListener('click', () => (barMode === 'confirm' ? closeClockBar() : openRecordConfirm()));
+
+chrome.storage.onChanged.addListener((changes) => {
+  const keys = clockKeys();
+  if (!keys) return;
+  if (changes[keys.clock]) clockStored = changes[keys.clock].newValue ?? null;
+  if (changes[keys.cover]) clockCover = changes[keys.cover].newValue ?? null;
+});
+
+// The pages count time spent in the panel too: its focus, and what is done in it.
+let panelFocusReported = null;
+let panelActiveReported = 0;
+function markPanelActive() {
+  if (Date.now() - panelActiveReported < 10000) return;
+  panelActiveReported = Date.now();
+  chrome.storage.local.set({ panelActiveAt: panelActiveReported }).catch(() => {});
+}
+for (const type of ['mousedown', 'keydown', 'mousemove', 'wheel']) {
+  document.addEventListener(type, markPanelActive, { capture: true, passive: true });
+}
+addEventListener('pagehide', () => chrome.storage.local.set({ panelFocus: false }).catch(() => {}));
+
+let statusPolledAt = 0;
+setInterval(() => {
+  const focused = document.hasFocus();
+  if (focused !== panelFocusReported) {
+    panelFocusReported = focused;
+    chrome.storage.local.set({ panelFocus: focused }).catch(() => {});
+  }
+  renderClock();
+  // Reviews recorded on another device reach this one by sync, with no event here.
+  if (shownStatus?.incremental && clockNow().unrecordedMs > 0 && Date.now() - statusPolledAt > 60000) {
+    statusPolledAt = Date.now();
+    refreshStatus();
+  }
+}, 1000);
 
 // ---- Status ----
 
