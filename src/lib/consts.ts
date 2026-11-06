@@ -479,6 +479,14 @@ export const mcScissorsWidgetId = 'mc_scissors';
 export const mcScissorsIdsKey = 'mcScissorsWidgetIds';
 /** Session: display indices of the struck options on the current card. */
 export const mcScissorsStruckKey = 'mcScissorsStruck';
+// Multiple-choice answer sheet (lib/mc_assertions.ts): a T/F box per numbered
+// assertion (I., II., III.) of a "judge each sentence" question.
+export const mcAssertionSheetSettingId = 'mc-assertion-sheet';
+export const mcAssertionsWidgetId = 'mc_assertions';
+/** Session: the numerals of the current card's assertions ("I", "II", …). */
+export const mcAssertionLabelsKey = 'mcAssertionLabels';
+/** Session: one mark per assertion, in order: '' (empty), 'T' or 'F'. */
+export const mcAssertionMarksKey = 'mcAssertionMarks';
 // Timestamp flag set by the IncRem "Next" paths just before they advance the
 // queue (while their widget sandbox is still alive). A persistent QueueLoadCard
 // listener consumes it to restore the Practiced Queues dashboard — the refocus

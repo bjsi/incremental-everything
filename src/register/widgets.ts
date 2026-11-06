@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
@@ -472,6 +472,10 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // multiple-choice card, pinned beside it by CSS anchor positioning.
   plugin.app.registerWidget(mcScissorsWidgetId, WidgetLocation.FloatingWidget, {
     dimensions: { height: 28, width: 28 },
+  });
+  // Its True/False answer sheet: one column, pinned beside the question.
+  plugin.app.registerWidget(mcAssertionsWidgetId, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 52 },
   });
 
   plugin.app.registerWidget('priority_review_graph', WidgetLocation.UnderRemEditor, {

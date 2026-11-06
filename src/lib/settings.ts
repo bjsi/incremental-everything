@@ -71,6 +71,7 @@ import {
   titleVideoExtractsId,
   autoFocusQueueDashboardId,
   mcScissorsSettingId,
+  mcAssertionSheetSettingId,
   hideCardPriorityTagSettingId,
   showLeftBorderForIncRemsSettingId,
   showPriorityBandsInTablesId,
@@ -173,6 +174,7 @@ export interface IESettings {
   [titleVideoExtractsId]: boolean;
   [autoFocusQueueDashboardId]: boolean;
   [mcScissorsSettingId]: boolean;
+  [mcAssertionSheetSettingId]: boolean;
 
   // Editor indicators
   [hideCardPriorityTagSettingId]: boolean;
@@ -274,6 +276,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [titleVideoExtractsId]: true,
   [autoFocusQueueDashboardId]: false,
   [mcScissorsSettingId]: true,
+  [mcAssertionSheetSettingId]: true,
 
   [hideCardPriorityTagSettingId]: true,
   [showLeftBorderForIncRemsSettingId]: true,
@@ -958,6 +961,16 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Shows a ✂ beside each option of a multiple-choice card. Click it to strike that option ' +
       'through and rule it out before you answer; click again to restore it. Takes effect from ' +
       'the next card.',
+  },
+  [mcAssertionSheetSettingId]: {
+    kind: 'boolean',
+    group: 'queue',
+    helpPath: 'Utilities-Multiple-Choice-Cards/#answer-sheet',
+    title: 'True/False Answer Sheet on Multiple-Choice Cards',
+    description:
+      'When a multiple-choice question lists statements numbered I., II., III. on their own lines, ' +
+      'shows a column with a box per statement beside the question. Click a box to mark it T, again ' +
+      'for F, and again to clear it. Takes effect from the next card.',
   },
 
   // --- Editor indicators ---

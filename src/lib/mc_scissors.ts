@@ -20,17 +20,26 @@
 // The strike itself is CSS keyed on the same display index. Nothing is saved:
 // the state lives in session storage and is dropped when the card changes.
 //
-// Gated by the Queue Display setting "Scissors on Multiple-Choice Cards", read
-// on every card load. The widget's keys live in consts.ts so its iframe (one per
-// option) does not load this file's imports.
+// The same controller opens the True/False answer sheet (widgets/mc_assertions.tsx)
+// when the question numbers its statements I., II., III. (see lib/mc_assertions.ts).
+//
+// Each is gated by its own Queue Display setting ("Scissors on Multiple-Choice
+// Cards", "True/False Answer Sheet on Multiple-Choice Cards"), read on every card
+// load. The widgets' keys live in consts.ts so their iframes (one per option for
+// the scissors) do not load this file's imports.
 
 import { AppEvents, BuiltInPowerupCodes, ReactRNPlugin, RNPlugin } from '@remnote/plugin-sdk';
 import {
+  mcAssertionLabelsKey as MC_ASSERTION_LABELS_KEY,
+  mcAssertionMarksKey as MC_ASSERTION_MARKS_KEY,
+  mcAssertionSheetSettingId,
+  mcAssertionsWidgetId as MC_ASSERTIONS_WIDGET,
   mcScissorsIdsKey as MC_SCISSORS_IDS_KEY,
   mcScissorsSettingId,
   mcScissorsStruckKey as MC_SCISSORS_STRUCK_KEY,
   mcScissorsWidgetId as MC_SCISSORS_WIDGET,
 } from './consts';
+import { assertionLabels, richTextPlain } from './mc_assertions';
 import { getIESetting } from './settings';
 
 const ANCHOR_CSS_ID = 'mc-scissors-anchors';
@@ -67,6 +76,19 @@ ${wrapperSel(i)} {
   position-visibility: anchors-visible;
 }`;
   }
+  /* The answer sheet: one column, its top level with the question's top and its
+     right edge on the scissors' column, so it reads as part of the same gutter. */
+  css += `
+.rn-question-rem { anchor-name: --ie-mc-question; }
+div.absolute.z-50:has(iframe[src*="widgetName=${MC_ASSERTIONS_WIDGET}"]) {
+  position: fixed !important;
+  position-anchor: --ie-mc-question;
+  top: anchor(--ie-mc-question top, 80px) !important;
+  right: calc(anchor(--ie-mc-0 left, 60px) + 6px) !important;
+  left: auto !important;
+  bottom: auto !important;
+  position-visibility: anchors-visible;
+}`;
   return css;
 }
 
@@ -82,16 +104,22 @@ ${optionSel(i)} span.w-full * { text-decoration: line-through; }`
 }
 
 let openIds: string[] = [];
+let sheetId: string | undefined;
 let shownForCardId: string | undefined;
 // QueueLoadCard fires in bursts (and id-less); one sync at a time.
 let chain: Promise<void> = Promise.resolve();
 
+const anythingOpen = () => openIds.length > 0 || !!sheetId;
+
 async function closeAll(plugin: RNPlugin): Promise<void> {
-  const ids = openIds;
+  const ids = sheetId ? [...openIds, sheetId] : openIds;
   openIds = [];
+  sheetId = undefined;
   shownForCardId = undefined;
   await plugin.storage.setSession(MC_SCISSORS_IDS_KEY, []);
   await plugin.storage.setSession(MC_SCISSORS_STRUCK_KEY, []);
+  await plugin.storage.setSession(MC_ASSERTION_LABELS_KEY, []);
+  await plugin.storage.setSession(MC_ASSERTION_MARKS_KEY, []);
   for (const id of ids) {
     try {
       await plugin.window.closeFloatingWidget(id);
@@ -101,33 +129,55 @@ async function closeAll(plugin: RNPlugin): Promise<void> {
   }
 }
 
-/** Number of options when the current card is a multiple-choice card, else 0. */
-async function optionCount(plugin: RNPlugin, remId: string): Promise<number> {
+interface McCard {
+  /** Options shown as card items. */
+  optionCount: number;
+  /** Numerals of the question's numbered assertions; [] when it has none. */
+  assertions: string[];
+}
+
+/** What the current card offers, or undefined when it is not a multiple-choice card. */
+async function readMcCard(plugin: RNPlugin, remId: string): Promise<McCard | undefined> {
   const rem = await plugin.rem.findOne(remId);
-  if (!rem || !(await rem.hasPowerup(BuiltInPowerupCodes.MultipleChoice))) return 0;
+  if (!rem || !(await rem.hasPowerup(BuiltInPowerupCodes.MultipleChoice))) return undefined;
   const children = await rem.getChildrenRem();
   const flags = await Promise.all(children.map((c) => c.isCardItem()));
-  return flags.filter(Boolean).length;
+  return {
+    optionCount: flags.filter(Boolean).length,
+    assertions: assertionLabels(richTextPlain(rem.text)),
+  };
 }
 
 async function sync(plugin: RNPlugin): Promise<void> {
   const card = await plugin.queue.getCurrentCard().catch(() => undefined);
   if (card && card._id === shownForCardId) return;
-  if (openIds.length) await closeAll(plugin);
+  if (anythingOpen()) await closeAll(plugin);
   if (!card) return;
-  if (!(await getIESetting(plugin, mcScissorsSettingId))) return;
+  const [scissorsOn, sheetOn] = await Promise.all([
+    getIESetting(plugin, mcScissorsSettingId),
+    getIESetting(plugin, mcAssertionSheetSettingId),
+  ]);
+  if (!scissorsOn && !sheetOn) return;
 
-  const count = await optionCount(plugin, card.remId).catch((e) => {
+  const mc = await readMcCard(plugin, card.remId).catch((e) => {
     console.warn(`${LOG} Could not read the card's Rem:`, e);
-    return 0;
+    return undefined;
   });
-  if (count === 0) return;
+  if (!mc || mc.optionCount === 0) return;
+  shownForCardId = card._id;
+
+  if (sheetOn && mc.assertions.length) {
+    await plugin.storage.setSession(MC_ASSERTION_LABELS_KEY, mc.assertions);
+    sheetId = await plugin.window.openFloatingWidget(MC_ASSERTIONS_WIDGET, { top: 80, right: 60 }, undefined, false);
+    console.log(`${LOG} Answer sheet opened for ${mc.assertions.length} assertions.`);
+  }
+
+  if (!scissorsOn) return;
+  const count = mc.optionCount;
   if (count > MAX_OPTIONS) {
     console.log(`${LOG} ${count} options, more than ${MAX_OPTIONS}: no scissors.`);
     return;
   }
-
-  shownForCardId = card._id;
   const ids: string[] = [];
   // In order, one at a time: nth-child relies on the opening order.
   for (let i = 0; i < count; i++) {
@@ -160,7 +210,7 @@ export async function registerMcScissors(plugin: ReactRNPlugin): Promise<void> {
   // Leaving by navigation fires no QueueExit.
   plugin.event.addListener(AppEvents.URLChange, undefined, () =>
     queue(plugin, async () => {
-      if (!openIds.length) return;
+      if (!anythingOpen()) return;
       const url = await plugin.window.getURL();
       if (!url.includes('/flashcards') && !url.startsWith('/need_to_learn')) await closeAll(plugin);
     })
