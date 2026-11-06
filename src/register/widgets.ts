@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
@@ -466,6 +466,12 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // new Rem waits for the user to confirm a parent there.
   plugin.app.registerWidget(parentPickWidgetId, WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 340 },
+  });
+
+  // Multiple-choice scissors (lib/mc_scissors.ts): one per option of a native
+  // multiple-choice card, pinned beside it by CSS anchor positioning.
+  plugin.app.registerWidget(mcScissorsWidgetId, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 28, width: 28 },
   });
 
   plugin.app.registerWidget('priority_review_graph', WidgetLocation.UnderRemEditor, {

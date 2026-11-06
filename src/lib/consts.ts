@@ -471,6 +471,14 @@ export const displayPriorityShieldId = 'display-priority-shield';
 export const deferSpoilerIncRemsId = 'defer-spoiler-increms';
 export const displayQueueToolbarPriorityId = 'display-queue-toolbar-priority';
 export const autoFocusQueueDashboardId = 'auto-focus-queue-dashboard';
+// Multiple-choice scissors (lib/mc_scissors.ts): a ✂ beside each option of a
+// native multiple-choice card that strikes the option through.
+export const mcScissorsSettingId = 'mc-scissors';
+export const mcScissorsWidgetId = 'mc_scissors';
+/** Session: the open scissors' floating widget ids, in display-index order. */
+export const mcScissorsIdsKey = 'mcScissorsWidgetIds';
+/** Session: display indices of the struck options on the current card. */
+export const mcScissorsStruckKey = 'mcScissorsStruck';
 // Timestamp flag set by the IncRem "Next" paths just before they advance the
 // queue (while their widget sandbox is still alive). A persistent QueueLoadCard
 // listener consumes it to restore the Practiced Queues dashboard — the refocus

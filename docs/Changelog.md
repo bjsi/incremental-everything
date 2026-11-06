@@ -2,6 +2,16 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.196 - November 5th, 2026
+
+### ✨ New
+
+**Multiple-Choice Cards**: Added scissors beside each option of RemNote's multiple-choice cards in the queue: click one to strike that option through and rule it out before you answer. On by default; turn it off in **IR Settings → Queue Display**.
+
+![A multiple-choice card in the queue with a ✂ beside each option; clicking a ✂ strikes that option through, and the answer is then picked from the options that are left](assets/mc-scissors.gif){ width="900" }
+
+📖 [Scissors](Utilities-Multiple-Choice-Cards.md#scissors)
+
 ## v1.0.195 - November 5th, 2026
 
 ### ✨ New

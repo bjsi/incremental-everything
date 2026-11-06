@@ -54,6 +54,12 @@ Mark a statement as true or false with one command, and make that kind of questi
 - [Importing True/False cards from text (`tfc`)](Utilities-True-or-False-Cards.md#importing-from-text)
 - [In a Card Cluster](Utilities-True-or-False-Cards.md#card-clusters)
 
+## [Multiple-Choice Cards](Utilities-Multiple-Choice-Cards.md)
+
+Additions to RemNote's own multiple-choice cards in the queue.
+
+- [Scissors — New](Utilities-Multiple-Choice-Cards.md#scissors)
+
 ## [Cleaning Up](Utilities-Cleaning-Up.md)
 
 Clear out Rems an import left behind, audit disabled cards, store the images and audio a Rem only links to, size imported images that show cropped in the queue, and repair references that show "Loading".

@@ -30,6 +30,7 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
+import { registerMcScissors } from '../lib/mc_scissors';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
 import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, queueBeautifulBarWidthKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
@@ -89,6 +90,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   // True/False cards: the TFT / TFF powerups and the CSS keyed on them.
   await registerTrueFalsePowerups(plugin);
   registerTrueFalseClusterTracker(plugin);
+  await registerMcScissors(plugin);
   // Settings appear in RemNote's own panel only while this KB still has to read
   // them across — the migration reads through getSetting, which throws for an
   // unregistered id. For an up-to-date KB this list is empty, so the plugin's

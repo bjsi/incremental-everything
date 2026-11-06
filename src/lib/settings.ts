@@ -70,6 +70,7 @@ import {
   tidyAutoCaptionsId,
   titleVideoExtractsId,
   autoFocusQueueDashboardId,
+  mcScissorsSettingId,
   hideCardPriorityTagSettingId,
   showLeftBorderForIncRemsSettingId,
   showPriorityBandsInTablesId,
@@ -171,6 +172,7 @@ export interface IESettings {
   [tidyAutoCaptionsId]: boolean;
   [titleVideoExtractsId]: boolean;
   [autoFocusQueueDashboardId]: boolean;
+  [mcScissorsSettingId]: boolean;
 
   // Editor indicators
   [hideCardPriorityTagSettingId]: boolean;
@@ -271,6 +273,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [tidyAutoCaptionsId]: true,
   [titleVideoExtractsId]: true,
   [autoFocusQueueDashboardId]: false,
+  [mcScissorsSettingId]: true,
 
   [hideCardPriorityTagSettingId]: true,
   [showLeftBorderForIncRemsSettingId]: true,
@@ -945,6 +948,16 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Opens the Practiced Queues dashboard in the right sidebar on queue entry, for a live view ' +
       'of the session. PDF IncRems may temporarily steal focus to PDF tabs; the dashboard tab ' +
       'stays available. Does not apply on mobile.',
+  },
+  [mcScissorsSettingId]: {
+    kind: 'boolean',
+    group: 'queue',
+    helpPath: 'Utilities-Multiple-Choice-Cards/#scissors',
+    title: 'Scissors on Multiple-Choice Cards',
+    description:
+      'Shows a ✂ beside each option of a multiple-choice card. Click it to strike that option ' +
+      'through and rule it out before you answer; click again to restore it. Takes effect from ' +
+      'the next card.',
   },
 
   // --- Editor indicators ---
