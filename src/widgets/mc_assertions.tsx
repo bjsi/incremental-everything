@@ -39,17 +39,30 @@ function McAssertions() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0', alignItems: 'flex-end' }}>
+    // The host CSS makes the frame as tall as the options' spacing times the rows
+    // (see sheetCss in lib/mc_scissors.ts); space-around then puts one row per
+    // pitch, so the boxes line up with the scissors' rhythm below.
+    <div
+      style={{
+        height: '100vh',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-around',
+        alignItems: 'flex-end',
+        overflow: 'hidden',
+      }}
+    >
       {labels.map((label, i) => {
         const mark = marks[i] ?? '';
         return (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span
               style={{
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: 600,
                 color: 'var(--rn-clr-content-tertiary, #9ca3af)',
-                minWidth: 22,
+                minWidth: 24,
                 textAlign: 'right',
                 userSelect: 'none',
               }}
@@ -60,16 +73,16 @@ function McAssertions() {
               onClick={() => cycle(i)}
               aria-label={`Statement ${label}: ${SPOKEN[mark]}. Click to change.`}
               style={{
-                width: 22,
-                height: 22,
+                width: 26,
+                height: 26,
                 padding: 0,
                 borderRadius: 5,
                 border: mark ? 'none' : '1.5px solid var(--rn-clr-content-tertiary, #9ca3af)',
                 background: mark ? FILL[mark] : 'transparent',
                 color: '#fff',
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: 700,
-                lineHeight: '22px',
+                lineHeight: '26px',
                 cursor: 'pointer',
                 boxSizing: 'border-box',
               }}

@@ -76,20 +76,47 @@ ${wrapperSel(i)} {
   position-visibility: anchors-visible;
 }`;
   }
-  /* The answer sheet: one column, its top level with the question's top and its
-     right edge on the scissors' column, so it reads as part of the same gutter. */
   css += `
-.rn-question-rem { anchor-name: --ie-mc-question; }
-div.absolute.z-50:has(iframe[src*="widgetName=${MC_ASSERTIONS_WIDGET}"]) {
+.rn-question-rem { anchor-name: --ie-mc-question; }`;
+  return css;
+}
+
+const SHEET_CSS_ID = 'mc-assertions-sheet';
+const SHEET_WRAPPER = `div.absolute.z-50:has(iframe[src*="widgetName=${MC_ASSERTIONS_WIDGET}"])`;
+
+/* The answer sheet: one column, its top level with the question's top and its
+   right edge on the scissors' column, so it reads as part of the same gutter.
+
+   Its boxes are spaced like the scissors: the column is made `rows` times the
+   options' average pitch tall, (last centre - first centre) / (options - 1),
+   and the widget spreads its rows evenly over that height. In `bottom`,
+   anchor(X) is the distance from the viewport's bottom edge to X, so the
+   options' pitch is anchor(first) - anchor(last) over (options - 1). The frame
+   and the host elements between it and the wrapper are stretched to fill it. */
+function sheetCss(rows: number, options: number): string {
+  const last = Math.min(options, MAX_OPTIONS) - 1;
+  const pitch =
+    last > 0
+      ? `((anchor(--ie-mc-0 center, 0px) - anchor(--ie-mc-${last} center, 0px)) / ${last})`
+      : '36px';
+  return `
+${SHEET_WRAPPER} {
   position: fixed !important;
   position-anchor: --ie-mc-question;
   top: anchor(--ie-mc-question top, 80px) !important;
   right: calc(anchor(--ie-mc-0 left, 60px) + 6px) !important;
+  bottom: calc(anchor(--ie-mc-question top, 0px) - ${rows} * max(${pitch}, 30px)) !important;
   left: auto !important;
-  bottom: auto !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column;
   position-visibility: anchors-visible;
+}
+${SHEET_WRAPPER} :is(div, iframe) {
+  flex: 1 1 auto;
+  height: 100% !important;
+  min-height: 0 !important;
 }`;
-  return css;
 }
 
 function strikeCss(struck: number[]): string {
@@ -105,6 +132,7 @@ ${optionSel(i)} span.w-full * { text-decoration: line-through; }`
 
 let openIds: string[] = [];
 let sheetId: string | undefined;
+let sheetCssOn = false;
 let shownForCardId: string | undefined;
 // QueueLoadCard fires in bursts (and id-less); one sync at a time.
 let chain: Promise<void> = Promise.resolve();
@@ -120,6 +148,10 @@ async function closeAll(plugin: RNPlugin): Promise<void> {
   await plugin.storage.setSession(MC_SCISSORS_STRUCK_KEY, []);
   await plugin.storage.setSession(MC_ASSERTION_LABELS_KEY, []);
   await plugin.storage.setSession(MC_ASSERTION_MARKS_KEY, []);
+  if (sheetCssOn) {
+    sheetCssOn = false;
+    await plugin.app.registerCSS(SHEET_CSS_ID, '');
+  }
   for (const id of ids) {
     try {
       await plugin.window.closeFloatingWidget(id);
@@ -168,6 +200,8 @@ async function sync(plugin: RNPlugin): Promise<void> {
 
   if (sheetOn && mc.assertions.length) {
     await plugin.storage.setSession(MC_ASSERTION_LABELS_KEY, mc.assertions);
+    await plugin.app.registerCSS(SHEET_CSS_ID, sheetCss(mc.assertions.length, mc.optionCount));
+    sheetCssOn = true;
     sheetId = await plugin.window.openFloatingWidget(MC_ASSERTIONS_WIDGET, { top: 80, right: 60 }, undefined, false);
     console.log(`${LOG} Answer sheet opened for ${mc.assertions.length} assertions.`);
   }

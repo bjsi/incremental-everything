@@ -475,7 +475,8 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   });
   // Its True/False answer sheet: one column, pinned beside the question.
   plugin.app.registerWidget(mcAssertionsWidgetId, WidgetLocation.FloatingWidget, {
-    dimensions: { height: 'auto', width: 52 },
+    // Its height comes from host CSS (the options' spacing), not from its content.
+    dimensions: { height: 120, width: 58 },
   });
 
   plugin.app.registerWidget('priority_review_graph', WidgetLocation.UnderRemEditor, {
