@@ -96,7 +96,12 @@ function runInPage() {
   root.innerHTML = `
     <style>
       div, button { font: 12px system-ui, sans-serif; }
+      #dock { display: flex; gap: 4px; align-items: flex-end; justify-content: flex-end; }
       #bar { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 340px; }
+      /* Collapsed, only the selection's own Add Extract button still shows. */
+      #bar.collapsed > :not(#extract) { display: none; }
+      #toggle { padding: 5px 7px; opacity: 0.75; }
+      #toggle:hover { opacity: 1; }
       button { padding: 5px 9px; border: 0; border-radius: 6px; background: #1f2937; color: white; cursor: pointer; }
       #extract { background: #3b82f6; }
       label { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 6px; background: #1f2937; color: white; font: 12px system-ui, sans-serif; cursor: pointer; }
@@ -118,13 +123,16 @@ function runInPage() {
       <div id="promptHint">Enter add · Esc cancel · Shift+Enter more options</div>
     </div>
     <div id="banner" hidden></div>
-    <div id="bar">
-      <label id="kbField" hidden>Send to <select id="kbPick"></select></label>
-      <label id="priorityLabel"><input id="priority" type="checkbox" />Set priority</label>
-      <button id="extract" hidden>Add Extract</button>
-      <button id="setRead">Set read point</button>
-      <button id="goRead">Go to read point</button>
-      <button id="import">Import headings</button>
+    <div id="dock">
+      <div id="bar">
+        <label id="kbField" hidden>Send to <select id="kbPick"></select></label>
+        <label id="priorityLabel"><input id="priority" type="checkbox" />Set priority</label>
+        <button id="extract" hidden>Add Extract</button>
+        <button id="setRead">Set read point</button>
+        <button id="goRead">Go to read point</button>
+        <button id="import">Import headings</button>
+      </div>
+      <button id="toggle"></button>
     </div>`;
   const $ = (id) => root.getElementById(id);
   let bannerTimer;
@@ -461,17 +469,33 @@ function runInPage() {
     else commitExtract(captured);
   }
 
+  function showCollapsed(collapsed) {
+    $('bar').classList.toggle('collapsed', collapsed);
+    $('toggle').textContent = collapsed ? '‹' : '›';
+    $('toggle').title = collapsed ? 'Show the Companion buttons' : 'Hide the Companion buttons';
+  }
+
   function attach() {
     document.documentElement.append(host);
+    showCollapsed(false);
 
-    chrome.storage.local.get('setPriority').then((stored) => {
+    chrome.storage.local.get(['setPriority', 'barCollapsed']).then((stored) => {
       $('priority').checked = !!stored.setPriority;
+      showCollapsed(!!stored.barCollapsed);
+    });
+    // One setting for every tab, so a collapsed bar stays out of the way everywhere.
+    $('toggle').addEventListener('mousedown', (event) => event.preventDefault());
+    $('toggle').addEventListener('click', () => {
+      const collapsed = !$('bar').classList.contains('collapsed');
+      showCollapsed(collapsed);
+      if (!refuseIfGone()) chrome.storage.local.set({ barCollapsed: collapsed });
     });
     $('priority').addEventListener('change', () => {
       if (!refuseIfGone()) chrome.storage.local.set({ setPriority: $('priority').checked });
     });
     chrome.storage.onChanged.addListener((changes) => {
       if (changes.setPriority) $('priority').checked = !!changes.setPriority.newValue;
+      if (changes.barCollapsed) showCollapsed(!!changes.barCollapsed.newValue);
       if (changes.kbKnown) {
         knownKbs = changes.kbKnown.newValue ?? {};
         showKbs();
