@@ -11,7 +11,7 @@ It works together with the plugin, through RemNote open in Chrome's side panel.
 ## What you need
 
 - **Chrome on a computer**, or another Chromium browser. It doesn't work on phones.
-- **The Incremental RemNote plugin**, version 1.0.186 or later, installed from the [plugin marketplace](https://www.remnote.com/plugins/incremental-everything).
+- **The Incremental RemNote plugin**, version 1.0.186 or later, installed from the [plugin marketplace](https://www.remnote.com/plugins/incremental-everything). [Add Highlight](#add-highlight) and the panel's [Incremental status](#the-pages-document-incremental-or-not) need 1.0.199 or later.
 - **A RemNote account, signed in on www.remnote.com in the same browser.** The panel opens whichever [knowledge base](#knowledge-bases) this browser used last.
 
 ## Setting it up
@@ -43,29 +43,45 @@ RemNote gets a document for a page only when you ask for it: by opening the pane
 
 To close the panel, use the **X** at the top of it.
 
+### The page's document: Incremental or not
+
+The top of the panel, beside **Copy diagnostics**, says whether the page's document is an Incremental Rem:
+
+- **✓ Incremental**, with its priority, when it is.
+- **Make Incremental** when it isn't. Click it, type a priority from 0 to 100 and press **Enter**. An empty field gives it the priority it would inherit, **↑ / ↓** change the number, and **Esc** cancels.
+
+It follows changes you make in RemNote too, such as making the document Incremental there.
+
 ## The bar
 
 A small bar stays at the bottom right of every page, with the panel open or closed:
 
 | Control | What it does |
 |---|---|
-| **Add Extract** | Appears when text is selected, and makes it an extract |
 | **Send to** | The [knowledge base](#knowledge-bases) this page's extracts go to, and whose highlights it shows |
 | **Set priority** | When ticked, each extract asks for its priority. It stays as you left it, on every page |
 | **Set read point** | Remembers the top of the window as your place on this page |
 | **Go to read point** | Scrolls back to that place |
 | **Import headings** | Adds the page's sections to its document |
-| **›** / **‹** | Hides the bar's buttons on every page, or brings them back. Add Extract still appears when text is selected |
+| **›** / **‹** | Hides the bar's buttons on every page, or brings them back. The menu still comes up beside selected text |
 
 ## Extracts
 
-Select text and press **`Opt+X`** (`Alt+X` on Windows), or click **Add Extract**. The selection becomes an Incremental Rem and turns blue on the page. Bold, italics, links, images and formulas in the selection come along, with formulas as real LaTeX on sites such as Wikipedia. A selection of several paragraphs stays one Rem, with a blank line between paragraphs and a new line for each list item. Images stay on their original website, so one disappears from your Rem if the site removes it. To keep a copy in RemNote, use [Store Linked Images & Audio](Utilities-Cleaning-Up.md#store-linked-images-audio).
+Select text and a small menu comes up beside it, with **Add Extract** and **[Add Highlight](#add-highlight)**.
 
-Extracts go in the page's document, which RemNote keeps in its `Links` folder until you move it. The document itself isn't made Incremental, so use [Make Incremental](Getting-Started.md#making-a-rem-incremental) on it if you want it in your queue as well.
+Click **Add Extract**, or press **`Opt+X`** (`Alt+X` on Windows). The selection becomes an Incremental Rem and turns blue on the page. Bold, italics, links, images and formulas in the selection come along, with formulas as real LaTeX on sites such as Wikipedia. A selection of several paragraphs stays one Rem, with a blank line between paragraphs and a new line for each list item. Images stay on their original website, so one disappears from your Rem if the site removes it. To keep a copy in RemNote, use [Store Linked Images & Audio](Utilities-Cleaning-Up.md#store-linked-images-audio).
+
+Extracts go in the page's document, which RemNote keeps in its `Links` folder until you move it. The document itself isn't made Incremental, so use the panel's [Make Incremental](#the-pages-document-incremental-or-not) if you want it in your queue as well.
 
 ![Extracts marked blue on a Wikipedia page, and the same text in the panel with its image and LaTeX imported](assets/companion-assets/extracted-image-latex.png)
 
 `Opt+X` is left alone when no text is selected, or inside a text box, so it still types `≈` there.
+
+## Add Highlight
+
+**Add Highlight** in the menu, or **`Opt+H`** (`Alt+H` on Windows), adds the selection just as Add Extract does, in the same section and with the same formatting, but the Rem isn't made Incremental, so it stays out of your queue. It never asks for a priority, and it turns yellow on the page instead of blue.
+
+If you make a highlight's Rem Incremental later in RemNote, it turns blue on the page.
 
 ## Setting a priority
 
@@ -95,7 +111,7 @@ Pages whose headings aren't real headings have no sections to import. Extracts f
 
 ## Highlights and the read point
 
-Highlights and the orange read point come back whenever you return to a page, and they don't change the page itself. Deleting an extract's Rem in the panel removes its highlight from the page at once. Deleted anywhere else, it goes the next time the page loads with the panel connected.
+Blue extracts, yellow highlights and the orange read point come back whenever you return to a page, and they don't change the page itself. Deleting an extract's Rem in the panel removes its highlight from the page at once. Deleted anywhere else, it goes the next time the page loads with the panel connected.
 
 They are found again by their text. If a page has changed so much that an extract's text is gone, a message says how many highlights couldn't be placed. A read point whose text has gone falls back to its old scroll position.
 

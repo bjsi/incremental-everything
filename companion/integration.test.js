@@ -610,10 +610,22 @@ describe('Knowledge bases', () => {
 describe('Documents are made only when asked for', () => {
   const URL_B = 'https://other.example/page';
   const nothing = () => ({ ok: true, result: { extracts: [] } });
-  const madeOrShown = (panel) =>
-    panel.sent.filter((message) => ['focusDoc', 'getOrCreatePageDocument'].includes(message.function));
   const offer = (panel) => panel.dom.window.document.getElementById('pageOffer');
   const frameSrc = (panel) => panel.dom.window.document.getElementById('frame').src;
+  /**
+   * What made or brought up a page's document. The header's lookup of the document
+   * RemNote already shows is neither: the same URL gets the same document back.
+   */
+  const madeOrShown = (panel) => {
+    const src = frameSrc(panel);
+    const shown = new Set(src ? [new URL(src).searchParams.get('clipperURL')] : []);
+    return panel.sent.filter((message) => {
+      if (!['focusDoc', 'getOrCreatePageDocument'].includes(message.function)) return false;
+      const lookup = message.function === 'getOrCreatePageDocument' && shown.has(message.data.url);
+      shown.add(message.data.url);
+      return !lookup;
+    });
+  };
 
   async function connected(options) {
     const b = browser();
@@ -686,10 +698,12 @@ describe('Documents are made only when asked for', () => {
     const tab = b.tabs.get(1);
     tab.url = `${URL_A}/next`;
     page.window.document.title = 'Next';
+    const calls = () => panel.sent.filter((m) => m.function === 'getOrCreatePageDocument').length;
+    const before = calls();
     selectParagraph(page, '#p');
     pressOptX(page);
     await settle(150);
-    assert.deepEqual(panel.sent.filter((m) => m.function === 'getOrCreatePageDocument').length, 1);
+    assert.equal(calls(), before + 1);
   });
 
   it('An extract from another tab makes its document, and the panel stays where it is', async () => {
@@ -944,5 +958,160 @@ describe('The plugin frame', () => {
     });
     assert.equal(plugin.seen.length, 0);
     assert.equal(waiting, 1);
+  });
+});
+
+describe('The selection menu and Add Highlight', () => {
+  const nothing = () => ({ ok: true, result: { extracts: [] } });
+  const aHighlight = () => ({ ok: true, result: { remId: 'rem2', section: 'A section', highlight: true } });
+
+  async function connected(answer) {
+    const b = browser();
+    const page = openPage(b, URL_A, PAGE);
+    page.window.Range.prototype.getBoundingClientRect = () => ({ top: 200, bottom: 220, left: 40, width: 300 });
+    await settle();
+    openPanel(b);
+    const plugin = startPlugin(b, answer);
+    plugin.boot();
+    await settle(700);
+    return { b, page, plugin };
+  }
+
+  it('Comes up beside a selection, and goes when it does', async () => {
+    const { page } = await connected(nothing);
+    const menu = shadow(page).getElementById('menu');
+    assert.equal(menu.hidden, true);
+    selectParagraph(page, '#p');
+    await settle(250);
+    assert.equal(menu.hidden, false);
+    page.window.getSelection().removeAllRanges();
+    page.window.document.dispatchEvent(new page.window.Event('selectionchange'));
+    assert.equal(menu.hidden, true);
+  });
+
+  it('Add Highlight adds the selection without making it Incremental, painted yellow, and asks no priority', async () => {
+    const { page, plugin } = await connected((op) => (op.op === 'pageState' ? nothing() : aHighlight()));
+    shadow(page).getElementById('priority').checked = true;
+    selectParagraph(page, '#p');
+    await settle(250);
+    shadow(page).getElementById('highlight').click();
+    await settle(150);
+    assert.equal(promptIsOpen(page), false);
+    const { data } = plugin.seen.find((op) => op.op === 'addExtract');
+    assert.equal(data.highlight, true);
+    assert.equal(data.withPriority, undefined);
+    assert.equal(page.window.CSS.highlights.get('ie-highlight').ranges.length, 1);
+    assert.equal(page.window.CSS.highlights.get('ie-extract').ranges.length, 0);
+    assert.equal(shadow(page).getElementById('menu').hidden, true);
+  });
+
+  it('Opt+H adds a highlight, and leaves text boxes alone', async () => {
+    const { page, plugin } = await connected((op) => (op.op === 'pageState' ? nothing() : aHighlight()));
+    const pressOptH = () =>
+      page.window.dispatchEvent(new page.window.KeyboardEvent('keydown', { code: 'KeyH', altKey: true, cancelable: true }));
+    selectParagraph(page, '#p');
+    pressOptH();
+    await settle(150);
+    const added = plugin.seen.filter((op) => op.op === 'addExtract');
+    assert.equal(added.length, 1);
+    assert.equal(added[0].data.highlight, true);
+    assert.equal(promptIsOpen(page), false);
+
+    const box = page.window.document.createElement('textarea');
+    box.value = 'typed text';
+    page.window.document.body.append(box);
+    box.focus();
+    box.select();
+    page.window.document.dispatchEvent(new page.window.Event('selectionchange'));
+    pressOptH();
+    await settle(150);
+    assert.equal(plugin.seen.filter((op) => op.op === 'addExtract').length, 1);
+  });
+
+  it('A highlight made Incremental since is painted blue', async () => {
+    const anchor = { exact: 'Another paragraph.', prefix: '', suffix: '', position: 0 };
+    const state = () => ({
+      ok: true,
+      result: { kbId: TEST_KB.id, extracts: [
+        { remId: 'h1', anchor, kind: 'highlight', incremental: true },
+      ] },
+    });
+    const { page } = await connected((op) => (op.op === 'pageState' ? state() : nothing()));
+    assert.equal(page.window.CSS.highlights.get('ie-extract').ranges.length, 1);
+    assert.equal(page.window.CSS.highlights.get('ie-highlight').ranges.length, 0);
+  });
+});
+
+describe("The header's document status", () => {
+  async function connected(status) {
+    const b = browser();
+    b.tabs.set(1, { id: 1, url: URL_A, title: 'A page', listeners: [] });
+    const panel = openPanel(b);
+    await settle();
+    const plugin = startPlugin(b, (op) => {
+      if (op.op === 'documentStatus') return { ok: true, result: status };
+      if (op.op === 'makeDocumentIncremental') return { ok: true, result: { docId: 'doc1', incremental: true, priority: op.data.priority } };
+      return { ok: true, result: { extracts: [] } };
+    });
+    plugin.boot();
+    await settle(700);
+    const $ = (id) => panel.dom.window.document.getElementById(id);
+    const type = (text, key = 'Enter') => {
+      $('makePriority').value = text;
+      $('makePriority').dispatchEvent(new panel.dom.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    };
+    return { panel, plugin, $, type };
+  }
+
+  it('Shows ✓ Incremental, with the priority, for a document that is', async () => {
+    const { plugin, $ } = await connected({ docId: 'doc1', incremental: true, priority: 7 });
+    assert.deepEqual(plugin.seen.find((op) => op.op === 'documentStatus').data.docId, 'doc1');
+    assert.equal($('docStatus').hidden, false);
+    assert.equal($('docIncremental').hidden, false);
+    assert.equal($('docPriority').textContent, 'P7');
+    assert.equal($('makeIncremental').hidden, true);
+  });
+
+  it('Make Incremental asks for a priority, and Enter makes the document Incremental', async () => {
+    const { plugin, $, type } = await connected({ docId: 'doc1', incremental: false });
+    assert.equal($('docIncremental').hidden, true);
+    assert.equal($('makeIncremental').hidden, false);
+    $('makeIncremental').click();
+    assert.equal($('makeField').hidden, false);
+
+    type('200');
+    await settle(50);
+    assert.ok($('makePriority').classList.contains('invalid'));
+    assert.equal(plugin.seen.filter((op) => op.op === 'makeDocumentIncremental').length, 0);
+
+    type('12');
+    await settle(100);
+    const made = plugin.seen.find((op) => op.op === 'makeDocumentIncremental');
+    assert.deepEqual([made.data.docId, made.data.priority], ['doc1', 12]);
+    assert.equal($('docIncremental').hidden, false);
+    assert.equal($('docPriority').textContent, 'P12');
+    assert.equal($('makeField').hidden, true);
+  });
+
+  it('Esc puts the button back, and an empty field leaves the priority to inheritance', async () => {
+    const { plugin, $, type } = await connected({ docId: 'doc1', incremental: false });
+    $('makeIncremental').click();
+    type('', 'Escape');
+    assert.equal($('makeField').hidden, true);
+    assert.equal($('makeIncremental').hidden, false);
+    $('makeIncremental').click();
+    type('');
+    await settle(100);
+    const made = plugin.seen.find((op) => op.op === 'makeDocumentIncremental');
+    assert.equal('priority' in made.data, false);
+  });
+
+  it('Follows a change made in RemNote', async () => {
+    const { plugin, $ } = await connected({ docId: 'doc1', incremental: false });
+    const status = { docId: 'doc1', incremental: true, priority: 30 };
+    plugin.dom.window.postMessage({ ieCompanion: 'toExtension', kind: 'documentChanged', status }, '*');
+    await settle(100);
+    assert.equal($('docIncremental').hidden, false);
+    assert.equal($('docPriority').textContent, 'P30');
   });
 });

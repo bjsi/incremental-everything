@@ -97,6 +97,7 @@ async function showPage(tab) {
   try {
     await callRemNote('focusDoc', { url: tab.url, title: tab.title || tab.url }, FOCUS_TIMEOUT_MS);
     note(`Showing the document of ${tab.url}`);
+    refreshDocument();
   } catch (err) {
     // It is stuck, so it starts again on that page.
     note(`${err.message}. Restarting.`);
@@ -205,6 +206,9 @@ chrome.runtime.onConnect.addListener((port) => {
       showPageOffer();
       drain();
       notifyTabs({ ie: 'pluginReady' });
+      refreshDocument();
+    } else if (message.kind === 'documentChanged') {
+      if (message.status?.docId === shownDocId) showDocument(message.status);
     } else if (message.kind === 'pageChanged' && typeof message.url === 'string') {
       // An extract's Rem was deleted: the page drops its highlight now, not on reload.
       notifyTabs({ ie: 'pageChanged' }, message.url);
@@ -218,6 +222,7 @@ chrome.runtime.onConnect.addListener((port) => {
       pluginPort = null;
       panelKbId = null;
       showPageOffer();
+      showDocument(null);
       if (!switchingTo) showStatus('The plugin disconnected. Waiting for it to return…');
       // Their answers will never come. Not a refusal, so a write stays queued.
       for (const answer of [...waiting.values()]) answer({ ok: false, lost: true, error: 'The plugin disconnected.' });
@@ -348,6 +353,94 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   } else if (message.ie === 'frameAlive') {
     note(`RemNote frame loaded, signed in: ${message.signedIn}`);
     if (!message.signedIn) showStatus('Sign in to RemNote in this browser, then reopen the panel.');
+  }
+});
+
+// ---- The page's document: Incremental or not ----
+
+const docStatus = document.getElementById('docStatus');
+const makeButton = document.getElementById('makeIncremental');
+const makeField = document.getElementById('makeField');
+const makePriority = document.getElementById('makePriority');
+/** The document the header is about: the one RemNote shows for this panel's page. */
+let shownDocId = null;
+let documentAsked = 0;
+
+function showDocument(status) {
+  shownDocId = status?.docId ?? null;
+  docStatus.hidden = !status;
+  if (!status) return;
+  document.getElementById('docIncremental').hidden = !status.incremental;
+  document.getElementById('docPriority').textContent = status.priority === undefined ? '' : `P${status.priority}`;
+  makeButton.hidden = status.incremental || !makeField.hidden;
+  if (status.incremental) closeMakeField();
+}
+
+/** Asks for the document of the page RemNote shows, which opening the panel already created. */
+async function refreshDocument() {
+  const asked = ++documentAsked;
+  if (!pluginPort || !focusedUrl || switchingTo) return showDocument(null);
+  try {
+    const tab = await ownTab();
+    const title = tab && withoutFragment(tab.url) === withoutFragment(focusedUrl) ? tab.title : undefined;
+    const doc = await callRemNote('getOrCreatePageDocument', { url: focusedUrl, title: title || focusedUrl });
+    if (!doc?._id) throw new Error('RemNote returned no document for this page');
+    const status = await callPlugin('documentStatus', { docId: doc._id });
+    if (asked === documentAsked) showDocument(status);
+  } catch (err) {
+    note(`Document status: ${err.message}`);
+    if (asked === documentAsked) showDocument(null);
+  }
+}
+
+function closeMakeField() {
+  makeField.hidden = true;
+  makePriority.value = '';
+  makePriority.disabled = false;
+  makePriority.classList.remove('invalid');
+}
+
+makeField.hidden = true;
+makeButton.addEventListener('click', () => {
+  makeButton.hidden = true;
+  makeField.hidden = false;
+  makePriority.focus();
+});
+
+makePriority.addEventListener('input', () => makePriority.classList.remove('invalid'));
+makePriority.addEventListener('keydown', async (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeMakeField();
+    makeButton.hidden = false;
+    return;
+  }
+  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    const current = Number(makePriority.value);
+    const delta = event.key === 'ArrowUp' ? 1 : -1;
+    const base = makePriority.value.trim() && Number.isFinite(current) ? current : delta > 0 ? -1 : 101;
+    makePriority.value = String(Math.max(0, Math.min(100, base + delta)));
+    return;
+  }
+  if (event.key !== 'Enter' || makePriority.disabled) return;
+  event.preventDefault();
+  // Empty: the priority it would inherit, or the default.
+  const text = makePriority.value.trim();
+  if (text && (!/^\d+$/.test(text) || Number(text) > 100)) return makePriority.classList.add('invalid');
+  if (!shownDocId || !pluginPort) return;
+  makePriority.disabled = true;
+  try {
+    const status = await callPlugin('makeDocumentIncremental', {
+      docId: shownDocId,
+      ...(text ? { priority: Number(text) } : {}),
+    });
+    note(`Made the document Incremental: ${JSON.stringify(status)}`);
+    closeMakeField();
+    showDocument(status);
+  } catch (err) {
+    makePriority.disabled = false;
+    showStatus(`Could not make the document Incremental: ${err.message}`);
   }
 });
 

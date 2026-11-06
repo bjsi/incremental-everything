@@ -35,25 +35,55 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pageKeyOf = (url: string) => canonicalUrlKey(url) ?? url;
 
-// ---- Telling a page that one of its extracts is gone ----
+// ---- Telling the extension what changed in RemNote ----
 
+/** The document the panel's header shows, and what it last said of it. */
+let watchedDoc: { docId: string; incremental: boolean; priority?: number } | undefined;
+type WatchedExtract = { parentId?: string; kind?: 'highlight'; incremental: boolean };
 /** The extracts of each page a tab has shown here, with the Rem each sits under. */
-const watchedPages = new Map<string, Map<string, string | undefined>>();
-/** Every extract and parent above, for a quick test of each change event. */
+const watchedPages = new Map<string, Map<string, WatchedExtract>>();
+/** Every extract and parent above, and the panel's document, for a quick test of each change event. */
 let watchedIds = new Set<string>();
 
-function setWatchedPage(url: string, extracts: Map<string, string | undefined>) {
+function rebuildWatchedIds() {
+  const ids = new Set<string>(watchedDoc ? [watchedDoc.docId] : []);
+  for (const page of watchedPages.values()) {
+    for (const [remId, { parentId }] of page) {
+      ids.add(remId);
+      if (parentId) ids.add(parentId);
+    }
+  }
+  watchedIds = ids;
+}
+
+function setWatchedPage(url: string, extracts: Map<string, WatchedExtract>) {
   watchedPages.set(url, extracts);
-  watchedIds = new Set([...watchedPages.values()].flatMap((page) => [...page].flat().filter((id): id is string => !!id)));
+  rebuildWatchedIds();
 }
 
-function watchExtract(url: string, remId: string, parentId: string | undefined) {
-  setWatchedPage(url, new Map([...(watchedPages.get(url) ?? []), [remId, parentId]]));
+function watchExtract(url: string, remId: string, extract: WatchedExtract) {
+  setWatchedPage(url, new Map([...(watchedPages.get(url) ?? []), [remId, extract]]));
 }
 
-async function isAliveExtract(plugin: ReactRNPlugin, remId: string) {
+function watchDocument(status: NonNullable<typeof watchedDoc>) {
+  watchedDoc = status;
+  rebuildWatchedIds();
+}
+
+/** A highlight lives while its Rem does. An extract also needs to stay Incremental or Dismissed. */
+async function isAliveExtract(plugin: ReactRNPlugin, remId: string, kind?: 'highlight') {
   const rem = await plugin.rem.findOne(remId);
-  return !!rem && ((await rem.hasPowerup(powerupCode)) || (await rem.hasPowerup(dismissedPowerupCode)));
+  if (!rem) return { alive: false, incremental: false };
+  const incremental = await rem.hasPowerup(powerupCode);
+  const alive = kind === 'highlight' || incremental || (await rem.hasPowerup(dismissedPowerupCode));
+  return { alive, incremental, rem };
+}
+
+/** The page's document, as the panel's header shows it. */
+async function documentStatus(plugin: ReactRNPlugin, doc: PluginRem) {
+  const incremental = await doc.hasPowerup(powerupCode);
+  const incRem = incremental ? await getIncrementalRemFromRem(plugin, doc) : undefined;
+  return { docId: doc._id, incremental, priority: incRem?.priority };
 }
 
 async function currentKbId(plugin: ReactRNPlugin): Promise<string> {
@@ -146,7 +176,10 @@ async function ensureSection(plugin: ReactRNPlugin, doc: PluginRem, chain: Secti
 
 export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>> = {
   async addExtract(plugin, data) {
-    const { docId, url, text, richText, chain, opId, withPriority, priority } = data;
+    const { docId, url, text, richText, chain, opId, priority } = data;
+    // Add Highlight: the same Rem in the same place, left out of the queue.
+    const highlightOnly = data.highlight === true;
+    const withPriority = !highlightOnly && !!data.withPriority;
     const anchor: Anchor = data.anchor;
     const started = Date.now();
     await guardTestPlugin(plugin);
@@ -167,21 +200,23 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
     state.order[rem._id] = anchor.position;
     // No cascade when the priority is settled here or by the popup: a new extract
     // has no descendants to pass it to, and the popup fires its own.
-    await initIncrementalRem(plugin, rem, {
-      explicitParentId: section._id,
-      priority: typeof priority === 'number' ? priority : undefined,
-      skipInitialCascade: !!withPriority || typeof priority === 'number',
-    });
+    if (!highlightOnly) {
+      await initIncrementalRem(plugin, rem, {
+        explicitParentId: section._id,
+        priority: typeof priority === 'number' ? priority : undefined,
+        skipInitialCascade: withPriority || typeof priority === 'number',
+      });
+    }
     const elapsedMs = Date.now() - started;
 
-    state.extracts.push({ remId: rem._id, anchor, opId });
+    state.extracts.push({ remId: rem._id, anchor, opId, ...(highlightOnly ? { kind: 'highlight' as const } : {}) });
     await writePage(plugin, url, state);
-    watchExtract(url, rem._id, section._id);
+    watchExtract(url, rem._id, { parentId: section._id, kind: highlightOnly ? 'highlight' : undefined, incremental: !highlightOnly });
 
     const saved = await plugin.rem.findOne(rem._id);
     if (!saved) throw new Error('The new Rem cannot be read back.');
     const siblings = await section.getChildrenRem();
-    const incRem = await getIncrementalRemFromRem(plugin, saved);
+    const incRem = highlightOnly ? undefined : await getIncrementalRemFromRem(plugin, saved);
 
     if (withPriority) {
       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
@@ -197,7 +232,8 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
       inReadingOrder: isInReadingOrder(siblings.map((child) => child._id), state.order),
       isIncremental: await saved.hasPowerup(powerupCode),
       priority: incRem?.priority,
-      priorityPopup: !!withPriority,
+      priorityPopup: withPriority,
+      highlight: highlightOnly,
       elapsedMs,
     };
   },
@@ -205,17 +241,37 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
   async pageState(plugin, { url }) {
     const state = await readPage(plugin, url);
     const alive: PageState['extracts'] = [];
-    const watched = new Map<string, string | undefined>();
+    // A highlight made Incremental since turns blue on the page.
+    const shown: Array<PageState['extracts'][number] & { incremental: boolean }> = [];
+    const watched = new Map<string, WatchedExtract>();
     for (const extract of state.extracts) {
-      const rem = await plugin.rem.findOne(extract.remId);
-      if (rem && ((await rem.hasPowerup(powerupCode)) || (await rem.hasPowerup(dismissedPowerupCode)))) {
-        alive.push(extract);
-        watched.set(rem._id, rem.parent ?? undefined);
-      }
+      const { alive: isAlive, incremental, rem } = await isAliveExtract(plugin, extract.remId, extract.kind);
+      if (!isAlive || !rem) continue;
+      alive.push(extract);
+      shown.push({ ...extract, incremental });
+      watched.set(rem._id, { parentId: rem.parent ?? undefined, kind: extract.kind, incremental });
     }
     setWatchedPage(url, watched);
     if (alive.length !== state.extracts.length) await writePage(plugin, url, { ...state, extracts: alive });
-    return { kbId: await currentKbId(plugin), extracts: alive, readPoint: state.readPoint };
+    return { kbId: await currentKbId(plugin), extracts: shown, readPoint: state.readPoint };
+  },
+
+  async documentStatus(plugin, { docId }) {
+    const status = await documentStatus(plugin, await findDocument(plugin, docId));
+    watchDocument(status);
+    return status;
+  },
+
+  async makeDocumentIncremental(plugin, { docId, priority }) {
+    await guardTestPlugin(plugin);
+    const doc = await findDocument(plugin, docId);
+    if (priority !== undefined && !(Number.isInteger(priority) && priority >= 0 && priority <= 100)) {
+      throw new Error('The priority must be a whole number from 0 to 100.');
+    }
+    await initIncrementalRem(plugin, doc, { priority });
+    const status = await documentStatus(plugin, doc);
+    watchDocument(status);
+    return status;
   },
 
   async setReadPoint(plugin, { url, anchor, percent }) {
@@ -248,19 +304,33 @@ export function startCompanionListener(plugin: ReactRNPlugin) {
 
   // A deleted Rem reports itself, and its parent reports a child gone. Either one
   // gets that page's affected extracts checked, and the page reloads its
-  // highlights if one of them died. A Set lookup per event: this one fires a lot.
+  // highlights if one died or changed colour. The panel's document is checked the
+  // same way, for its header. A Set lookup per event: this one fires a lot.
   const changed = new Set<string>();
   let flushTimer: ReturnType<typeof setTimeout> | undefined;
   const flush = async () => {
     const ids = [...changed];
     changed.clear();
     for (const [url, extracts] of watchedPages) {
-      const suspects = [...extracts].filter(([remId, parentId]) => ids.includes(remId) || (parentId && ids.includes(parentId)));
-      for (const [remId] of suspects) {
-        if (await isAliveExtract(plugin, remId)) continue;
+      const suspects = [...extracts].filter(
+        ([remId, { parentId }]) => ids.includes(remId) || (!!parentId && ids.includes(parentId))
+      );
+      for (const [remId, watched] of suspects) {
+        const { alive, incremental } = await isAliveExtract(plugin, remId, watched.kind);
+        if (alive && incremental === watched.incremental) continue;
+        // pageState, which the page now asks for, sets this page's list anew.
         setWatchedPage(url, new Map([...extracts].filter(([id]) => id !== remId)));
         toExtension({ kind: 'pageChanged', url });
         break;
+      }
+    }
+    const shown = watchedDoc;
+    if (shown && ids.includes(shown.docId)) {
+      const doc = await plugin.rem.findOne(shown.docId);
+      const status = doc ? await documentStatus(plugin, doc) : undefined;
+      if (status && (status.incremental !== shown.incremental || status.priority !== shown.priority)) {
+        watchDocument(status);
+        toExtension({ kind: 'documentChanged', status });
       }
     }
   };

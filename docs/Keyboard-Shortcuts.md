@@ -71,6 +71,7 @@ On web pages, with the [Chrome Companion Extension](Chrome-Companion-Extension.m
 | :--- | :--- | :--- | :--- |
 | `Alt` + `X` | [Add Extract](Chrome-Companion-Extension.md#extracts) | Makes the selection an Incremental Rem | Web page, text selected |
 | `Alt` + `Shift` + `X` | [Add Extract with priority](Chrome-Companion-Extension.md#setting-a-priority) | Asks for a priority first | Web page, text selected |
+| `Alt` + `H` | [Add Highlight](Chrome-Companion-Extension.md#add-highlight) | Adds the selection as a Rem that isn't Incremental, highlighted yellow | Web page, text selected |
 
 ### Editing Utilities
 

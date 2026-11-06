@@ -14,12 +14,28 @@
       #waitingText { flex: 1; overflow-wrap: anywhere; }
       button { font: inherit; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
       textarea { width: 100%; height: 140px; box-sizing: border-box; font: 11px ui-monospace, monospace; display: none; }
+      #docStatus { display: flex; align-items: center; gap: 6px; }
+      #docStatus[hidden], #docStatus [hidden] { display: none; }
+      #docIncremental { color: #16a34a; font-weight: 600; white-space: nowrap; }
+      #docPriority { margin-left: 2px; padding: 0 5px; border-radius: 4px; background: rgba(22, 163, 74, 0.15); font-weight: 500; }
+      #makeField { display: flex; align-items: center; gap: 6px; }
+      #makePriority { width: 64px; font: inherit; padding: 1px 4px; }
+      #makePriority.invalid { outline: 2px solid #ef4444; }
+      #makeHint { opacity: 0.6; white-space: nowrap; }
       #frame { flex: 1; border: 0; width: 100%; min-height: 0; }
     </style>
   </head>
   <body>
     <div id="status">
       <span id="statusText">Open a web page to begin.</span>
+      <span id="docStatus" hidden>
+        <span id="docIncremental" title="This page's document is an Incremental Rem">✓ Incremental<span id="docPriority"></span></span>
+        <button id="makeIncremental" title="Make this page's document an Incremental Rem">Make Incremental</button>
+        <span id="makeField">
+          <input id="makePriority" inputmode="numeric" maxlength="3" placeholder="priority" autocomplete="off" aria-label="Priority" />
+          <span id="makeHint">Enter · Esc</span>
+        </span>
+      </span>
       <button id="diagnostics">Copy diagnostics</button>
     </div>
     <div id="pageOffer" hidden>

@@ -99,11 +99,10 @@ function runInPage() {
       #dock { display: flex; gap: 4px; align-items: flex-end; justify-content: flex-end; }
       #bar { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 340px; }
       /* Collapsed, only the selection's own Add Extract button still shows. */
-      #bar.collapsed > :not(#extract) { display: none; }
+      #bar.collapsed { display: none; }
       #toggle { padding: 5px 7px; opacity: 0.75; }
       #toggle:hover { opacity: 1; }
       button { padding: 5px 9px; border: 0; border-radius: 6px; background: #1f2937; color: white; cursor: pointer; }
-      #extract { background: #3b82f6; }
       label { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 6px; background: #1f2937; color: white; font: 12px system-ui, sans-serif; cursor: pointer; }
       input { margin: 0; }
       #prompt { position: fixed; padding: 8px 10px; border-radius: 8px; background: #111827; color: white; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
@@ -116,18 +115,31 @@ function runInPage() {
       #kbField { max-width: 100%; }
       #kbField[hidden] { display: none; }
       #kbPick { max-width: 150px; border: 0; background: #1f2937; color: white; font: 12px system-ui, sans-serif; cursor: pointer; }
+      /* The menu that comes up beside a selection. */
+      #menu { position: fixed; display: flex; align-items: center; padding: 3px; border-radius: 8px; background: #111827; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); }
+      #menu[hidden] { display: none; }
+      #menu button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: none; font-size: 13px; }
+      #menu button:hover { background: #374151; }
+      #menu .sep { width: 1px; align-self: stretch; margin: 4px 0; background: #374151; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; }
+      #extract .dot { background: #3b82f6; }
+      #highlight .dot { background: #facc15; }
       #banner { margin-bottom: 6px; padding: 8px 10px; border-radius: 6px; background: #111827; color: white; max-width: 340px; overflow-wrap: anywhere; }
     </style>
     <div id="prompt" hidden>
       <label id="priorityField">Priority <input id="priorityInput" inputmode="numeric" maxlength="3" placeholder="inherited" autocomplete="off" /></label>
       <div id="promptHint">Enter add · Esc cancel · Shift+Enter more options</div>
     </div>
+    <div id="menu" hidden>
+      <button id="extract" title="Opt+X · makes the selection an Incremental Rem"><span class="dot"></span>Add Extract</button>
+      <span class="sep"></span>
+      <button id="highlight" title="Opt+H · adds the selection as a Rem, left out of the queue"><span class="dot"></span>Add Highlight</button>
+    </div>
     <div id="banner" hidden></div>
     <div id="dock">
       <div id="bar">
         <label id="kbField" hidden>Send to <select id="kbPick"></select></label>
         <label id="priorityLabel"><input id="priority" type="checkbox" />Set priority</label>
-        <button id="extract" hidden>Add Extract</button>
         <button id="setRead">Set read point</button>
         <button id="goRead">Go to read point</button>
         <button id="import">Import headings</button>
@@ -184,22 +196,28 @@ function runInPage() {
     }, 2500);
   }
 
+  /** Added with Add Highlight, and not made Incremental since. */
+  const isYellow = (extract) => extract.kind === 'highlight' && !extract.incremental;
+
   function paint(source) {
     const index = A.buildIndex(document);
     const counts = { exact: 0, edges: 0, ambiguous: 0, lost: 0 };
-    const ranges = [];
-    for (const { anchor } of extracts) {
-      const found = A.resolveAnchor(index, anchor);
+    const blue = [];
+    const yellow = [];
+    for (const extract of extracts) {
+      const found = A.resolveAnchor(index, extract.anchor);
       if (!found) {
         counts.lost++;
         continue;
       }
       counts[found.how]++;
-      ranges.push(A.toRange(document, index, found.start, found.end));
+      (isYellow(extract) ? yellow : blue).push(A.toRange(document, index, found.start, found.end));
     }
+    const ranges = [...blue, ...yellow];
     const hasApi = typeof CSS !== 'undefined' && !!CSS.highlights && typeof Highlight !== 'undefined';
     if (hasApi) {
-      CSS.highlights.set('ie-extract', new Highlight(...ranges));
+      CSS.highlights.set('ie-extract', new Highlight(...blue));
+      CSS.highlights.set('ie-highlight', new Highlight(...yellow));
       const point = readPoint && A.resolveAnchor(index, readPoint.anchor);
       if (point) CSS.highlights.set('ie-readpoint', new Highlight(A.toRange(document, index, point.start, point.end)));
       else CSS.highlights.delete('ie-readpoint');
@@ -345,7 +363,7 @@ function runInPage() {
 
   async function commitExtract({ anchor, started, payload }, options = {}) {
     if (refuseIfGone()) return;
-    const extract = { anchor };
+    const extract = { anchor, ...(options.highlight ? { kind: 'highlight' } : {}) };
     extracts.push(extract);
     window.getSelection()?.removeAllRanges();
     paint('this extract');
@@ -363,7 +381,8 @@ function runInPage() {
       const r = message.result;
       logLine(`Extract ${Math.round(performance.now() - started)} ms in all: ${JSON.stringify(r)}`);
       const priorityText = r.priority === undefined ? '' : `, priority ${r.priority}`;
-      show(`✅ Extract added${r.section ? ` to “${r.section}”` : ''}${priorityText}`, 3500);
+      const what = options.highlight ? '🖍 Highlight added' : '✅ Extract added';
+      show(`${what}${r.section ? ` to “${r.section}”` : ''}${priorityText}`, 3500);
     });
     extract.opId = id;
     saveCache();
@@ -390,6 +409,7 @@ function runInPage() {
 
   function openPrompt(captured) {
     promptFor = captured;
+    hideMenu();
     // Focusing the field takes the page's selection away, so this keeps it visible.
     setPendingHighlight(captured.range);
     const rect = captured.range.getBoundingClientRect?.();
@@ -469,6 +489,54 @@ function runInPage() {
     else commitExtract(captured);
   }
 
+  /** Like an extract, but the Rem is not made Incremental, so it has no priority to ask for. */
+  function startHighlight() {
+    if (promptFor || refuseIfGone()) return;
+    const captured = captureSelection();
+    if (captured) commitExtract(captured, { highlight: true });
+  }
+
+  // ---- The menu beside a selection ----
+
+  let mouseIsDown = false;
+  let menuTimer;
+
+  /** The selection the menu is for, or null when there is none it can act on. */
+  function selectionForMenu() {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || !selection.toString().trim() || isEditable(selection.anchorNode)) return null;
+    return selection.getRangeAt(0);
+  }
+
+  function hideMenu() {
+    clearTimeout(menuTimer);
+    $('menu').hidden = true;
+  }
+
+  /** Above the selection, or below it when there is no room, and always in the window. */
+  function placeMenu() {
+    const range = !promptFor && !mouseIsDown && selectionForMenu();
+    const rect = range && range.getBoundingClientRect?.();
+    if (!rect || rect.bottom < 0 || rect.top > innerHeight) return hideMenu();
+    const menu = $('menu');
+    menu.hidden = false;
+    const width = menu.offsetWidth || 260;
+    const height = menu.offsetHeight || 34;
+    const above = rect.top - height - 8;
+    const below = rect.bottom + 8;
+    const top = above >= 8 ? above : below + height <= innerHeight - 8 ? below : 8;
+    const left = rect.left + rect.width / 2 - width / 2;
+    menu.style.top = `${top}px`;
+    menu.style.left = `${Math.max(8, Math.min(innerWidth - width - 8, left))}px`;
+  }
+
+  /** Once the selection has settled: not while a drag is still making it. */
+  function scheduleMenu() {
+    clearTimeout(menuTimer);
+    if (mouseIsDown) return;
+    menuTimer = setTimeout(placeMenu, 150);
+  }
+
   function showCollapsed(collapsed) {
     $('bar').classList.toggle('collapsed', collapsed);
     $('toggle').textContent = collapsed ? '‹' : '›';
@@ -503,10 +571,31 @@ function runInPage() {
       if (changes.kb) showKb(changes.kb.newValue);
     });
 
-    document.addEventListener('selectionchange', () => {
-      const selection = window.getSelection();
-      $('extract').hidden = !selection?.toString().trim() || isEditable(selection.anchorNode);
-    });
+    document.addEventListener('selectionchange', () => (selectionForMenu() ? scheduleMenu() : hideMenu()));
+    // A press in the page starts a new selection, or ends this one. One on the bar
+    // or the menu arrives with the host as its target.
+    document.addEventListener(
+      'mousedown',
+      (event) => {
+        if (event.target === host) return;
+        mouseIsDown = true;
+        hideMenu();
+      },
+      true
+    );
+    document.addEventListener(
+      'mouseup',
+      () => {
+        mouseIsDown = false;
+        scheduleMenu();
+      },
+      true
+    );
+    addEventListener('scroll', () => !$('menu').hidden && placeMenu(), { capture: true, passive: true });
+    addEventListener('resize', () => !$('menu').hidden && placeMenu());
+    // Keeps the page's selection when the menu is clicked.
+    $('menu').addEventListener('mousedown', (event) => event.preventDefault());
+    $('highlight').addEventListener('click', startHighlight);
     // Keeps the page's selection when the bar is clicked. Clicks still work.
     $('bar').addEventListener('mousedown', (event) => {
       if (event.target !== $('kbPick')) event.preventDefault();
@@ -532,17 +621,21 @@ function runInPage() {
     });
     $('priorityInput').addEventListener('input', () => $('priorityInput').classList.remove('invalid'));
 
-    // Opt+X and Opt+Shift+X, only with text selected outside an editable area. The
-    // key's code, because Option changes what `key` reports on a Mac.
+    // Opt+X and Opt+Shift+X for an extract, Opt+H for a highlight, only with text
+    // selected outside an editable area. The key's code, because Option changes
+    // what `key` reports on a Mac.
     window.addEventListener(
       'keydown',
       (event) => {
-        if (promptFor || event.code !== 'KeyX' || !event.altKey || event.ctrlKey || event.metaKey) return;
+        const extract = event.code === 'KeyX';
+        const highlight = event.code === 'KeyH' && !event.shiftKey;
+        if (promptFor || !(extract || highlight) || !event.altKey || event.ctrlKey || event.metaKey) return;
         const selection = window.getSelection();
         if (!selection?.toString().trim() || isEditable(selection.anchorNode) || isEditable(event.target)) return;
         event.preventDefault();
         event.stopPropagation();
-        startExtract(event.shiftKey || $('priority').checked);
+        if (highlight) startHighlight();
+        else startExtract(event.shiftKey || $('priority').checked);
       },
       true
     );

@@ -2,7 +2,17 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
-## v1.0.198 - November 6th, 2026
+## v1.0.199 - November 6th, 2026
+
+These need the Companion's new version, which is waiting for Google's approval in the Chrome Web Store. It updates on its own once approved.
+
+### ✨ New
+
+**Chrome Companion Extension**: Selecting text now brings up a menu beside it with **Add Extract** and **Add Highlight**, instead of the button on the bar.
+
+**Chrome Companion Extension**: Added **Add Highlight** (`Opt+H`): the selection becomes a Rem in its section, as with Add Extract, but isn't made Incremental, and is highlighted yellow on the page.
+
+**Chrome Companion Extension**: The panel's header now shows **✓ Incremental** with its priority when the page's document is Incremental, and a **Make Incremental** button with a priority field when it isn't.
 
 ### ⚡ Improved
 
@@ -12,7 +22,7 @@ This page documents the major changes and improvements for each version of the I
 
 **Chrome Companion Extension**: Deleting an extract's Rem in the panel now removes its highlight from the page at once, without a reload.
 
-📖 [Extracts](Chrome-Companion-Extension.md#extracts) · [The bar](Chrome-Companion-Extension.md#the-bar) · [Highlights and the read point](Chrome-Companion-Extension.md#highlights-and-the-read-point)
+📖 [Extracts](Chrome-Companion-Extension.md#extracts) · [Add Highlight](Chrome-Companion-Extension.md#add-highlight) · [Incremental status](Chrome-Companion-Extension.md#the-pages-document-incremental-or-not) · [The bar](Chrome-Companion-Extension.md#the-bar) · [Highlights and the read point](Chrome-Companion-Extension.md#highlights-and-the-read-point)
 
 ## v1.0.196 - November 5th, 2026
 
