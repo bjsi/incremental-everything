@@ -2,6 +2,26 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.200 - November 6th, 2026
+
+These need the Companion's new version, which is waiting for Google's approval in the Chrome Web Store. It updates on its own once approved.
+
+### ✨ New
+
+**Chrome Companion Extension**: Added a reading clock beside **✓ Incremental** in the panel: it counts the time you spend reading the page, pauses in a background tab or after 3 minutes without activity, and shows the total with the reviews already in the page's history.
+
+**Chrome Companion Extension**: Click the clock to record that time as a review: **Enter** lets the scheduler pick the next date, **Shift+Enter** opens the Execute Repetition popup with the minutes filled in.
+
+**Chrome Companion Extension**: A session you didn't record is offered the next time you open the panel, dated when you stopped reading, with **Keep counting** to add more to it.
+
+**Chrome Companion Extension**: The panel now shows **Dismissed** for a dismissed page, with **Make Incremental again**.
+
+### ⚡ Improved
+
+**Queue**: **Open URL** now says **Use Companion**, and a page opened with it is counted by the Companion from the start; the queue's review and the Companion's reading become one review, never two.
+
+📖 [The reading clock](Chrome-Companion-Extension.md#the-reading-clock) · [With the queue](Chrome-Companion-Extension.md#with-the-queue-and-the-editor-review-timer) · [Open URL, Use Companion](Reviewing-Items-in-the-Queue.md#open-url-use-companion)
+
 ## v1.0.199 - November 6th, 2026
 
 These need the Companion's new version, which is waiting for Google's approval in the Chrome Web Store. It updates on its own once approved.

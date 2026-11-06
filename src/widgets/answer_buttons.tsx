@@ -1,3 +1,4 @@
+import { recordCompanionHandoff } from '../lib/companion/handoff';
 import {
   renderWidget,
   usePlugin,
@@ -732,6 +733,15 @@ export function AnswerButtons() {
                     document.body.appendChild(link);
                     link.click();
                     setTimeout(() => document.body.removeChild(link), 100);
+                  }
+
+                  // After opening it, so the click still counts as one for the popup blocker.
+                  // The page's document itself (not a highlight in it): the
+                  // Companion counts its reading, and Next leaves that time to it.
+                  if (remType === 'html' && baseData?.rem) {
+                    await recordCompanionHandoff(plugin, baseData.rem._id, htmlSourceUrl).catch((err) =>
+                      console.warn('[Use Companion] hand-off not recorded:', err)
+                    );
                   }
 
                   // Show a helpful toast

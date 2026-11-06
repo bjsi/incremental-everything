@@ -17,7 +17,9 @@ A bar stays at the bottom right of every page, whether the panel is open or not:
 - **Import headings:** creates the page's sections in its document.
 - **› / ‹:** hides the bar's buttons on every page, or brings them back.
 
-The panel's header says **✓ Incremental** when the page's document is an Incremental Rem, or offers **Make Incremental**, which asks for a priority.
+The panel's header says **✓ Incremental** when the page's document is an Incremental Rem, **Dismissed** when it was dismissed, or offers **Make Incremental** (or **Make Incremental again**), which asks for a priority.
+
+On an Incremental page, the header's **reading clock** counts the time read: it pauses in a background tab, in another app, or after 3 minutes without activity. Clicking it records the time as a review (Enter: the scheduler picks the date; Shift+Enter: the plugin's review popup). The page counts (`content.js`), the panel shows and records (`panel.js`), and `clock.js` holds the arithmetic both use. A queue review of a page opened with **Use Companion** gets the clock's reading in place of its wall-clock time, and a review recorded in RemNote while the page was read is taken off the clock, so one sitting is one review.
 
 Writes made while the panel is closed wait in the browser, shown as a count on the toolbar icon, and reach RemNote when the panel connects.
 

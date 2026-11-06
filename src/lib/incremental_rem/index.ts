@@ -271,7 +271,12 @@ export async function updateReviewRemData(
    * key belongs to the next item and the lookback state may have changed.
    * `reviewTimeSeconds: null` means no start time was recorded.
    */
-  captured?: { reviewTimeSeconds: number | null; inLookbackMode: boolean }
+  captured?: {
+    reviewTimeSeconds: number | null;
+    inLookbackMode: boolean;
+    /** Merged into the new entry's context, such as a hand-off to the Chrome Companion. */
+    context?: IncrementalRep['context'];
+  }
 ) {
   if (!incRem) {
     console.log("❌ [reviewRem] No incRem provided!");
@@ -311,6 +316,7 @@ export async function updateReviewRemData(
     if (rem) {
       await stampNoteAndContext(plugin, rem, lastEntry);
     }
+    if (captured?.context) lastEntry.context = { ...lastEntry.context, ...captured.context };
   }
 
   // Apply manual overrides when provided (used by drag-to-next/today UX)

@@ -49,3 +49,14 @@ describe('reading clock', () => {
     assert.equal(C.targetKey('kb', 'https://a.org/x#part'), C.targetKey('kb', 'https://a.org/x'));
   });
 });
+
+describe('reading clock and the queue', () => {
+  it('spans a handed-off queue review from the hand-off on', () => {
+    assert.deepEqual(C.windowsOf([{ date: 100000, reviewTimeSeconds: 10, companionHandoffAt: 20000 }]), [[20000, 100000]]);
+    assert.deepEqual(C.windowsOf([{ date: 100000, reviewTimeSeconds: 0, companionHandoffAt: 20000 }]), [[20000, 100000]]);
+  });
+
+  it('cuts segments to a span', () => {
+    assert.deepEqual(C.within([[0, 10], [20, 30]], 5, 25), [[5, 10], [20, 25]]);
+  });
+});

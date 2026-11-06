@@ -6,7 +6,8 @@
 
 import { AppEvents, PluginRem, ReactRNPlugin, RichTextInterface } from '@remnote/plugin-sdk';
 import { dismissedPowerupCode, editorReviewTimerRemIdKey, powerupCode } from '../consts';
-import { addExternalSessionRep } from '../history_edit';
+import { addExternalSessionRep, updateHistoryEntry } from '../history_edit';
+import { CompanionTargets, companionTargetsKey, refinedReviewSeconds } from './handoff';
 import { repCountsForStats } from '../incremental_rem/types';
 import { getNextSpacingDateForRem } from '../scheduler';
 import { canonicalUrlKey } from '../duplicate_source/url_key';
@@ -107,7 +108,13 @@ async function documentStatus(plugin: ReactRNPlugin, doc: PluginRem, since?: num
         ? []
         : reviews
             .filter((rep) => rep.date >= since)
-            .map((rep) => ({ date: rep.date, reviewTimeSeconds: rep.reviewTimeSeconds ?? 0, eventType: rep.eventType })),
+            .map((rep) => ({
+              date: rep.date,
+              reviewTimeSeconds: rep.reviewTimeSeconds ?? 0,
+              eventType: rep.eventType,
+              companionHandoffAt: rep.context?.companionHandoffAt,
+              companionSeconds: rep.context?.companionSeconds,
+            })),
     editorTimerRunning: !!timerRemId && timerRemId === doc._id,
   };
 }
@@ -323,6 +330,34 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
     return { ...status, rescheduled: result.rescheduled, nextRepDate: result.rescheduled ? nextRepDate : undefined };
   },
 
+  /**
+   * A queue review of a page opened with Use Companion: the wall-clock time
+   * after the hand-off becomes the reading the Companion measured. Once only.
+   */
+  async refineQueueReview(plugin, { docId, date, companionSeconds }) {
+    await guardTestPlugin(plugin);
+    const doc = await findDocument(plugin, docId);
+    const incRem = await getIncrementalRemFromRem(plugin, doc);
+    const review = incRem?.history?.find((rep) => rep.date === date && rep.context?.companionHandoffAt);
+    if (!review) throw new Error('That queue review is no longer in the history.');
+    if (review.context?.companionSeconds !== undefined) return { refined: false, reviewTimeSeconds: review.reviewTimeSeconds };
+    const seconds = Math.max(0, Math.round(Number(companionSeconds)));
+    const reviewTimeSeconds = refinedReviewSeconds(review, review.context!.companionHandoffAt!, seconds);
+    const result = await updateHistoryEntry(plugin, docId, review, {
+      reviewTimeSeconds,
+      context: { companionSeconds: seconds },
+    });
+    if (!result.ok) throw new Error(result.error || 'Could not update the review.');
+    return { refined: true, reviewTimeSeconds, previousSeconds: review.reviewTimeSeconds ?? 0 };
+  },
+
+  /** Pages handed to the Companion from the queue, so it counts them before the panel shows them. */
+  async companionTargets(plugin) {
+    const kbId = await currentKbId(plugin);
+    const all = (await plugin.storage.getSynced<CompanionTargets>(companionTargetsKey)) ?? {};
+    return Object.fromEntries(Object.entries(all[kbId] ?? {}).map(([docId, { url }]) => [docId, url]));
+  },
+
   /** Shift+Enter on the clock: the Execute Repetition popup, with the time filled in. */
   async openReviewPopup(plugin, { docId, minutes }) {
     await guardTestPlugin(plugin);
@@ -405,6 +440,9 @@ export function startCompanionListener(plugin: ReactRNPlugin) {
       toExtension({ kind: 'documentChanged', status });
     }
   };
+  plugin.event.addListener(AppEvents.StorageSyncedChange, companionTargetsKey, () =>
+    toExtension({ kind: 'targetsChanged' })
+  );
   // The Editor Review Timer starting or ending on the document changes no Rem.
   plugin.event.addListener(AppEvents.StorageSessionChange, editorReviewTimerRemIdKey, () => void checkDocument());
   plugin.event.addListener(AppEvents.GlobalRemChanged, undefined, (data) => {

@@ -1127,7 +1127,7 @@ describe("The header's document status", () => {
 describe('The reading clock', () => {
   const MIN = 60000;
 
-  async function connected({ status, page = true, stored = {} }) {
+  async function connected({ status, page = true, stored = {}, answers = {} }) {
     const b = browser();
     Object.assign(b.stored, stored);
     let dom;
@@ -1140,6 +1140,7 @@ describe('The reading clock', () => {
     await settle();
     const panel = openPanel(b);
     const plugin = startPlugin(b, (op) => {
+      if (answers[op.op]) return { ok: true, result: answers[op.op](op) };
       if (op.op === 'documentStatus') return { ok: true, result: { ...status, reviewsSince: status.reviewsSince ?? [] } };
       if (op.op === 'recordPageReview') {
         return { ok: true, result: { ...status, totalSeconds: status.totalSeconds + op.data.reviewTimeSeconds, nextRepDate: Date.now() + 5 * 86400000 } };
@@ -1241,6 +1242,52 @@ describe('The reading clock', () => {
     $('clock').click();
     assert.match($('clockText').textContent, /Editor Review Timer is running/);
     assert.equal(plugin.seen.some((op) => op.op === 'recordPageReview'), false);
+  });
+
+  it("Puts the Companion's reading into a queue review of a page opened with Use Companion", async () => {
+    const handoff = Date.now() - 30 * MIN;
+    const next = handoff + 20 * MIN;
+    // Shown in the queue 5 minutes before the hand-off; Next 20 minutes after it.
+    const review = { date: next, reviewTimeSeconds: 25 * 60, companionHandoffAt: handoff };
+    let refined = false;
+    const { $, b, plugin } = await connected({
+      page: false,
+      status: incremental,
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[handoff + MIN, handoff + 11 * MIN]] } },
+      answers: {
+        documentStatus: () => ({ ...incremental, reviewsSince: [refined ? { ...review, reviewTimeSeconds: 15 * 60, companionSeconds: 600 } : review] }),
+        refineQueueReview: () => {
+          refined = true;
+          return { refined: true, reviewTimeSeconds: 15 * 60 };
+        },
+      },
+    });
+    await settle(300);
+    const call = plugin.seen.find((op) => op.op === 'refineQueueReview');
+    assert.deepEqual([call.data.docId, call.data.date, call.data.companionSeconds], ['doc1', next, 600]);
+    assert.match($('clockText').textContent, /^Added 10 min of Companion reading to the queue review/);
+    await settle(1100);
+    assert.deepEqual(coverOf(b).windows, [[handoff, next]]);
+    assert.equal($('clockTime').textContent, '0:00');
+  });
+
+  it('Keeps a handed-off review as it was when the Companion read nothing after the hand-off', async () => {
+    const handoff = Date.now() - 30 * MIN;
+    const { plugin } = await connected({
+      page: false,
+      status: { ...incremental, reviewsSince: [{ date: handoff + 20 * MIN, reviewTimeSeconds: 25 * 60, companionHandoffAt: handoff }] },
+    });
+    await settle(300);
+    assert.equal(plugin.seen.some((op) => op.op === 'refineQueueReview'), false);
+  });
+
+  it('Counts pages opened from the queue with Use Companion, before the panel shows them', async () => {
+    const { b } = await connected({
+      page: false,
+      status: incremental,
+      answers: { companionTargets: () => ({ doc9: 'https://other.example/read#top' }) },
+    });
+    assert.equal(b.stored.readingTargets[`${TEST_KB.id}|https://other.example/read`], 'doc9');
   });
 
   it('Shows a dismissed document, with Make Incremental again', async () => {

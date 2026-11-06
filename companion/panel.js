@@ -209,6 +209,9 @@ chrome.runtime.onConnect.addListener((port) => {
       drain();
       notifyTabs({ ie: 'pluginReady' });
       refreshDocument();
+      loadCompanionTargets();
+    } else if (message.kind === 'targetsChanged') {
+      loadCompanionTargets();
     } else if (message.kind === 'documentChanged') {
       // Asked again, for the reviews since the clock began.
       if (message.status?.docId === shownDocId) refreshStatus();
@@ -559,12 +562,72 @@ const clockSince = (docId = shownDocId) => clockNow(docId).firstReadAt;
 /** Reviews recorded in RemNote while the page was read: their time is not counted twice. */
 function applyReviews(status) {
   if (!status.incremental || !status.reviewsSince?.length) return;
-  let cover = C.withWindows(clockCover, C.windowsOf(status.reviewsSince)) ?? clockCover;
+  // A review still waiting for the Companion's reading keeps that reading on the
+  // clock until it is added, so the clock goes on asking.
+  const waiting = refineHandoffs(status);
+  const settled = status.reviewsSince.filter((review) => !waiting.has(review.date));
+  let cover = C.withWindows(clockCover, C.windowsOf(settled)) ?? clockCover;
   if (awaitingPopup?.docId === status.docId && status.reviewsSince.some((review) => review.date >= awaitingPopup.since)) {
     cover = { ...cover, clearedUntil: Math.max(cover?.clearedUntil ?? 0, awaitingPopup.endedAt) };
     awaitingPopup = null;
   }
   if (cover !== clockCover) writeCover(cover);
+}
+
+// A queue review of a page opened with Use Companion counted wall-clock time from
+// the hand-off on. The reading measured here replaces it, once, with no question.
+const refining = new Set();
+
+/** Refines what it can, and says which reviews are still waiting for it. */
+function refineHandoffs(status) {
+  const waiting = new Set();
+  if (status.docId !== clockDoc) return waiting;
+  for (const review of status.reviewsSince) {
+    if (!review.companionHandoffAt || review.companionSeconds !== undefined) continue;
+    const read = C.uncovered(clockStored?.segments, { clearedUntil: clockCover?.clearedUntil });
+    const readMs = C.totalMs(C.within(read, review.companionHandoffAt, review.date));
+    // Nothing read here after the hand-off: the queue's own time stands.
+    if (readMs < 1000) continue;
+    waiting.add(review.date);
+    // The page saves its last seconds within 15 s of them.
+    if (Date.now() - review.date < 20000) continue;
+    const key = `${status.docId}:${review.date}`;
+    if (refining.has(key)) continue;
+    refining.add(key);
+    callPlugin('refineQueueReview', { docId: status.docId, date: review.date, companionSeconds: Math.round(readMs / 1000) })
+      .then((result) => {
+        note(`Queue review refined: ${JSON.stringify(result)}`);
+        if (!result.refined) return;
+        const at = new Date(review.date).toLocaleTimeString(undefined, { timeStyle: 'short' });
+        flashClockBar(`Added ${C.formatShort(readMs)} of Companion reading to the queue review of ${at}.`);
+        refreshStatus();
+      })
+      .catch((err) => {
+        refining.delete(key);
+        note(`Could not refine the queue review: ${err.message}`);
+      });
+  }
+  return waiting;
+}
+
+/** Pages opened from the queue with Use Companion: counted before the panel ever shows them. */
+async function loadCompanionTargets() {
+  if (!pluginPort || !panelKbId) return;
+  try {
+    const targets = await callPlugin('companionTargets', {});
+    const { readingTargets = {} } = await chrome.storage.local.get('readingTargets');
+    let changed = false;
+    for (const [docId, url] of Object.entries(targets ?? {})) {
+      const key = C.targetKey(panelKbId, url);
+      if (readingTargets[key] !== docId) {
+        readingTargets[key] = docId;
+        changed = true;
+      }
+    }
+    if (changed) await chrome.storage.local.set({ readingTargets });
+  } catch (err) {
+    note(`Companion targets: ${err.message}`);
+  }
 }
 
 const PAUSED = {

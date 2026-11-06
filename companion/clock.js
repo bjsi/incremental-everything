@@ -61,11 +61,25 @@
   const lastEnd = (segments) => (segments?.length ? segments[segments.length - 1][1] : undefined);
   const firstStart = (segments) => (segments?.length ? segments[0][0] : undefined);
 
-  /** The spans of reviews recorded in RemNote, from the end of each back over its time. */
+  /**
+   * The spans of reviews recorded in RemNote, from the end of each back over its
+   * time. A queue review handed to the Companion spans from the hand-off on as
+   * well, since the Companion's reading after it is now part of that review.
+   */
   function windowsOf(reviews) {
     return (reviews ?? [])
-      .filter((review) => review.reviewTimeSeconds > 0)
-      .map((review) => [review.date - review.reviewTimeSeconds * 1000, review.date]);
+      .filter((review) => review.reviewTimeSeconds > 0 || review.companionHandoffAt)
+      .map((review) => {
+        const start = review.date - (review.reviewTimeSeconds ?? 0) * 1000;
+        return [review.companionHandoffAt ? Math.min(start, review.companionHandoffAt) : start, review.date];
+      });
+  }
+
+  /** The parts of the segments between from and to. */
+  function within(segments, from, to) {
+    return (segments ?? [])
+      .map(([start, end]) => [Math.max(start, from), Math.min(end, to)])
+      .filter(([start, end]) => end > start);
   }
 
   /** The cover with more windows, once each, newest kept. */
@@ -108,6 +122,7 @@
     lastEnd,
     firstStart,
     windowsOf,
+    within,
     withWindows,
     format,
     formatShort,

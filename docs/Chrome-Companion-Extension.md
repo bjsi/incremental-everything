@@ -11,7 +11,7 @@ It works together with the plugin, through RemNote open in Chrome's side panel.
 ## What you need
 
 - **Chrome on a computer**, or another Chromium browser. It doesn't work on phones.
-- **The Incremental RemNote plugin**, version 1.0.186 or later, installed from the [plugin marketplace](https://www.remnote.com/plugins/incremental-everything). [Add Highlight](#add-highlight) and the panel's [Incremental status](#the-pages-document-incremental-or-not) need 1.0.199 or later.
+- **The Incremental RemNote plugin**, version 1.0.186 or later, installed from the [plugin marketplace](https://www.remnote.com/plugins/incremental-everything). [Add Highlight](#add-highlight) and the panel's [Incremental status](#the-pages-document-incremental-or-not) need 1.0.199 or later, and the [reading clock](#the-reading-clock) 1.0.200.
 - **A RemNote account, signed in on www.remnote.com in the same browser.** The panel opens whichever [knowledge base](#knowledge-bases) this browser used last.
 
 ## Setting it up
@@ -47,10 +47,47 @@ To close the panel, use the **X** at the top of it.
 
 The top of the panel, beside **Copy diagnostics**, says whether the page's document is an Incremental Rem:
 
-- **✓ Incremental**, with its priority, when it is.
-- **Make Incremental** when it isn't. Click it, type a priority from 0 to 100 and press **Enter**. An empty field gives it the priority it would inherit, **↑ / ↓** change the number, and **Esc** cancels.
+- **✓ Incremental**, with its priority, when it is, followed by the [reading clock](#the-reading-clock).
+- **Dismissed** when it was Incremental and you dismissed it.
+- **Make Incremental** when it isn't, or **Make Incremental again** when it's dismissed. Click it, type a priority from 0 to 100 and press **Enter**. An empty field gives it the priority it would inherit, **↑ / ↓** change the number, and **Esc** cancels.
 
 It follows changes you make in RemNote too, such as making the document Incremental there.
+
+## The reading clock
+
+When the page's document is Incremental, the panel's header shows **⏱ 12:34 · Σ 2 h 05 min**: the reading time you haven't recorded yet, then the total with the reviews already in the page's history.
+
+The clock runs while you read: the tab is in front, Chrome or the panel is the window in use, and you have scrolled, typed, clicked or selected something on the page or in the panel in the last 3 minutes. A playing video counts as reading. Otherwise it pauses and dims, and pointing at it says why. Those last 3 minutes before it pauses are kept, as reading a long paragraph without touching anything is still reading.
+
+It keeps counting with the panel closed, for pages the panel has already shown as Incremental, and for pages you open from the queue with [Use Companion](#with-the-queue-and-the-editor-review-timer). The time is kept in the browser until you record it, so closing the page or Chrome loses nothing.
+
+### Recording a review
+
+Click the clock, and a bar under the header asks *"Record 12 min of reading, until 14:32, as a review?"*:
+
+| Key | What it does |
+|---|---|
+| **Enter** | Records it. The scheduler picks the next date, counted from when you stopped reading |
+| **Shift+Enter** | Opens the Execute Repetition popup in the panel with the minutes filled in, to choose the interval or priority yourself |
+| **← / →** | Moves between the bar's buttons |
+| **Esc** | Closes the bar |
+
+**Discard** throws the time away, after asking. A recorded session appears in the page's [Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view) as 🌐 *Web page session (Companion)*, with its address. The clock then starts again from 0:00.
+
+### A session you didn't record
+
+If you leave a page with time on the clock and don't come back for 30 minutes, the next time you open the panel on it you're offered that session: *"Unrecorded session: 18 min, last read Nov 5, 21:40."* **Record it** records it as a review dated when you stopped reading. **Keep counting** leaves it on the clock, so the next sitting adds to it and one review covers both.
+
+### With the queue and the Editor Review Timer
+
+One sitting gets one review, wherever you record it:
+
+- **Opened from the queue with [Use Companion](Reviewing-Items-in-the-Queue.md#open-url-use-companion), then Next in RemNote**: the queue's review counts the time in RemNote before you clicked, plus the reading the Companion measured after it, not the wall-clock time. The panel says *"Added 10 min of Companion reading to the queue review"*, and the clock goes back to 0:00.
+- **Recorded in the Companion first, then Next in the queue**: Next adds the queue's minutes to the Companion's review and moves on, without a second review.
+- **Any other review of the page recorded in RemNote while you read it**, such as End Review or the Execute Repetition popup: the clock takes out the time that review covered.
+- **The Editor Review Timer running on the page in the panel**: the clock doesn't record, and End Review there records the review.
+
+RemNote's sync carries the reviews between the RemNote app and Chrome, so recording in both within a few seconds of each other can still give two reviews.
 
 ## The bar
 

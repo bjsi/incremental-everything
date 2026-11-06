@@ -56,6 +56,8 @@ import { handleCardPriorityInheritance } from '../card_priority/card_priority_in
 import { applySchedulerChoice } from '../scheduler_choice';
 import { SchedulerChoice } from '../scheduler_core';
 import { pendingReviewJobQueueKey, incremReviewStartTimeKey, powerupCode } from '../consts';
+import { updateHistoryEntry } from '../history_edit';
+import { companionSessionInTurn, queueSecondsBefore, takeCompanionHandoff } from '../companion/handoff';
 
 interface ReviewJobBase {
   /** Unique per click, so a job the drain sees twice is applied once. */
@@ -108,6 +110,10 @@ export interface QueueNextJob extends ReviewJobBase {
   inLookbackMode: boolean;
   /** A PDF IncRem: log the reading time against its active PDF's current page. */
   syncPdfPage: boolean;
+  /** When the queue began showing the item, for the Chrome Companion's hand-off. */
+  turnStartedAt?: number | null;
+  /** When Open URL (Use Companion) was clicked during this turn. */
+  companionHandoffAt?: number;
 }
 
 /** The queue's drag to Today / Tomorrow: a fixed day, interval kept. */
@@ -192,10 +198,12 @@ export async function queueNextRepetition(
   remId: string,
   options: { syncPdfPage: boolean }
 ): Promise<void> {
-  const [reviewTimeSeconds, inLookbackMode] = await Promise.all([
+  const [reviewTimeSeconds, inLookbackMode, turnStartedAt] = await Promise.all([
     captureQueueReviewSeconds(plugin),
     plugin.queue.inLookbackMode().then((v) => !!v),
+    plugin.storage.getSession<number>(incremReviewStartTimeKey).then((v) => v ?? null),
   ]);
+  const companionHandoffAt = await takeCompanionHandoff(plugin, remId, turnStartedAt);
   await enqueueReviewJob(plugin, {
     id: newReviewJobId(remId),
     kind: 'queueNext',
@@ -203,6 +211,8 @@ export async function queueNextRepetition(
     reviewTimeSeconds,
     inLookbackMode,
     syncPdfPage: options.syncPdfPage,
+    turnStartedAt,
+    companionHandoffAt,
     confirmedAt: Date.now(),
   });
   await requestQueueDashboardRefocus(plugin, 'handleNextRepetitionClick');
@@ -281,6 +291,22 @@ export async function runReviewJob(
 
   switch (job.kind) {
     case 'queueNext': {
+      // The Chrome Companion recorded this sitting already: the queue adds its own
+      // minutes to that session instead of a second review and reschedule.
+      const companionSession = !job.inLookbackMode && companionSessionInTurn(incRem.history, job.turnStartedAt ?? null);
+      if (companionSession && job.turnStartedAt) {
+        const added = queueSecondsBefore(companionSession, job.turnStartedAt, job.companionHandoffAt);
+        if (added > 0) {
+          await updateHistoryEntry(plugin, remId, companionSession, {
+            reviewTimeSeconds: (companionSession.reviewTimeSeconds ?? 0) + added,
+          });
+        }
+        const at = dayjs(companionSession.date).format('HH:mm');
+        void plugin.app.toast(
+          `Already recorded from the Companion at ${at}${added >= 60 ? `: added ${Math.round(added / 60)} min from the queue` : ''}`
+        );
+        return {};
+      }
       if (job.syncPdfPage) {
         const pdfRem = await getActivePdfForIncRem(plugin, rem);
         if (pdfRem) {
@@ -294,6 +320,7 @@ export async function runReviewJob(
       const result = await updateReviewRemData(plugin, incRem, undefined, {
         reviewTimeSeconds: job.reviewTimeSeconds,
         inLookbackMode: job.inLookbackMode,
+        ...(job.companionHandoffAt ? { context: { companionHandoffAt: job.companionHandoffAt } } : {}),
       });
       if (!result) throw new Error('The scheduler could not compute the next repetition.');
       cache.set(remId, reviewedEntry(incRem, result.newNextRepDate, result.newHistory));
