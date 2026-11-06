@@ -12,7 +12,12 @@
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React, { useEffect } from 'react';
 import '../rn_theme_vars.css';
-import { mcAssertionLabelsKey, mcAssertionMarksKey } from '../lib/consts';
+import {
+  mcAssertionLabelsKey,
+  mcAssertionMarksKey,
+  mcSheetBottomEdge as SHEET_BOTTOM_EDGE,
+  mcSheetTopEdge as SHEET_TOP_EDGE,
+} from '../lib/consts';
 
 type Mark = '' | 'T' | 'F';
 const NEXT: Record<Mark, Mark> = { '': 'T', T: 'F', F: '' };
@@ -20,9 +25,7 @@ const FILL: Record<Exclude<Mark, ''>, string> = { T: '#16a34a', F: '#dc2626' };
 const SPOKEN: Record<Mark, string> = { '': 'not judged', T: 'true', F: 'false' };
 // The first box's centre sits this share of the column below its top, the last
 // one's this share above its bottom; the others are spread evenly between them.
-// Keep in step with SHEET_SPAN in lib/mc_scissors.ts, which sizes the column.
-const SHEET_TOP_EDGE = 0.3;
-const SHEET_BOTTOM_EDGE = 0.1;
+// Both values live in consts.ts, shared with lib/mc_scissors.ts, which sizes the column.
 
 /** A row's centre as a share of the column's height. */
 const rowCentre = (i: number, count: number) =>

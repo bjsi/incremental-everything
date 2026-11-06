@@ -24,7 +24,7 @@ Many exam questions list statements and ask which are true: *"Analyze the senten
 ![A multiple-choice question that lists statements I, II and III, with a column of boxes beside it, one per statement, marked T in green or F in red; the options below say which statements are false](assets/mc-answer-sheet.png){ width="700" }
 
 - **Which questions get it**: the statements must be in the question itself, each on its own line and starting with a roman numeral and a full stop or parenthesis, optionally after a bullet: `I. `, `• II. `, `III) `. They must count up from I, and there must be at least two.
-- **Where it sits**: in the same left-hand column as the scissors, beside the question, with its boxes spread evenly down the question's height. On a short question with many statements the column runs below the question, so the boxes never crowd together.
+- **Where it sits**: in the same left-hand column as the scissors, beside the question, with its boxes spread evenly over the lower part of the question, where the statements usually are. On a short question with many statements the column runs below the question, so the boxes never crowd together.
 - Marks are not saved: they clear when the next card comes up.
 - On by default. Turn it off in **IR Settings → Queue Display → True/False Answer Sheet on Multiple-Choice Cards**; the change applies from the next card.
 

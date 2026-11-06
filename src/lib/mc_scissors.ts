@@ -38,6 +38,8 @@ import {
   mcScissorsSettingId,
   mcScissorsStruckKey as MC_SCISSORS_STRUCK_KEY,
   mcScissorsWidgetId as MC_SCISSORS_WIDGET,
+  mcSheetBottomEdge,
+  mcSheetTopEdge,
 } from './consts';
 import { assertionLabels, richTextPlain } from './mc_assertions';
 import { getIESetting } from './settings';
@@ -86,9 +88,9 @@ const SHEET_WRAPPER = `div.absolute.z-50:has(iframe[src*="widgetName=${MC_ASSERT
 
 /* The answer sheet: one column as tall as the question beside it, with its
    right edge on the scissors' column, so it reads as part of the same gutter.
-   The widget puts the first box's centre 30% below the column's top, the last
-   one's 10% above its bottom, and spaces the rest evenly between them
-   (SHEET_TOP_EDGE / SHEET_BOTTOM_EDGE in widgets/mc_assertions.tsx).
+   The widget puts the first box's centre mcSheetTopEdge of the column below its
+   top, the last one's mcSheetBottomEdge above its bottom, and spaces the rest
+   evenly between them (both in consts.ts).
 
    The column runs from the question's top to whichever comes first, the
    question's bottom or the first option's top (in case the options render
@@ -101,8 +103,8 @@ const SHEET_WRAPPER = `div.absolute.z-50:has(iframe[src*="widgetName=${MC_ASSERT
    distance. The frame and the host elements between it and the wrapper are
    stretched to fill the column. */
 const MIN_SHEET_PITCH = 30;
-// Share of the column the boxes span: 1 - 30% at the top - 10% at the bottom.
-const SHEET_SPAN = 1 - 0.3 - 0.1;
+// Share of the column the boxes span, between the two edges.
+const SHEET_SPAN = 1 - mcSheetTopEdge - mcSheetBottomEdge;
 
 function sheetCss(rows: number): string {
   const a = (name: string, side: string) => `anchor(--ie-mc-${name} ${side}, 0px)`;
