@@ -72,7 +72,9 @@ Click the clock, and a bar under the header asks *"Record 12 min of reading, unt
 | **← / →** | Moves between the bar's buttons |
 | **Esc** | Closes the bar |
 
-**Discard** throws the time away, after asking. A recorded session appears in the page's [Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view) as 🌐 *Web page session (Companion)*, with its address. The clock then starts again from 0:00.
+**Discard** throws the time away, after asking. A recorded session appears in the page's [Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view) marked 🌐, with *"Read in the Chrome Companion"* and the page's address under it. The clock then starts again from 0:00.
+
+If the page was already reviewed today and isn't due yet, recording keeps the next review date and says so: see [Same-day reviews](IncRem-Scheduler.md#same-day-reviews).
 
 ### A session you didn't record
 
@@ -82,12 +84,12 @@ If you leave a page with time on the clock and don't come back for 30 minutes, t
 
 One sitting gets one review, wherever you record it:
 
-- **Opened from the queue with [Use Companion](Reviewing-Items-in-the-Queue.md#open-url-use-companion), then Next in RemNote**: the queue's review counts the time in RemNote before you clicked, plus the reading the Companion measured after it, not the wall-clock time. The panel says *"Added 10 min of Companion reading to the queue review"*, and the clock goes back to 0:00.
-- **Recorded in the Companion first, then Next in the queue**: Next adds the queue's minutes to the Companion's review and moves on, without a second review.
+- **Opened from the queue with [Use Companion](Reviewing-Items-in-the-Queue.md#open-url-use-companion), then Next in RemNote**: the queue's review counts the time in RemNote before you clicked, plus the reading the Companion measured after it, not the wall-clock time. That reading leaves the clock as soon as the panel sees the review. About 20 seconds later the panel says *"Added 10 min of Companion reading to the queue review"*, and the history shows 📎 *"Queue, then the Chrome Companion from 14:27: 1m 19s of reading there"* under the review. Reading you do after Next stays on the clock, as a new session.
+- **Recorded in the Companion first, then Next in the queue**: Next adds the queue's minutes to the Companion's review and moves on, without a second review. The history shows them as *"+3m in the queue"*.
 - **Any other review of the page recorded in RemNote while you read it**, such as End Review or the Execute Repetition popup: the clock takes out the time that review covered.
 - **The Editor Review Timer running on the page in the panel**: the clock doesn't record, and End Review there records the review.
 
-RemNote's sync carries the reviews between the RemNote app and Chrome, so recording in both within a few seconds of each other can still give two reviews.
+Before recording, the panel asks RemNote for the latest reviews. If one has just arrived, the bar says *"RemNote has just recorded part of this reading"* and offers only the rest. RemNote's sync carries the reviews between the RemNote app and Chrome, so recording in both within a few seconds of each other can still give two reviews.
 
 ## The bar
 

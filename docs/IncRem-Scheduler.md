@@ -93,6 +93,29 @@ interval = ⌈ firstReviewInterval + (maxInterval − firstReviewInterval) × (N
 
 Because it depends only on the count, a [Reschedule](Reviewing-Items-in-the-Queue.md#reschedule) on a curve item is a **one-time postponement**: the next Next returns to the curve. That is what you want for a book you push a month ahead while you read its prerequisites.
 
+**What N counts.** Reviews since the Rem was last made Incremental: queue reviews, Execute Repetition, Reschedule in the queue and sessions recorded outside RemNote. A review made before the item was due takes the place of the review before it, so reviewing early never piles up reviews. A Reschedule in the editor, a date edit or a priority change is not a review and doesn't count. Same-day reviews count once, as explained below.
+
+---
+
+## Same-day reviews { #same-day-reviews }
+
+A review often comes on top of one you already made that day, through no plan of the scheduler: an [Editor Review](Reviewing-Items-in-the-Editor.md#2-sequential-review-via-increm-lists), a reading session in the [Chrome Companion](Chrome-Companion-Extension.md#the-reading-clock), or a second look at the document in the editor. Neither scheduler gains anything from it. The Saturating Curve would climb a step for a sitting it already counted, and the Multiplier would multiply the interval twice in one day.
+
+With **Ignore Same-Day Reviews in Scheduling** on (the default), a review on the same day as an earlier one, before the item is due again:
+
+- **Keeps the next review date.** The date the first review set stays, and so does the interval the item is on.
+- **Counts once.** The Saturating Curve counts one review a day, and the Multiplier doesn't build on an interval a same-day review picked by itself.
+- **Keeps its time.** The minutes go into the Rem's [Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), its totals and the [Study Dashboard](Study-Dashboard.md) as usual. The history marks it **🔁 same day**.
+
+Queue **Next** shows *"Same-day review: the next review stays on Nov 16"*, and the Companion says the same after recording.
+
+**What still applies:**
+
+- **A date you choose yourself.** The [Execute Repetition](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) popup says *"Same-day review"* and fills in the days to the date in force. Confirm them unchanged to keep that date, or type other days to use them. The same goes for Reschedule and editing the date.
+- **An item due again the same day.** With an interval of 0 days, or after a Reschedule to today, the next review is a real one and is scheduled as usual.
+
+The day is the local calendar day, so reading at 23:50 and again at 00:10 counts as two days. The rule works from the dates in the history, so it also applies to reviews you made before turning it on, and turning it off restores the old behaviour.
+
 ---
 
 ## Which scheduler an item uses { #which-scheduler }
@@ -168,6 +191,7 @@ All of these are in the **Scheduling** group of the [settings popup](Plugin-Sett
 | **Multiplier** | Number | `1.5` | Multiplier scheduler: `next interval = current interval × multiplier`. The value suggested for every Rem; `1` keeps the interval constant. |
 | **First Review Interval (Saturating Curve)** | Number | `5` | Saturating Curve: interval in days after the **first** review. |
 | **Max Interval (Saturating Curve)** | Number | `30` | Saturating Curve: ceiling the interval gradually approaches but never exceeds. |
+| **Ignore Same-Day Reviews in Scheduling** | Toggle | On | A review on the same day as an earlier one, before the item is due again, keeps the next review date and counts once. See [Same-day reviews](#same-day-reviews). |
 | **Scheduler for Documents / Videos / Highlights and Video Extracts / Regular Rems** | Dropdown | `Use the Default Scheduler` | [Per-type defaults](#per-type-defaults) that prevail over the Default Scheduler. |
 
 ---

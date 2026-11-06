@@ -34,6 +34,7 @@ import {
   betaSchedulerEnabledId,
   betaFirstReviewIntervalId,
   betaMaxIntervalId,
+  ignoreSameDayReviewsId,
   schedulerForDocumentsId,
   schedulerForVideosId,
   schedulerForHighlightsId,
@@ -137,6 +138,7 @@ export interface IESettings {
   [betaSchedulerEnabledId]: boolean;
   [betaFirstReviewIntervalId]: number;
   [betaMaxIntervalId]: number;
+  [ignoreSameDayReviewsId]: boolean;
   [schedulerForDocumentsId]: SchedulerTypeDefault;
   [schedulerForVideosId]: SchedulerTypeDefault;
   [schedulerForHighlightsId]: SchedulerTypeDefault;
@@ -241,6 +243,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [betaSchedulerEnabledId]: false,
   [betaFirstReviewIntervalId]: 5,
   [betaMaxIntervalId]: 30,
+  [ignoreSameDayReviewsId]: true,
   [schedulerForDocumentsId]: 'default',
   [schedulerForVideosId]: 'default',
   [schedulerForHighlightsId]: 'default',
@@ -635,6 +638,18 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     description:
       'Saturating Curve scheduler: upper bound the interval gradually approaches; it will never ' +
       'exceed this value.',
+  },
+  [ignoreSameDayReviewsId]: {
+    kind: 'boolean',
+    group: 'scheduling',
+    helpPath: 'IncRem-Scheduler/#same-day-reviews',
+    title: 'Ignore Same-Day Reviews in Scheduling',
+    description:
+      'A review on the same day as an earlier one, before the item is due again (an Editor ' +
+      'Review, a Chrome Companion session, a second look), keeps the next review date and does ' +
+      'not count again: the Saturating Curve counts one review a day, and the Multiplier does not ' +
+      'multiply the interval twice. Its time is still recorded. A date or interval you choose ' +
+      'yourself always applies.',
   },
   [schedulerForDocumentsId]: {
     kind: 'dropdown',

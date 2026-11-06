@@ -2,6 +2,30 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.202 - November 6th, 2026
+
+### ✨ New
+
+**Scheduler**: Added **Ignore Same-Day Reviews in Scheduling** (on by default): a second review the same day, before the item is due again, keeps the next review date and counts once, so an Editor Review or a Companion session no longer pushes the Saturating Curve a step or multiplies the interval twice. Its time is still recorded, and the history marks it 🔁 *same day*.
+
+### 🐛 Fixed
+
+**Scheduler**: A Reschedule in the editor or a date edit right after a review no longer takes that review out of the Saturating Curve's count.
+
+📖 [Same-day reviews](IncRem-Scheduler.md#same-day-reviews)
+
+## v1.0.201 - November 6th, 2026
+
+### ⚡ Improved
+
+**Repetition History**: Reviews involving the Chrome Companion now say so under the row: 🌐 *Read in the Chrome Companion*, with the page's address, or 📎 *Queue, then the Chrome Companion*, with the reading measured there.
+
+### 🐛 Fixed
+
+**Chrome Companion Extension**: Recording in the Companion right after Next in the queue no longer records the reading again as a second review. Needs the Companion's new version, waiting for Google's approval in the Chrome Web Store.
+
+📖 [With the queue](Chrome-Companion-Extension.md#with-the-queue-and-the-editor-review-timer)
+
 ## v1.0.200 - November 6th, 2026
 
 These need the Companion's new version, which is waiting for Google's approval in the Chrome Web Store. It updates on its own once approved.

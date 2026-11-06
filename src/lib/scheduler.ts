@@ -2,18 +2,23 @@ import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { nextRepDateSlotCode, powerupCode, repHistorySlotCode } from './consts';
 import { IncrementalRep } from './incremental_rem';
 import { repCountsForScheduling } from './incremental_rem/types';
-import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { getDailyDocReferenceForDate } from './utils';
 import { getRemSchedulerInfo } from './scheduler_choice';
 import {
+  automaticRepeatIndexes,
+  calendarDaysBetween,
   computeNextInterval,
   getCurrentInterval,
+  isSameDayRepeat,
   ResolvedScheduler,
   SchedulerChoice,
+  sameDayRepeatIndexes,
 } from './scheduler_core';
+import { getIESetting } from './settings';
+import { ignoreSameDayReviewsId } from './consts';
 dayjs.extend(relativeTime);
 
 function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
@@ -29,11 +34,16 @@ function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
       continue;
     }
 
-    const scheduledTime = timeWhenCardAppearsInQueueFromScheduled(history, i + 1)?.getTime();
+    // The response is the next REVIEW: a reschedule, a date edit or a priority
+    // change after a review says nothing about whether it was early, and used to
+    // make the review before it drop out of the count.
+    let next = i + 1;
+    while (next < history.length && !repCountsForScheduling(history[next].eventType)) next++;
+    const scheduledTime = timeWhenCardAppearsInQueueFromScheduled(history, next)?.getTime();
     if (
-      history[i + 1]?.date != undefined &&
+      history[next]?.date != undefined &&
       scheduledTime != undefined &&
-      new Date(history[i + 1]?.date).getTime() < scheduledTime
+      new Date(history[next]?.date).getTime() < scheduledTime
     ) {
       // Skip - this rep was followed by an early response
     } else {
@@ -113,12 +123,15 @@ export const removeLastInteraction = (history: IncrementalRep[]): IncrementalRep
  *
  * @param schedulerOverride Compute with this scheduler instead of the rem's own —
  *   the popups use it to preview a switch before it is saved.
+ * @param at When the review happened, if not now (a Companion session recorded
+ *   after it ended). Decides whether it is a same-day repeat.
  */
 export async function getNextSpacingDateForRem(
   plugin: RNPlugin,
   remId: string,
   inLookbackMode: boolean,
-  schedulerOverride?: SchedulerChoice
+  schedulerOverride?: SchedulerChoice,
+  at?: number
 ) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) {
@@ -131,12 +144,15 @@ export async function getNextSpacingDateForRem(
 
   const rawHistory = incrementalRemInfo.history || [];
   // In lookback mode the last interaction is the one being redone, so neither
-  // scheduler may see it.
+  // scheduler may see it. It goes first, before the filters below, so they
+  // judge the history as it stood before that interaction.
   const effectiveHistory = inLookbackMode ? removeLastInteraction(rawHistory) : rawHistory;
-  const cleansedHistory = _.pipe(
-    rawHistory,
-    removeResponsesBeforeEarlyResponses,
-    inLookbackMode ? removeLastInteraction : _.identity
+  const ignoreSameDay = await getIESetting(plugin, ignoreSameDayReviewsId);
+  // Same-day repeats leave before the early-response filter: each one is early
+  // next to the review it repeats, and would otherwise make that one drop out.
+  const repeats = ignoreSameDay ? sameDayRepeatIndexes(effectiveHistory) : new Set<number>();
+  const cleansedHistory = removeResponsesBeforeEarlyResponses(
+    effectiveHistory.filter((_entry, index) => !repeats.has(index))
   );
 
   // Get only the reps since the last 'madeIncremental' marker for interval calculation
@@ -147,17 +163,32 @@ export async function getNextSpacingDateForRem(
   const scheduler: ResolvedScheduler = schedulerOverride
     ? { ...schedulerOverride, source: 'item' }
     : schedulerInfo.scheduler;
-  const newInterval = computeNextInterval({
-    scheduler,
-    reviewNumber: sessionHistory.length + 1,
-    // The multiplier scheduler works from the interval the item is on, read off
-    // the unfiltered history: an editor reschedule or a manual date edit counts
-    // here even though it never counts as a review.
-    currentInterval: getCurrentInterval(effectiveHistory),
-    curveFirstInterval: schedulerInfo.settings.curveFirstInterval,
-    curveMaxInterval: schedulerInfo.settings.curveMaxInterval,
-  });
-  const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
+
+  const reviewAt = at ?? Date.now();
+  // A redo in lookback mode replaces a review, so it is never a repeat itself.
+  const sameDayRepeat =
+    ignoreSameDay && !inLookbackMode && isSameDayRepeat(rawHistory, reviewAt, incrementalRemInfo.nextRepDate);
+
+  let newInterval: number;
+  let newNextRepDate: number;
+  if (sameDayRepeat) {
+    // The date in force stays, and so does the interval the item is on.
+    newNextRepDate = incrementalRemInfo.nextRepDate;
+    newInterval = Math.max(0, calendarDaysBetween(reviewAt, newNextRepDate));
+  } else {
+    newInterval = computeNextInterval({
+      scheduler,
+      reviewNumber: sessionHistory.length + 1,
+      // The multiplier scheduler works from the interval the item is on, read off
+      // the unfiltered history: an editor reschedule or a manual date edit counts
+      // here even though it never counts as a review. A same-day repeat the
+      // scheduler dated by itself does not: it never chose a new interval.
+      currentInterval: getCurrentInterval(effectiveHistory, automaticRepeatIndexes(effectiveHistory, repeats)),
+      curveFirstInterval: schedulerInfo.settings.curveFirstInterval,
+      curveMaxInterval: schedulerInfo.settings.curveMaxInterval,
+    });
+    newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
+  }
 
   // Calculate if review was early/late and by how many days
   const scheduledDate = inLookbackMode
@@ -194,6 +225,11 @@ export async function getNextSpacingDateForRem(
     newHistory,
     remId,
     newInterval,
+    /**
+     * A review on the same day as one that counted, before the item is due:
+     * newNextRepDate is the date in force, kept. Ignore Same-Day Reviews only.
+     */
+    sameDayRepeat,
     /** The scheduler this projection used, and what the settings alone would give. */
     scheduler,
     inheritedScheduler: schedulerInfo.inherited,

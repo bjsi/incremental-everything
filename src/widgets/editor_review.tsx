@@ -125,6 +125,10 @@ const EditorReviewInput: React.FC<{
   // Stored nextRepDate for regression check
   const currentNextRepDateRef = useRef<number>(0);
 
+  // A same-day repeat (Ignore Same-Day Reviews): the date in force, and the days
+  // prefilled for it. Confirming those days unchanged keeps that exact date.
+  const [sameDayKept, setSameDayKept] = useState<{ date: number; days: string } | null>(null);
+
   // Regression warning state
   const [regressionInfo, setRegressionInfo] = useState<RegressionInfo | null>(null);
 
@@ -184,6 +188,11 @@ const EditorReviewInput: React.FC<{
 
       // Set the calculated interval from the scheduling algorithm
       setDays(String(scheduleData?.newInterval || 1));
+      setSameDayKept(
+        scheduleData?.sameDayRepeat
+          ? { date: scheduleData.newNextRepDate, days: String(scheduleData.newInterval || 1) }
+          : null
+      );
       setPriority(incRemData?.priority ?? 10);
 
       // Store the current nextRepDate for regression checks
@@ -524,21 +533,26 @@ const EditorReviewInput: React.FC<{
 
   // ─── User-facing Handlers (with regression gate) ────────────────────────
 
+  /** The kept date of a same-day repeat, while the prefilled days are left as they are. */
+  const keptSameDayDate = sameDayKept && days.trim() === sameDayKept.days ? sameDayKept.date : undefined;
+
   const handleConfirm = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      if (keptSameDayDate !== undefined) return executeConfirm(undefined, keptSameDayDate);
       if (!checkForRegression('confirm')) {
         await executeConfirm();
       }
     },
-    [checkForRegression, executeConfirm]
+    [checkForRegression, executeConfirm, keptSameDayDate]
   );
 
   const handleStartTimer = useCallback(async () => {
+    if (keptSameDayDate !== undefined) return executeStartTimer(undefined, keptSameDayDate);
     if (!checkForRegression('timer')) {
       await executeStartTimer();
     }
-  }, [checkForRegression, executeStartTimer]);
+  }, [checkForRegression, executeStartTimer, keptSameDayDate]);
 
   // ─── Regression Dialog Resolution Handlers ─────────────────────────────
 
@@ -945,7 +959,7 @@ const EditorReviewInput: React.FC<{
           )}
 
           {/* ─── Ahead-of-Schedule Banner ─── */}
-          {earlyReviewInfo && (
+          {earlyReviewInfo && !sameDayKept && (
             <div
               className="p-2.5 rounded-lg flex items-start gap-2"
               style={{
@@ -958,6 +972,24 @@ const EditorReviewInput: React.FC<{
                 <strong>Reviewing ahead of schedule</strong> — this IncRem is not due for{' '}
                 <strong>{earlyReviewInfo.daysEarly}</strong> day{earlyReviewInfo.daysEarly !== 1 ? 's' : ''}{' '}
                 (due: {earlyReviewInfo.dueDate}).
+              </div>
+            </div>
+          )}
+
+          {/* ─── Same-Day Review Banner ─── */}
+          {sameDayKept && (
+            <div
+              className="p-2.5 rounded-lg flex items-start gap-2"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              <span className="text-sm shrink-0 mt-0.5">🔁</span>
+              <div className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                <strong>Same-day review</strong> — already reviewed today, so the next review stays on{' '}
+                <strong>{dayjs(sameDayKept.date).format('MMMM D')}</strong>. Change the days to choose
+                another date.
               </div>
             </div>
           )}

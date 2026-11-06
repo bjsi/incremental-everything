@@ -238,6 +238,11 @@ async function startNextInList(
   await plugin.storage.setSession('editor-review-timer-rem-id', nextRemId);
   await plugin.storage.setSession('editor-review-timer-start', Date.now()); // Reset start time
   await plugin.storage.setSession('editor-review-timer-interval', nextInterval);
+  // A same-day repeat keeps the date in force (Ignore Same-Day Reviews).
+  await plugin.storage.setSession(
+    'editor-review-timer-date-override',
+    scheduleData?.sameDayRepeat ? scheduleData.newNextRepDate : undefined
+  );
   await plugin.storage.setSession('editor-review-timer-priority', nextIncRemInfo?.priority ?? 10);
   await plugin.storage.setSession('editor-review-timer-rem-name', nextRemName || 'Unnamed Rem');
   await plugin.storage.setSession('editor-review-timer-queue-list', newQueueList);

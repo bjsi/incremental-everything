@@ -68,6 +68,9 @@ export const multiplierId = 'multiplier';
 export const betaSchedulerEnabledId = 'beta-scheduler-enabled';
 export const betaFirstReviewIntervalId = 'beta-first-review-interval';
 export const betaMaxIntervalId = 'beta-max-interval';
+// Same-day reviews (Editor Review, Companion, a second look) neither move the date
+// nor count twice for scheduling. See sameDayRepeatIndexes in scheduler_core.ts.
+export const ignoreSameDayReviewsId = 'ignore-same-day-reviews';
 // Per-type default scheduler. 'default' defers to the Default Scheduler setting
 // (betaSchedulerEnabledId); 'multiplier' / 'curve' prevail over it for that kind of
 // Incremental Rem. A scheduler pinned on the rem itself (schedulerSlotCode) beats both.

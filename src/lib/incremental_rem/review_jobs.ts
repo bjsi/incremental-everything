@@ -325,6 +325,11 @@ export async function runReviewJob(
       });
       if (!result) throw new Error('The scheduler could not compute the next repetition.');
       cache.set(remId, reviewedEntry(incRem, result.newNextRepDate, result.newHistory));
+      if (result.sameDayRepeat) {
+        void plugin.app.toast(
+          `Same-day review: the next review stays on ${dayjs(result.newNextRepDate).format('MMM D')}`
+        );
+      }
       return {};
     }
 

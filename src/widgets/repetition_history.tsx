@@ -23,7 +23,9 @@ import {
 } from '../lib/history_edit';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
 import { getRemSchedulerInfo } from '../lib/scheduler_choice';
-import { describeScheduler } from '../lib/scheduler_core';
+import { describeScheduler, sameDayRepeatIndexes } from '../lib/scheduler_core';
+import { useIESetting } from '../lib/settings';
+import { ignoreSameDayReviewsId } from '../lib/consts';
 import { MAX_NOTE_LENGTH } from '../lib/history_notes';
 import { priorityEventIcon, priorityEventLabel } from '../lib/priority_history';
 import { formatVideoContext } from '../lib/video_position';
@@ -729,6 +731,7 @@ function RepetitionHistoryPopup() {
     const [refreshKey, setRefreshKey] = React.useState(0);
     const [dialog, setDialog] = React.useState<DialogTarget | null>(null);
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
+    const ignoreSameDay = useIESetting(ignoreSameDayReviewsId);
 
     const data = useRunAsync(async () => {
         try {
@@ -1007,6 +1010,8 @@ function RepetitionHistoryPopup() {
     // Sort history by date descending (most recent first). The stored index is
     // carried along so the edit/delete actions can point at the right entry in
     // the underlying (chronological) array.
+    // Same-day repeats count once for scheduling (Ignore Same-Day Reviews).
+    const sameDayRepeats = ignoreSameDay ? sameDayRepeatIndexes(history || []) : new Set<number>();
     const sortedHistory = (history || [])
         .map((rep, storedIndex) => ({ rep, storedIndex }))
         .sort((a, b) => b.rep.date - a.rep.date);
@@ -1443,6 +1448,14 @@ function RepetitionHistoryPopup() {
                                 <span>{formatDuration(rep.reviewTimeSeconds || 0) || '—'}</span>
                                 <span>{rep.interval !== undefined ? `${rep.interval}d` : '—'}</span>
                                 <span>{rep.priority !== undefined ? rep.priority : '—'}</span>
+                                {sameDayRepeats.has(storedIndex) ? (
+                                    <span
+                                        style={{ color: 'var(--rn-clr-content-tertiary)' }}
+                                        title="A second review the same day, before the item was due: scheduling counts that day once (Ignore Same-Day Reviews), and a review recorded with the setting on keeps the next review date. Its time still counts."
+                                    >
+                                        🔁 same day
+                                    </span>
+                                ) : (
                                 <span style={{
                                     color: rep.daysEarlyOrLate !== undefined && rep.daysEarlyOrLate > 0
                                         ? 'var(--rn-clr-red, #ef4444)'
@@ -1452,6 +1465,7 @@ function RepetitionHistoryPopup() {
                                 }}>
                                     {formatEarlyLate(rep)}
                                 </span>
+                                )}
                                 {canEditEntry ? actions : <span />}
                             </div>
                         );

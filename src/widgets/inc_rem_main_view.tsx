@@ -346,6 +346,11 @@ export function IncRemMainView() {
     await plugin.storage.setSession('editor-review-timer-rem-id', remId);
     await plugin.storage.setSession('editor-review-timer-start', Date.now());
     await plugin.storage.setSession('editor-review-timer-interval', interval);
+    // A same-day repeat keeps the date in force (Ignore Same-Day Reviews).
+    await plugin.storage.setSession(
+      'editor-review-timer-date-override',
+      scheduleData?.sameDayRepeat ? scheduleData.newNextRepDate : undefined
+    );
     await plugin.storage.setSession('editor-review-timer-priority', incRemInfo?.priority ?? 10);
     await plugin.storage.setSession('editor-review-timer-rem-name', remName || 'Unnamed Rem');
     await plugin.storage.setSession('editor-review-timer-from-queue', false);

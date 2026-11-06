@@ -832,9 +832,14 @@ async function recordClock(withPopup) {
     note(`Recorded the page's review: ${JSON.stringify(result)}`);
     await writeCover({ ...clockCover, clearedUntil: Math.max(clockCover?.clearedUntil ?? 0, endedAt) });
     if (docId === shownDocId) showDocument(result);
-    const next = result.nextRepDate
-      ? ` Next review: ${new Date(result.nextRepDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}.`
+    const nextDay = result.nextRepDate
+      ? new Date(result.nextRepDate).toLocaleDateString(undefined, { dateStyle: 'medium' })
       : '';
+    const next = !nextDay
+      ? ''
+      : result.sameDayRepeat
+        ? ` Same-day review: the next review stays on ${nextDay}.`
+        : ` Next review: ${nextDay}.`;
     flashClockBar(`✓ Recorded ${C.formatShort(reviewTimeSeconds * 1000)} of reading.${next}`);
   } catch (err) {
     setClockBar('error', `Could not record it: ${err.message}`, [{ label: 'OK', run: closeClockBar }]);

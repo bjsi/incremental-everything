@@ -315,9 +315,12 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
     const seconds = Math.round(Number(reviewTimeSeconds));
     const ended = Math.min(Number(endedAt), Date.now());
     if (!(seconds > 0) || !Number.isFinite(ended)) throw new Error('There is no reading time to record.');
-    const spacing = await getNextSpacingDateForRem(plugin, docId, false);
+    const spacing = await getNextSpacingDateForRem(plugin, docId, false, undefined, ended);
     if (!spacing) throw new Error('The scheduler could not compute the next repetition.');
-    const nextRepDate = ended + Math.max(0, spacing.newNextRepDate - Date.now());
+    // A same-day repeat keeps the date in force; otherwise the interval runs from the reading's end.
+    const nextRepDate = spacing.sameDayRepeat
+      ? spacing.newNextRepDate
+      : ended + Math.max(0, spacing.newNextRepDate - Date.now());
     const result = await addExternalSessionRep(plugin, docId, {
       date: ended,
       reviewTimeSeconds: seconds,
@@ -327,7 +330,12 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
     if (!result.ok) throw new Error(result.error || 'Could not record the session.');
     const status = await documentStatus(plugin, doc);
     watchDocument(status);
-    return { ...status, rescheduled: result.rescheduled, nextRepDate: result.rescheduled ? nextRepDate : undefined };
+    return {
+      ...status,
+      rescheduled: result.rescheduled,
+      nextRepDate: result.rescheduled ? nextRepDate : undefined,
+      sameDayRepeat: spacing.sameDayRepeat,
+    };
   },
 
   /**
