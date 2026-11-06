@@ -18,6 +18,15 @@ type Mark = '' | 'T' | 'F';
 const NEXT: Record<Mark, Mark> = { '': 'T', T: 'F', F: '' };
 const FILL: Record<Exclude<Mark, ''>, string> = { T: '#16a34a', F: '#dc2626' };
 const SPOKEN: Record<Mark, string> = { '': 'not judged', T: 'true', F: 'false' };
+// The first box's centre sits this share of the column below its top, the last
+// one's this share above its bottom; the others are spread evenly between them.
+// Keep in step with SHEET_SPAN in lib/mc_scissors.ts, which sizes the column.
+const SHEET_TOP_EDGE = 0.3;
+const SHEET_BOTTOM_EDGE = 0.1;
+
+/** A row's centre as a share of the column's height. */
+const rowCentre = (i: number, count: number) =>
+  count < 2 ? 0.5 : SHEET_TOP_EDGE + (i * (1 - SHEET_TOP_EDGE - SHEET_BOTTOM_EDGE)) / (count - 1);
 
 function McAssertions() {
   const plugin = usePlugin();
@@ -39,24 +48,24 @@ function McAssertions() {
   };
 
   return (
-    // The host CSS makes the frame as tall as the options' spacing times the rows
-    // (see sheetCss in lib/mc_scissors.ts); space-around then puts one row per
-    // pitch, so the boxes line up with the scissors' rhythm below.
-    <div
-      style={{
-        height: '100vh',
-        boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-around',
-        alignItems: 'flex-end',
-        overflow: 'hidden',
-      }}
-    >
+    // The host CSS makes the frame as tall as the question (see sheetCss in
+    // lib/mc_scissors.ts); each row is placed by its share of that height.
+    <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
       {labels.map((label, i) => {
         const mark = marks[i] ?? '';
         return (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div
+            key={label}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: `${rowCentre(i, labels.length) * 100}%`,
+              transform: 'translateY(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
             <span
               style={{
                 fontSize: 13,

@@ -84,49 +84,39 @@ ${wrapperSel(i)} {
 const SHEET_CSS_ID = 'mc-assertions-sheet';
 const SHEET_WRAPPER = `div.absolute.z-50:has(iframe[src*="widgetName=${MC_ASSERTIONS_WIDGET}"])`;
 
-/* The answer sheet: one column, centred on the question beside it, with its
+/* The answer sheet: one column as tall as the question beside it, with its
    right edge on the scissors' column, so it reads as part of the same gutter.
+   The widget puts the first box's centre 30% below the column's top, the last
+   one's 10% above its bottom, and spaces the rest evenly between them
+   (SHEET_TOP_EDGE / SHEET_BOTTOM_EDGE in widgets/mc_assertions.tsx).
 
-   Its boxes are spaced like the scissors: the column is made `rows` times the
-   options' average pitch tall, (last centre - first centre) / (options - 1),
-   and the widget spreads its rows evenly over that height.
+   The column runs from the question's top to whichever comes first, the
+   question's bottom or the first option's top (in case the options render
+   inside the question element). A question too short for its statements gets
+   a column tall enough for MIN_SHEET_PITCH between boxes, running down from the
+   question's top.
 
-   anchor() measures from the side its property names: in `top` from the
-   viewport's top edge, in `bottom` from its bottom edge. So each inset spells
-   the same geometry from its own side:
-     question block = from the question's top to whichever comes first, its
-                      bottom or the first option's top (in case the options
-                      render inside the question element)
-     column top     = the block's centre minus half the column, but never above
-                      the question's top, so a column taller than the question
-                      runs down instead of up into the breadcrumbs.
-   The frame and the host elements between it and the wrapper are stretched to
-   fill the column. */
-function sheetCss(rows: number, options: number): string {
-  const last = Math.min(options, MAX_OPTIONS) - 1;
+   anchor() measures from the side its property names: in `bottom` from the
+   viewport's bottom edge, so there the nearer of two edges is the LARGER
+   distance. The frame and the host elements between it and the wrapper are
+   stretched to fill the column. */
+const MIN_SHEET_PITCH = 30;
+// Share of the column the boxes span: 1 - 30% at the top - 10% at the bottom.
+const SHEET_SPAN = 1 - 0.3 - 0.1;
+
+function sheetCss(rows: number): string {
   const a = (name: string, side: string) => `anchor(--ie-mc-${name} ${side}, 0px)`;
-  // The options' pitch, positive whichever side it is read from.
-  const pitchFromTop = last > 0 ? `((${a(String(last), 'center')} - ${a('0', 'center')}) / ${last})` : '36px';
-  const pitchFromBottom = last > 0 ? `((${a('0', 'center')} - ${a(String(last), 'center')}) / ${last})` : '36px';
-  const heightFromTop = `(${rows} * max(${pitchFromTop}, 30px))`;
-  const heightFromBottom = `(${rows} * max(${pitchFromBottom}, 30px))`;
-
-  // From the top: the block ends at the nearer (smaller) of the two edges.
-  const blockEndTop = `min(${a('question', 'bottom')}, ${a('0', 'top')})`;
-  const centreTop = `((${a('question', 'top')} + ${blockEndTop}) / 2)`;
-  const columnTop = `max(${a('question', 'top')}, ${centreTop} - ${heightFromTop} / 2)`;
-
-  // From the bottom: the same edges, so the larger distance is the nearer one.
-  const blockEndBottom = `max(${a('question', 'bottom')}, ${a('0', 'top')})`;
-  const centreBottom = `((${a('question', 'top')} + ${blockEndBottom}) / 2)`;
-  const columnTopFromBottom = `min(${a('question', 'top')}, ${centreBottom} + ${heightFromBottom} / 2)`;
+  // Height that keeps MIN_SHEET_PITCH between centres within SHEET_SPAN.
+  const minHeight = `${Math.ceil((MIN_SHEET_PITCH * Math.max(rows - 1, 1)) / SHEET_SPAN)}px`;
+  const blockEnd = `max(${a('question', 'bottom')}, ${a('0', 'top')})`;
+  const blockHeight = `(${a('question', 'top')} - ${blockEnd})`;
 
   return `
 ${SHEET_WRAPPER} {
   position: fixed !important;
   position-anchor: --ie-mc-question;
-  top: calc(${columnTop}) !important;
-  bottom: calc(${columnTopFromBottom} - ${heightFromBottom}) !important;
+  top: anchor(--ie-mc-question top, 80px) !important;
+  bottom: calc(${a('question', 'top')} - max(${blockHeight}, ${minHeight})) !important;
   right: calc(anchor(--ie-mc-0 left, 60px) + 6px) !important;
   left: auto !important;
   height: auto !important;
@@ -222,7 +212,7 @@ async function sync(plugin: RNPlugin): Promise<void> {
 
   if (sheetOn && mc.assertions.length) {
     await plugin.storage.setSession(MC_ASSERTION_LABELS_KEY, mc.assertions);
-    await plugin.app.registerCSS(SHEET_CSS_ID, sheetCss(mc.assertions.length, mc.optionCount));
+    await plugin.app.registerCSS(SHEET_CSS_ID, sheetCss(mc.assertions.length));
     sheetCssOn = true;
     sheetId = await plugin.window.openFloatingWidget(MC_ASSERTIONS_WIDGET, { top: 80, right: 60 }, undefined, false);
     console.log(`${LOG} Answer sheet opened for ${mc.assertions.length} assertions.`);
