@@ -59,6 +59,7 @@ Mark a statement as true or false with one command, and make that kind of questi
 Additions to RemNote's own multiple-choice cards in the queue.
 
 - [Scissors — New](Utilities-Multiple-Choice-Cards.md#scissors)
+- [True/False answer sheet — New](Utilities-Multiple-Choice-Cards.md#answer-sheet)
 
 ## [Cleaning Up](Utilities-Cleaning-Up.md)
 

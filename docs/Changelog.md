@@ -10,7 +10,11 @@ This page documents the major changes and improvements for each version of the I
 
 ![A multiple-choice card in the queue with a ✂ beside each option; clicking a ✂ strikes that option through, and the answer is then picked from the options that are left](assets/mc-scissors.gif){ width="900" }
 
-📖 [Scissors](Utilities-Multiple-Choice-Cards.md#scissors)
+**Multiple-Choice Cards**: Added a True/False answer sheet beside questions that list statements numbered I., II., III.: click a box to mark its statement T, again for F, and again to clear it, then match your verdicts to an option. On by default, in **IR Settings → Queue Display**.
+
+![A multiple-choice question that lists statements I, II and III, with a column of boxes beside it, one per statement, marked T in green or F in red; the options below say which statements are false](assets/mc-answer-sheet.png){ width="700" }
+
+📖 [Scissors](Utilities-Multiple-Choice-Cards.md#scissors) · [True/False answer sheet](Utilities-Multiple-Choice-Cards.md#answer-sheet)
 
 ## v1.0.195 - November 5th, 2026
 

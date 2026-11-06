@@ -84,28 +84,50 @@ ${wrapperSel(i)} {
 const SHEET_CSS_ID = 'mc-assertions-sheet';
 const SHEET_WRAPPER = `div.absolute.z-50:has(iframe[src*="widgetName=${MC_ASSERTIONS_WIDGET}"])`;
 
-/* The answer sheet: one column, its top level with the question's top and its
+/* The answer sheet: one column, centred on the question beside it, with its
    right edge on the scissors' column, so it reads as part of the same gutter.
 
    Its boxes are spaced like the scissors: the column is made `rows` times the
    options' average pitch tall, (last centre - first centre) / (options - 1),
-   and the widget spreads its rows evenly over that height. In `bottom`,
-   anchor(X) is the distance from the viewport's bottom edge to X, so the
-   options' pitch is anchor(first) - anchor(last) over (options - 1). The frame
-   and the host elements between it and the wrapper are stretched to fill it. */
+   and the widget spreads its rows evenly over that height.
+
+   anchor() measures from the side its property names: in `top` from the
+   viewport's top edge, in `bottom` from its bottom edge. So each inset spells
+   the same geometry from its own side:
+     question block = from the question's top to whichever comes first, its
+                      bottom or the first option's top (in case the options
+                      render inside the question element)
+     column top     = the block's centre minus half the column, but never above
+                      the question's top, so a column taller than the question
+                      runs down instead of up into the breadcrumbs.
+   The frame and the host elements between it and the wrapper are stretched to
+   fill the column. */
 function sheetCss(rows: number, options: number): string {
   const last = Math.min(options, MAX_OPTIONS) - 1;
-  const pitch =
-    last > 0
-      ? `((anchor(--ie-mc-0 center, 0px) - anchor(--ie-mc-${last} center, 0px)) / ${last})`
-      : '36px';
+  const a = (name: string, side: string) => `anchor(--ie-mc-${name} ${side}, 0px)`;
+  // The options' pitch, positive whichever side it is read from.
+  const pitchFromTop = last > 0 ? `((${a(String(last), 'center')} - ${a('0', 'center')}) / ${last})` : '36px';
+  const pitchFromBottom = last > 0 ? `((${a('0', 'center')} - ${a(String(last), 'center')}) / ${last})` : '36px';
+  const heightFromTop = `(${rows} * max(${pitchFromTop}, 30px))`;
+  const heightFromBottom = `(${rows} * max(${pitchFromBottom}, 30px))`;
+
+  // From the top: the block ends at the nearer (smaller) of the two edges.
+  const blockEndTop = `min(${a('question', 'bottom')}, ${a('0', 'top')})`;
+  const centreTop = `((${a('question', 'top')} + ${blockEndTop}) / 2)`;
+  const columnTop = `max(${a('question', 'top')}, ${centreTop} - ${heightFromTop} / 2)`;
+
+  // From the bottom: the same edges, so the larger distance is the nearer one.
+  const blockEndBottom = `max(${a('question', 'bottom')}, ${a('0', 'top')})`;
+  const centreBottom = `((${a('question', 'top')} + ${blockEndBottom}) / 2)`;
+  const columnTopFromBottom = `min(${a('question', 'top')}, ${centreBottom} + ${heightFromBottom} / 2)`;
+
   return `
 ${SHEET_WRAPPER} {
   position: fixed !important;
   position-anchor: --ie-mc-question;
-  top: anchor(--ie-mc-question top, 80px) !important;
+  top: calc(${columnTop}) !important;
+  bottom: calc(${columnTopFromBottom} - ${heightFromBottom}) !important;
   right: calc(anchor(--ie-mc-0 left, 60px) + 6px) !important;
-  bottom: calc(anchor(--ie-mc-question top, 0px) - ${rows} * max(${pitch}, 30px)) !important;
   left: auto !important;
   height: auto !important;
   display: flex !important;
