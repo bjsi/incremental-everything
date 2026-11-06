@@ -2,6 +2,18 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.198 - November 6th, 2026
+
+### ⚡ Improved
+
+**Chrome Companion Extension**: An extract of several paragraphs keeps them apart with a blank line, still in one Rem, and list items and line breaks start new lines.
+
+**Chrome Companion Extension**: Added a **›** button at the right end of the bar that hides its buttons on every page, and **‹** brings them back.
+
+**Chrome Companion Extension**: Deleting an extract's Rem in the panel now removes its highlight from the page at once, without a reload.
+
+📖 [Extracts](Chrome-Companion-Extension.md#extracts) · [The bar](Chrome-Companion-Extension.md#the-bar) · [Highlights and the read point](Chrome-Companion-Extension.md#highlights-and-the-read-point)
+
 ## v1.0.196 - November 5th, 2026
 
 ### ✨ New

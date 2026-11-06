@@ -10,6 +10,7 @@ A bar stays at the bottom right of every page, whether the panel is open or not:
 - **Priority:** `Opt+Shift+X`, or Add Extract with **Set priority** ticked, first asks for the extract's priority in a small field beside the selection. Type a number and press Enter; leave it empty for the inherited priority. Esc cancels the extract, and Shift+Enter opens the plugin's full popup in the panel instead, for the interval and scheduler.
 - **Set read point / Go to read point:** remembers the top of the window, and scrolls back to it.
 - **Import headings:** creates the page's sections in its document.
+- **› / ‹:** hides the bar's buttons on every page, or brings them back.
 
 Writes made while the panel is closed wait in the browser, shown as a count on the toolbar icon, and reach RemNote when the panel connects.
 

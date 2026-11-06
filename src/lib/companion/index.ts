@@ -4,7 +4,7 @@
 // this frame, so no other plugin can take part, and this listener is all that runs
 // where the extension is not installed, including the desktop app.
 
-import { PluginRem, ReactRNPlugin, RichTextInterface } from '@remnote/plugin-sdk';
+import { AppEvents, PluginRem, ReactRNPlugin, RichTextInterface } from '@remnote/plugin-sdk';
 import { dismissedPowerupCode, powerupCode } from '../consts';
 import { canonicalUrlKey } from '../duplicate_source/url_key';
 import { markRemsAsFreshlyCreated } from '../incRemHelpers';
@@ -34,6 +34,27 @@ type SectionChain = Array<{ text: string; position: number }>;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pageKeyOf = (url: string) => canonicalUrlKey(url) ?? url;
+
+// ---- Telling a page that one of its extracts is gone ----
+
+/** The extracts of each page a tab has shown here, with the Rem each sits under. */
+const watchedPages = new Map<string, Map<string, string | undefined>>();
+/** Every extract and parent above, for a quick test of each change event. */
+let watchedIds = new Set<string>();
+
+function setWatchedPage(url: string, extracts: Map<string, string | undefined>) {
+  watchedPages.set(url, extracts);
+  watchedIds = new Set([...watchedPages.values()].flatMap((page) => [...page].flat().filter((id): id is string => !!id)));
+}
+
+function watchExtract(url: string, remId: string, parentId: string | undefined) {
+  setWatchedPage(url, new Map([...(watchedPages.get(url) ?? []), [remId, parentId]]));
+}
+
+async function isAliveExtract(plugin: ReactRNPlugin, remId: string) {
+  const rem = await plugin.rem.findOne(remId);
+  return !!rem && ((await rem.hasPowerup(powerupCode)) || (await rem.hasPowerup(dismissedPowerupCode)));
+}
 
 async function currentKbId(plugin: ReactRNPlugin): Promise<string> {
   const knowledgeBase = await plugin.kb.getCurrentKnowledgeBaseData();
@@ -155,6 +176,7 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
 
     state.extracts.push({ remId: rem._id, anchor, opId });
     await writePage(plugin, url, state);
+    watchExtract(url, rem._id, section._id);
 
     const saved = await plugin.rem.findOne(rem._id);
     if (!saved) throw new Error('The new Rem cannot be read back.');
@@ -183,12 +205,15 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
   async pageState(plugin, { url }) {
     const state = await readPage(plugin, url);
     const alive: PageState['extracts'] = [];
+    const watched = new Map<string, string | undefined>();
     for (const extract of state.extracts) {
       const rem = await plugin.rem.findOne(extract.remId);
       if (rem && ((await rem.hasPowerup(powerupCode)) || (await rem.hasPowerup(dismissedPowerupCode)))) {
         alive.push(extract);
+        watched.set(rem._id, rem.parent ?? undefined);
       }
     }
+    setWatchedPage(url, watched);
     if (alive.length !== state.extracts.length) await writePage(plugin, url, { ...state, extracts: alive });
     return { kbId: await currentKbId(plugin), extracts: alive, readPoint: state.readPoint };
   },
@@ -220,6 +245,32 @@ export function startCompanionListener(plugin: ReactRNPlugin) {
     window.postMessage({ ieCompanion: 'toExtension', ...message }, '*');
   // One at a time: operations read and rewrite the same stored pages.
   let queue: Promise<unknown> = Promise.resolve();
+
+  // A deleted Rem reports itself, and its parent reports a child gone. Either one
+  // gets that page's affected extracts checked, and the page reloads its
+  // highlights if one of them died. A Set lookup per event: this one fires a lot.
+  const changed = new Set<string>();
+  let flushTimer: ReturnType<typeof setTimeout> | undefined;
+  const flush = async () => {
+    const ids = [...changed];
+    changed.clear();
+    for (const [url, extracts] of watchedPages) {
+      const suspects = [...extracts].filter(([remId, parentId]) => ids.includes(remId) || (parentId && ids.includes(parentId)));
+      for (const [remId] of suspects) {
+        if (await isAliveExtract(plugin, remId)) continue;
+        setWatchedPage(url, new Map([...extracts].filter(([id]) => id !== remId)));
+        toExtension({ kind: 'pageChanged', url });
+        break;
+      }
+    }
+  };
+  plugin.event.addListener(AppEvents.GlobalRemChanged, undefined, (data) => {
+    const remId = data?.remId;
+    if (!remId || !watchedIds.has(remId)) return;
+    changed.add(remId);
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(() => void flush(), 400);
+  });
 
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.data?.ieCompanion !== 'toPlugin') return;

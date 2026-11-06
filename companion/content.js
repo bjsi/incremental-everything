@@ -619,7 +619,7 @@ function runInPage() {
     if (message.ie === 'opDone' || message.ie === 'readDone') {
       pending.get(message.id)?.(message);
       pending.delete(message.id);
-    } else if (message.ie === 'pluginReady') {
+    } else if (message.ie === 'pluginReady' || message.ie === 'pageChanged') {
       loadFromPlugin();
     }
     respond(true);

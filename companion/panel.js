@@ -205,6 +205,9 @@ chrome.runtime.onConnect.addListener((port) => {
       showPageOffer();
       drain();
       notifyTabs({ ie: 'pluginReady' });
+    } else if (message.kind === 'pageChanged' && typeof message.url === 'string') {
+      // An extract's Rem was deleted: the page drops its highlight now, not on reload.
+      notifyTabs({ ie: 'pageChanged' }, message.url);
     } else if (message.kind === 'opDone') {
       waiting.get(message.id)?.(message);
       waiting.delete(message.id);

@@ -55,10 +55,11 @@ A small bar stays at the bottom right of every page, with the panel open or clos
 | **Set read point** | Remembers the top of the window as your place on this page |
 | **Go to read point** | Scrolls back to that place |
 | **Import headings** | Adds the page's sections to its document |
+| **›** / **‹** | Hides the bar's buttons on every page, or brings them back. Add Extract still appears when text is selected |
 
 ## Extracts
 
-Select text and press **`Opt+X`** (`Alt+X` on Windows), or click **Add Extract**. The selection becomes an Incremental Rem and turns blue on the page. Bold, italics, links, images and formulas in the selection come along, with formulas as real LaTeX on sites such as Wikipedia. Images stay on their original website, so one disappears from your Rem if the site removes it. To keep a copy in RemNote, use [Store Linked Images & Audio](Utilities-Cleaning-Up.md#store-linked-images-audio).
+Select text and press **`Opt+X`** (`Alt+X` on Windows), or click **Add Extract**. The selection becomes an Incremental Rem and turns blue on the page. Bold, italics, links, images and formulas in the selection come along, with formulas as real LaTeX on sites such as Wikipedia. A selection of several paragraphs stays one Rem, with a blank line between paragraphs and a new line for each list item. Images stay on their original website, so one disappears from your Rem if the site removes it. To keep a copy in RemNote, use [Store Linked Images & Audio](Utilities-Cleaning-Up.md#store-linked-images-audio).
 
 Extracts go in the page's document, which RemNote keeps in its `Links` folder until you move it. The document itself isn't made Incremental, so use [Make Incremental](Getting-Started.md#making-a-rem-incremental) on it if you want it in your queue as well.
 
@@ -94,7 +95,7 @@ Pages whose headings aren't real headings have no sections to import. Extracts f
 
 ## Highlights and the read point
 
-Highlights and the orange read point come back whenever you return to a page, and they don't change the page itself. Deleting an extract's Rem removes its highlight the next time the page loads with the panel connected.
+Highlights and the orange read point come back whenever you return to a page, and they don't change the page itself. Deleting an extract's Rem in the panel removes its highlight from the page at once. Deleted anywhere else, it goes the next time the page loads with the panel connected.
 
 They are found again by their text. If a page has changed so much that an extract's text is gone, a message says how many highlights couldn't be placed. A read point whose text has gone falls back to its old scroll position.
 

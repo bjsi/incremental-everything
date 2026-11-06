@@ -373,6 +373,18 @@ describe('The browser copy', () => {
     assert.equal(pageEntries(b).length, 1);
   });
 
+  it('Asks again when the plugin says an extract of this page is gone, without a reload', async () => {
+    const { plugin } = await connected(emptyState);
+    const asked = () => plugin.seen.filter((op) => op.op === 'pageState').length;
+    const before = asked();
+    plugin.dom.window.postMessage({ ieCompanion: 'toExtension', kind: 'pageChanged', url: URL_A }, '*');
+    await settle(200);
+    assert.equal(asked(), before + 1);
+    plugin.dom.window.postMessage({ ieCompanion: 'toExtension', kind: 'pageChanged', url: 'https://example.org/other' }, '*');
+    await settle(200);
+    assert.equal(asked(), before + 1);
+  });
+
   it('Removes the entry when the last extract is gone', async () => {
     const b = browser();
     b.stored[`page:${TEST_KB.id}:${URL_A}`] = { extracts: [{ remId: 'gone', anchor: { exact: 'Another paragraph.', prefix: '', suffix: '', position: 0 } }], readPoint: null };
