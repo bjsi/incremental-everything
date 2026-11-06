@@ -380,7 +380,8 @@ function showDocument(status) {
   shownDocId = status?.docId ?? null;
   shownStatus = status ?? null;
   docStatus.hidden = !status;
-  if (changedDoc) loadClock();
+  // refreshDocument has loaded it already; a second load could land after a cover written below.
+  if (changedDoc && clockDoc !== shownDocId) loadClock();
   if (status) {
     document.getElementById('docIncremental').hidden = !status.incremental;
     document.getElementById('docDismissed').hidden = !status.dismissed;
@@ -557,16 +558,20 @@ function clockNow(docId = shownDocId) {
   };
 }
 
-const clockSince = (docId = shownDocId) => clockNow(docId).firstReadAt;
+/** Reviews from here on matter: those over unrecorded reading, and queue reviews still to refine. */
+function clockSince(docId = shownDocId) {
+  const first = clockNow(docId).firstReadAt;
+  const pending = refinePending.get(docId);
+  return pending === undefined ? first : Math.min(first ?? pending, pending);
+}
 
 /** Reviews recorded in RemNote while the page was read: their time is not counted twice. */
 function applyReviews(status) {
   if (!status.incremental || !status.reviewsSince?.length) return;
-  // A review still waiting for the Companion's reading keeps that reading on the
-  // clock until it is added, so the clock goes on asking.
-  const waiting = refineHandoffs(status);
-  const settled = status.reviewsSince.filter((review) => !waiting.has(review.date));
-  let cover = C.withWindows(clockCover, C.windowsOf(settled)) ?? clockCover;
+  refineHandoffs(status);
+  // Every review's span leaves the clock at once, a queue review still to refine
+  // as well: the reading in it is that review's, never a second one's.
+  let cover = C.withWindows(clockCover, C.windowsOf(status.reviewsSince)) ?? clockCover;
   if (awaitingPopup?.docId === status.docId && status.reviewsSince.some((review) => review.date >= awaitingPopup.since)) {
     cover = { ...cover, clearedUntil: Math.max(cover?.clearedUntil ?? 0, awaitingPopup.endedAt) };
     awaitingPopup = null;
@@ -577,21 +582,41 @@ function applyReviews(status) {
 // A queue review of a page opened with Use Companion counted wall-clock time from
 // the hand-off on. The reading measured here replaces it, once, with no question.
 const refining = new Set();
+/** Per document, the oldest queue review still to refine, so the status keeps listing it. */
+const refinePending = new Map();
+const refineTimers = new Set();
 
-/** Refines what it can, and says which reviews are still waiting for it. */
+/** The reading after a queue review's hand-off, up to that review. */
+function readAfterHandoff(review) {
+  // A recording made here after the review left its span out (applyReviews), so
+  // only one made before it took any of this reading.
+  const cleared = clockCover?.clearedUntil ?? 0;
+  const read = C.uncovered(clockStored?.segments, { clearedUntil: cleared <= review.date ? cleared : 0 });
+  return C.totalMs(C.within(read, review.companionHandoffAt, review.date));
+}
+
 function refineHandoffs(status) {
-  const waiting = new Set();
-  if (status.docId !== clockDoc) return waiting;
+  if (status.docId !== clockDoc) return;
+  let oldest;
   for (const review of status.reviewsSince) {
     if (!review.companionHandoffAt || review.companionSeconds !== undefined) continue;
-    const read = C.uncovered(clockStored?.segments, { clearedUntil: clockCover?.clearedUntil });
-    const readMs = C.totalMs(C.within(read, review.companionHandoffAt, review.date));
+    const readMs = readAfterHandoff(review);
     // Nothing read here after the hand-off: the queue's own time stands.
     if (readMs < 1000) continue;
-    waiting.add(review.date);
-    // The page saves its last seconds within 15 s of them.
-    if (Date.now() - review.date < 20000) continue;
+    oldest = Math.min(oldest ?? review.date, review.date);
     const key = `${status.docId}:${review.date}`;
+    // The page saves its last seconds within 15 s of them: ask again once it has.
+    const wait = review.date + 20000 - Date.now();
+    if (wait > 0) {
+      if (!refineTimers.has(key)) {
+        refineTimers.add(key);
+        setTimeout(() => {
+          refineTimers.delete(key);
+          if (status.docId === shownDocId) refreshStatus();
+        }, wait + 500);
+      }
+      continue;
+    }
     if (refining.has(key)) continue;
     refining.add(key);
     callPlugin('refineQueueReview', { docId: status.docId, date: review.date, companionSeconds: Math.round(readMs / 1000) })
@@ -607,7 +632,8 @@ function refineHandoffs(status) {
         note(`Could not refine the queue review: ${err.message}`);
       });
   }
-  return waiting;
+  if (oldest === undefined) refinePending.delete(status.docId);
+  else refinePending.set(status.docId, oldest);
 }
 
 /** Pages opened from the queue with Use Companion: counted before the panel ever shows them. */
@@ -739,17 +765,17 @@ function showPastSession(now) {
   ]);
 }
 
-function openRecordConfirm() {
+function openRecordConfirm(lead = '') {
   if (!shownStatus?.incremental) return;
   if (shownStatus.editorTimerRunning) {
     return flashClockBar('The Editor Review Timer is running on this page. End Review there records the review.');
   }
   const now = clockNow();
-  if (now.unrecordedMs < 1000) return flashClockBar('No reading time to record yet.', 3000);
+  if (now.unrecordedMs < 1000) return flashClockBar(lead ? `${lead} Nothing is left to record.` : 'No reading time to record yet.', 3000);
   const until = new Date(now.lastReadAt).toLocaleTimeString(undefined, { timeStyle: 'short' });
   setClockBar(
     'confirm',
-    `Record ${C.formatShort(now.unrecordedMs)} of reading, until ${until}, as a review?`,
+    `${lead ? `${lead} ` : ''}Record ${lead ? 'the other ' : ''}${C.formatShort(now.unrecordedMs)} of reading, until ${until}, as a review?`,
     [
       { label: 'Record', run: () => recordClock(false) },
       { label: 'Choose interval…', run: () => recordClock(true) },
@@ -776,8 +802,20 @@ function confirmDiscard() {
 /** Enter: the scheduler picks the date. Shift+Enter: the Execute Repetition popup, in the panel. */
 async function recordClock(withPopup) {
   const docId = shownDocId;
+  if (!docId || !pluginPort) return closeClockBar();
+  // A review recorded in RemNote moments ago, by the queue's Next say, may not
+  // have reached the panel yet: its time leaves the clock before this records.
+  const coverBefore = clockCover;
+  setClockBar('busy', 'Checking RemNote…');
+  await refreshStatus();
+  if (docId !== shownDocId) return closeClockBar();
+  if (clockCover !== coverBefore) {
+    // The page counts with the new cover from its next tick on.
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    return openRecordConfirm('RemNote has just recorded part of this reading.');
+  }
   const now = clockNow();
-  if (!docId || !pluginPort || now.unrecordedMs < 1000) return closeClockBar();
+  if (now.unrecordedMs < 1000) return flashClockBar('No reading time left to record.', 3000);
   const reviewTimeSeconds = Math.round(now.unrecordedMs / 1000);
   const endedAt = now.lastReadAt;
   setClockBar('busy', withPopup ? 'Opening the review popup…' : 'Recording…');

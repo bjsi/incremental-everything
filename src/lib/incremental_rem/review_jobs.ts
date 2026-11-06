@@ -299,6 +299,7 @@ export async function runReviewJob(
         if (added > 0) {
           await updateHistoryEntry(plugin, remId, companionSession, {
             reviewTimeSeconds: (companionSession.reviewTimeSeconds ?? 0) + added,
+            context: { queueSeconds: (companionSession.context?.queueSeconds ?? 0) + added },
           });
         }
         const at = dayjs(companionSession.date).format('HH:mm');

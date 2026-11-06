@@ -1267,8 +1267,48 @@ describe('The reading clock', () => {
     assert.deepEqual([call.data.docId, call.data.date, call.data.companionSeconds], ['doc1', next, 600]);
     assert.match($('clockText').textContent, /^Added 10 min of Companion reading to the queue review/);
     await settle(1100);
-    assert.deepEqual(coverOf(b).windows, [[handoff, next]]);
+    assert.deepEqual(coverOf(b).windows, [[handoff - 5 * MIN, next]]);
     assert.equal($('clockTime').textContent, '0:00');
+  });
+
+  it('Leaves a queue review\'s reading off the clock at once, and refines that review after Record', async () => {
+    // Next 19 s ago; Record pressed before the refine's wait is over (the bug of Nov 6).
+    const now = Date.now();
+    const handoff = now - 3 * MIN;
+    const review = { date: now - 19000, reviewTimeSeconds: 120, companionHandoffAt: handoff };
+    const { $, b, plugin, press } = await connected({
+      page: false,
+      status: { ...incremental, reviewsSince: [review] },
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[now - 4 * MIN, now - 30000]] } },
+    });
+    assert.deepEqual(coverOf(b).windows, [[handoff, review.date]]);
+    assert.equal($('clockTime').textContent, '1:00');
+    $('clock').click();
+    press('Enter');
+    await settle(300);
+    const recorded = plugin.seen.find((op) => op.op === 'recordPageReview');
+    assert.equal(recorded.data.reviewTimeSeconds, 60);
+    assert.equal(recorded.data.endedAt, handoff);
+    await settle(1500);
+    const refine = plugin.seen.find((op) => op.op === 'refineQueueReview');
+    assert.deepEqual([refine.data.date, refine.data.companionSeconds], [review.date, 150]);
+  });
+
+  it('Checks RemNote again before recording, and leaves out a review that has just arrived', async () => {
+    const now = Date.now();
+    const status = { ...incremental, reviewsSince: [] };
+    const { $, plugin, press } = await connected({
+      page: false,
+      status,
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[now - 10 * MIN, now - MIN]] } },
+    });
+    assert.equal($('clockTime').textContent, '9:00');
+    $('clock').click();
+    status.reviewsSince = [{ date: now - 2 * MIN, reviewTimeSeconds: 6 * 60 }];
+    press('Enter');
+    await settle(1600);
+    assert.equal(plugin.seen.some((op) => op.op === 'recordPageReview'), false);
+    assert.match($('clockText').textContent, /^RemNote has just recorded part of this reading\. Record the other 3 min/);
   });
 
   it('Keeps a handed-off review as it was when the Companion read nothing after the hand-off', async () => {

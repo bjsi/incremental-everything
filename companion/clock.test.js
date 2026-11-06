@@ -35,6 +35,9 @@ describe('reading clock', () => {
     const cover = C.withWindows(null, windows);
     assert.deepEqual(cover.windows, [[40000, 100000]]);
     assert.equal(C.withWindows(cover, windows), null);
+    // A refined review's span overlaps the one it had before: the union is kept.
+    assert.deepEqual(C.withWindows(cover, [[70000, 120000]]).windows, [[40000, 120000]]);
+    assert.equal(C.withWindows(cover, [[50000, 90000]]), null);
   });
 
   it('formats the clock and the total', () => {

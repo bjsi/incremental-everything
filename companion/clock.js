@@ -82,12 +82,20 @@
       .filter(([start, end]) => end > start);
   }
 
-  /** The cover with more windows, once each, newest kept. */
+  /**
+   * The cover with more windows, kept as their union: a queue review's span before
+   * and after the Companion refines it overlap, and count once. Null if nothing new.
+   */
   function withWindows(cover, windows) {
-    const known = new Set((cover?.windows ?? []).map((w) => w.join('-')));
-    const added = windows.filter((w) => !known.has(w.join('-')));
-    if (!added.length) return null;
-    return { ...cover, windows: [...(cover?.windows ?? []), ...added].slice(-MAX_WINDOWS) };
+    const merged = [];
+    for (const [a, b] of [...(cover?.windows ?? []), ...windows].sort((x, y) => x[0] - y[0])) {
+      const last = merged[merged.length - 1];
+      if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+      else merged.push([a, b]);
+    }
+    const kept = merged.slice(-MAX_WINDOWS);
+    if (JSON.stringify(kept) === JSON.stringify(cover?.windows ?? [])) return null;
+    return { ...cover, windows: kept };
   }
 
   /** 12:34, or 1:05:20 past an hour. */

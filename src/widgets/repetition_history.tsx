@@ -133,7 +133,34 @@ function formatRepContext(ctx: NonNullable<IncrementalRep['context']>): string {
         const name = ctx.flashcardName ? `“${ctx.flashcardName}”` : 'flashcard';
         parts.push(`🃏 ${name}${label ? ` · ${label}` : ''}`);
     }
+    const companion = formatCompanionContext(ctx);
+    if (companion) parts.push(companion);
     return parts.join(' · ');
+}
+
+/** "https://en.wikipedia.org/wiki/World_War_II" → "en.wikipedia.org/wiki/World_War_II". */
+function shortUrl(url: string): string {
+    try {
+        const { host, pathname } = new URL(url);
+        return `${host.replace(/^www\./, '')}${pathname === '/' ? '' : decodeURI(pathname)}`;
+    } catch {
+        return url;
+    }
+}
+
+/** Where the Chrome Companion took part: a session it recorded, or a queue review handed to it. */
+function formatCompanionContext(ctx: NonNullable<IncrementalRep['context']>): string {
+    if (ctx.webUrl) {
+        const queue = ctx.queueSeconds ? ` · +${formatDuration(ctx.queueSeconds)} in the queue` : '';
+        return `🌐 Read in the Chrome Companion: ${shortUrl(ctx.webUrl)}${queue}`;
+    }
+    if (ctx.companionHandoffAt) {
+        const at = dayjs(ctx.companionHandoffAt).format('HH:mm');
+        return ctx.companionSeconds !== undefined
+            ? `📎 Queue, then the Chrome Companion from ${at}: ${formatDuration(ctx.companionSeconds) || '0s'} of reading there`
+            : `📎 Queue, then the Chrome Companion from ${at} (time as counted by the queue)`;
+    }
+    return '';
 }
 
 /**
