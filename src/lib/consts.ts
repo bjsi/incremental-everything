@@ -488,7 +488,7 @@ export const mcAssertionLabelsKey = 'mcAssertionLabels';
 /** Session: one mark per assertion, in order: '' (empty), 'T' or 'F'. */
 export const mcAssertionMarksKey = 'mcAssertionMarks';
 /** The sheet's first box centre sits this share of the column below its top… */
-export const mcSheetTopEdge = 0.4;
+export const mcSheetTopEdge = 0.35;
 /** …and its last box centre this share above its bottom; the rest are spaced evenly between. */
 export const mcSheetBottomEdge = 0.1;
 // Timestamp flag set by the IncRem "Next" paths just before they advance the
