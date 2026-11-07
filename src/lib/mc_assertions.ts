@@ -5,7 +5,7 @@
 //
 //     I. In a 3D body, …
 //     • II. On the parallel middle body …
-//     III) At the stern …
+//     III) At the stern …   (or "III- At the stern …")
 //
 // and the options say which are true or false ("Only II is false."). The
 // answer sheet (widgets/mc_assertions.tsx) shows one T/F box per statement.
@@ -16,8 +16,9 @@
 /** A question that numbers more statements than this gets no sheet. */
 export const MAX_ASSERTIONS = 10;
 
-// A line opening with a roman numeral and "." or ")", optionally after a bullet.
-const ASSERTION_LINE = /^[ \t]*(?:[•·▪◦\-–—*][ \t]*)?([IVX]{1,5})[.)][ \t]+\S/;
+// A line opening with a roman numeral and ".", ")" or a dash ("I- ", "II – "),
+// optionally after a bullet. A space must follow the mark.
+const ASSERTION_LINE = /^[ \t]*(?:[•·▪◦\-–—*][ \t]*)?([IVX]{1,5})(?:[.)]|[ \t]*[-–—])[ \t]+\S/;
 
 const ROMAN: Record<string, number> = { I: 1, V: 5, X: 10 };
 

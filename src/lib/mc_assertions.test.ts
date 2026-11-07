@@ -34,6 +34,13 @@ describe('assertionLabels', () => {
     assert.deepEqual(assertionLabels(text), ['I', 'II', 'III', 'IV']);
   });
 
+  it('accepts a dash after the numeral', () => {
+    const text = 'Luiz pode esperar que:\n\nI- Um suprimento.\n\nII- O indicador.\n\nIII – a fonte.\n\nAnalise as afirmativas.';
+    assert.deepEqual(assertionLabels(text), ['I', 'II', 'III']);
+    // A dash needs a space after it, like the other marks.
+    assert.deepEqual(assertionLabels('Q\nI-a\nII-b'), []);
+  });
+
   it('needs at least two statements', () => {
     assert.deepEqual(assertionLabels('Question?\nI. Only one.'), []);
     assert.deepEqual(assertionLabels('No statements at all.'), []);

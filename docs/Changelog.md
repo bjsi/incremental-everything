@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.203 - November 7th, 2026
+
+### ⚡ Improved
+
+**Multiple-Choice Cards**: The scissors of an option that has slid under the answer buttons now slide under with it, instead of showing beside the buttons.
+
+### 🐛 Fixed
+
+**Multiple-Choice Cards**: In the Android app, the scissors and the True/False answer sheet now sit beside the card instead of stacked at the top right of the screen.
+
+**Multiple-Choice Cards**: The True/False answer sheet now also appears when the statements are numbered with a dash (`I- `, `II- `).
+
+📖 [Scissors](Utilities-Multiple-Choice-Cards.md#scissors) · [True/False answer sheet](Utilities-Multiple-Choice-Cards.md#answer-sheet)
+
 ## v1.0.202 - November 6th, 2026
 
 ### ✨ New

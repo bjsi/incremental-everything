@@ -41,6 +41,7 @@ import {
   mcSheetBottomEdge,
   mcSheetTopEdge,
 } from './consts';
+import { DOCKED_CARD_INFO_BAR, QUEUE_BOTTOM_CONTROLS } from './card_info_bar_dock';
 import { assertionLabels, richTextPlain } from './mc_assertions';
 import { getIESetting } from './settings';
 
@@ -54,34 +55,68 @@ const optionSel = (i: number) => `[data-test="multiple-choice-option-choice-${i}
 const wrapperSel = (i: number) =>
   `div.absolute.z-50:nth-child(${i + 1} of div.absolute.z-50:has(iframe[src*="widgetName=${MC_SCISSORS_WIDGET}"]))`;
 
+/* The mobile apps portal the queue into a body-level position: fixed layer that
+   comes after #react-root, where the floating widgets render. An anchor inside a
+   fixed box that is later in tree order than the positioned element is not
+   acceptable, so every anchor() below fell back (all scissors stacked at the top
+   right). While a multiple-choice card is in it, the layer is put back in flow,
+   pulled up over #react-root (which fills the viewport, as does the layer), so it
+   paints where it did and the elements after it keep their place. Measured on
+   Android 1.29.8: html and body do not scroll, and the layer's inline height and
+   bottom only change for the on-screen keyboard. */
+const MOBILE_QUEUE_PORTAL = '#keyboard-aware-portal-before';
+
 /* position: fixed so the containing block is the viewport: an absolutely
    positioned wrapper's containing block is somewhere near #main, and the queue
    may sit inside positioned boxes that come later in tree order, which would
    make the options unacceptable anchors.
 
    The anchor() fallbacks stack the scissors at the top right, so a browser
-   that cannot resolve the anchors still shows them somewhere usable. */
+   that cannot resolve the anchors still shows them somewhere usable.
+
+   The bottom of the Beautiful queue covers the end of the card: the docked
+   card_info_bar, and the answer buttons. An option slid under them is covered,
+   not clipped, so position-visibility keeps its ✂. So each wrapper's bottom is
+   the top of the highest of those (the "floor"): the wrapper is at most one ✂
+   tall, shrinks as its ✂ reaches the floor, and clips what is below it. A floor
+   that is missing falls back to the viewport's bottom edge. */
+const SCISSORS_SIZE = 28;
+const FLOORS = [DOCKED_CARD_INFO_BAR, ...QUEUE_BOTTOM_CONTROLS];
+
 function anchorCss(): string {
-  let css = '';
+  const half = SCISSORS_SIZE / 2;
+  // In `bottom`, anchor() measures from the viewport's bottom: the highest floor is the largest.
+  const floor = `max(${FLOORS.map((_, f) => `anchor(--ie-mc-floor-${f} top, 0px)`).join(', ')})`;
+  let css = FLOORS.map((sel, f) => `
+${sel} { anchor-name: --ie-mc-floor-${f}; }`).join('');
   for (let i = 0; i < MAX_OPTIONS; i++) {
     css += `
 ${optionSel(i)} { anchor-name: --ie-mc-${i}; }
 ${wrapperSel(i)} {
   position: fixed !important;
   position-anchor: --ie-mc-${i};
-  top: anchor(--ie-mc-${i} center, ${80 + 36 * i}px) !important;
+  top: calc(anchor(--ie-mc-${i} center, ${80 + 36 * i + half}px) - ${half}px) !important;
   right: calc(anchor(--ie-mc-${i} left, 16px) + 6px) !important;
   left: auto !important;
-  bottom: auto !important;
-  translate: 0 -50%;
+  bottom: ${floor} !important;
+  height: auto !important;
+  max-height: ${SCISSORS_SIZE}px;
+  overflow: hidden;
   /* Hidden while its option is scrolled fully out of view. */
   position-visibility: anchors-visible;
 }`;
   }
   css += `
-.rn-question-rem { anchor-name: --ie-mc-question; }`;
+.rn-question-rem { anchor-name: --ie-mc-question; }
+${MOBILE_QUEUE_PORTAL}:has(${optionSel(0)}) {
+  position: relative !important;
+  top: 0 !important;
+  bottom: auto !important;
+  margin-top: -100vh !important;
+}`;
   return css;
 }
+
 
 const SHEET_CSS_ID = 'mc-assertions-sheet';
 const SHEET_WRAPPER = `div.absolute.z-50:has(iframe[src*="widgetName=${MC_ASSERTIONS_WIDGET}"])`;

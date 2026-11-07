@@ -10,7 +10,7 @@ Rule options out before you answer, as on a digital exam. Each option of a multi
 
 ![A multiple-choice card in the queue with a ✂ beside each option; clicking a ✂ strikes that option through, and the answer is then picked from the options that are left](assets/mc-scissors.gif){ width="900" }
 
-- The scissors follow their options when the card scrolls or the window is resized, and an option scrolled out of view takes its ✂ with it.
+- The scissors follow their options when the card scrolls or the window is resized, and an option scrolled out of view, or under the answer buttons at the bottom of the queue, takes its ✂ with it.
 - Struck options are only a visual aid: they are not saved, and they clear when the next card comes up.
 - Works in both the Compact and the Beautiful queue.
 - The scissors are on by default. Turn them off in **IR Settings → Queue Display → Scissors on Multiple-Choice Cards**; the change applies from the next card.
@@ -23,7 +23,7 @@ Many exam questions list statements and ask which are true: *"Analyze the senten
 
 ![A multiple-choice question that lists statements I, II and III, with a column of boxes beside it, one per statement, marked T in green or F in red; the options below say which statements are false](assets/mc-answer-sheet.png){ width="700" }
 
-- **Which questions get it**: the statements must be in the question itself, each on its own line and starting with a roman numeral and a full stop or parenthesis, optionally after a bullet: `I. `, `• II. `, `III) `. They must count up from I, and there must be at least two.
+- **Which questions get it**: the statements must be in the question itself, each on its own line and starting with a roman numeral and a full stop, parenthesis or dash, optionally after a bullet: `I. `, `• II. `, `III) `, `IV- `. They must count up from I, and there must be at least two.
 - **Where it sits**: in the same left-hand column as the scissors, beside the question, with its boxes spread evenly over the lower part of the question, where the statements usually are. On a short question with many statements the column runs below the question, so the boxes never crowd together.
 - Marks are not saved: they clear when the next card comes up.
 - On by default. Turn it off in **IR Settings → Queue Display → True/False Answer Sheet on Multiple-Choice Cards**; the change applies from the next card.
@@ -33,4 +33,4 @@ Many exam questions list statements and ask which are true: *"Analyze the senten
 ## Notes { #notes }
 
 - Cards with more than 12 options get no scissors, and questions with more than ten statements show the first ten.
-- In a browser without CSS anchor positioning, the scissors and the answer sheet appear at the top right of the window instead of beside the card; the scissors still match the options in order, top to bottom.
+- Works in the desktop app, the web app and the Android app. In a browser without CSS anchor positioning, the scissors and the answer sheet appear at the top right of the window instead of beside the card; the scissors still match the options in order, top to bottom.
