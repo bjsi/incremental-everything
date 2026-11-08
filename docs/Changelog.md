@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.205 - November 8th, 2026
+
+### 🐛 Fixed
+
+**AI Transcription of PDF Highlights**: **✨** on a larger highlight that starts in a bold heading now also merges the smaller highlights inside it, which stayed separate before.
+
+📖 [A larger highlight over earlier ones](AI-Transcription-of-PDF-Highlights.md#absorb)
+
 ## v1.0.204 - November 7th, 2026
 
 ### ⚡ Improved

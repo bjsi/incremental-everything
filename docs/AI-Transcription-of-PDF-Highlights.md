@@ -146,7 +146,7 @@ Everything that pointed at the smaller highlight moves to the larger one, in the
 - **Tags, sources, portals, children and flashcards** (with their history) move over.
 - A **bookmark** on the smaller highlight now points at the larger one.
 
-The smaller highlight is then deleted. It counts as inside when at least 80% of it lies within the larger one. If both were Incremental Rems, the larger one keeps its own schedule and history.
+The smaller highlight is then deleted. It counts as inside when at least 80% of it lies within the larger one, measured line by line: a line counts as covered when the larger highlight covers it from side to side, even if the two highlights mark that line at slightly different heights (which happens when the larger one starts in a bold heading). If both were Incremental Rems, the larger one keeps its own schedule and history.
 
 ## Undoing a transcription { #restore }
 
