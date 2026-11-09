@@ -378,6 +378,14 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Fallback for lib/clipboard.ts when the index iframe cannot write the clipboard.
+  plugin.app.registerWidget('copy_text_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 420,
+      height: 'auto',
+    },
+  });
+
   // Scan → review → delete for entries left behind in Priority Review Documents.
   // Tall and scrollable because the review stage is also the diagnostic: it lists
   // every document with what it still carries, and you tick which ones to clean.

@@ -288,6 +288,9 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 
 ### Other utilities
 
+- **[Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id)** (`Ctrl+Opt+I`) — `quick: id`
+  Copies the ID of the focused Rem, or of each selected Rem (one per line), to the clipboard; in the queue, the current card's Rem. Silent through the [Local Media Bridge](Local-Media-Bridge.md) helper when it runs, otherwise via a small popup where `Enter` or `⌘C` copies.
+
 - **Toggle Ignore Tag** (`Ctrl+Shift+I`) — `quick: ign`
   Adds or removes the `#ignore` tag on the **focused editor Rem**, or on a **multi-rem selection** (select several rems in the outline and run it from the Omnibar). The plugin registers CSS so ignored rems and their descendants are rendered smaller and slightly dimmed (full opacity returns on hover/focus), and the `#ignore` chip itself is hidden from the editor tag bar to keep the document clean.
   **Multi-rem behavior:** if **every** selected rem is already tagged, the tag is **removed** from all; otherwise it is **added** to those that lack it (so a mixed selection becomes uniformly tagged).

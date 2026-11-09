@@ -27,6 +27,7 @@ Reach a Rem, a source or a figure that RemNote’s own search will not surface.
 - [Filter a Document by Images](Utilities-Finding-and-Navigating.md#filter-a-document-by-images)
 - [Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website)
 - [Readable Breadcrumbs in Rem Preview](Utilities-Finding-and-Navigating.md#readable-breadcrumbs-in-rem-preview)
+- [Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id)
 
 ## [Queue Display](Utilities-Queue-Display.md)
 

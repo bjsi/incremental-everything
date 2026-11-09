@@ -203,6 +203,7 @@ import {
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { batchPriorityTargetRemIdsKey, titleCaseAcronymsId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
+import { copyTextToClipboard } from '../lib/clipboard';
 
 // Opens a priority popup against one or many rems. Single-rem calls behave
 // exactly as before; multi-rem calls hand the full id list to the widget through
@@ -3538,6 +3539,44 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       // run in the tracker and the queue advances at once.
       const remType = await plugin.storage.getSession<string | null>(currentIncrementalRemTypeKey);
       await queueNextRepetition(plugin, rem._id, { syncPdfPage: remType === 'pdf' });
+    },
+  });
+
+  // ─── Copy Rem ID ─────────────────────────────────────────────────────────
+  // For pointing an AI agent (MCP) or a debug tool at a Rem. Selected Rems win
+  // (one ID per line), then the Rem with the caret, then the card in the queue.
+  plugin.app.registerCommand({
+    id: 'copy-rem-id',
+    name: 'Copy Rem ID',
+    description: 'Copies the ID of the focused Rem (or of each selected Rem, one per line) to the clipboard.',
+    keyboardShortcut: 'ctrl+opt+i',
+    quickCode: 'id',
+    action: async () => {
+      let remIds: string[] = [];
+      const sel = await getEffectiveSelection(plugin);
+      if (sel?.type === SelectionType.Rem && sel.remIds?.length) {
+        remIds = sel.remIds;
+      } else if (sel?.type === SelectionType.Text && sel.remId) {
+        remIds = [sel.remId];
+      } else {
+        const focused = await plugin.focus.getFocusedRem();
+        if (focused) {
+          remIds = [focused._id];
+        } else if ((await plugin.window.getURL()).includes('/flashcards')) {
+          const card = await plugin.queue.getCurrentCard();
+          if (card?.remId) remIds = [card.remId];
+        }
+      }
+
+      if (remIds.length === 0) {
+        await plugin.app.toast('No Rem focused or selected.');
+        return;
+      }
+      await copyTextToClipboard(
+        plugin,
+        remIds.join('\n'),
+        remIds.length === 1 ? 'Rem ID' : `${remIds.length} Rem IDs`
+      );
     },
   });
 

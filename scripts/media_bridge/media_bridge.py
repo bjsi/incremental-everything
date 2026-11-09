@@ -42,6 +42,8 @@ Endpoints (127.0.0.1:3460, CORS open, for the plugin iframe):
                                polling without v=2 is an older build: it gets only
                                localize jobs, the rest wait for a build that knows them.
   POST /result {jobId, …}      plugin answer
+  POST /clipboard {text}       puts text on the system clipboard (pbcopy). Plugin iframes
+                               have no clipboard-write permission, so "Copy Rem ID" asks here.
   POST /shutdown
 """
 from __future__ import annotations
@@ -64,7 +66,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 3  # 3: /upscale
+VERSION = 4  # 3: /upscale, 4: /clipboard
 # The jobs a plugin build understands, by the protocol version it polls with.
 OPS_BY_PLUGIN_VERSION = {1: {"localize"}, 2: {"localize", "move", "untag", "get-image", "incrementalize"}}
 KNOWN_OPS = OPS_BY_PLUGIN_VERSION[max(OPS_BY_PLUGIN_VERSION)]
@@ -230,6 +232,16 @@ class Handler(BaseHTTPRequestHandler):
             _tasks[task["id"]] = task
             threading.Thread(target=_run_upscale, args=(task,), daemon=True).start()
             return self._json(200, {"taskId": task["id"]})
+        if url.path == "/clipboard":
+            text = body.get("text")
+            if not isinstance(text, str) or not text:
+                return self._json(400, {"error": "text required"})
+            if not shutil.which("pbcopy"):
+                return self._json(501, {"error": "pbcopy not available"})
+            proc = subprocess.run(["pbcopy"], input=text, text=True, capture_output=True, timeout=5)
+            if proc.returncode != 0:
+                return self._json(500, {"error": proc.stderr.strip() or "pbcopy failed"})
+            return self._json(200, {"ok": True})
         if url.path == "/result":
             job = _jobs.get(str(body.get("jobId")))
             if not job:

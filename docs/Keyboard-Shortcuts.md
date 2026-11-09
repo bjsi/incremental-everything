@@ -61,6 +61,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | :--- | :--- | :--- | :--- |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Opens the main view popup showing all Incremental Rems with filtering and sorting. | Global |
 | `Ctrl` + `Shift` + `H` | [Open Repetition History](Repetition-History-and-Statistics.md) | Routes to the right view: **Single History** for an Incremental Rem, **[Flashcard History](Plugin-Widgets-Reference.md#211-flashcard-repetition-history)** (all of the Rem's cards) for a flashcard, **Aggregated History** for a folder with incremental descendants. A Rem that is both offers a button across. *(May conflict on Windows — see [Windows Notes](#windows-notes))* | Editor and Queue |
+| `Ctrl` + `Alt` + `I` | [Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id) | Copies the ID of the focused Rem (or of each selected Rem, one per line) to the clipboard — handy for pointing an AI assistant at a Rem through the MCP. | Editor and Queue |
 | `Ctrl` + `Shift` + `I` | [Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities) | Adds/removes the `#ignore` tag on the focused Rem **or a multi-rem selection** (run from the Omnibar). Ignored rems are shrunk and dimmed (full opacity on hover/focus) and the tag chip is hidden — used during IR to mark already-read snippets that don't deserve becoming Incremental. | Editor Only |
 
 ### Chrome Companion Extension
@@ -195,6 +196,7 @@ Function keys carry the utilities whose natural letter combination was already t
 
 | Shortcut | Command | Context |
 | :--- | :--- | :--- |
+| `Ctrl` + `Alt` + `I` | [Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id) | Editor and Queue |
 | `Ctrl` + `Alt` + `P` | [Quick Set Priority](Prioritization-&-Sorting.md#light-priority-popup) (light popup) | Editor and Queue |
 | `Ctrl` + `Alt` + `↑` | [Quick Increase Priority Number](Prioritization-&-Sorting.md#quick-priority-shortcuts) (less important) | Editor and Queue |
 | `Ctrl` + `Alt` + `↓` | [Quick Decrease Priority Number](Prioritization-&-Sorting.md#quick-priority-shortcuts) (more important) | Editor and Queue |
@@ -259,6 +261,8 @@ These keys are active **while a plugin popup or floating window is open** — th
 | | `←` / `→` | Go to the buttons, and between them |
 | | `Enter` | Mark the ticked cards (or press the button you are on) |
 | | `Esc` | Cancel and close |
+| [Copy Rem ID popup](Utilities-Finding-and-Navigating.md#copy-rem-id) | `Enter` or `Ctrl`/`Cmd` + `C` | Copy the ID and close |
+| | `Esc` | Close without copying |
 | [Floating source window](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing) | `Esc` | Close the window **without** closing the queue |
 | [Select Parent popup](Create-Incremental-Rem-from-PDF-Highlights.md#keyboard-shortcuts) | `E` | Close the list and [pick the parent in the editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) |
 | [Pick-in-editor card](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | `Esc` | Cancel the pick, **even while typing in the editor** |

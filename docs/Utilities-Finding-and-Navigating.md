@@ -423,3 +423,15 @@ The popup itself stays at RemNote's 700px. If you want it wider, and the breadcr
 ```
 
 At 900px each breadcrumb shows about 22 characters. The rule widens the whole popup (Reference, Explain and Mnemonic tabs too), so it does not change width when you switch tabs. RemNote places the hover popup once, when it opens. With a very large width, check that it still fits when the reference is near the right edge of the screen.
+
+## Copy Rem ID { #copy-rem-id }
+
+Copies a Rem's ID to the clipboard, so you can point an AI assistant (through the RemNote MCP) or a script at that exact Rem instead of describing it.
+
+- **Shortcut:** `Ctrl+Opt+I` (`Ctrl+Alt+I` on Windows), or **Copy Rem ID** / `id` in the Omnibar.
+- **Which Rem:** the selected Rems (one ID per line), otherwise the Rem with the cursor, otherwise, in the queue, the current card's Rem.
+
+RemNote does not let plugins write to the clipboard by themselves, so how the copy happens depends on the [Local Media Bridge](Local-Media-Bridge.md):
+
+- **Bridge on and the helper running:** the helper copies the ID and a toast confirms it. Nothing else to do.
+- **Otherwise:** a small popup shows the ID already selected. Press `Enter` or `⌘C` / `Ctrl+C` to copy it and close the popup, or `Esc` to cancel.
