@@ -226,6 +226,10 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **Store linked images & audio in RemNote (with descendants)**
   The same, over the focused or selected Rems and their whole subtree — point it at a document to store everything it links to.
 
+- <a id="upscale-image-with-chatgpt"></a>**Upscale image with ChatGPT** — `quick: upi`
+  Regenerates the focused Rem's image (each image in turn, front and back) at a higher resolution with ChatGPT's image model, then shows the original beside the result with an automatic check for changes. **Replace image** swaps the new image into the Rem in place; nothing changes until you press it. Keep the popup open while it works (about 45 seconds per image). Needs the **Local Media Bridge** setting, its helper and the Codex CLI signed in with a paid ChatGPT plan.
+  📖 See [Local Media Bridge → Upscale an image with ChatGPT](Local-Media-Bridge.md#upscale).
+
 - <a id="cycle-image-size"></a>**Cycle Image Size (Fit / Large / Medium / Small / Original)** (`Opt+Shift+G` / `Alt+Shift+G`) — `quick: cis`
   Resizes the images of a card or Rem, including imported ones the queue can show zoomed in and cut off. Each press moves them one step along **Fit → Large → Medium → Small → Original**, and a small bar shows the size set.
   Acts on the current queue card (or the Rem selected in the previewer), or on the focused or selected Rems in the editor, and three levels below. It asks first before changing images you have sized, or more than 5 images. Image Occlusions and highlight images are left alone.

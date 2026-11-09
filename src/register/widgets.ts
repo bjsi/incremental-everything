@@ -634,6 +634,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
       height: 'auto',
     },
   });
+  // Upscale image with ChatGPT: progress, side-by-side + fidelity check, replace (lib/upscale_image.ts).
+  // Fixed, screen-fitted frame: 'auto' measures the popup before the side-by-side
+  // image has loaded, so the result spilled out of the frame. The body scrolls.
+  plugin.app.registerWidget('upscale_image_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 960,
+      height: screenFittedHeight(640, 1100),
+    },
+  });
   plugin.app.registerWidget('image_size_feedback', WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 'auto' },
   });

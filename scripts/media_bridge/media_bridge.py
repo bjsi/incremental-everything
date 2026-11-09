@@ -34,6 +34,10 @@ Endpoints (127.0.0.1:3460, CORS open, for the plugin iframe):
   GET  /files/<name>           a stored file
   POST /jobs {op?, remIds, …}  → {jobId}   (op defaults to "localize")
   GET  /jobs/<id>              {status: queued|taken|done, result?}
+  POST /upscale {remId, url, kbId?, extra?} → {taskId}   (plugin → helper: the
+                               "Upscale image with ChatGPT" command; runs upscale_image.py,
+                               i.e. Codex CLI image generation + the fidelity check)
+  GET  /upscale/<id>           {status: queued|running|done, stage, result?}
   GET  /next?wait=25&v=2       plugin long-poll → {id, op, remIds, …} or 204. A plugin
                                polling without v=2 is an older build: it gets only
                                localize jobs, the rest wait for a build that knows them.
@@ -60,7 +64,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 2
+VERSION = 3  # 3: /upscale
 # The jobs a plugin build understands, by the protocol version it polls with.
 OPS_BY_PLUGIN_VERSION = {1: {"localize"}, 2: {"localize", "move", "untag", "get-image", "incrementalize"}}
 KNOWN_OPS = OPS_BY_PLUGIN_VERSION[max(OPS_BY_PLUGIN_VERSION)]
@@ -78,6 +82,9 @@ REDELIVER_AFTER_S = 120  # a localize job taken but never answered goes back to 
 # plugin reloaded mid-job) is marked lost instead, so it cannot run later, after
 # newer commands, once its caller has given up.
 REPEATABLE_OPS = {"localize"}
+
+UPSCALE_SCRIPT = Path(__file__).resolve().parent / "upscale_image.py"
+UPSCALE_HOME = Path(os.environ.get("REMNOTE_UPSCALE_HOME", Path.home() / "Pictures" / "remnote-upscale"))
 
 # --- server --------------------------------------------------------------------
 
@@ -154,6 +161,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "not found"})
             ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
             return self._send(200, path.read_bytes(), ctype)
+        if url.path.startswith("/upscale/"):
+            task = _tasks.get(url.path[len("/upscale/"):])
+            if not task:
+                return self._json(404, {"error": "no such task (helper restarted?)"})
+            out = {k: task.get(k) for k in ("id", "remId", "status", "stage", "result")}
+            out["elapsed"] = round(time.time() - task["createdAt"])
+            return self._json(200, out)
         if url.path.startswith("/jobs/"):
             job = _jobs.get(url.path[len("/jobs/"):])
             if not job:
@@ -205,6 +219,17 @@ class Handler(BaseHTTPRequestHandler):
                 if job["status"] == "queued":
                     job["status"], job["result"] = "done", {"ok": False, "cancelled": True}
             return self._json(200, {"status": job["status"], "cancelled": bool((job["result"] or {}).get("cancelled"))})
+        if url.path == "/upscale":
+            if not body.get("remId") or not isinstance(body.get("url"), str) or not body["url"]:
+                return self._json(400, {"error": "remId and url required"})
+            task = {
+                "id": uuid.uuid4().hex[:12], "remId": str(body["remId"]), "url": body["url"],
+                "kbId": body.get("kbId"), "extra": body.get("extra") or "",
+                "status": "running", "stage": "starting", "result": None, "createdAt": time.time(),
+            }
+            _tasks[task["id"]] = task
+            threading.Thread(target=_run_upscale, args=(task,), daemon=True).start()
+            return self._json(200, {"taskId": task["id"]})
         if url.path == "/result":
             job = _jobs.get(str(body.get("jobId")))
             if not job:
@@ -216,6 +241,69 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
         self._json(404, {"error": "unknown path"})
+
+
+# --- upscale (plugin → helper) ------------------------------------------------------
+
+_tasks: dict[str, dict] = {}
+_upscale_lock = threading.Lock()  # one Codex image generation at a time
+
+
+def _publish(path: str, task_id: str) -> str:
+    """Serve a result file from the store; returns its URL."""
+    src = Path(path)
+    name = f"up-{task_id}-{re.sub(r'[^A-Za-z0-9._-]+', '-', src.name)}"
+    shutil.copyfile(src, STORE / name)
+    return f"{BASE}/files/{quote(name)}"
+
+
+def _run_upscale(task: dict) -> None:
+    tid = task["id"]
+    try:
+        task["stage"] = "fetching the image"
+        data, ext = _fetch_image(task["url"], task.get("kbId"))
+        folder = UPSCALE_HOME / re.sub(r"[^A-Za-z0-9_-]", "_", task["remId"]) / time.strftime("%Y%m%d-%H%M%S")
+        folder.mkdir(parents=True, exist_ok=True)
+        src = folder / f"original{ext}"
+        src.write_bytes(data)
+        task["stage"] = "waiting for another upscale" if _upscale_lock.locked() else "generating"
+        with _upscale_lock:
+            task["stage"], task["startedAt"] = "generating", time.time()
+            cmd = [sys.executable, "-I", str(UPSCALE_SCRIPT), "upscale", str(src), "--out", str(folder)]
+            if task.get("extra"):
+                cmd += ["--extra", str(task["extra"])]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1500)
+        try:
+            res = json.loads(proc.stdout)
+        except ValueError:
+            raise RuntimeError((proc.stderr or proc.stdout or "upscale_image.py gave no answer").strip()[-600:])
+        if not res.get("upscaled"):
+            msg = res.get("error") or "no image came back"
+            last = (res.get("messages") or [""])[-1]
+            raise RuntimeError(f"{msg}{' — ' + last if last else ''}")
+        chk = res.get("check") or {}
+        task["result"] = {
+            "ok": True,
+            "seconds": res.get("seconds"),
+            "folder": str(folder),
+            "upscaledUrl": _publish(res["upscaled"], tid),
+            "origSize": chk.get("orig_size"), "newSize": chk.get("new_size"),
+            "verdict": chk.get("verdict"), "flags": chk.get("flags", []),
+            "sideBySideUrl": _publish(chk["side_by_side"], tid) if chk.get("side_by_side") else None,
+            "diffUrl": _publish(chk["diff_overlay"], tid) if chk.get("diff_overlay") else None,
+            "crops": [{"kind": c["kind"], "px": c["px"], "url": _publish(c["crop"], tid)}
+                      for c in chk.get("change_crops", [])],
+            "ocrWordDiff": (chk.get("ocr") or {}).get("word_diff", []),
+            "metrics": {k: chk.get(k) for k in ("missing_pct", "added_pct", "hue_shift_gt40_pct",
+                                                "color_lost_pct", "aspect_deviation", "iou")},
+        }
+    except Exception as err:  # reported to the plugin, which shows it
+        task["result"] = {"ok": False, "message": str(err)}
+    finally:
+        task["status"], task["stage"] = "done", "done"
+        print(f"{time.strftime('%H:%M:%S')} upscale {tid} {task['remId']}: "
+              f"{'ok ' + str(task['result'].get('verdict')) if task['result'].get('ok') else task['result'].get('message')}",
+              file=sys.stderr, flush=True)
 
 
 def _prune_store() -> None:

@@ -15,6 +15,7 @@ import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote, pinSourceQuotesInTree } from '../lib/pdf_source_pins';
 import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { localizeMediaInRems } from '../lib/localize_media';
+import { openUpscaleImage } from '../lib/upscale_image';
 import { showMessageDialog } from '../lib/message_dialog';
 import {
   addVideoTranscript,
@@ -50,6 +51,7 @@ import {
   pinSourceQuotesInTreeCommandId,
   localizeMediaCommandId,
   localizeMediaTreeCommandId,
+  upscaleImageCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
   allCardPriorityInfoKey,
@@ -362,6 +364,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Store linked images & audio in RemNote',
     quickCode: 'slm',
     action: async () => runLocalizeMedia(false),
+  });
+
+  await plugin.app.registerCommand({
+    id: upscaleImageCommandId,
+    name: 'Upscale image with ChatGPT',
+    description: "Regenerate the focused rem's image at a higher resolution (Local Media Bridge + Codex CLI), compare, replace.",
+    quickCode: 'upi',
+    action: async () => openUpscaleImage(plugin),
   });
 
   await plugin.app.registerCommand({

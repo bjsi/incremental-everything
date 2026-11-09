@@ -1,6 +1,6 @@
 # Local Media Bridge
 
-Lets tools outside RemNote — scripts, or an AI assistant writing through the RemNote MCP — put **local images** into your rems and have RemNote **store them itself**, as if you had pasted them. It also lets them [move rems, remove tags, read out images and make rems Incremental](#operations). **Desktop app only; the helper is a small Python script (macOS, Linux or Windows).**
+Lets tools outside RemNote — scripts, or an AI assistant writing through the RemNote MCP — put **local images** into your rems and have RemNote **store them itself**, as if you had pasted them. It also lets them [move rems, remove tags, read out images and make rems Incremental](#operations), and it runs the command [Upscale image with ChatGPT](#upscale). **Desktop app only; the helper is a small Python script (macOS, Linux or Windows).**
 
 ## Why it is needed { #why }
 
@@ -108,6 +108,35 @@ Other commands: `start`, `status`, `stop`. Files are kept in `~/.remnote-media-b
 !!! warning "Do not leave the link behind"
     Until `localize` has run, the image shows only while the helper is running, and only on this computer.
 
+## Upscale an image with ChatGPT { #upscale }
+
+A figure taken from a scanned book is often blurry. ChatGPT's image model can redraw it at a higher resolution and usually keeps it exactly as it was: the same curves, labels and formulas. The command **Upscale image with ChatGPT** (`upi`) does this from inside RemNote, using your ChatGPT subscription rather than a paid API key.
+
+1. Put the cursor in the Rem that has the image and run **Upscale image with ChatGPT**.
+2. A popup opens and the helper sends the image to ChatGPT. This takes about 45 seconds per image. **Keep the popup open**: if you close it, the generation finishes but nothing is replaced (the result is only saved on disk).
+3. The popup shows the original beside the result and the outcome of an automatic check:
+    - **✓ Same content**: no line, colour or word changed.
+    - **⚠ Check before replacing**: something differs. The popup lists what, and shows zoomed views of each region that changed (original on the left, new on the right). **Differences** colours the overlay: grey is in both images, red only in the original, blue only in the new one.
+4. Compare the two images yourself, especially digits, symbols and formulas, which the check cannot read. Then press **Replace image**, or **Try again**, optionally with an instruction such as *the dashed lines must stay dashed*.
+
+**Replace image** stores the new image in RemNote and swaps it into the Rem in place: the caption, the display width and the flashcards stay as they were. A Rem with several images goes through them one at a time, and **Skip this image** passes one by. Every run is saved under `~/Pictures/remnote-upscale/<remId>/<date-time>/`, including the original, so a replaced image can always be put back by hand.
+
+### Setup { #upscale-setup }
+
+The upscaling runs in the helper on your computer, not in RemNote:
+
+1. The **Local Media Bridge** setting on and the helper running (see [Setup](#setup)). After updating the plugin, restart the helper so it is version 3 or later: the command says so if it is not.
+2. The [Codex CLI](https://learn.chatgpt.com/docs/codex/cli), signed in with your ChatGPT account. This needs a paid ChatGPT plan (Go, Plus, Pro…): image generation is not available on the Free plan. Each image counts against the plan's Codex usage limits, about 3–5 times a normal request.
+
+    ```bash
+    npm install -g @openai/codex
+    codex login          # choose "Sign in with ChatGPT"
+    ```
+
+3. For the check, the Python that runs the helper needs `Pillow`, `numpy` and `scipy` (`python3 -m pip install pillow numpy scipy`). On macOS, `pyobjc-framework-Vision` adds the check of words; without it that part is skipped.
+
+The same script works from a terminal, without RemNote: `python3 upscale_image.py upscale figure.png` makes and checks an upscaled copy of a file, and `python3 upscale_image.py compare original.png new.png` only runs the check. Both print the result as JSON.
+
 ## Rem operations { #operations }
 
 The same helper also carries a few operations that the RemNote MCP cannot do. The plugin runs them with its own code, so an outside tool (or an AI assistant) gets the same result as doing it by hand in RemNote:
@@ -131,4 +160,4 @@ Each command prints the plugin's answer as JSON and exits with `0` when everythi
 Unlike `localize`, these commands never run late: if the plugin does not answer before the command gives up, a job still waiting is cancelled, and a job the plugin took but never finished (for example because the plugin reloaded) is reported as lost rather than run again. Check the rems and run the command again.
 
 !!! note "Plugin and helper versions"
-    These operations need this plugin version and the matching `media_bridge.py`. An older plugin still gets `localize` jobs; the others wait, and the command warns that the plugin does not know them yet. After updating the script, restart the helper (`media_bridge.py stop`, or `launchctl kickstart -k …` when it runs at login).
+    These operations need this plugin version and the matching `media_bridge.py`; **Upscale image with ChatGPT** needs helper version 3 (`media_bridge.py status` shows the version). An older plugin still gets `localize` jobs; the others wait, and the command warns that the plugin does not know them yet. After updating the script, restart the helper (`media_bridge.py stop`, or `launchctl kickstart -k …` when it runs at login).

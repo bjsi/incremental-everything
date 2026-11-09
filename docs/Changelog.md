@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.207 - November 9th, 2026
+
+### ✨ New
+
+**Upscale image with ChatGPT** (`upi`): Regenerates the focused Rem's figure at a higher resolution with ChatGPT's image model, through the Local Media Bridge helper and the Codex CLI signed in with your ChatGPT plan. A popup shows the original beside the result, with an automatic check for changed lines, colours and words, and zoomed views of every region that changed. **Replace image** swaps it into the Rem in place, keeping the caption and display size.
+
+📖 [Upscale an image with ChatGPT](Local-Media-Bridge.md#upscale)
+
 ## v1.0.206 - November 9th, 2026
 
 ### ✨ New
