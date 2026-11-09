@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.211 - November 9th, 2026
+
+### ✨ New
+
+**Copy Rem ID** (`Ctrl+Opt+I`, `id`): Copies the ID of the focused Rem, or of each selected Rem, to the clipboard, ready to hand to an AI assistant through the RemNote MCP.
+
+📖 [Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id)
+
 ## v1.0.210 - November 9th, 2026
 
 ### ✨ New
