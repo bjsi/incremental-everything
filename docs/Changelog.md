@@ -2,7 +2,7 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
-## v1.0.207 - November 9th, 2026
+## v1.0.210 - November 9th, 2026
 
 ### ✨ New
 
