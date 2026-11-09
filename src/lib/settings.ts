@@ -1386,8 +1386,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Uploads into RemNote the images that outside tools (such as Claude through the RemNote MCP) ' +
       'write as links to the local media-bridge helper (scripts/media_bridge/media_bridge.py, ' +
       'http://127.0.0.1:3460). Since RemNote 1.29 a file:// image written from outside is never ' +
-      'uploaded; this does it, the same way as "Store linked images & audio in RemNote". Leave off ' +
-      'unless you use the helper.',
+      'uploaded; this does it, the same way as "Store linked images & audio in RemNote". The helper ' +
+      'can also ask the plugin to move rems, remove tags, read out images and make rems Incremental. ' +
+      'Leave off unless you use the helper.',
   },
 
   // --- Misc ---

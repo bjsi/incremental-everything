@@ -1,6 +1,6 @@
 # Local Media Bridge
 
-Lets tools outside RemNote — scripts, or an AI assistant writing through the RemNote MCP — put **local images** into your rems and have RemNote **store them itself**, as if you had pasted them. **Desktop app only; the helper is a small Python script (macOS, Linux or Windows).**
+Lets tools outside RemNote — scripts, or an AI assistant writing through the RemNote MCP — put **local images** into your rems and have RemNote **store them itself**, as if you had pasted them. It also lets them [move rems, remove tags, read out images and make rems Incremental](#operations). **Desktop app only; the helper is a small Python script (macOS, Linux or Windows).**
 
 ## Why it is needed { #why }
 
@@ -107,3 +107,28 @@ Other commands: `start`, `status`, `stop`. Files are kept in `~/.remnote-media-b
 
 !!! warning "Do not leave the link behind"
     Until `localize` has run, the image shows only while the helper is running, and only on this computer.
+
+## Rem operations { #operations }
+
+The same helper also carries a few operations that the RemNote MCP cannot do. The plugin runs them with its own code, so an outside tool (or an AI assistant) gets the same result as doing it by hand in RemNote:
+
+| Command | What it does |
+|---|---|
+| `move <rem>[,<rem>…] <parent> [position]` | Moves the rems under `parent`, in the order given. `position` is `first`, `last` (default), a 0-based index among the parent's visible children, `before:<remId>` or `after:<remId>`. `--expect-parent <id>` refuses unless each rem is still where you think it is; `--dry-run` only reports. A rem cannot be moved under itself or its own descendants. |
+| `untag <rem>[,<rem>…] <tag>` | Removes a tag, given by id or by name as shown in RemNote. Also removes built-in powerups such as **Extra Card Detail** or **Quote**, by name or as `powerup:<code>` (`powerup:x`). `--drop-properties` also deletes the tag's property values. The **Incremental** tag is refused: dismiss the rem instead, which keeps its history. |
+| `get-image <rem> [--out DIR]` | Copies the images of the rem (front and back) to files, by default in `~/.remnote-media-bridge/out/`, and prints their paths. Images stored in RemNote are read from RemNote's own folder on this computer; linked ones are downloaded. |
+| `incrementalize <rem>[,<rem>…] [--priority N]` | Makes the rems Incremental exactly like the plugin's own command: first date from the Initial Interval, the history entry, the cache and the inheritance cascade. Without `--priority` the priority is inherited or the default. On a rem that is already Incremental, `--priority` changes its priority (recorded in its history as *Local bridge* 🔌). |
+
+```bash
+python3 media_bridge.py move AbC123 XyZ789 after:QrS456
+python3 media_bridge.py untag AbC123 "Extra Card Detail"
+python3 media_bridge.py get-image AbC123
+python3 media_bridge.py incrementalize AbC123,DeF456 --priority 20
+```
+
+Each command prints the plugin's answer as JSON and exits with `0` when everything worked, `1` when something failed (the message says what), and `2` when the plugin did not answer in time. RemNote shows a toast for each operation except `get-image`; the console logs them under `[MediaBridge]`.
+
+Unlike `localize`, these commands never run late: if the plugin does not answer before the command gives up, a job still waiting is cancelled, and a job the plugin took but never finished (for example because the plugin reloaded) is reported as lost rather than run again. Check the rems and run the command again.
+
+!!! note "Plugin and helper versions"
+    These operations need this plugin version and the matching `media_bridge.py`. An older plugin still gets `localize` jobs; the others wait, and the command warns that the plugin does not know them yet. After updating the script, restart the helper (`media_bridge.py stop`, or `launchctl kickstart -k …` when it runs at login).

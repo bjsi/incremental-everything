@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.206 - November 9th, 2026
+
+### ✨ New
+
+**Local Media Bridge**: Besides storing images, the helper can now ask the plugin to move rems, remove tags (Extra Card Detail and other built-in powerups included), copy a rem's images to files, and make rems Incremental with a given priority — the operations the RemNote MCP lacks, done by the plugin itself.
+
+📖 [Rem operations](Local-Media-Bridge.md#operations)
+
 ## v1.0.205 - November 8th, 2026
 
 ### 🐛 Fixed
