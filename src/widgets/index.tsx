@@ -1,3 +1,5 @@
+// First: times every RemNote call and keeps recent log lines for stall reports.
+import { startStallMonitor } from '../lib/stall_diagnostics';
 import { declareIndexPlugin, ReactRNPlugin } from '@remnote/plugin-sdk';
 import { registerStartupShieldCoolingScan } from '../lib/priority_review_document/shield_cooling_scan';
 import '../style.css';
@@ -65,6 +67,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   console.log('Plugin.app methods:', Object.keys(plugin.app));
   console.log('Plugin.storage methods:', Object.keys(plugin.storage));
 
+  startStallMonitor(plugin);
   (window as any).__plugin = plugin;
   registerJumpToRemHelper(plugin);
 

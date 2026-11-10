@@ -9,6 +9,7 @@
 // column beside the question with CSS anchor positioning. Nothing is saved: the
 // marks are session state and are cleared when the card changes.
 
+import '../lib/stall_diagnostics';
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React, { useEffect } from 'react';
 import '../rn_theme_vars.css';

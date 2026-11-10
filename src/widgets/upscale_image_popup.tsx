@@ -1,3 +1,4 @@
+import '../lib/stall_diagnostics';
 import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
