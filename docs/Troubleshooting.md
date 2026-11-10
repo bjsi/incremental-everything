@@ -775,7 +775,7 @@ One exception: a hint can't extend beyond the plugin window it belongs to. In st
 
 The plugin watches for these stalls and writes what it saw to the developer console (desktop app: **View → Toggle Developer Tools**, then the **Console** tab; web app: `F12`). It writes nothing while things are normal, apart from one `[StallDiag] watching for stalls since …` line at startup.
 
-- `[StallDiag] ⚠️ STALL started …`: RemNote has stopped answering the plugin quickly. The line lists the calls still waiting and the plugin's most recent log lines, which name the job that was running.
+- `[StallDiag] ⚠️ STALL started …`: RemNote has stopped answering the plugin quickly. The line lists the calls still waiting; the plugin's log lines just above it name the job that was running.
 - `[StallDiag] main thread blocked for …`: the plugin's own work froze all of its widgets for that long.
 - `[StallDiag] widget "…"`: a single widget reporting its own slow calls, so you can see which widgets were waiting.
 - `[StallDiag] ✅ stall ended …`: how long it lasted, and whether the plugin's own work or the wait for RemNote caused it.

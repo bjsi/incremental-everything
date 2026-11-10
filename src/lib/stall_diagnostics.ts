@@ -28,8 +28,10 @@ import { RNPlugin } from '@remnote/plugin-sdk';
      window is hidden, when Chromium throttles timers anyway).
    - A cheap bridge probe (a session read) every 5 s. An answer slower than 3 s opens
      a stall episode: a start report, a progress line every 20 s, an end summary.
-   - A ring of the index's recent console lines, so a report says which job was
-     running (the jobs already log when they are picked up and complete).
+   Which job was running is read from the console lines around a report: the
+   jobs already log when they are picked up and complete. (An earlier version
+   kept them in a ring by wrapping console.log, but a wrapper makes DevTools
+   attribute EVERY log line of the plugin to the wrapper's own file and line.)
 
    Everything is silent until something is slow. */
 
@@ -45,13 +47,11 @@ const BRIDGE_SLOW_MS = 3000;
 const BRIDGE_OK_MS = 1000;
 const STALL_QUIET_MS = 5000;
 const PROGRESS_EVERY_MS = 20_000;
-const LOG_RING_SIZE = 40;
 
 type InFlightCall = { method: string; startedAt: number };
 type Bucket = { sec: number; total: number; byMethod: Map<string, number> };
 type SlowCall = { method: string; ms: number; endedAt: number };
 type LongTask = { at: number; ms: number; who: string };
-type LogLine = { at: number; level: string; text: string };
 
 const frameName: string = (() => {
   try {
@@ -244,39 +244,6 @@ function maybeReportWidget(trigger: string) {
 
 // ---------------------------------------------------------------- index monitor
 
-const logRing: LogLine[] = [];
-
-function summarizeArg(arg: unknown): string {
-  if (typeof arg === 'string') return arg.length > 160 ? `${arg.slice(0, 160)}…` : arg;
-  if (typeof arg === 'number' || typeof arg === 'boolean' || arg == null) return String(arg);
-  if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
-  if (Array.isArray(arg)) return `[array(${arg.length})]`;
-  return '{…}';
-}
-
-function installConsoleRing() {
-  for (const level of ['log', 'info', 'warn', 'error'] as const) {
-    const original = console[level].bind(console);
-    console[level] = (...args: unknown[]) => {
-      try {
-        const text = args.map(summarizeArg).join(' ');
-        if (!text.startsWith('[StallDiag]')) pushCapped(logRing, { at: Date.now(), level, text }, LOG_RING_SIZE);
-      } catch {
-        // never let the ring break logging
-      }
-      original(...args);
-    };
-  }
-}
-
-function describeRecentLogs(now: number, count = 12): string {
-  const lines = logRing.slice(-count);
-  if (lines.length === 0) return '  (no plugin log lines yet)';
-  return lines
-    .map((l) => `  -${fmtS(now - l.at)} ${l.level === 'log' ? '' : `[${l.level}] `}${l.text}`)
-    .join('\n');
-}
-
 type Episode = {
   startedAt: number;
   lastBadAt: number;
@@ -340,8 +307,7 @@ class StallMonitor {
         `[StallDiag] … still stalled after ${fmtS(now - ep.startedAt)}: ` +
           `${probeAge > 0 ? `probe waiting ${fmtS(probeAge)}` : `last probe ${fmtS(this.lastProbeMs)}`}; ` +
           `index ${describeInFlight(now)}; ${describeCallRate(now)}; ` +
-          `main-thread blocks so far: ${ep.mainBlocks.length}.\n` +
-          `Recent plugin log:\n${describeRecentLogs(now, 6)}`
+          `main-thread blocks so far: ${ep.mainBlocks.length}.`
       );
     }
   }
@@ -389,8 +355,7 @@ class StallMonitor {
     }
     console.warn(
       `[StallDiag] main thread blocked for ${fmtS(ms)} (ended ${fmtTime(now)}) — every widget of the plugin was frozen meanwhile.\n` +
-        `Long tasks: ${describeLongTasks(now - ms - 2000)}\n` +
-        `Recent plugin log:\n${describeRecentLogs(now, 8)}`
+        `Long tasks: ${describeLongTasks(now - ms - 2000)}. The plugin's log lines just above show what was running.`
     );
   }
 
@@ -415,7 +380,7 @@ class StallMonitor {
       `  index calls: ${describeInFlight(now)}; ${describeCallRate(now)}\n` +
       `  last probe: ${this.lastProbeAt ? `${fmtS(this.lastProbeMs)} at ${fmtTime(this.lastProbeAt)}` : 'none yet'}\n` +
       `  long tasks: ${describeLongTasks(longTasksSince)}\n` +
-      `  recent plugin log:\n${describeRecentLogs(now)}`
+      `  The plugin's log lines just above show which job was running.`
     );
   }
 }
@@ -434,4 +399,3 @@ export function startStallMonitor(plugin: RNPlugin) {
 // Runs on import, before the SDK constructs the plugin object.
 installBridgeTracking();
 installLongTaskObserver();
-if (isIndexFrame) installConsoleRing();
