@@ -1,3 +1,4 @@
+import { recordCompanionHandoff } from '../lib/companion/handoff';
 import {
   renderWidget,
   usePlugin,
@@ -7,6 +8,7 @@ import {
   PluginRem,
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useMemo, useRef, useState, useLayoutEffect, useEffect } from 'react';
 import { repCountsForScheduling } from '../lib/incremental_rem/types';
 import { NextRepTime } from '../components/NextRepTime';
@@ -712,7 +714,7 @@ export function AnswerButtons() {
 
 
 
-        {/* Open URL for Clipper - Only for HTML type rems */}
+        {/* Open URL for the Companion - Only for HTML type rems */}
         {(remType === 'html' || remType === 'html-highlight') && htmlSourceUrl && (
           <>
             <div style={dividerStyle} />
@@ -733,8 +735,17 @@ export function AnswerButtons() {
                     setTimeout(() => document.body.removeChild(link), 100);
                   }
 
+                  // After opening it, so the click still counts as one for the popup blocker.
+                  // The page's document itself (not a highlight in it): the
+                  // Companion counts its reading, and Next leaves that time to it.
+                  if (remType === 'html' && baseData?.rem) {
+                    await recordCompanionHandoff(plugin, baseData.rem._id, htmlSourceUrl).catch((err) =>
+                      console.warn('[Use Companion] hand-off not recorded:', err)
+                    );
+                  }
+
                   // Show a helpful toast
-                  await plugin.app.toast('📎 URL opened! Use RemNote Clipper in the browser to take notes.');
+                  await plugin.app.toast('📎 URL opened! Use the Incremental RemNote Companion in Chrome to read and extract.');
                 } catch (error) {
                   console.error('Error opening URL:', error);
                   await plugin.app.toast('Error opening URL');
@@ -749,13 +760,13 @@ export function AnswerButtons() {
                 fontWeight: 600,
                 minWidth: '110px',
               }}
-              title="Open URL for Web Clipper 📎: Open original URL in a new tab"
+              title="Open URL for the Companion 📎: Open the original page in a new tab, to read it with the Chrome Companion Extension"
             >
               <div style={{ ...buttonStyles.label, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span>📎</span>
                 <span>Open URL</span>
               </div>
-              <div style={buttonStyles.sublabel}>Use Clipper</div>
+              <div style={buttonStyles.sublabel}>Use Companion</div>
             </Button>
             <style>{`
               @keyframes clipperPulse {
@@ -1091,4 +1102,4 @@ export function AnswerButtons() {
   );
 }
 
-renderWidget(AnswerButtons);
+renderWidget(withHoverTips(AnswerButtons));

@@ -85,6 +85,8 @@ export type PriorityChangeEvent =
   | 'import'
   /** A maintenance/repair pass writing a value back into a healthy slot. */
   | 'repair'
+  /** An outside tool through the Local Media Bridge (media_bridge.py incrementalize). */
+  | 'bridge'
   /** Anything not otherwise mapped. */
   | 'other';
 
@@ -107,6 +109,7 @@ export const PRIORITY_EVENT_LABELS: Record<PriorityChangeEvent, string> = {
   cloze: 'Cloze split',
   import: 'Import',
   repair: 'Slot repair',
+  bridge: 'Local bridge',
   other: 'Other',
 };
 
@@ -129,6 +132,7 @@ export const PRIORITY_EVENT_ICONS: Record<PriorityChangeEvent, string> = {
   cloze: '✂️',
   import: '📥',
   repair: '🛠',
+  bridge: '🔌',
   other: '·',
 };
 

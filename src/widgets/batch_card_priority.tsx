@@ -6,6 +6,7 @@ import {
   PluginRem,
   RNPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect, useMemo } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { getCardPriority, setCardPriority } from '../lib/card_priority';
@@ -830,4 +831,4 @@ function BatchCardPriority() {
   );
 }
 
-renderWidget(BatchCardPriority);
+renderWidget(withHoverTips(BatchCardPriority));

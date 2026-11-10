@@ -13,6 +13,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { DocumentViewer, RemId, renderWidget, usePlugin, useTrackerPlugin, RNPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import {
   currentIncRemKey,
   incrementalQueueActiveKey,
@@ -355,4 +356,4 @@ const selectorButtonStyle: React.CSSProperties = {
   width: '100%',
 };
 
-renderWidget(IncremNotesSidebar);
+renderWidget(withHoverTips(IncremNotesSidebar));

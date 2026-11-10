@@ -68,6 +68,9 @@ export const multiplierId = 'multiplier';
 export const betaSchedulerEnabledId = 'beta-scheduler-enabled';
 export const betaFirstReviewIntervalId = 'beta-first-review-interval';
 export const betaMaxIntervalId = 'beta-max-interval';
+// Same-day reviews (Editor Review, Companion, a second look) neither move the date
+// nor count twice for scheduling. See sameDayRepeatIndexes in scheduler_core.ts.
+export const ignoreSameDayReviewsId = 'ignore-same-day-reviews';
 // Per-type default scheduler. 'default' defers to the Default Scheduler setting
 // (betaSchedulerEnabledId); 'multiplier' / 'curve' prevail over it for that kind of
 // Incremental Rem. A scheduler pinned on the rem itself (schedulerSlotCode) beats both.
@@ -471,6 +474,26 @@ export const displayPriorityShieldId = 'display-priority-shield';
 export const deferSpoilerIncRemsId = 'defer-spoiler-increms';
 export const displayQueueToolbarPriorityId = 'display-queue-toolbar-priority';
 export const autoFocusQueueDashboardId = 'auto-focus-queue-dashboard';
+// Multiple-choice scissors (lib/mc_scissors.ts): a ✂ beside each option of a
+// native multiple-choice card that strikes the option through.
+export const mcScissorsSettingId = 'mc-scissors';
+export const mcScissorsWidgetId = 'mc_scissors';
+/** Session: the open scissors' floating widget ids, in display-index order. */
+export const mcScissorsIdsKey = 'mcScissorsWidgetIds';
+/** Session: display indices of the struck options on the current card. */
+export const mcScissorsStruckKey = 'mcScissorsStruck';
+// Multiple-choice answer sheet (lib/mc_assertions.ts): a T/F box per numbered
+// assertion (I., II., III.) of a "judge each sentence" question.
+export const mcAssertionSheetSettingId = 'mc-assertion-sheet';
+export const mcAssertionsWidgetId = 'mc_assertions';
+/** Session: the numerals of the current card's assertions ("I", "II", …). */
+export const mcAssertionLabelsKey = 'mcAssertionLabels';
+/** Session: one mark per assertion, in order: '' (empty), 'T' or 'F'. */
+export const mcAssertionMarksKey = 'mcAssertionMarks';
+/** The sheet's first box centre sits this share of the column below its top… */
+export const mcSheetTopEdge = 0.35;
+/** …and its last box centre this share above its bottom; the rest are spaced evenly between. */
+export const mcSheetBottomEdge = 0.1;
 // Timestamp flag set by the IncRem "Next" paths just before they advance the
 // queue (while their widget sandbox is still alive). A persistent QueueLoadCard
 // listener consumes it to restore the Practiced Queues dashboard — the refocus
@@ -709,6 +732,10 @@ export const videoExtractEndSlotCode = 'endTime';
 export const localVideoPowerupCode = 'localVideo';
 export const localVideoLibrarySlotCode = 'library';
 export const localVideoPathSlotCode = 'path';
+// A local video that explains a flashcard, on the card's own Rem: shown under
+// its answer once revealed (widgets/card_video.tsx) and under the Rem's title
+// in the editor. Not Incremental. Same slots as the Local Video powerup.
+export const cardVideoPowerupCode = 'cardVideo';
 
 // The floating review bar over RemNote's video page (lib/video_review_bar.ts).
 export const videoReviewBarIdKey = 'video-review-bar-id';
@@ -758,6 +785,14 @@ export const localizeMediaTreeCommandId = 'localize-external-media-tree';
 export const logosBridgeEnabledId = 'logos-bridge-enabled';
 export const logosAutoOpenId = 'logos-auto-open';
 export const openInLogosCommandId = 'open-in-logos';
+
+// Local Media Bridge (lib/media_bridge.ts + scripts/media_bridge/): uploads images
+// that outside tools (the RemNote MCP) write as http://127.0.0.1:3460 links.
+export const mediaBridgeEnabledId = 'media-bridge-enabled';
+// Upscale the focused rem's image with ChatGPT (Codex CLI) through the helper's
+// /upscale endpoint, review, replace in place (lib/upscale_image.ts).
+export const upscaleImageCommandId = 'upscale-image-chatgpt';
+export const UPSCALE_IMAGE_POPUP = 'upscale_image_popup';
 
 // --- Cards on a scheduler other than the Global Default (lib/scheduler_cards.ts) ---
 // Synced and per KB: `<prefix>_<kbId>` is the manifest, `<prefix>_<kbId>_<n>` the shards.

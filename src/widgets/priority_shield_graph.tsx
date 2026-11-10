@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import {
   ComposedChart,
   Area,
@@ -901,4 +902,4 @@ function PriorityShieldGraph() {
   );
 }
 
-renderWidget(PriorityShieldGraph);
+renderWidget(withHoverTips(PriorityShieldGraph));

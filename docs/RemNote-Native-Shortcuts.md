@@ -577,6 +577,7 @@ Active only outside text editing: in the queue, the PDF viewer and drawings.
 
 | Keys | Command | Where | Notes |
 | :--- | :--- | :--- | :--- |
+| `Ctrl + Opt + I` / `Ctrl + Alt + I` | [Copy Rem ID](Keyboard-Shortcuts.md) | **Incremental RemNote** |  |
 | `Ctrl + Opt + P` / `Ctrl + Alt + P` | [Quick Set Priority](Keyboard-Shortcuts.md) | **Incremental RemNote** | ⚠️ Same keys as *Add All Properties* (Windows) |
 | `Ctrl + Opt + ↑` / `Ctrl + Alt + ↑` | [Quick Increase Priority Number (Less Important)](Keyboard-Shortcuts.md) | **Incremental RemNote** | ⚠️ Same keys as *Increase Video Playback Speed on Learning Page* (Windows) |
 | `Ctrl + Opt + ↓` / `Ctrl + Alt + ↓` | [Quick Decrease Priority Number (More Important)](Keyboard-Shortcuts.md) | **Incremental RemNote** | ⚠️ Same keys as *Decrease Video Playback Speed on Learning Page* (Windows) |

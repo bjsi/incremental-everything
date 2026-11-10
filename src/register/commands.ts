@@ -15,6 +15,7 @@ import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote, pinSourceQuotesInTree } from '../lib/pdf_source_pins';
 import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { localizeMediaInRems } from '../lib/localize_media';
+import { openUpscaleImage } from '../lib/upscale_image';
 import { showMessageDialog } from '../lib/message_dialog';
 import {
   addVideoTranscript,
@@ -25,7 +26,7 @@ import {
   TranscriptTarget,
 } from '../lib/video_transcript';
 import { TranscriptSource } from '../lib/youtube_transcript';
-import { chooseLocalVideo, localVideoTitle, setLocalVideo } from '../lib/local_video';
+import { chooseLocalVideo, localVideoTitle, setCardVideo, setLocalVideo } from '../lib/local_video';
 import { markRemsAsFreshlyCreated } from '../lib/incRemHelpers';
 import { isHintNode } from '../lib/richTextSanitize';
 import {
@@ -50,6 +51,7 @@ import {
   pinSourceQuotesInTreeCommandId,
   localizeMediaCommandId,
   localizeMediaTreeCommandId,
+  upscaleImageCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
   allCardPriorityInfoKey,
@@ -124,6 +126,7 @@ import { createOpTimer, OpTimer } from '../lib/op_timer';
 import dayjs from 'dayjs';
 import { createTurnQueue } from '../lib/turn_queue';
 import { holdCardPriorityCacheEntry, loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist } from '../lib/card_priority/cache';
+import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
 import {
   isHiddenSlotMigrated,
   isVisiblePrioritySlotRetired,
@@ -201,6 +204,7 @@ import {
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { batchPriorityTargetRemIdsKey, titleCaseAcronymsId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
+import { copyTextToClipboard } from '../lib/clipboard';
 
 // Opens a priority popup against one or many rems. Single-rem calls behave
 // exactly as before; multi-rem calls hand the full id list to the widget through
@@ -362,6 +366,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Store linked images & audio in RemNote',
     quickCode: 'slm',
     action: async () => runLocalizeMedia(false),
+  });
+
+  await plugin.app.registerCommand({
+    id: upscaleImageCommandId,
+    name: 'Upscale image with ChatGPT',
+    description: "Regenerate the focused rem's image at a higher resolution (Local Media Bridge + Codex CLI), compare, replace.",
+    quickCode: 'upi',
+    action: async () => openUpscaleImage(plugin),
   });
 
   await plugin.app.registerCommand({
@@ -1945,6 +1957,20 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Same reasoning for the IncRem cache, which startup also serves from a saved
+  // copy (lib/incremental_rem/persistence.ts): the command re-reads every IncRem.
+  plugin.app.registerCommand({
+    id: 'refresh-increm-cache',
+    name: 'Refresh IncRem Cache',
+    description:
+      'Re-reads every Incremental Rem from the database, ignoring the saved copy, and rebuilds both the cache and the saved copy from it.',
+    action: async () => {
+      await plugin.app.toast('Rebuilding the IncRem cache from the database…');
+      const loaded = await loadIncrementalRemCache(plugin, { forceCold: true });
+      await plugin.app.toast(`IncRem cache rebuilt: ${loaded.length} Incremental Rems.`);
+    },
+  });
+
   // Backfill / repair for the table-cell priority badges. The band tags are kept
   // current by the write paths (setCardPriority and the three IncRem priority
   // writes in tracker.ts), so this exists for two cases: the first run after
@@ -2502,6 +2528,38 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         const wasIncremental = await rem.hasPowerup(powerupCode);
         if (!wasIncremental) await initIncrementalRem(plugin, rem);
         await plugin.app.toast(`🎞️ Linked “${name}”${wasIncremental ? '' : ', and made it Incremental'}`);
+      } catch (e) {
+        await localVideoFailure(e);
+      }
+    },
+  });
+
+  // A video that explains a flashcard, on the card's own Rem: shown under the
+  // answer after Show Answer (widgets/card_video.tsx) and under the Rem's title
+  // in the editor. The Rem stays as it is: nothing is made Incremental.
+  plugin.app.registerCommand({
+    id: 'link-local-video-card-extra',
+    name: 'Link Local Video as Card Extra',
+    description: 'Pick a video file on this computer that explains the focused flashcard, shown with its answer',
+    quickCode: 'llce',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('Focus the flashcard the video explains first.');
+        return;
+      }
+      try {
+        await plugin.app.toast('🎞️ Choose the video in the dialog…');
+        const file = await chooseLocalVideo('file', 'Choose the video that explains this card');
+        if (!file) return;
+        await setCardVideo(rem, file);
+        const name = localVideoTitle(file.path);
+        const hasCards = (await rem.getCards()).length > 0;
+        await plugin.app.toast(
+          hasCards
+            ? `🎞️ “${name}” will show with this card's answer`
+            : `🎞️ Linked “${name}”: it will show with the answer once this Rem has a flashcard`
+        );
       } catch (e) {
         await localVideoFailure(e);
       }
@@ -3434,7 +3492,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             id: newReviewJobId(r._id),
             kind: 'dismiss' as const,
             remId: r._id,
-            cardPriorityInheritance: false,
+            // Same anchor as every other Dismiss: the Incremental powerup takes
+            // the priority with it, so the cardPriority tag must keep it.
+            cardPriorityInheritance: true,
             confirmedAt,
           }))
         );
@@ -3494,6 +3554,44 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       // run in the tracker and the queue advances at once.
       const remType = await plugin.storage.getSession<string | null>(currentIncrementalRemTypeKey);
       await queueNextRepetition(plugin, rem._id, { syncPdfPage: remType === 'pdf' });
+    },
+  });
+
+  // ─── Copy Rem ID ─────────────────────────────────────────────────────────
+  // For pointing an AI agent (MCP) or a debug tool at a Rem. Selected Rems win
+  // (one ID per line), then the Rem with the caret, then the card in the queue.
+  plugin.app.registerCommand({
+    id: 'copy-rem-id',
+    name: 'Copy Rem ID',
+    description: 'Copies the ID of the focused Rem (or of each selected Rem, one per line) to the clipboard.',
+    keyboardShortcut: 'ctrl+opt+i',
+    quickCode: 'id',
+    action: async () => {
+      let remIds: string[] = [];
+      const sel = await getEffectiveSelection(plugin);
+      if (sel?.type === SelectionType.Rem && sel.remIds?.length) {
+        remIds = sel.remIds;
+      } else if (sel?.type === SelectionType.Text && sel.remId) {
+        remIds = [sel.remId];
+      } else {
+        const focused = await plugin.focus.getFocusedRem();
+        if (focused) {
+          remIds = [focused._id];
+        } else if ((await plugin.window.getURL()).includes('/flashcards')) {
+          const card = await plugin.queue.getCurrentCard();
+          if (card?.remId) remIds = [card.remId];
+        }
+      }
+
+      if (remIds.length === 0) {
+        await plugin.app.toast('No Rem focused or selected.');
+        return;
+      }
+      await copyTextToClipboard(
+        plugin,
+        remIds.join('\n'),
+        remIds.length === 1 ? 'Rem ID' : `${remIds.length} Rem IDs`
+      );
     },
   });
 

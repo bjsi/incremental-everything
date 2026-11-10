@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { renderWidget, usePlugin, WidgetLocation, useRunAsync, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
@@ -522,4 +523,4 @@ function AggregatedRepetitionHistoryPopup() {
     );
 }
 
-renderWidget(AggregatedRepetitionHistoryPopup);
+renderWidget(withHoverTips(AggregatedRepetitionHistoryPopup));

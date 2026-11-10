@@ -748,3 +748,38 @@ Paste a card id. Compares the `remId` field the plugin groups by against the SDK
 *   **Entries but never graded**: skips, resets and views only — RemNote shows these as *Times practiced N / Last practiced Never*. Opt-in.
 
 Both deletion tools require the backup JSON — full repetition histories of everything queued for deletion — to be saved before the delete button unlocks. Card deletion cannot be undone from the plugin.
+
+---
+
+## 💬 Hover hints missing in the desktop app { #hover-hints-desktop }
+
+**Symptom:** in RemNote's desktop app, hovering a plugin element that should explain itself (a `?` button, a table header, a priority figure) changes the cursor but shows no hint, or shows it once and never again. The same hint appears normally in the web app.
+
+### What Happened
+
+Since early November 2026 (RemNote 1.29.x), the desktop app often fails to draw the browser's own hover hints inside plugin windows. The web app in Chrome is not affected, and the plugin's code did not change. It has been reported to RemNote.
+
+### What the Plugin Does About It
+
+Every plugin window now draws its own hints, styled like RemNote's and following your light or dark theme. They appear after a short pause, under the element (or above it when there's no room), and disappear when you click, type or scroll.
+
+One exception: a hint can't extend beyond the plugin window it belongs to. In strips too thin to hold it (the queue bars, the card info bar, the editor priority badges, the PDF highlight toolbar), the plugin leaves the hint to RemNote. Those keep working in the web app but stay unreliable in the desktop app until RemNote fixes it.
+
+---
+
+## 🧊 Plugin widgets freeze or vanish for a while { #stall-diagnostics }
+
+**Symptom:** for a minute or more, every plugin widget (priority badges, the review timer, bars, popups) stops responding or doesn't appear, even after you open another document. Then they come back on their own.
+
+### What the Plugin Records
+
+The plugin watches for these stalls and writes what it saw to the developer console (desktop app: **View → Toggle Developer Tools**, then the **Console** tab; web app: `F12`). It writes nothing while things are normal, apart from one `[StallDiag] watching for stalls since …` line at startup.
+
+- `[StallDiag] ⚠️ STALL started …`: RemNote has stopped answering the plugin quickly. The line lists the calls still waiting; the plugin's log lines just above it name the job that was running.
+- `[StallDiag] main thread blocked for …`: the plugin's own work froze all of its widgets for that long.
+- `[StallDiag] widget "…"`: a single widget reporting its own slow calls, so you can see which widgets were waiting.
+- `[StallDiag] ✅ stall ended …`: how long it lasted, and whether the plugin's own work or the wait for RemNote caused it.
+
+### What to Send
+
+When it happens, copy the console from the `⚠️ STALL started` line to the `✅ stall ended` line and post it in the plugin's support thread on Discord or as a GitHub issue. Lines such as `Set fake window` or `[worker] Worker initialized` come from RemNote itself and are harmless.

@@ -1,4 +1,5 @@
 import { ReactRNPlugin, renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useRef } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey, powerupCode, prioritySlotCode } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
@@ -240,6 +241,11 @@ export function IncRemList() {
     await plugin.storage.setSession('editor-review-timer-rem-id', remId);
     await plugin.storage.setSession('editor-review-timer-start', Date.now());
     await plugin.storage.setSession('editor-review-timer-interval', interval);
+    // A same-day repeat keeps the date in force (Ignore Same-Day Reviews).
+    await plugin.storage.setSession(
+      'editor-review-timer-date-override',
+      scheduleData?.sameDayRepeat ? scheduleData.newNextRepDate : undefined
+    );
     await plugin.storage.setSession('editor-review-timer-priority', incRemInfo?.priority ?? 10);
     await plugin.storage.setSession('editor-review-timer-rem-name', remName || 'Unnamed Rem');
     await plugin.storage.setSession('editor-review-timer-from-queue', false);
@@ -283,4 +289,4 @@ export function IncRemList() {
   );
 }
 
-renderWidget(IncRemList);
+renderWidget(withHoverTips(IncRemList));

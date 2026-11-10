@@ -2,6 +2,202 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.213 - November 10th, 2026
+
+### ⚡ Improved
+
+**Startup**: The Incremental Rem cache now loads from a copy saved on your device, re-reading only the IncRems that changed (39 s → 2.4 s on 6,583 IncRems), so the plugin's widgets no longer freeze while RemNote starts.
+
+📖 [How the IncRem cache is loaded](IncRem-Scheduler.md#increm-startup-cache)
+
+## v1.0.212 - November 10th, 2026
+
+### ✨ New
+
+**Stall diagnostics**: When every plugin widget freezes for a while, the console now records how long, what the plugin was doing, and whether the wait was on the plugin or on RemNote.
+
+📖 [Plugin widgets freeze or vanish for a while](Troubleshooting.md#stall-diagnostics)
+
+## v1.0.211 - November 9th, 2026
+
+### ✨ New
+
+**Copy Rem ID** (`Ctrl+Opt+I`, `id`): Copies the ID of the focused Rem, or of each selected Rem, to the clipboard, ready to hand to an AI assistant through the RemNote MCP.
+
+📖 [Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id)
+
+## v1.0.210 - November 9th, 2026
+
+### ✨ New
+
+**Upscale image with ChatGPT** (`upi`): Regenerates the focused Rem's figure at a higher resolution with ChatGPT's image model, through the Local Media Bridge helper and the Codex CLI signed in with your ChatGPT plan. A popup shows the original beside the result, with an automatic check for changed lines, colours and words, and zoomed views of every region that changed. **Replace image** swaps it into the Rem in place, keeping the caption and display size.
+
+📖 [Upscale an image with ChatGPT](Local-Media-Bridge.md#upscale)
+
+## v1.0.206 - November 9th, 2026
+
+### ✨ New
+
+**Local Media Bridge**: Besides storing images, the helper can now ask the plugin to move rems, remove tags (Extra Card Detail and other built-in powerups included), copy a rem's images to files, and make rems Incremental with a given priority — the operations the RemNote MCP lacks, done by the plugin itself.
+
+📖 [Rem operations](Local-Media-Bridge.md#operations)
+
+## v1.0.205 - November 8th, 2026
+
+### 🐛 Fixed
+
+**AI Transcription of PDF Highlights**: **✨** on a larger highlight that starts in a bold heading now also merges the smaller highlights inside it, which stayed separate before.
+
+📖 [A larger highlight over earlier ones](AI-Transcription-of-PDF-Highlights.md#absorb)
+
+## v1.0.204 - November 7th, 2026
+
+### ⚡ Improved
+
+**Multiple-Choice Cards**: The scissors of an option that has slid under the answer buttons now slide under with it, instead of showing beside the buttons.
+
+### 🐛 Fixed
+
+**Multiple-Choice Cards**: In the Android app, the scissors and the True/False answer sheet now sit beside the card instead of stacked at the top right of the screen.
+
+**Multiple-Choice Cards**: The True/False answer sheet now also appears when the statements are numbered with a dash (`I- `, `II- `).
+
+📖 [Scissors](Utilities-Multiple-Choice-Cards.md#scissors) · [True/False answer sheet](Utilities-Multiple-Choice-Cards.md#answer-sheet)
+
+## v1.0.202 - November 6th, 2026
+
+### ✨ New
+
+**Scheduler**: Added **Ignore Same-Day Reviews in Scheduling** (on by default): a second review the same day, before the item is due again, keeps the next review date and counts once, so an Editor Review or a Companion session no longer pushes the Saturating Curve a step or multiplies the interval twice. Its time is still recorded, and the history marks it 🔁 *same day*.
+
+### 🐛 Fixed
+
+**Scheduler**: A Reschedule in the editor or a date edit right after a review no longer takes that review out of the Saturating Curve's count.
+
+📖 [Same-day reviews](IncRem-Scheduler.md#same-day-reviews)
+
+## v1.0.201 - November 6th, 2026
+
+### ⚡ Improved
+
+**Repetition History**: Reviews involving the Chrome Companion now say so under the row: 🌐 *Read in the Chrome Companion*, with the page's address, or 📎 *Queue, then the Chrome Companion*, with the reading measured there.
+
+### 🐛 Fixed
+
+**Chrome Companion Extension**: Recording in the Companion right after Next in the queue no longer records the reading again as a second review. Needs the Companion's new version, waiting for Google's approval in the Chrome Web Store.
+
+📖 [With the queue](Chrome-Companion-Extension.md#with-the-queue-and-the-editor-review-timer)
+
+## v1.0.200 - November 6th, 2026
+
+These need the Companion's new version, which is waiting for Google's approval in the Chrome Web Store. It updates on its own once approved.
+
+### ✨ New
+
+**Chrome Companion Extension**: Added a reading clock beside **✓ Incremental** in the panel: it counts the time you spend reading the page, pauses in a background tab or after 3 minutes without activity, and shows the total with the reviews already in the page's history.
+
+**Chrome Companion Extension**: Click the clock to record that time as a review: **Enter** lets the scheduler pick the next date, **Shift+Enter** opens the Execute Repetition popup with the minutes filled in.
+
+**Chrome Companion Extension**: A session you didn't record is offered the next time you open the panel, dated when you stopped reading, with **Keep counting** to add more to it.
+
+**Chrome Companion Extension**: The panel now shows **Dismissed** for a dismissed page, with **Make Incremental again**.
+
+### ⚡ Improved
+
+**Queue**: **Open URL** now says **Use Companion**, and a page opened with it is counted by the Companion from the start; the queue's review and the Companion's reading become one review, never two.
+
+📖 [The reading clock](Chrome-Companion-Extension.md#the-reading-clock) · [With the queue](Chrome-Companion-Extension.md#with-the-queue-and-the-editor-review-timer) · [Open URL, Use Companion](Reviewing-Items-in-the-Queue.md#open-url-use-companion)
+
+## v1.0.199 - November 6th, 2026
+
+These need the Companion's new version, which is waiting for Google's approval in the Chrome Web Store. It updates on its own once approved.
+
+### ✨ New
+
+**Chrome Companion Extension**: Selecting text now brings up a menu beside it with **Add Extract** and **Add Highlight**, instead of the button on the bar.
+
+**Chrome Companion Extension**: Added **Add Highlight** (`Opt+H`): the selection becomes a Rem in its section, as with Add Extract, but isn't made Incremental, and is highlighted yellow on the page.
+
+**Chrome Companion Extension**: The panel's header now shows **✓ Incremental** with its priority when the page's document is Incremental, and a **Make Incremental** button with a priority field when it isn't.
+
+### ⚡ Improved
+
+**Chrome Companion Extension**: An extract of several paragraphs keeps them apart with a blank line, still in one Rem, and list items and line breaks start new lines.
+
+**Chrome Companion Extension**: Added a **›** button at the right end of the bar that hides its buttons on every page, and **‹** brings them back.
+
+**Chrome Companion Extension**: Deleting an extract's Rem in the panel now removes its highlight from the page at once, without a reload.
+
+📖 [Extracts](Chrome-Companion-Extension.md#extracts) · [Add Highlight](Chrome-Companion-Extension.md#add-highlight) · [Incremental status](Chrome-Companion-Extension.md#the-pages-document-incremental-or-not) · [The bar](Chrome-Companion-Extension.md#the-bar) · [Highlights and the read point](Chrome-Companion-Extension.md#highlights-and-the-read-point)
+
+## v1.0.196 - November 5th, 2026
+
+### ✨ New
+
+**Multiple-Choice Cards**: Added scissors beside each option of RemNote's multiple-choice cards in the queue: click one to strike that option through and rule it out before you answer. On by default; turn it off in **IR Settings → Queue Display**.
+
+![A multiple-choice card in the queue with a ✂ beside each option; clicking a ✂ strikes that option through, and the answer is then picked from the options that are left](assets/mc-scissors.gif){ width="900" }
+
+**Multiple-Choice Cards**: Added a True/False answer sheet beside questions that list statements numbered I., II., III.: click a box to mark its statement T, again for F, and again to clear it, then match your verdicts to an option. On by default, in **IR Settings → Queue Display**.
+
+![A multiple-choice question that lists statements I, II and III, with a column of boxes beside it, one per statement, marked T in green or F in red; the options below say which statements are false](assets/mc-answer-sheet.png){ width="700" }
+
+📖 [Scissors](Utilities-Multiple-Choice-Cards.md#scissors) · [True/False answer sheet](Utilities-Multiple-Choice-Cards.md#answer-sheet)
+
+## v1.0.195 - November 5th, 2026
+
+### ✨ New
+
+**Local Media Bridge**: Tools outside RemNote — scripts, or an AI assistant writing through the RemNote MCP — can insert local images again, and RemNote stores its own copy. Since RemNote 1.29 an image written from outside as a `file://` link is never uploaded and shows *"Unable to find this image"*. A small helper (`scripts/media_bridge/media_bridge.py`) serves the image at a local address, and with **Settings → Integrations → Local Media Bridge** on, the plugin runs **Store linked images & audio in RemNote** on the rems the tool names. A toast confirms each job. Off by default.
+
+📖 [Local Media Bridge](Local-Media-Bridge.md)
+
+**Card Videos**: Added **Link Local Video as Card Extra** (`llce`), which links a video on your computer to a flashcard: it shows under the answer after Show Answer, and above the Rem in the editor, without making anything Incremental.
+
+**Bridge for Other Plugins**: Other plugins can now link card videos too, picking a folder through Incremental RemNote's dialog, so an importer can attach to each question the video that explains it.
+
+📖 [A video that explains a card](Incremental-Video.md#card-video) · [Card videos for other plugins](Priority-Bridge-for-Other-Plugins.md#card-videos)
+
+**Chrome Companion Extension**: Incremental RemNote Companion is now published in the **[Chrome Web Store](https://chromewebstore.google.com/detail/incremental-remnote-compa/jdmbkbchgkfmipijdolpkhehjmehaagf)**: install it with **Add to Chrome**, no developer mode needed.
+
+![The Incremental RemNote Companion page in the Chrome Web Store](assets/companion-assets/companion-webstore.png){ width="700" }
+
+![A Wikipedia page read with the Companion: extracts highlighted on the page, and the page's document in the panel](assets/companion-assets/companion-usage.png){ width="900" }
+
+📖 [Chrome Companion Extension](Chrome-Companion-Extension.md#setting-it-up)
+
+### ⚡ Improved
+
+**Mastery Drill**: The regular-queue drill now opens the Queue Dashboard when **Auto-focus Queue Dashboard** is on; the popup drill still never does.
+
+📖 [Auto-focus Queue Dashboard](Plugin-Settings-Reference.md#queue-display) · [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill)
+
+### 🐛 Fixed
+
+**Queue Dashboard**: The previous card in the Live Session and the forgetting curve's **Previous** view is now the last card you saw, not one that the Mastery Drill, cooling or Recognition First skipped as it loaded.
+
+**Hover Hints**: Hover hints in plugin popups, sidebars and floating windows show reliably again in the desktop app, which stopped drawing them in RemNote 1.29.x; the plugin now draws them itself.
+
+**Dismiss**: Dismissing Incremental Rems with `Ctrl+D` in the editor (focused Rem or a selection) now leaves their priority behind as an `incremental` card priority, like every other Dismiss, so cards under them inherit it.
+
+📖 [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) · [Hover hints missing in the desktop app](Troubleshooting.md#hover-hints-desktop) · [Priority Sources](Priorities-for-Flashcards.md#priority-sources)
+
+## v1.0.194 - November 4th, 2026
+
+### ⚡ Improved
+
+**Open in a New Pane**: Shift+click an entry in the Incremental Rem, Visited Rem or Flashcard History, or the Editor Review Timer's **↗ Go to Rem**, to open the Rem in a new pane beside your document instead of replacing it.
+
+📖 [Visited Rem History](History-Queue-Dashboard-and-Mastery-Drill.md#visited-rem-history) · [Flashcard History](History-Queue-Dashboard-and-Mastery-Drill.md#flashcard-history) · [Editor Review Timer](Reviewing-Items-in-the-Editor.md#the-workflow)
+
+### 🐛 Fixed
+
+**Quick Priority**: Fixed `Ctrl+Opt+↑/↓` presses made just before rating a card sometimes changing the next card instead; if the plugin can't tell which card a press was for, it now changes nothing and says so.
+
+**Priority Popup**: Hovering **Relative** now shows the rank among IncRems only or cards only again, and the cards-only rank counts cards rather than Rems with cards, so it matches the Card Shield.
+
+📖 [Quick Priority in the queue](Prioritization-&-Sorting.md#quick-priority-in-the-queue) · [Main Priority Popup](Prioritization-&-Sorting.md#main-priority-popup)
+
 ## v1.0.193 - November 4th, 2026
 
 ### ✨ New
@@ -15,6 +211,12 @@ This page documents the major changes and improvements for each version of the I
 **Priority Colours**: Every priority colour in the plugin (editor, tables, highlights, queue bars and toolbar, priority popup, sidebar lists) now uses one scale, IncRems and cards ranked together, so the same priority is the same colour everywhere; the queue bars' percentages follow the shield on screen, and the popup's **Relative** ranks among IncRems + cards.
 
 📖 [IncRems and cards together](Prioritization-&-Sorting.md#unified-priority-shield) · [Priority Shield History](Prioritization-&-Sorting.md#priority-shield-history) · [Switching shields on flashcards](Prioritization-&-Sorting.md#flashcard-bar-shield) · [The priority ramp](Colour-Coding-Reference.md#the-priority-ramp)
+
+### 🐛 Fixed
+
+**Priority Popups**: Fixed `Opt+P` and `Ctrl+Opt+P` in the queue opening on a Rem you had just edited in the previewer, after closing it, instead of on the card on screen.
+
+📖 [Which Rem a popup opens on](Prioritization-&-Sorting.md#popup-target-in-queue)
 
 ## v1.0.192 - November 4th, 2026
 

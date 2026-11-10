@@ -4,6 +4,7 @@ import {
   WidgetLocation,
   ReactRNPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useEffect, useState } from 'react';
 import { SourceReaderView } from '../components/SourceReaderView';
 
@@ -63,4 +64,4 @@ export function PdfSourcePopup() {
   );
 }
 
-renderWidget(PdfSourcePopup);
+renderWidget(withHoverTips(PdfSourcePopup));

@@ -4,12 +4,22 @@ A Chrome extension for incremental reading of web pages. It works with the Incre
 
 ## What it does
 
+Selecting text brings up a menu beside it:
+
+- **Add Extract** (`Opt+X`): the selection becomes an Incremental Rem under its section, and turns blue.
+- **Add Highlight** (`Opt+H`): the same Rem in the same place, not made Incremental, and it turns yellow.
+- **Priority:** `Opt+Shift+X`, or Add Extract with **Set priority** ticked, first asks for the extract's priority in a small field beside the selection. Type a number and press Enter; leave it empty for the inherited priority. Esc cancels the extract, and Shift+Enter opens the plugin's full popup in the panel instead, for the interval and scheduler.
+
 A bar stays at the bottom right of every page, whether the panel is open or not:
 
-- **Add Extract** (`Opt+X`, when text is selected): the selection becomes an Incremental Rem under its section, and turns blue.
-- **Priority:** `Opt+Shift+X`, or Add Extract with **Set priority** ticked, first asks for the extract's priority in a small field beside the selection. Type a number and press Enter; leave it empty for the inherited priority. Esc cancels the extract, and Shift+Enter opens the plugin's full popup in the panel instead, for the interval and scheduler.
+- **Send to / Set priority:** the knowledge base the page's extracts go to, and whether each extract asks for its priority.
 - **Set read point / Go to read point:** remembers the top of the window, and scrolls back to it.
 - **Import headings:** creates the page's sections in its document.
+- **› / ‹:** hides the bar's buttons on every page, or brings them back.
+
+The panel's header says **✓ Incremental** when the page's document is an Incremental Rem, **Dismissed** when it was dismissed, or offers **Make Incremental** (or **Make Incremental again**), which asks for a priority.
+
+On an Incremental page, the header's **reading clock** counts the time read: it pauses in a background tab, in another app, or after 3 minutes without activity. Clicking it records the time as a review (Enter: the scheduler picks the date; Shift+Enter: the plugin's review popup). The page counts (`content.js`), the panel shows and records (`panel.js`), and `clock.js` holds the arithmetic both use. A queue review of a page opened with **Use Companion** gets the clock's reading in place of its wall-clock time, and a review recorded in RemNote while the page was read is taken off the clock, so one sitting is one review.
 
 Writes made while the panel is closed wait in the browser, shown as a count on the toolbar icon, and reach RemNote when the panel connects.
 
@@ -42,7 +52,7 @@ Plugin development from `localhost` does not load in the panel, so the plugin si
 Raise `version` in `manifest.json`, then from this folder:
 
 ```
-rm -f ../companion-store.zip && zip -X ../companion-store.zip manifest.json background.js content.js anchors.js panel.html panel.js page.css icons/icon-16.png icons/icon-32.png icons/icon-48.png icons/icon-128.png
+rm -f ../companion-store.zip && zip -X ../companion-store.zip manifest.json background.js content.js anchors.js clock.js panel.html panel.js page.css icons/icon-16.png icons/icon-32.png icons/icon-48.png icons/icon-128.png
 ```
 
 ## Icons

@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -341,4 +342,4 @@ export function OnboardingTipsPopup() {
   );
 }
 
-renderWidget(OnboardingTipsPopup);
+renderWidget(withHoverTips(OnboardingTipsPopup));

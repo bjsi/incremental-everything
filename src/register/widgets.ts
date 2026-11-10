@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
@@ -378,6 +378,14 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Fallback for lib/clipboard.ts when the index iframe cannot write the clipboard.
+  plugin.app.registerWidget('copy_text_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 420,
+      height: 'auto',
+    },
+  });
+
   // Scan → review → delete for entries left behind in Priority Review Documents.
   // Tall and scrollable because the review stage is also the diagnostic: it lists
   // every document with what it still carries, and you tick which ones to clean.
@@ -390,6 +398,16 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('card_info_bar', WidgetLocation.FlashcardUnder, {
     powerupFilter: 'cardPriority',
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
+  // The video that explains a card (Link Local Video as Card Extra). The slot
+  // is mounted only after Show Answer, where Extra Card Details show.
+  plugin.app.registerWidget('card_video', WidgetLocation.FlashcardExtraDetail, {
+    powerupFilter: cardVideoPowerupCode,
     dimensions: {
       width: '100%',
       height: 'auto',
@@ -456,6 +474,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // new Rem waits for the user to confirm a parent there.
   plugin.app.registerWidget(parentPickWidgetId, WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 340 },
+  });
+
+  // Multiple-choice scissors (lib/mc_scissors.ts): one per option of a native
+  // multiple-choice card, pinned beside it by CSS anchor positioning.
+  plugin.app.registerWidget(mcScissorsWidgetId, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 28, width: 28 },
+  });
+  // Its True/False answer sheet: one column, pinned beside the question.
+  plugin.app.registerWidget(mcAssertionsWidgetId, WidgetLocation.FloatingWidget, {
+    // Its height comes from host CSS (the options' spacing), not from its content.
+    dimensions: { height: 120, width: 58 },
   });
 
   plugin.app.registerWidget('priority_review_graph', WidgetLocation.UnderRemEditor, {
@@ -611,6 +640,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: {
       width: 540,
       height: 'auto',
+    },
+  });
+  // Upscale image with ChatGPT: progress, side-by-side + fidelity check, replace (lib/upscale_image.ts).
+  // Fixed, screen-fitted frame: 'auto' measures the popup before the side-by-side
+  // image has loaded, so the result spilled out of the frame. The body scrolls.
+  plugin.app.registerWidget('upscale_image_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 960,
+      height: screenFittedHeight(640, 1100),
     },
   });
   plugin.app.registerWidget('image_size_feedback', WidgetLocation.FloatingWidget, {

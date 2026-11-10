@@ -7,6 +7,7 @@ import {
   useTrackerPlugin,
   QueueInteractionScore,
 } from "@remnote/plugin-sdk";
+import { withHoverTips } from "../components/HoverTipLayer";
 import '../style.css';
 import '../App.css';
 import { MasteryDrillCardList } from '../components/MasteryDrillCardList';
@@ -588,4 +589,4 @@ function FinalDrill() {
   );
 }
 
-renderWidget(FinalDrill);
+renderWidget(withHoverTips(FinalDrill));

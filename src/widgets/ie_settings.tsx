@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
 import {
   SpeedCalibrationPeriod,
@@ -632,4 +633,4 @@ export function IESettingsWidget() {
   );
 }
 
-renderWidget(IESettingsWidget);
+renderWidget(withHoverTips(IESettingsWidget));

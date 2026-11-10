@@ -10,6 +10,7 @@ import {
   RichTextElementRemInterface,
   RemType,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { scanCooling } from '../lib/priority_review_document/cooling_gather';
 import { CoolingVerdict } from '../lib/priority_review_document/cooling';
@@ -7150,4 +7151,4 @@ function Debug() {
   );
 }
 
-renderWidget(Debug);
+renderWidget(withHoverTips(Debug));

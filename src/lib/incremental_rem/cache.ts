@@ -1,7 +1,13 @@
-import { ReactRNPlugin, RNPlugin } from '@remnote/plugin-sdk';
+import { PluginRem, ReactRNPlugin, RNPlugin } from '@remnote/plugin-sdk';
 import { allIncrementalRemKey, allIncrementalRemSlimKey, powerupCode } from '../consts';
 import { IncrementalRem } from './types';
 import { getIncrementalRemFromRem } from './index';
+import {
+  INCREM_MAX_WARM_STORE_AGE_MS,
+  loadPersistedIncRems,
+  persistIncRemStore,
+  snapshotIncRemDirtySet,
+} from './persistence';
 
 /**
  * The only fields queue item selection actually uses. See
@@ -154,44 +160,190 @@ export async function removeIncrementalRemCache(
   knownIncRemIds.delete(remId);
 }
 
+// ── Loading ─────────────────────────────────────────────────────────────────
+
 /**
- * Loads all Rems tagged with the Incremental powerup and caches them in session storage.
+ * Rems read at once on a load. Each read is a short chain of mostly sequential
+ * calls, so this is roughly the number of calls the load keeps in flight. The
+ * bridge serves calls at a fixed rate whatever the scheduling (see
+ * lib/updated_at_probe.ts), so a small window costs the load almost nothing — and
+ * it is what lets a widget's call get answered in milliseconds instead of waiting
+ * behind thousands (the old 500-Rem Promise.all batches kept ~5,000 in flight).
+ */
+const LOAD_CONCURRENCY = 24;
+
+/** Reused entries compared against the database before trusting the copy. */
+const WARM_SELF_CHECK_SAMPLE = 100;
+
+/** More disagreements than this share of the sample means the copy is wrong in bulk. */
+const WARM_SELF_CHECK_MAX_MISMATCH_SHARE = 0.05;
+
+/** The copy (~8 MB) is written this long after a load, clear of the startup rush. */
+const PERSIST_DELAY_MS = 30_000;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+async function readIncRems(plugin: RNPlugin, rems: PluginRem[]): Promise<IncrementalRem[]> {
+  const read = await mapWithConcurrency(rems, LOAD_CONCURRENCY, (rem) =>
+    getIncrementalRemFromRem(plugin, rem, { knownTagged: true }).catch((err) => {
+      console.warn('[IncRem Cache] Failed to read', rem._id, err);
+      return null;
+    })
+  );
+  return read.filter((r): r is IncrementalRem => r !== null);
+}
+
+/**
+ * Whether a stored entry still matches the database. History is compared by
+ * length and last date, which every review and priority change moves. One
+ * drift is not a disagreement: an IncRem with no next-rep date at all resolves
+ * to "due now" (today's midnight), so its live value moves forward every day.
+ */
+function sameEntry(stored: IncrementalRem, live: IncrementalRem, startOfToday: number): boolean {
+  if (stored.priority !== live.priority) return false;
+  if ((stored.prioritySource ?? 'slot') !== (live.prioritySource ?? 'slot')) return false;
+  if ((stored.createdAt ?? null) !== (live.createdAt ?? null)) return false;
+  const sh = stored.history ?? [];
+  const lh = live.history ?? [];
+  if (sh.length !== lh.length) return false;
+  if (sh.length > 0 && sh[sh.length - 1]?.date !== lh[lh.length - 1]?.date) return false;
+  if (stored.nextRepDate !== live.nextRepDate) {
+    const dueNowDrift = live.nextRepDate === startOfToday && stored.nextRepDate <= live.nextRepDate;
+    if (!dueNowDrift) return false;
+  }
+  return true;
+}
+
+type WarmLoad = {
+  entries: IncrementalRem[];
+  /** Whether the entries differ from the stored copy (so it must be rewritten). */
+  changed: boolean;
+  builtAt: number;
+};
+
+/**
+ * Builds the cache from the stored copy, reading only the IncRems that changed.
+ * Returns null to mean "cold load": no usable copy, a copy past its age, or a
+ * self-check that disagrees with the database in bulk.
+ */
+async function tryWarmLoad(
+  plugin: RNPlugin,
+  taggedRem: PluginRem[],
+  dirty: Set<string>
+): Promise<WarmLoad | null> {
+  const store = await loadPersistedIncRems(plugin);
+  if (!store) return null;
+
+  const age = Date.now() - store.meta.builtAt;
+  if (age > INCREM_MAX_WARM_STORE_AGE_MS) {
+    console.log(
+      `[IncRem Cache] Stored copy was last fully read ${Math.round(age / 86400000)}d ago ` +
+        `(max ${INCREM_MAX_WARM_STORE_AGE_MS / 86400000}d) — cold load to pick up any off-device hand edits.`
+    );
+    return null;
+  }
+
+  const reusable: PluginRem[] = [];
+  const mustRead: PluginRem[] = [];
+  for (const rem of taggedRem) {
+    if (!store.byRem.has(rem._id)) mustRead.push(rem); // made incremental since the copy
+    else if (dirty.has(rem._id)) mustRead.push(rem); // changed while the plugin was running
+    else if (typeof rem.updatedAt === 'number' && rem.updatedAt > store.meta.syncedAt) mustRead.push(rem);
+    else reusable.push(rem);
+  }
+
+  console.log(
+    `[IncRem Cache] Warm start: ${reusable.length} IncRems from the stored copy, ${mustRead.length} to re-read ` +
+      `(${dirty.size} in the dirty set; last full read ${Math.round(age / 60000)}min ago).`
+  );
+
+  // Spot-check an even spread of the reused majority.
+  const step = Math.max(1, Math.floor(reusable.length / WARM_SELF_CHECK_SAMPLE));
+  const sample: PluginRem[] = [];
+  for (let i = 0; i < reusable.length && sample.length < WARM_SELF_CHECK_SAMPLE; i += step) {
+    sample.push(reusable[i]);
+  }
+  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const live = await readIncRems(plugin, sample);
+  const liveById = new Map(live.map((r) => [r.remId, r]));
+  const mismatched = new Map<string, IncrementalRem | null>();
+  for (const rem of sample) {
+    const fresh = liveById.get(rem._id) ?? null;
+    if (!fresh || !sameEntry(store.byRem.get(rem._id)!, fresh, startOfToday)) mismatched.set(rem._id, fresh);
+  }
+  if (mismatched.size > Math.max(1, Math.floor(sample.length * WARM_SELF_CHECK_MAX_MISMATCH_SHARE))) {
+    console.warn(
+      `[IncRem Cache] Warm start self-check failed: ${mismatched.size}/${sample.length} sampled IncRems ` +
+        `disagree with the stored copy (e.g. ${[...mismatched.keys()].slice(0, 3).join(', ')}). Cold load.`
+    );
+    return null;
+  }
+  if (mismatched.size > 0) {
+    console.log(
+      `[IncRem Cache] Self-check: ${mismatched.size}/${sample.length} sampled IncRems had changed ` +
+        `without a trace (${[...mismatched.keys()].join(', ')}) — refreshed from the database.`
+    );
+  }
+
+  const reread = await readIncRems(plugin, mustRead);
+  const entries: IncrementalRem[] = [];
+  for (const rem of reusable) {
+    if (mismatched.has(rem._id)) {
+      const fresh = mismatched.get(rem._id);
+      if (fresh) entries.push(fresh);
+    } else {
+      entries.push(store.byRem.get(rem._id)!);
+    }
+  }
+  entries.push(...reread);
+
+  const changed = mustRead.length > 0 || mismatched.size > 0 || entries.length !== store.byRem.size;
+  return { entries, changed, builtAt: store.meta.builtAt };
+}
+
+/**
+ * Loads all Rems tagged with the Incremental powerup into the session cache.
  *
- * Processes rems in batches to avoid overwhelming the API. Invalid rems are filtered out.
- *
- * @param plugin Plugin instance with powerup/rem/storage access
- * @param batchSize Number of rems to process per batch (default: 500)
- * @param batchDelayMs Delay in milliseconds between batches (default: 100)
- * @returns Array of successfully loaded IncrementalRem objects
+ * Warm when it can (lib/incremental_rem/persistence.ts): the stored copy, with
+ * only the IncRems that changed read again. Cold otherwise: every IncRem read,
+ * LOAD_CONCURRENCY at a time. Either way the copy is written again shortly after.
  */
 export async function loadIncrementalRemCache(
   plugin: ReactRNPlugin,
-  batchSize: number = 500,
-  batchDelayMs: number = 100
+  opts?: { forceCold?: boolean }
 ): Promise<IncrementalRem[]> {
-
-  console.log('[IncRem Cache] Loading started...');
+  console.log('[IncRem Cache] Loading started...' + (opts?.forceCold ? ' (FORCED COLD)' : ''));
+  // Taken before anything is read, so a change made while the load runs is newer
+  // than syncedAt and gets re-read next time.
   const startTime = Date.now();
   const powerup = await plugin.powerup.getPowerupByCode(powerupCode);
   const taggedRem = (await powerup?.taggedRem()) || [];
+  const dirty = await snapshotIncRemDirtySet(plugin).catch(() => new Set<string>());
 
-
-  const updatedAllRem: IncrementalRem[] = [];
-  const numBatches = Math.ceil(taggedRem.length / batchSize);
-
-  for (let i = 0; i < taggedRem.length; i += batchSize) {
-    const batch = taggedRem.slice(i, i + batchSize);
-
-
-    const batchInfos = (
-      await Promise.all(batch.map((rem) => getIncrementalRemFromRem(plugin, rem)))
-    ).filter(Boolean) as IncrementalRem[];
-
-    updatedAllRem.push(...batchInfos);
-
-    await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
+  let warm: WarmLoad | null = null;
+  if (!opts?.forceCold) {
+    try {
+      warm = await tryWarmLoad(plugin, taggedRem, dirty);
+    } catch (err) {
+      console.warn('[IncRem Cache] Warm start failed — cold load.', err);
+    }
   }
-
+  const updatedAllRem = warm ? warm.entries : await readIncRems(plugin, taggedRem);
 
   await writeIncRemCaches(plugin, updatedAllRem);
   await plugin.storage.setSession('inc_rem_cache_fully_loaded', true);
@@ -202,7 +354,17 @@ export async function loadIncrementalRemCache(
   knownIncRemIdsPopulated = true;
 
   const elapsed = Date.now() - startTime;
-  console.log(`[IncRem Cache] Loading complete: ${updatedAllRem.length} IncRems loaded in ${elapsed}ms`);
+  console.log(
+    `[IncRem Cache] Loading complete (${warm ? 'WARM' : 'COLD'}): ${updatedAllRem.length} IncRems loaded in ${elapsed}ms`
+  );
+
+  const builtAt = warm ? warm.builtAt : startTime;
+  const entriesToWrite = warm && !warm.changed ? null : updatedAllRem;
+  setTimeout(() => {
+    persistIncRemStore(plugin, entriesToWrite, updatedAllRem.length, builtAt, startTime, dirty).catch((err) =>
+      console.error('[IncRem store] persist failed:', err)
+    );
+  }, PERSIST_DELAY_MS);
 
   return updatedAllRem;
 }

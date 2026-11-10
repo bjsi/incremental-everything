@@ -6,6 +6,7 @@ import {
   localVideoMediaPath,
   localVideoUrl,
   parseLocalVideoUrl,
+  readCardVideo,
   readLocalVideo,
 } from './local_video_ref';
 import {
@@ -112,4 +113,10 @@ export async function localVideoItemForRem(
     startTime: Number(start),
     endTime: Number(end),
   };
+}
+
+/** The video that explains a card Rem (the Card Video powerup), as an item for LocalVideoViewer. */
+export async function cardVideoItemForRem(rem: PluginRem): Promise<LocalVideoActionItem | null> {
+  const file = await readCardVideo(rem);
+  return file ? { type: 'local-video', rem, file, url: localVideoUrl(file) } : null;
 }

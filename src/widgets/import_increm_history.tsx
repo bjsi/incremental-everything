@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, RNPlugin, PluginRem } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -528,4 +529,4 @@ export function ImportIncremHistory() {
   );
 }
 
-renderWidget(ImportIncremHistory);
+renderWidget(withHoverTips(ImportIncremHistory));

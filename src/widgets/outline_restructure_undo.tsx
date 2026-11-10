@@ -3,6 +3,7 @@ import {
   usePlugin,
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -107,4 +108,4 @@ export const OutlineRestructureUndo = () => {
   );
 };
 
-renderWidget(OutlineRestructureUndo);
+renderWidget(withHoverTips(OutlineRestructureUndo));

@@ -25,6 +25,7 @@ import {
     WidgetLocation,
     QueueInteractionScore,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useMemo, useEffect, useState } from 'react';
 import { computeFSRSStatesPerReview, computeFSRSState, countsForMainCard, parseWeightsString } from '../lib/fsrs';
 import { CardSchedulerLabel } from '../components/OtherSchedulers';
@@ -1543,4 +1544,4 @@ function FlashcardRepetitionHistory() {
     );
 }
 
-renderWidget(FlashcardRepetitionHistory);
+renderWidget(withHoverTips(FlashcardRepetitionHistory));

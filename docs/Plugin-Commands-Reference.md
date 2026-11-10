@@ -179,6 +179,9 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Link Local Video](Incremental-Video.md#link-local-video)** — `quick: llv`
   Pick one video file for the focused Rem and make the Rem Incremental.
 
+- **[Link Local Video as Card Extra](Incremental-Video.md#card-video)** — `quick: llce`
+  Pick a video file that explains the focused flashcard. It shows under the answer after Show Answer, and under the Rem's title in the editor; nothing is made Incremental. Desktop on macOS, with the [helper](Incremental-Video.md#setup).
+
 ---
 
 ## Utilities
@@ -222,6 +225,10 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 
 - **Store linked images & audio in RemNote (with descendants)**
   The same, over the focused or selected Rems and their whole subtree — point it at a document to store everything it links to.
+
+- <a id="upscale-image-with-chatgpt"></a>**Upscale image with ChatGPT** — `quick: upi`
+  Regenerates the focused Rem's image (each image in turn, front and back) at a higher resolution with ChatGPT's image model, then shows the original beside the result with an automatic check for changes. **Replace image** swaps the new image into the Rem in place; nothing changes until you press it. Keep the popup open while it works (about 45 seconds per image). Needs the **Local Media Bridge** setting, its helper and the Codex CLI signed in with a paid ChatGPT plan.
+  📖 See [Local Media Bridge → Upscale an image with ChatGPT](Local-Media-Bridge.md#upscale).
 
 - <a id="cycle-image-size"></a>**Cycle Image Size (Fit / Large / Medium / Small / Original)** (`Opt+Shift+G` / `Alt+Shift+G`) — `quick: cis`
   Resizes the images of a card or Rem, including imported ones the queue can show zoomed in and cut off. Each press moves them one step along **Fit → Large → Medium → Small → Original**, and a small bar shows the size set.
@@ -280,6 +287,9 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   Removes the tag and its styling. The card and its back text are left as they are.
 
 ### Other utilities
+
+- **[Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id)** (`Ctrl+Opt+I`) — `quick: id`
+  Copies the ID of the focused Rem, or of each selected Rem (one per line), to the clipboard; in the queue, the current card's Rem. Silent through the [Local Media Bridge](Local-Media-Bridge.md) helper when it runs, otherwise via a small popup where `Enter` or `⌘C` copies.
 
 - **Toggle Ignore Tag** (`Ctrl+Shift+I`) — `quick: ign`
   Adds or removes the `#ignore` tag on the **focused editor Rem**, or on a **multi-rem selection** (select several rems in the outline and run it from the Omnibar). The plugin registers CSS so ignored rems and their descendants are rendered smaller and slightly dimmed (full opacity returns on hover/focus), and the `#ignore` chip itself is hidden from the editor tag bar to keep the document clean.
@@ -546,6 +556,9 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 
 - **Refresh Card Priority Cache**
   Forces a manual recalculation of the queue caching system.
+
+- **Refresh IncRem Cache**
+  Re-reads every Incremental Rem from the database, ignoring the copy saved for fast startup, and rebuilds both. 📖 [How the IncRem cache is loaded](IncRem-Scheduler.md#increm-startup-cache)
 
 - **Preserve history & remove** — `quick: phr`
   Deletes a rem's content the way native delete does (the rem **and its whole subtree**), but first **rescues all repetition history** in that subtree so your study stats survive. Normally, deleting a flashcard / Incremental / Dismissed rem discards its reviews and time-spent — and the [Study Dashboard](Study-Dashboard.md) total silently drops. This command prevents that.

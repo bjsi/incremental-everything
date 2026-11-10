@@ -14,13 +14,46 @@
       #waitingText { flex: 1; overflow-wrap: anywhere; }
       button { font: inherit; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
       textarea { width: 100%; height: 140px; box-sizing: border-box; font: 11px ui-monospace, monospace; display: none; }
+      #docStatus { display: flex; align-items: center; gap: 6px; }
+      #docStatus[hidden], #docStatus [hidden] { display: none; }
+      #docIncremental { color: #16a34a; font-weight: 600; white-space: nowrap; }
+      #docPriority { margin-left: 2px; padding: 0 5px; border-radius: 4px; background: rgba(22, 163, 74, 0.15); font-weight: 500; }
+      #makeField { display: flex; align-items: center; gap: 6px; }
+      #makePriority { width: 64px; font: inherit; padding: 1px 4px; }
+      #makePriority.invalid { outline: 2px solid #ef4444; }
+      #makeHint { opacity: 0.6; white-space: nowrap; }
+      #docDismissed { color: #b45309; font-weight: 600; white-space: nowrap; }
+      #clock { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+      #clock.paused { opacity: 0.6; }
+      #clockTotal { opacity: 0.7; }
+      #clockBar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 4px 8px; border-bottom: 1px solid var(--line); outline: none; }
+      #clockBar[hidden] { display: none; }
+      #clockBar:focus { box-shadow: inset 0 0 0 2px #3b82f6; }
+      #clockText { flex: 1; min-width: 160px; overflow-wrap: anywhere; }
+      #clockBar button.selected { outline: 2px solid #3b82f6; outline-offset: 1px; }
+      #clockHint { opacity: 0.6; white-space: nowrap; }
       #frame { flex: 1; border: 0; width: 100%; min-height: 0; }
     </style>
   </head>
   <body>
     <div id="status">
       <span id="statusText">Open a web page to begin.</span>
+      <span id="docStatus" hidden>
+        <span id="docIncremental" title="This page's document is an Incremental Rem">✓ Incremental<span id="docPriority"></span></span>
+        <span id="docDismissed" title="This page's document was Incremental, and was dismissed">Dismissed</span>
+        <button id="clock" title="Reading time not yet recorded. Click to record it as a review">⏱ <span id="clockTime">0:00</span><span id="clockTotal"></span></button>
+        <button id="makeIncremental" title="Make this page's document an Incremental Rem">Make Incremental</button>
+        <span id="makeField">
+          <input id="makePriority" inputmode="numeric" maxlength="3" placeholder="priority" autocomplete="off" aria-label="Priority" />
+          <span id="makeHint">Enter · Esc</span>
+        </span>
+      </span>
       <button id="diagnostics">Copy diagnostics</button>
+    </div>
+    <div id="clockBar" hidden tabindex="-1">
+      <span id="clockText"></span>
+      <span id="clockButtons"></span>
+      <span id="clockHint"></span>
     </div>
     <div id="pageOffer" hidden>
       <span style="flex: 1">RemNote is not showing this page.</span>
@@ -32,6 +65,7 @@
     </div>
     <textarea id="diagnosticsText" readonly></textarea>
     <iframe id="frame" title="RemNote"></iframe>
+    <script src="clock.js"></script>
     <script src="panel.js"></script>
   </body>
 </html>

@@ -93,6 +93,29 @@ interval = ⌈ firstReviewInterval + (maxInterval − firstReviewInterval) × (N
 
 Because it depends only on the count, a [Reschedule](Reviewing-Items-in-the-Queue.md#reschedule) on a curve item is a **one-time postponement**: the next Next returns to the curve. That is what you want for a book you push a month ahead while you read its prerequisites.
 
+**What N counts.** Reviews since the Rem was last made Incremental: queue reviews, Execute Repetition, Reschedule in the queue and sessions recorded outside RemNote. A review made before the item was due takes the place of the review before it, so reviewing early never piles up reviews. A Reschedule in the editor, a date edit or a priority change is not a review and doesn't count. Same-day reviews count once, as explained below.
+
+---
+
+## Same-day reviews { #same-day-reviews }
+
+A review often comes on top of one you already made that day, through no plan of the scheduler: an [Editor Review](Reviewing-Items-in-the-Editor.md#2-sequential-review-via-increm-lists), a reading session in the [Chrome Companion](Chrome-Companion-Extension.md#the-reading-clock), or a second look at the document in the editor. Neither scheduler gains anything from it. The Saturating Curve would climb a step for a sitting it already counted, and the Multiplier would multiply the interval twice in one day.
+
+With **Ignore Same-Day Reviews in Scheduling** on (the default), a review on the same day as an earlier one, before the item is due again:
+
+- **Keeps the next review date.** The date the first review set stays, and so does the interval the item is on.
+- **Counts once.** The Saturating Curve counts one review a day, and the Multiplier doesn't build on an interval a same-day review picked by itself.
+- **Keeps its time.** The minutes go into the Rem's [Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), its totals and the [Study Dashboard](Study-Dashboard.md) as usual. The history marks it **🔁 same day**.
+
+Queue **Next** shows *"Same-day review: the next review stays on Nov 16"*, and the Companion says the same after recording.
+
+**What still applies:**
+
+- **A date you choose yourself.** The [Execute Repetition](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) popup says *"Same-day review"* and fills in the days to the date in force. Confirm them unchanged to keep that date, or type other days to use them. The same goes for Reschedule and editing the date.
+- **An item due again the same day.** With an interval of 0 days, or after a Reschedule to today, the next review is a real one and is scheduled as usual.
+
+The day is the local calendar day, so reading at 23:50 and again at 00:10 counts as two days. The rule works from the dates in the history, so it also applies to reviews you made before turning it on, and turning it off restores the old behaviour.
+
 ---
 
 ## Which scheduler an item uses { #which-scheduler }
@@ -168,6 +191,7 @@ All of these are in the **Scheduling** group of the [settings popup](Plugin-Sett
 | **Multiplier** | Number | `1.5` | Multiplier scheduler: `next interval = current interval × multiplier`. The value suggested for every Rem; `1` keeps the interval constant. |
 | **First Review Interval (Saturating Curve)** | Number | `5` | Saturating Curve: interval in days after the **first** review. |
 | **Max Interval (Saturating Curve)** | Number | `30` | Saturating Curve: ceiling the interval gradually approaches but never exceeds. |
+| **Ignore Same-Day Reviews in Scheduling** | Toggle | On | A review on the same day as an earlier one, before the item is due again, keeps the next review date and counts once. See [Same-day reviews](#same-day-reviews). |
 | **Scheduler for Documents / Videos / Highlights and Video Extracts / Regular Rems** | Dropdown | `Use the Default Scheduler` | [Per-type defaults](#per-type-defaults) that prevail over the Default Scheduler. |
 
 ---
@@ -183,6 +207,27 @@ The multiplier scheduler is the same idea: a per-item factor applied to the item
 The reason for having it is convenience, not memory science. Spacing improves retention, but the theory of an *optimum* interval applies to active recall (flashcards). For passive reading there is no such thing as an optimum interval, so the goal is simply a scheduler that keeps the intervals you want with the least effort: one that remembers a long interval you chose for a sentence, and another that keeps a book coming back.
 
 ---
+
+## Startup: how the IncRem cache is loaded { #increm-startup-cache }
+
+The queue, the IncRem lists, the priority badges and the Priority Queue all read one in-memory list of every Incremental Rem, built when the plugin starts. Building it from scratch means about ten reads per IncRem (its next date, priority and history). On a 6,500-IncRem library that is around 66,000 reads, which took about 40 seconds. While they ran, the plugin's widgets had to wait their turn for RemNote's answers, so the first seconds after opening RemNote felt frozen.
+
+### The saved copy
+
+The plugin keeps a copy of that list on your device and starts from it, re-reading only the IncRems that changed since it was saved. **Measured on a 6,583-IncRem knowledge base: 39 seconds from scratch, 2.4 seconds from the saved copy.** The copy is never synced: each device keeps its own.
+
+An IncRem is re-read when:
+
+* it was made Incremental since the copy was saved;
+* it was reviewed or had its priority changed, on this device or another, which RemNote records as a change to the Rem;
+* you edited its **Priority** or **Next Rep Date** row by hand while the plugin was running, which the plugin notes for the next start.
+
+The plugin reads everything from scratch instead when there is no copy yet (the first start after this update), when the copy belongs to another knowledge base or an older plugin version, at least **once every seven days**, and when a spot-check of 100 IncRems finds the copy wrong in bulk. Those full reads now go a few at a time, so widgets keep responding while they run.
+
+The seven-day limit covers the one change the plugin cannot see: a hand edit of an IncRem's Priority or Next Rep Date row made **on another device**, or with the plugin turned off.
+
+!!! tip "Forcing a full read"
+    The command **Refresh IncRem Cache** ignores the saved copy and re-reads every Incremental Rem from the database, rebuilding both the cache and the copy. Run it if an IncRem's priority or date looks wrong in the plugin's views.
 
 ## Scheduling and the Queue
 

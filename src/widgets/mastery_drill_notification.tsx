@@ -1,5 +1,6 @@
 
 import { renderWidget, usePlugin, useTrackerPlugin } from "@remnote/plugin-sdk";
+import { withHoverTips } from "../components/HoverTipLayer";
 import React, { useEffect, useState } from "react";
 import '../style.css';
 import '../App.css';
@@ -201,4 +202,4 @@ export const FinalDrillNotification = () => {
     );
 };
 
-renderWidget(FinalDrillNotification);
+renderWidget(withHoverTips(FinalDrillNotification));

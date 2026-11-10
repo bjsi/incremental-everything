@@ -234,7 +234,7 @@ const storeViaImportedRem = async (
  * The shared sanitizer keeps an audio `percent` verbatim, but the stored value
  * is sometimes a float (59.42…) that `setText` rejects outright.
  */
-const prepareForSetText = (richText: RichTextInterface): RichTextInterface =>
+export const prepareForSetText = (richText: RichTextInterface): RichTextInterface =>
   sanitizeRichTextForSetText(richText).map((element) => {
     const el = element as any;
     if (typeof element === 'string' || el.i !== 'a' || el.percent === undefined) return element;
@@ -242,6 +242,25 @@ const prepareForSetText = (richText: RichTextInterface): RichTextInterface =>
     const { percent: _dropped, ...rest } = el;
     return rest;
   }) as RichTextInterface;
+
+/**
+ * Store one image found at `url` in RemNote and return the stored URL
+ * (%LOCAL_FILE%… or RemNote's own host), trying the data-URI door, then the
+ * import door. Undefined when neither took it.
+ */
+export const storeImageInRemNote = async (plugin: RNPlugin, url: string): Promise<string | undefined> => {
+  try {
+    const hosted = await storeImageViaDataUri(plugin, url);
+    if (hosted) return hosted;
+  } catch (error) {
+    console.warn(`${LOG} data-URI upload failed, trying the import job`, url, error);
+  }
+  let hosted: string | undefined;
+  await storeViaImportedRem(plugin, [url], (_url, stored) => {
+    hosted = stored;
+  });
+  return hosted;
+};
 
 /**
  * Store every externally linked image and audio of `rems` in RemNote and point

@@ -33,8 +33,12 @@ import { getIESetting } from './settings';
  *   set-priority     {requestId, items: [{remId, priority}]} → set-priority-ack
  *                    {requestId, done: remId[], failed: remId[]}
  *                    — written as a manual priority (history event 'import').
+ *
+ * PROTOCOL v2 adds card videos (lib/external_card_video_bridge.ts), on keys of
+ * the same `ie-bridge.v1.` family; v1 clients are unaffected. A client tells
+ * them apart by the version in `pong` / `ready`.
  */
-export const PRIORITY_BRIDGE_VERSION = 1;
+export const PRIORITY_BRIDGE_VERSION = 2;
 export const PRIORITY_BRIDGE_KEYS = {
   ready: 'ie-bridge.v1.ready',
   ping: 'ie-bridge.v1.ping',
@@ -45,14 +49,14 @@ export const PRIORITY_BRIDGE_KEYS = {
   ack: 'ie-bridge.v1.set-priority-ack',
 } as const;
 
-type Payload = Record<string, any> | undefined;
+export type Payload = Record<string, any> | undefined;
 
 /** The listener receives the value itself, or wrapped as {value} (see mastery_drill_native.ts). */
-const unwrap = (raw: any): Payload => (raw && typeof raw === 'object' && 'value' in raw && !('requestId' in raw) ? raw.value : raw);
+export const unwrap = (raw: any): Payload => (raw && typeof raw === 'object' && 'value' in raw && !('requestId' in raw) ? raw.value : raw);
 
 /** Requests already handled in this realm: the event can arrive more than once. */
 const handled = new Set<string>();
-const firstTime = (kind: string, requestId: unknown) => {
+export const firstTime = (kind: string, requestId: unknown) => {
   if (typeof requestId !== 'string' || !requestId) return false;
   const key = `${kind}:${requestId}`;
   if (handled.has(key)) return false;
@@ -61,7 +65,7 @@ const firstTime = (kind: string, requestId: unknown) => {
   return true;
 };
 
-const reply = (plugin: RNPlugin, key: string, value: Record<string, any>) =>
+export const reply = (plugin: RNPlugin, key: string, value: Record<string, any>) =>
   plugin.storage.setSession(key, { ...value, at: Date.now() });
 
 async function inheritedFor(plugin: RNPlugin, parentId: string | null) {

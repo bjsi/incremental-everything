@@ -79,7 +79,35 @@ None of it is in the SDK.
 - **Source Rem**: Link powerup `b`, slot `FileURL` = `%LOCAL_FILE%<name>.html` (readability output).
 - **Highlight Rem**: HTML Highlight powerup `hh`. `Data` is `{startXPath, endXPath, startOffset, endOffset, text, textBefore, textAfter}`, and `HTMLId` references the source Rem. It is parented **directly** under the source's "Highlights" child, with no Page Rems. RemNote also calls an internal `addToPortal("htmlHighlight", …)`.
 - **The XPath root** is the viewer's `<div>`, mounted as follows: `<inline_math>`/`<block_math>` replaced with `katex.renderToString`, then `DOMPurify.sanitize` (default config), then `dangerouslySetInnerHTML`. Each XPath step is `nodeName.toLowerCase()` (`#text` → `text()`) plus `[n]`, counting previous siblings with the same name, itself included. Resolve with `document.evaluate('.' + xpath, root)`. `src/lib/pdf_source_pins/html.ts` reproduces it.
-- **PDF Text Reader view**: converting a PDF adds a Link powerup `b` to the PDF Rem itself (`FileURL` = the full S3 URL of an `.html`), plus `ShouldOpenInTextReader = "true"`, which is **never cleared**. So a plugin cannot tell which view is on screen. Text Reader highlights are ordinary HTML highlights under the PDF's Highlights container, next to the Page Rems of the PDF view. They carry no page position.
+- **PDF Text Reader view**: converting a PDF adds a Link powerup `b` to the PDF Rem itself (`FileURL` = the full S3 URL of an `.html`), plus `ShouldOpenInTextReader = "true"`, which is **never cleared**. So a plugin cannot tell which view is on screen. Text Reader highlights are ordinary HTML highlights under the PDF's Highlights container, next to the Page Rems of the PDF view. They carry no page position. The flag is not always there: some PDFs converted in August 2025 got the Link powerup without it, which breaks clicks on them (see the next section).
+
+## Clicking a converted PDF in the Sources list
+
+Established on 9 November 2026 by comparing working and failing Rems in the main KB's `remnote.db`, reading the click handlers in the RemNote 1.29.8-beta bundle, and testing in the app.
+
+**The Link handler goes first.** A source click (and any reference click) goes to `tk(event, rem, ctx, …)`. It walks `U5(rem)`, which is the keys of `rem.apu` with `v === true` followed by tag powerups, and the first `onClickReferenceToRem` that returns true handles the click. On converted PDFs the Link powerup `b` takes it ahead of the PDF powerup `f` (UploadedFile). On disk `apu` lists `b` before `f` on every converted PDF checked, and both symptoms below match that order.
+
+```js
+// Link powerup (b)
+async onClickReferenceToRem(e, rem, ctx, flag) {
+  if (e.shiftKey || rem.getPowerupProperty("b", ShouldOpenInTextReader))
+    return openRem(rem, ctx.focusId, { forceOtherPane: e.shiftKey, fromDocumentSourcePill: false }), true;
+  if (flag) return false;
+  const url = rem.getPowerupProperty("b", URL);           // slot `u`
+  url ? openLink(url, rem.owner) : toast("Missing URL");
+  return true;
+}
+// PDF powerup (f)
+onClickReferenceToRem: async (e, rem, ctx) =>
+  !e.ctrlKey && (openReader(rem, ctx.focusId, { forceOtherPane: e.shiftKey, fromDocumentSourcePill: ctx.fromDocumentSourcePill ?? false }), true)
+```
+
+This causes two symptoms:
+
+- **"Missing URL" toast.** It appears when the Rem has `b` but no `ShouldOpenInTextReader` (`ps.b_s` / `bpc.b.s` absent, and no `b_s_*` entry in `psh`). A converted PDF stores only `FileURL` (`b.f`), never `URL` (`b.u`), so the link branch has nothing to open. Opening the Text Reader once writes `b.s = "true"` and ends the toast. Rems that were never converted (no `b` in `apu`) are not affected.
+- **The PDF replaces the document instead of opening beside it.** Once `b.s` is set, every plain click goes through the Link branch. That branch hard-codes `fromDocumentSourcePill: false`, so the PDF opens in the current pane and closes the notes document. The PDF handler passes `ctx.fromDocumentSourcePill` through, which gives the paired side pane. Every converted PDF behaves this way, including ones that were converted cleanly with the flag set. Switching back to the PDF view doesn't change it, because `b.s` is never cleared. Clearing it wouldn't help either: the click would fall back to "Missing URL".
+
+**Workaround: Shift+click the source.** Shift takes the first branch with `forceOtherPane: true`, so the PDF opens in the other pane next to the document, whether or not `b.s` is set. A plugin can't fix this. Both handlers are host code, and removing the Link powerup is programmatic-only (`onlyProgrammaticTagging`) and would also drop the Text Reader copy.
 
 ## Reader zoom steps
 

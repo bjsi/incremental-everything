@@ -242,6 +242,18 @@ export const IncrementalRep = z.object({
        * later renamed or deleted).
        */
       transferredFromName: z.string().optional(),
+      /** The web page read, for a session the Chrome Companion recorded ('externalRep'). */
+      webUrl: z.string().optional(),
+      /**
+       * A queue review whose page was opened with Open URL (Use Companion): when
+       * it was clicked. The Companion then swaps the wall-clock time after it for
+       * the reading it measured.
+       */
+      companionHandoffAt: z.number().optional(),
+      /** That reading, in seconds, once the Companion has added it. Set at most once. */
+      companionSeconds: z.number().optional(),
+      /** On a Companion session: the queue's own seconds, added when Next found the sitting recorded. */
+      queueSeconds: z.number().optional(),
     })
     .optional(),
 });

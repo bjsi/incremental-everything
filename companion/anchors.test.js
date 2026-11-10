@@ -106,15 +106,25 @@ describe('rangeToRichText', () => {
     return A.rangeToRichText(range);
   };
 
-  it('keeps formats and absolute links, on one line', () => {
+  it('keeps formats and absolute links, with a blank line between paragraphs', () => {
     assert.deepEqual(richTextOf('<p>Plain <b>bold</b> and <i>slanted</i></p><p>a <a href="/x">link</a></p>'), [
       'Plain ',
       { i: 'm', text: 'bold', b: true },
       ' and ',
       { i: 'm', text: 'slanted', l: true },
-      ' a ',
+      '\n\na ',
       { i: 'm', text: 'link', iUrl: 'https://example.org/x' },
     ]);
+  });
+
+  it('breaks lines at paragraphs, list items, rows and <br>, spaces between cells', () => {
+    assert.deepEqual(richTextOf('<h3>Title </h3>\n  <p> One <b>two</b> </p>\n<div><div><p>Three</p></div></div>'), [
+      'Title\n\nOne ',
+      { i: 'm', text: 'two', b: true },
+      '\n\nThree',
+    ]);
+    assert.deepEqual(richTextOf('<p>Intro</p><ul><li>a</li><li>b</li></ul><p>x<br>y</p>'), ['Intro\n\na\nb\n\nx\ny']);
+    assert.deepEqual(richTextOf('<table><tr><td>1</td><td>2</td></tr><tr><td>3</td></tr></table>'), ['1 2\n3']);
   });
 
   it('leaves page text that looks like commands as text', () => {

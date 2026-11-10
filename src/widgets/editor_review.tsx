@@ -5,6 +5,7 @@ import {
   WidgetLocation,
   RNPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
@@ -94,7 +95,9 @@ const EditorReviewInput: React.FC<{
    * queue handoff sets both, and the queue turn is the one that owns the clock.
    */
   editorTimerRemId?: string;
-}> = ({ plugin, remId, queueIncRemId, editorTimerRemId }) => {
+  /** Minutes to start the review time field with: the Companion's unrecorded reading time. */
+  initialReviewMinutes?: number;
+}> = ({ plugin, remId, queueIncRemId, editorTimerRemId, initialReviewMinutes }) => {
   // One concept, whichever surface it came from. The queue wins if both are
   // set: a handoff timer is the same review continued, not a second one.
   const activeReviewKind: ActiveReviewInfo['kind'] | null = queueIncRemId
@@ -106,7 +109,9 @@ const EditorReviewInput: React.FC<{
   const [days, setDays] = useState<string>('1');
   const [priority, setPriority] = useState<number>(10);
   const [note, setNote] = useState<string>('');
-  const [reviewTimeMinutes, setReviewTimeMinutes] = useState<string>('');
+  const [reviewTimeMinutes, setReviewTimeMinutes] = useState<string>(
+    initialReviewMinutes && initialReviewMinutes > 0 ? String(initialReviewMinutes) : ''
+  );
   const [futureDate, setFutureDate] = useState('');
   const [ancestorInfo, setAncestorInfo] = useState<any>(null);
   const [remName, setRemName] = useState<string>('');
@@ -119,6 +124,10 @@ const EditorReviewInput: React.FC<{
 
   // Stored nextRepDate for regression check
   const currentNextRepDateRef = useRef<number>(0);
+
+  // A same-day repeat (Ignore Same-Day Reviews): the date in force, and the days
+  // prefilled for it. Confirming those days unchanged keeps that exact date.
+  const [sameDayKept, setSameDayKept] = useState<{ date: number; days: string } | null>(null);
 
   // Regression warning state
   const [regressionInfo, setRegressionInfo] = useState<RegressionInfo | null>(null);
@@ -179,6 +188,11 @@ const EditorReviewInput: React.FC<{
 
       // Set the calculated interval from the scheduling algorithm
       setDays(String(scheduleData?.newInterval || 1));
+      setSameDayKept(
+        scheduleData?.sameDayRepeat
+          ? { date: scheduleData.newNextRepDate, days: String(scheduleData.newInterval || 1) }
+          : null
+      );
       setPriority(incRemData?.priority ?? 10);
 
       // Store the current nextRepDate for regression checks
@@ -519,21 +533,26 @@ const EditorReviewInput: React.FC<{
 
   // ─── User-facing Handlers (with regression gate) ────────────────────────
 
+  /** The kept date of a same-day repeat, while the prefilled days are left as they are. */
+  const keptSameDayDate = sameDayKept && days.trim() === sameDayKept.days ? sameDayKept.date : undefined;
+
   const handleConfirm = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      if (keptSameDayDate !== undefined) return executeConfirm(undefined, keptSameDayDate);
       if (!checkForRegression('confirm')) {
         await executeConfirm();
       }
     },
-    [checkForRegression, executeConfirm]
+    [checkForRegression, executeConfirm, keptSameDayDate]
   );
 
   const handleStartTimer = useCallback(async () => {
+    if (keptSameDayDate !== undefined) return executeStartTimer(undefined, keptSameDayDate);
     if (!checkForRegression('timer')) {
       await executeStartTimer();
     }
-  }, [checkForRegression, executeStartTimer]);
+  }, [checkForRegression, executeStartTimer, keptSameDayDate]);
 
   // ─── Regression Dialog Resolution Handlers ─────────────────────────────
 
@@ -940,7 +959,7 @@ const EditorReviewInput: React.FC<{
           )}
 
           {/* ─── Ahead-of-Schedule Banner ─── */}
-          {earlyReviewInfo && (
+          {earlyReviewInfo && !sameDayKept && (
             <div
               className="p-2.5 rounded-lg flex items-start gap-2"
               style={{
@@ -953,6 +972,24 @@ const EditorReviewInput: React.FC<{
                 <strong>Reviewing ahead of schedule</strong> — this IncRem is not due for{' '}
                 <strong>{earlyReviewInfo.daysEarly}</strong> day{earlyReviewInfo.daysEarly !== 1 ? 's' : ''}{' '}
                 (due: {earlyReviewInfo.dueDate}).
+              </div>
+            </div>
+          )}
+
+          {/* ─── Same-Day Review Banner ─── */}
+          {sameDayKept && (
+            <div
+              className="p-2.5 rounded-lg flex items-start gap-2"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              <span className="text-sm shrink-0 mt-0.5">🔁</span>
+              <div className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                <strong>Same-day review</strong> — already reviewed today, so the next review stays on{' '}
+                <strong>{dayjs(sameDayKept.date).format('MMMM D')}</strong>. Change the days to choose
+                another date.
               </div>
             </div>
           )}
@@ -1246,6 +1283,8 @@ export function EditorReview() {
   // Set by the editor branch of Ctrl+Shift+J when the Editor Review Timer is
   // already running for a different rem.
   const editorTimerRemId = ctx?.contextData?.editorTimerRemId as string | undefined;
+  // Set by the Chrome Companion's Shift+Enter on its reading clock.
+  const initialReviewMinutes = ctx?.contextData?.reviewMinutes as number | undefined;
 
   if (!remId) {
     return null;
@@ -1258,9 +1297,10 @@ export function EditorReview() {
         remId={remId}
         queueIncRemId={queueIncRemId}
         editorTimerRemId={editorTimerRemId}
+        initialReviewMinutes={initialReviewMinutes}
       />
     </div>
   );
 }
 
-renderWidget(EditorReview);
+renderWidget(withHoverTips(EditorReview));

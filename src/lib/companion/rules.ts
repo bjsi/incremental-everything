@@ -8,7 +8,8 @@ export interface Anchor {
 }
 
 export interface PageState {
-  extracts: Array<{ remId: string; anchor: Anchor; opId?: string }>;
+  /** `highlight`: added with Add Highlight, so the Rem was never made Incremental. */
+  extracts: Array<{ remId: string; anchor: Anchor; opId?: string; kind?: 'highlight' }>;
   readPoint?: { anchor: Anchor; percent: number; at: number };
   /** Section path joined with \u0001 → its Rem. */
   sections: Record<string, string>;

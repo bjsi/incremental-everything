@@ -1,3 +1,5 @@
+// First: times every RemNote call and keeps recent log lines for stall reports.
+import { startStallMonitor } from '../lib/stall_diagnostics';
 import { declareIndexPlugin, ReactRNPlugin } from '@remnote/plugin-sdk';
 import { registerStartupShieldCoolingScan } from '../lib/priority_review_document/shield_cooling_scan';
 import '../style.css';
@@ -30,6 +32,7 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
+import { registerMcScissors } from '../lib/mc_scissors';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
 import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, queueBeautifulBarWidthKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
@@ -39,7 +42,9 @@ import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerLogosBridge } from '../lib/logos_bridge';
+import { registerMediaBridge } from '../lib/media_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
+import { registerExternalCardVideoBridge } from '../lib/external_card_video_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { registerOpenInWindowListener } from '../lib/open_in_window';
 import { registerFollowQueueSources, startFollowingQueueSources } from '../lib/follow_queue_sources';
@@ -62,6 +67,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   console.log('Plugin.app methods:', Object.keys(plugin.app));
   console.log('Plugin.storage methods:', Object.keys(plugin.storage));
 
+  startStallMonitor(plugin);
   (window as any).__plugin = plugin;
   registerJumpToRemHelper(plugin);
 
@@ -87,6 +93,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   // True/False cards: the TFT / TFF powerups and the CSS keyed on them.
   await registerTrueFalsePowerups(plugin);
   registerTrueFalseClusterTracker(plugin);
+  await registerMcScissors(plugin);
   // Settings appear in RemNote's own panel only while this KB still has to read
   // them across — the migration reads through getSetting, which throws for an
   // unregistered id. For an up-to-date KB this list is empty, so the plugin's
@@ -140,7 +147,13 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerPrefetchTrackers(plugin);
   // Long-polls the local Logos helper while the Logos Bridge setting is on.
   registerLogosBridge(plugin);
-  // Answers card-priority requests from other plugins (docs/Priority-Bridge-for-Other-Plugins.md).
+  // Long-polls the local media-bridge helper while its setting is on, and stores
+  // in RemNote the images outside tools wrote as links to it (lib/media_bridge.ts).
+  registerMediaBridge(plugin);
+  // Answers card-priority and card-video requests from other plugins
+  // (docs/Priority-Bridge-for-Other-Plugins.md). Card videos first: the
+  // priority bridge announces `ready`, on which clients resend both.
+  registerExternalCardVideoBridge(plugin);
   registerExternalPriorityBridge(plugin);
   // Publishes this window's open PDFs/articles so a command run in another
   // RemNote window can find them.

@@ -271,7 +271,12 @@ export async function updateReviewRemData(
    * key belongs to the next item and the lookback state may have changed.
    * `reviewTimeSeconds: null` means no start time was recorded.
    */
-  captured?: { reviewTimeSeconds: number | null; inLookbackMode: boolean }
+  captured?: {
+    reviewTimeSeconds: number | null;
+    inLookbackMode: boolean;
+    /** Merged into the new entry's context, such as a hand-off to the Chrome Companion. */
+    context?: IncrementalRep['context'];
+  }
 ) {
   if (!incRem) {
     console.log("❌ [reviewRem] No incRem provided!");
@@ -311,6 +316,7 @@ export async function updateReviewRemData(
     if (rem) {
       await stampNoteAndContext(plugin, rem, lastEntry);
     }
+    if (captured?.context) lastEntry.context = { ...lastEntry.context, ...captured.context };
   }
 
   // Apply manual overrides when provided (used by drag-to-next/today UX)
@@ -370,7 +376,12 @@ export async function requestQueueDashboardRefocus(plugin: RNPlugin, source: str
  */
 export const getIncrementalRemFromRem = async (
   plugin: RNPlugin,
-  r: PluginRem | undefined
+  r: PluginRem | undefined,
+  opts?: {
+    /** The Rem came from the powerup's taggedRem(), so it carries the powerup by
+     *  definition: skip the hasPowerup round trip (one call per IncRem on a load). */
+    knownTagged?: boolean;
+  }
 ): Promise<IncrementalRem | null> => {
   if (!r) {
     return null;
@@ -381,7 +392,7 @@ export const getIncrementalRemFromRem = async (
   // from the cache/list — that is exactly what made interval-0 (today-referenced)
   // rems disappear. We gate on the powerup and fall back to "due now" instead of
   // returning null; null is reserved for rems that genuinely aren't incremental.
-  if (!(await r.hasPowerup(powerupCode))) {
+  if (!opts?.knownTagged && !(await r.hasPowerup(powerupCode))) {
     return null;
   }
 

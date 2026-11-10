@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -705,4 +706,4 @@ export function PrdCleanupPopup() {
   );
 }
 
-renderWidget(PrdCleanupPopup);
+renderWidget(withHoverTips(PrdCleanupPopup));

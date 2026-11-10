@@ -178,7 +178,9 @@ export async function updateCardPriorityCache(
   plugin: RNPlugin,
   remId: RemId,
   isLightUpdate = false,
-  optimisticInfo?: Partial<CardPriorityInfo> | null
+  optimisticInfo?: Partial<CardPriorityInfo> | null,
+  /** Queue only: the caller flushes once for its whole batch (flushPendingCardPriorityUpdates). */
+  options?: { deferFlush?: boolean }
 ) {
   try {
     let updatedInfo: CardPriorityInfo | null = null;
@@ -226,6 +228,8 @@ export async function updateCardPriorityCache(
         expiresAt: Date.now() + 5000
       });
     }
+
+    if (options?.deferFlush) return;
 
     // The flushCacheUpdates function now has an intelligent internal `isFlushing` loop
     // that prevents overlapping saves and safely batches rapid requests. 
@@ -368,6 +372,19 @@ async function rereadHeldEntries(plugin: RNPlugin, remIds: RemId[], retryWithout
   if (retryWithoutCards && withoutCards.length > 0) {
     setTimeout(() => void rereadHeldEntries(plugin, withoutCards, false), HELD_RETRY_MS);
   }
+}
+
+/**
+ * Flushes what is queued and waits until it is written, for a writer that queued its
+ * entries with `deferFlush` (and awaited them, so they are in before the flush starts).
+ * Not flushCacheUpdatesNow: that forces a percentile pass even with nothing queued and
+ * drains the batched ratings, and when it raced an entry still being read it produced an
+ * extra full pass over the cache ("0 Rem(s)" in the console) before the real one. A
+ * round that changes a priority recalculates the percentiles by itself.
+ */
+export async function flushPendingCardPriorityUpdates(plugin: RNPlugin) {
+  await flushCacheUpdates(plugin);
+  await whenCardPriorityCacheFlushed();
 }
 
 export async function flushCacheUpdatesNow(plugin: RNPlugin) {

@@ -1,16 +1,14 @@
-import { ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
+import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import {
-    currentIncRemKey,
     powerupCode,
     priorityStepSizeId,
     pendingPriorityDeltaQueueKey,
 } from './consts';
 import { withQueueMutex } from './mutex';
-import {
-    getCurrentIncrementalRem,
-} from './incremental_rem';
 import { getIESetting } from './settings';
-import { getQueueVisibleCard } from './queue_visible_card';
+import { resolveQueueCommandTarget } from './queue_target';
+import { captureQueuePress, createTurnTargetResolver } from './queue_turn';
+import { showMessageDialog } from './message_dialog';
 import { PriorityChangeEvent } from './priority_history';
 
 // Module-level promise chain used as a mutex for the session-storage append.
@@ -40,67 +38,55 @@ export interface PriorityDeltaEntry {
     event?: PriorityChangeEvent;
 }
 
+// The Rem a queue keypress acts on: a live selection that is not the card wins
+// (the previewer), else the card or IncRem on screen. Resolved once per queue
+// turn and shared by every press of that turn, so a burst of presses that reaches
+// the plugin late still lands on the card it was pressed on.
+const resolveQueueTarget = createTurnTargetResolver<string>(
+    async (plugin) => (await resolveQueueCommandTarget(plugin)).remId
+);
+
 export async function handleQuickPriorityChange(
     plugin: ReactRNPlugin,
     direction: 'increase' | 'decrease'
 ) {
-    // 1. Get Step Size
-    const stepSize = await getIESetting(plugin, priorityStepSizeId);
+    // Before any await: which queue turn this keypress belongs to (lib/queue_turn).
+    const press = captureQueuePress();
 
-    // Up Arrow → Number Increase (+step) → Less Important
-    // Down Arrow → Number Decrease (−step) → More Important
-    const delta = direction === 'increase' ? stepSize : -stepSize;
-
-    // 2. Detect Context & Get Rem ID
+    // 1. Detect Context & Get Rem ID. The queue target is asked for alongside the
+    //    URL, not after it: each bridge call is a chance for the queue to move first.
     let remId: string | undefined;
+    const queueTarget = resolveQueueTarget(plugin, press);
+    queueTarget.catch(() => undefined); // only awaited in the queue
     const url = await plugin.window.getURL();
     const isQueue = url.includes('/flashcards');
 
     if (isQueue) {
-        // Cluster-aware: the sibling on screen, not the cluster's anchor card.
-        const card = await getQueueVisibleCard(plugin);
-        const sel = await plugin.editor.getSelection();
-        const selType = sel?.type;
-
-        let isTargetingQueueContext = false;
-
-        if (!selType) {
-            isTargetingQueueContext = true;
-        } else if (card) {
-            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(card.remId)) {
-                isTargetingQueueContext = true;
-            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === card.remId) {
-                isTargetingQueueContext = true;
-            }
-        } else {
-            const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-            if (currentIncRemId) {
-                if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
-                    isTargetingQueueContext = true;
-                } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
-                    isTargetingQueueContext = true;
-                }
-            }
+        const resolution = await queueTarget;
+        if (resolution.status === 'moved') {
+            console.log('[QuickPriority] The queue moved on before this press was resolved; nothing changed.');
+            await showMessageDialog(plugin, {
+                title: 'Priority not changed',
+                message:
+                    'The queue moved to the next card before this shortcut could tell which card it was meant for, so it changed nothing.',
+                detail: 'Press it again on the card you want, or change that card from its Rem.',
+                tone: 'info',
+            });
+            return;
         }
-
-        if (isTargetingQueueContext) {
-            if (card) {
-                remId = card.remId;
-            } else {
-                remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
-            }
-        } else {
-            if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
-                remId = sel.remIds[0];
-            } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
-                remId = sel.remId;
-            }
-        }
+        remId = resolution.value;
     } else {
         // Editor context
         const focusedRem = await plugin.focus.getFocusedRem();
         remId = focusedRem?._id;
     }
+
+    // 2. Step Size
+    const stepSize = await getIESetting(plugin, priorityStepSizeId);
+
+    // Up Arrow → Number Increase (+step) → Less Important
+    // Down Arrow → Number Decrease (−step) → More Important
+    const delta = direction === 'increase' ? stepSize : -stepSize;
 
     if (!remId) {
         await plugin.app.toast('No Rem found to update priority.');

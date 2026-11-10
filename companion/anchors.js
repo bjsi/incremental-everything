@@ -223,7 +223,12 @@
   }
 
   const INLINE_FORMAT = { b: 'b', strong: 'b', i: 'l', em: 'l', u: 'u', sup: 'sup', sub: 'sub', code: 'q', s: 'str', del: 'str' };
-  const BLOCK_TAG = /^(p|div|li|h[1-6]|blockquote|tr|td|th|dd|dt|section|article|br)$/;
+  // What an element puts around its content: a blank line between paragraphs, one
+  // line break between list items and table rows, a space between table cells.
+  const PARAGRAPH_TAG = /^(p|div|h[1-6]|blockquote|section|article|header|footer|aside|main|figure|figcaption|ul|ol|dl|table|pre|hr)$/;
+  const LINE_TAG = /^(br|li|tr|dt|dd)$/;
+  const SPACED_TAG = /^(td|th)$/;
+  const breakOf = (tag) => (PARAGRAPH_TAG.test(tag) ? 2 : LINE_TAG.test(tag) ? 1 : SPACED_TAG.test(tag) ? 0 : null);
 
   function collectRichText(node, format, out) {
     if (node.nodeType === 3) {
@@ -251,10 +256,10 @@
     let inner = format;
     if (INLINE_FORMAT[tag]) inner = { ...format, [INLINE_FORMAT[tag]]: true };
     if (tag === 'a' && /^https?:/.test(node.href || '')) inner = { ...format, iUrl: node.href };
-    const isBlock = BLOCK_TAG.test(tag);
-    if (isBlock) out.push({ text: ' ', format: {} });
+    const gap = breakOf(tag);
+    if (gap !== null) out.push({ gap });
     for (const child of node.childNodes) collectRichText(child, inner, out);
-    if (isBlock) out.push({ text: ' ', format: {} });
+    if (gap !== null) out.push({ gap });
   }
 
   /**
@@ -266,30 +271,54 @@
     const pieces = [];
     collectRichText(range.cloneContents(), {}, pieces);
 
-    const merged = [];
+    // A run of spaces and element edges between two pieces of content becomes the
+    // widest gap in it: a space, a soft line break, or a blank line. None at either end.
+    const SEPARATOR = [' ', '\n', '\n\n'];
+    const spaced = [];
+    let gap = null;
+    const widen = (width) => (gap = Math.max(gap ?? 0, width));
+    const isText = (piece) => piece && 'format' in piece;
     for (const piece of pieces) {
-      const last = merged[merged.length - 1];
-      const sameFormat = last && 'format' in last && 'format' in piece && JSON.stringify(last.format) === JSON.stringify(piece.format);
-      if (sameFormat) last.text += piece.text;
-      else if ('format' in piece) merged.push({ text: piece.text, format: piece.format });
-      else merged.push(piece);
+      if ('gap' in piece) {
+        widen(piece.gap);
+        continue;
+      }
+      let text = isText(piece) ? piece.text.replace(/ +/g, ' ') : null;
+      if (text !== null) {
+        if (text.startsWith(' ')) widen(0);
+        const trailing = text.endsWith(' ');
+        text = text.trim();
+        if (!text) continue;
+        piece.text = text;
+        if (gap !== null && spaced.length) {
+          // A space joins the plain text beside it, so no bold or link takes it in.
+          const previous = spaced[spaced.length - 1];
+          const plain = (candidate) => isText(candidate) && !Object.keys(candidate.format).length;
+          if (gap !== 0) spaced.push({ text: SEPARATOR[gap], format: {} });
+          else if (plain(previous) || (isText(previous) && !plain(piece))) previous.text += ' ';
+          else text = ` ${text}`;
+          piece.text = text;
+        }
+        spaced.push(piece);
+        gap = trailing ? 0 : null;
+        continue;
+      }
+      if (gap !== null && spaced.length) spaced.push({ text: SEPARATOR[gap], format: {} });
+      spaced.push(piece);
+      gap = null;
     }
 
-    // Spaces where blocks and inline text meet: collapse them, and trim both ends.
-    merged.forEach((piece, index) => {
-      if (!('format' in piece)) return;
-      const previous = merged[index - 1];
-      piece.text = piece.text.replace(/ +/g, ' ');
-      if (index === 0 || (previous && 'format' in previous && previous.text.endsWith(' '))) piece.text = piece.text.replace(/^ /, '');
-      if (index === merged.length - 1) piece.text = piece.text.replace(/ $/, '');
-    });
+    const merged = [];
+    for (const piece of spaced) {
+      const last = merged[merged.length - 1];
+      if (isText(last) && isText(piece) && JSON.stringify(last.format) === JSON.stringify(piece.format)) last.text += piece.text;
+      else merged.push(isText(piece) ? { text: piece.text, format: piece.format } : piece);
+    }
 
-    return merged
-      .filter((piece) => !('format' in piece) || piece.text)
-      .map((piece) => {
-        if (!('format' in piece)) return piece;
-        return Object.keys(piece.format).length ? { i: 'm', text: piece.text, ...piece.format } : piece.text;
-      });
+    return merged.map((piece) => {
+      if (!isText(piece)) return piece;
+      return Object.keys(piece.format).length ? { i: 'm', text: piece.text, ...piece.format } : piece.text;
+    });
   }
 
   const api = { buildIndex, describeRange, anchorAt, resolveAnchor, toRange, readOutline, sectionOf, rangeToRichText };

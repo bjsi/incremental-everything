@@ -13,6 +13,7 @@
  * the rem's own Scheduler slot → the per-type setting → the Default Scheduler.
  */
 import type { ActionItemType, IncrementalRep } from './incremental_rem/types';
+import { repCountsForScheduling } from './incremental_rem/types';
 
 export type SchedulerKind = 'multiplier' | 'curve';
 
@@ -178,8 +179,9 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
  * Returns null when nothing in the current session recorded one (history written
  * before `interval` was stamped), so the caller can fall back.
  */
-export function getCurrentInterval(history: IncrementalRep[]): number | null {
+export function getCurrentInterval(history: IncrementalRep[], skip?: ReadonlySet<number>): number | null {
   for (let i = history.length - 1; i >= 0; i--) {
+    if (skip?.has(i)) continue;
     const entry = history[i];
     const type = entry.eventType;
     const setsSchedule =
@@ -206,6 +208,90 @@ export function getCurrentInterval(history: IncrementalRep[]): number | null {
     if (type === 'madeIncremental') break;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Same-day reviews
+// ---------------------------------------------------------------------------
+//
+// A review on the same day as one that already counted, done before the item
+// is due again, comes from outside the scheduler's plan: an Editor Review, the
+// Chrome Companion, a second look in the editor. With the setting on (Ignore
+// Same-Day Reviews), it keeps its time and its place in the stats, but
+// scheduling sees one review a day: the count the Saturating Curve climbs, and
+// the interval the Multiplier multiplies, stay where the first one left them,
+// and the date in force is kept.
+
+/** The local calendar day of a timestamp, as a comparable number. */
+export function localDayKey(ms: number): number {
+  const d = new Date(ms);
+  return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate();
+}
+
+/** Whole calendar days from `from`'s day to `to`'s day. */
+export function calendarDaysBetween(from: number, to: number): number {
+  const a = new Date(from);
+  const b = new Date(to);
+  const startA = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
+  const startB = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime();
+  return Math.round((startB - startA) / MS_PER_DAY);
+}
+
+/**
+ * The positions of the same-day repeats in a history: reviews on the same local
+ * day as the last review that counted, done before the item was due again (the
+ * entry's `scheduled`, the date in force when it was made). A 'madeIncremental'
+ * marker starts afresh. Worked out from the dates alone, so the setting applies
+ * to past history too and can be switched off and on cleanly.
+ */
+export function sameDayRepeatIndexes(history: IncrementalRep[]): Set<number> {
+  const repeats = new Set<number>();
+  let lastDay: number | null = null;
+  history.forEach((entry, index) => {
+    if (entry.eventType === 'madeIncremental') {
+      lastDay = null;
+      return;
+    }
+    if (!repCountsForScheduling(entry.eventType) || typeof entry.date !== 'number') return;
+    const day = localDayKey(entry.date);
+    if (day === lastDay && typeof entry.scheduled === 'number' && entry.date < entry.scheduled) {
+      repeats.add(index);
+      return;
+    }
+    lastDay = day;
+  });
+  return repeats;
+}
+
+/**
+ * Whether a review at `at` would be a same-day repeat: a review that counts was
+ * already made that day (since the last 'madeIncremental'), and the item is not
+ * due again yet.
+ */
+export function isSameDayRepeat(history: IncrementalRep[], at: number, nextRepDate: number | undefined): boolean {
+  if (typeof nextRepDate !== 'number' || at >= nextRepDate) return false;
+  const day = localDayKey(at);
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = history[i];
+    if (entry.eventType === 'madeIncremental') return false;
+    if (!repCountsForScheduling(entry.eventType) || typeof entry.date !== 'number' || entry.date > at) continue;
+    return localDayKey(entry.date) === day;
+  }
+  return false;
+}
+
+/**
+ * The repeats whose interval the scheduler chose by itself (queue Next, the
+ * Companion, a logged session), which the Multiplier must not build on. An
+ * interval typed in Execute Repetition or Reschedule stays the one the item is on.
+ */
+export function automaticRepeatIndexes(history: IncrementalRep[], repeats: ReadonlySet<number>): Set<number> {
+  const automatic = new Set<number>();
+  for (const index of repeats) {
+    const type = history[index]?.eventType;
+    if (type === undefined || type === 'rep' || type === 'externalRep') automatic.add(index);
+  }
+  return automatic;
 }
 
 /**

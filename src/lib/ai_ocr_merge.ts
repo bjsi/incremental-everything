@@ -117,7 +117,19 @@ const intersection = (a: Box, b: Box): Box => ({
 /** The pages a highlight's rects lie on. */
 export const pagesOf = (data: any): number[] => [...new Set(rectsOf(data).map((r) => r.pageNumber))];
 
-/** Share of `inner`'s rect area that `outer`'s rects cover, page by page (0..1). */
+/** Two line boxes are the same line when they share this much of the taller one's height. */
+export const MIN_LINE_OVERLAP = 0.5;
+
+/**
+ * Share of `inner`'s rect area that `outer`'s rects cover, page by page (0..1).
+ *
+ * Line by line, not box by box: the same line can get a box of a different height
+ * in each highlight (page 93 of the Bridge Procedures Guide: 12.8pt in the small
+ * highlights, 9.3pt in the larger one starting in bold headings), so a box on the
+ * same line as an outer box counts as covered over their shared width, at full
+ * height. Any other overlap (a tall outer block, a box crossing lines) counts as
+ * the plain intersection.
+ */
 export function coveredShare(inner: any, outer: any): number {
   const outerBoxes = rectsOf(outer)
     .filter((r) => r.width && r.height)
@@ -130,9 +142,16 @@ export function coveredShare(inner: any, outer: any): number {
     const a = area(box);
     if (!a) continue;
     total += a;
-    const hit = outerBoxes
-      .filter((o) => o.page === r.pageNumber)
-      .reduce((sum, o) => sum + area(intersection(box, o.box)), 0);
+    let hit = 0;
+    for (const o of outerBoxes) {
+      if (o.page !== r.pageNumber) continue;
+      const shared = intersection(box, o.box);
+      const width = shared.x2 - shared.x1;
+      const height = shared.y2 - shared.y1;
+      if (width <= 0 || height <= 0) continue;
+      const taller = Math.max(box.y2 - box.y1, o.box.y2 - o.box.y1);
+      hit += width * (height >= MIN_LINE_OVERLAP * taller ? box.y2 - box.y1 : height);
+    }
     covered += Math.min(a, hit);
   }
   return total ? covered / total : 0;

@@ -8,7 +8,6 @@ import { CardMemoryAnalyticsView } from './CardMemoryAnalyticsView';
 import { SuppressedCardsView } from './SuppressedCardsView';
 import { FSRSCalibrationView } from './FSRSCalibrationView';
 import { OddsUniverse, SelectionOddsPanel } from './SelectionOddsPanel';
-import { HoverTipLayer } from './HoverTipLayer';
 import { IE_DOCS_BASE_URL } from '../lib/settings';
 
 interface MonthlyBests {
@@ -612,7 +611,6 @@ export function WeightedShieldPopup() {
       overflowY: 'auto',
       boxSizing: 'border-box',
     }}>
-      <HoverTipLayer />
       {showTabs && (
         <div
           role="tablist"

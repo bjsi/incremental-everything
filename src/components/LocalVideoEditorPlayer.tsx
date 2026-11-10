@@ -12,7 +12,7 @@ import {
   localVideoQueueNotesKey,
 } from '../lib/consts';
 import { LocalVideoActionItem, LocalVideoHighlightActionItem } from '../lib/incremental_rem/types';
-import { localVideoItemForRem } from '../lib/local_video';
+import { cardVideoItemForRem, localVideoItemForRem } from '../lib/local_video';
 import { LocalVideoViewer, QUEUE_NOTES_REFRESH_MS } from './LocalVideoViewer';
 
 // The player of a local video under its document's title, so it plays in the
@@ -27,6 +27,9 @@ import { LocalVideoViewer, QUEUE_NOTES_REFRESH_MS } from './LocalVideoViewer';
 // never came on after zooming into one. The context changes with no event of
 // its own, so the document is read again on every URL, pane and focus change,
 // and twice more shortly after mounting.
+//
+// A card Rem with a Card Video (Link Local Video as Card Extra) gets the same
+// player, in its card mode, when the Rem holds no Local Video of its own.
 //
 // The queue's notes pane is a DocumentViewer of the same Rem and hosts this
 // too, beside the queue's own player. The widget context is only
@@ -47,6 +50,7 @@ export function LocalVideoEditorPlayer() {
     documentId: string;
     item: Item;
     autoplay: boolean;
+    cardExtra: boolean;
   } | null>(null);
   // Re-reads the announcement when it may have gone stale.
   const [now, setNow] = React.useState(Date.now());
@@ -60,7 +64,8 @@ export function LocalVideoEditorPlayer() {
       if (documentId === shownId.current) return;
       shownId.current = documentId;
       const rem = documentId ? await plugin.rem.findOne(documentId) : undefined;
-      const item = rem ? await localVideoItemForRem(plugin, rem) : null;
+      const incremental = rem ? await localVideoItemForRem(plugin, rem) : null;
+      const item = incremental ?? (rem ? await cardVideoItemForRem(rem) : null);
       // Play at once only for a review of this Rem; opening it otherwise stays quiet.
       const [reviewRemId, reviewStart] = await Promise.all([
         plugin.storage.getSession<string>(editorReviewTimerRemIdKey),
@@ -69,7 +74,12 @@ export function LocalVideoEditorPlayer() {
       if (shownId.current !== documentId) return;
       setState(
         item && documentId
-          ? { documentId, item, autoplay: !!reviewStart && reviewRemId === documentId }
+          ? {
+              documentId,
+              item,
+              autoplay: !!incremental && !!reviewStart && reviewRemId === documentId,
+              cardExtra: !incremental,
+            }
           : null
       );
     } catch (e) {
@@ -107,6 +117,7 @@ export function LocalVideoEditorPlayer() {
         actionItem={state.item}
         inEditor
         autoplay={state.autoplay}
+        cardExtra={state.cardExtra}
       />
     </div>
   );

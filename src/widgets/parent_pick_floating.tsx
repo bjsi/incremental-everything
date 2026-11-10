@@ -14,6 +14,7 @@ import {
   ReactRNPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import '../rn_theme_vars.css';
 import { parentPickConfirmRequestKey, parentPickContextKey } from '../lib/consts';
@@ -395,4 +396,4 @@ const cardStyle: React.CSSProperties = {
   fontFamily: 'system-ui, -apple-system, sans-serif',
 };
 
-renderWidget(ParentPickFloating);
+renderWidget(withHoverTips(ParentPickFloating));

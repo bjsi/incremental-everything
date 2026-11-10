@@ -4,8 +4,9 @@ Other RemNote plugins can work with **flashcard priorities** through a small mes
 
 - **Ask** what priority a new flashcard would get at a given place in your knowledge base, so they can show it to you before creating anything.
 - **Set** a flashcard's priority. Incremental RemNote applies it as a **manual** priority, exactly as if you had set it in the Priority popup.
+- **Link a video** on your computer to a flashcard, shown under its answer: a [card video](Incremental-Video.md#card-video). The other plugin asks Incremental RemNote to open its folder dialog and matches the videos to its cards. Since v1.0.195.
 
-The typical client is an **importer**: before it creates the cards, it shows you the priority each one would inherit and lets you type a different one.
+The typical client is an **importer**: before it creates the cards, it shows you the priority each one would inherit and lets you type a different one, and it can link each question to the video that explains it.
 
 ## What you see { #what-you-see }
 
@@ -41,11 +42,13 @@ Every request carries a `requestId` (any unique string), and every answer echoes
 
 | Request key (client writes) | Payload | Answer key (Incremental RemNote writes) | Answer |
 |---|---|---|---|
-| `ie-bridge.v1.ping` | `{ requestId }` | `ie-bridge.v1.pong` | `{ requestId, version: 1 }` |
+| `ie-bridge.v1.ping` | `{ requestId }` | `ie-bridge.v1.pong` | `{ requestId, version }` |
 | `ie-bridge.v1.priority-query` | `{ requestId, parentIds: (remId \| null)[] }` | `ie-bridge.v1.priority-answer` | `{ requestId, enabled, results }` |
 | `ie-bridge.v1.set-priority` | `{ requestId, items: [{ remId, priority }] }` | `ie-bridge.v1.set-priority-ack` | `{ requestId, done: remId[], failed: remId[] }` |
 
 Incremental RemNote also writes **`ie-bridge.v1.ready`** (`{ requestId, version }`) each time it starts.
+
+`version` is **2** since v1.0.195, which added [card videos](#card-videos); the calls above are unchanged. An older Incremental RemNote answers `1` and never answers the card-video keys, so check the version before using them.
 
 **`priority-query`**: for each parent, the priority a **new child** of it would get. The walk starts at the parent itself, so passing an existing flashcard Rem gives that Rem's own priority.
 
@@ -60,6 +63,30 @@ Incremental RemNote also writes **`ie-bridge.v1.ready`** (`{ requestId, version 
 - `priority` must be a whole number from 0 to 100.
 - Rems that do not exist, or have invalid values, are listed in `failed`.
 - Setting a priority does not cascade it to descendants. Items are meant to be the flashcard Rems themselves.
+
+### Card videos (version 2) { #card-videos }
+
+A [card video](Incremental-Video.md#card-video) is a video file on the user's computer, linked to a flashcard's own Rem and shown under its answer. A plugin can neither open a file dialog nor reach the local helper that plays the videos, so the folder is picked through Incremental RemNote:
+
+| Request key (client writes) | Payload | Answer key (Incremental RemNote writes) | Answer |
+|---|---|---|---|
+| `ie-bridge.v1.video-folder` | `{ requestId, prompt? }` | `ie-bridge.v1.video-folder-answer` | `{ requestId, status, error?, library?, root?, path?, videos? }` |
+| `ie-bridge.v1.set-card-video` | `{ requestId, items: [{ remId, library, path }] }` | `ie-bridge.v1.set-card-video-ack` | `{ requestId, done: remId[], failed: remId[] }` |
+
+**`video-folder`** opens the helper's macOS folder dialog, with `prompt` as its message.
+
+- `status` is `'ok'`, `'cancelled'`, or `'error'` with the reason in `error` (for example, the helper isn't running).
+- With `'ok'`, `videos` lists every video under the folder, subfolders included, as `{ name, path }`. `name` is the file name without its extension, for matching; `path` is relative to the video library `library`. Pass both back unchanged.
+- Only MP4, M4V, MOV and WebM files are listed.
+- The user may keep the dialog open for a while: wait minutes, not seconds.
+
+**`set-card-video`** links each item's video to the Rem, replacing any earlier one. Link it to the Rem that holds the card, such as a multiple-choice question.
+
+- An item `{ remId, remove: true }` unlinks the Rem's video.
+- A Rem that doesn't exist, or a path that isn't a video inside the library, is listed in `failed`.
+- Nothing is made Incremental, and the card's priority isn't touched.
+
+Queue unconfirmed `set-card-video` items and resend them on `ready`, as for priorities.
 
 ### Delivery { #delivery }
 
@@ -108,4 +135,4 @@ await ask(plugin, 'ie-bridge.v1.set-priority', 'ie-bridge.v1.set-priority-ack', 
 });
 ```
 
-The implementation is in [`src/lib/external_priority_bridge.ts`](https://github.com/hugomarins/incremental-remnote/blob/main/src/lib/external_priority_bridge.ts).
+The implementation is in [`src/lib/external_priority_bridge.ts`](https://github.com/hugomarins/incremental-remnote/blob/main/src/lib/external_priority_bridge.ts) and, for card videos, [`src/lib/external_card_video_bridge.ts`](https://github.com/hugomarins/incremental-remnote/blob/main/src/lib/external_card_video_bridge.ts).

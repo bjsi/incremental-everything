@@ -34,6 +34,7 @@ import {
   betaSchedulerEnabledId,
   betaFirstReviewIntervalId,
   betaMaxIntervalId,
+  ignoreSameDayReviewsId,
   schedulerForDocumentsId,
   schedulerForVideosId,
   schedulerForHighlightsId,
@@ -70,6 +71,8 @@ import {
   tidyAutoCaptionsId,
   titleVideoExtractsId,
   autoFocusQueueDashboardId,
+  mcScissorsSettingId,
+  mcAssertionSheetSettingId,
   hideCardPriorityTagSettingId,
   showLeftBorderForIncRemsSettingId,
   showPriorityBandsInTablesId,
@@ -80,6 +83,7 @@ import {
   enableHideInQueueIntegrationId,
   logosBridgeEnabledId,
   logosAutoOpenId,
+  mediaBridgeEnabledId,
   enableFlashcardPrioritisationId,
   performanceModeId,
   alwaysUseLightModeOnMobileId,
@@ -134,6 +138,7 @@ export interface IESettings {
   [betaSchedulerEnabledId]: boolean;
   [betaFirstReviewIntervalId]: number;
   [betaMaxIntervalId]: number;
+  [ignoreSameDayReviewsId]: boolean;
   [schedulerForDocumentsId]: SchedulerTypeDefault;
   [schedulerForVideosId]: SchedulerTypeDefault;
   [schedulerForHighlightsId]: SchedulerTypeDefault;
@@ -170,6 +175,8 @@ export interface IESettings {
   [tidyAutoCaptionsId]: boolean;
   [titleVideoExtractsId]: boolean;
   [autoFocusQueueDashboardId]: boolean;
+  [mcScissorsSettingId]: boolean;
+  [mcAssertionSheetSettingId]: boolean;
 
   // Editor indicators
   [hideCardPriorityTagSettingId]: boolean;
@@ -184,6 +191,7 @@ export interface IESettings {
   [enableHideInQueueIntegrationId]: boolean;
   [logosBridgeEnabledId]: boolean;
   [logosAutoOpenId]: boolean;
+  [mediaBridgeEnabledId]: boolean;
   [enableFlashcardPrioritisationId]: boolean;
   [performanceModeId]: PerformanceMode;
   [alwaysUseLightModeOnMobileId]: boolean;
@@ -235,6 +243,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [betaSchedulerEnabledId]: false,
   [betaFirstReviewIntervalId]: 5,
   [betaMaxIntervalId]: 30,
+  [ignoreSameDayReviewsId]: true,
   [schedulerForDocumentsId]: 'default',
   [schedulerForVideosId]: 'default',
   [schedulerForHighlightsId]: 'default',
@@ -269,6 +278,8 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [tidyAutoCaptionsId]: true,
   [titleVideoExtractsId]: true,
   [autoFocusQueueDashboardId]: false,
+  [mcScissorsSettingId]: true,
+  [mcAssertionSheetSettingId]: true,
 
   [hideCardPriorityTagSettingId]: true,
   [showLeftBorderForIncRemsSettingId]: true,
@@ -281,6 +292,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [enableHideInQueueIntegrationId]: false,
   [logosBridgeEnabledId]: false,
   [logosAutoOpenId]: false,
+  [mediaBridgeEnabledId]: false,
   [enableFlashcardPrioritisationId]: false,
   [performanceModeId]: 'light',
   [alwaysUseLightModeOnMobileId]: true,
@@ -627,6 +639,18 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Saturating Curve scheduler: upper bound the interval gradually approaches; it will never ' +
       'exceed this value.',
   },
+  [ignoreSameDayReviewsId]: {
+    kind: 'boolean',
+    group: 'scheduling',
+    helpPath: 'IncRem-Scheduler/#same-day-reviews',
+    title: 'Ignore Same-Day Reviews in Scheduling',
+    description:
+      'A review on the same day as an earlier one, before the item is due again (an Editor ' +
+      'Review, a Chrome Companion session, a second look), keeps the next review date and does ' +
+      'not count again: the Saturating Curve counts one review a day, and the Multiplier does not ' +
+      'multiply the interval twice. Its time is still recorded. A date or interval you choose ' +
+      'yourself always applies.',
+  },
   [schedulerForDocumentsId]: {
     kind: 'dropdown',
     group: 'scheduling',
@@ -942,6 +966,26 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Opens the Practiced Queues dashboard in the right sidebar on queue entry, for a live view ' +
       'of the session. PDF IncRems may temporarily steal focus to PDF tabs; the dashboard tab ' +
       'stays available. Does not apply on mobile.',
+  },
+  [mcScissorsSettingId]: {
+    kind: 'boolean',
+    group: 'queue',
+    helpPath: 'Utilities-Multiple-Choice-Cards/#scissors',
+    title: 'Scissors on Multiple-Choice Cards',
+    description:
+      'Shows a ✂ beside each option of a multiple-choice card. Click it to strike that option ' +
+      'through and rule it out before you answer; click again to restore it. Takes effect from ' +
+      'the next card.',
+  },
+  [mcAssertionSheetSettingId]: {
+    kind: 'boolean',
+    group: 'queue',
+    helpPath: 'Utilities-Multiple-Choice-Cards/#answer-sheet',
+    title: 'True/False Answer Sheet on Multiple-Choice Cards',
+    description:
+      'When a multiple-choice question lists statements numbered I., II., III. on their own lines, ' +
+      'shows a column with a box per statement beside the question. Click a box to mark it T, again ' +
+      'for F, and again to clear it. Takes effect from the next card.',
   },
 
   // --- Editor indicators ---
@@ -1332,6 +1376,19 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'When an Incremental Rem comes up — in the queue, or when an Editor Review timer starts — ' +
       'run "Open in Logos" for it: Logos comes forward at its bookmark (or, for an extract, at its ' +
       'passage). Incremental Rems with no Logos link are left alone.',
+  },
+  [mediaBridgeEnabledId]: {
+    kind: 'boolean',
+    group: 'integrations',
+    helpPath: 'Local-Media-Bridge/',
+    title: 'Local Media Bridge',
+    description:
+      'Uploads into RemNote the images that outside tools (such as Claude through the RemNote MCP) ' +
+      'write as links to the local media-bridge helper (scripts/media_bridge/media_bridge.py, ' +
+      'http://127.0.0.1:3460). Since RemNote 1.29 a file:// image written from outside is never ' +
+      'uploaded; this does it, the same way as "Store linked images & audio in RemNote". The helper ' +
+      'can also ask the plugin to move rems, remove tags, read out images and make rems Incremental. ' +
+      'Leave off unless you use the helper.',
   },
 
   // --- Misc ---

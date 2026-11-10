@@ -4,8 +4,12 @@
 // this frame, so no other plugin can take part, and this listener is all that runs
 // where the extension is not installed, including the desktop app.
 
-import { PluginRem, ReactRNPlugin, RichTextInterface } from '@remnote/plugin-sdk';
-import { dismissedPowerupCode, powerupCode } from '../consts';
+import { AppEvents, PluginRem, ReactRNPlugin, RichTextInterface } from '@remnote/plugin-sdk';
+import { dismissedPowerupCode, editorReviewTimerRemIdKey, powerupCode } from '../consts';
+import { addExternalSessionRep, updateHistoryEntry } from '../history_edit';
+import { CompanionTargets, companionTargetsKey, refinedReviewSeconds } from './handoff';
+import { repCountsForStats } from '../incremental_rem/types';
+import { getNextSpacingDateForRem } from '../scheduler';
 import { canonicalUrlKey } from '../duplicate_source/url_key';
 import { markRemsAsFreshlyCreated } from '../incRemHelpers';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../incremental_rem';
@@ -34,6 +38,94 @@ type SectionChain = Array<{ text: string; position: number }>;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pageKeyOf = (url: string) => canonicalUrlKey(url) ?? url;
+
+// ---- Telling the extension what changed in RemNote ----
+
+type DocumentStatus = Awaited<ReturnType<typeof documentStatus>>;
+/** The document the panel's header shows, and what it last said of it. */
+let watchedDoc: DocumentStatus | undefined;
+type WatchedExtract = { parentId?: string; kind?: 'highlight'; incremental: boolean };
+/** The extracts of each page a tab has shown here, with the Rem each sits under. */
+const watchedPages = new Map<string, Map<string, WatchedExtract>>();
+/** Every extract and parent above, and the panel's document, for a quick test of each change event. */
+let watchedIds = new Set<string>();
+
+function rebuildWatchedIds() {
+  const ids = new Set<string>(watchedDoc ? [watchedDoc.docId] : []);
+  for (const page of watchedPages.values()) {
+    for (const [remId, { parentId }] of page) {
+      ids.add(remId);
+      if (parentId) ids.add(parentId);
+    }
+  }
+  watchedIds = ids;
+}
+
+function setWatchedPage(url: string, extracts: Map<string, WatchedExtract>) {
+  watchedPages.set(url, extracts);
+  rebuildWatchedIds();
+}
+
+function watchExtract(url: string, remId: string, extract: WatchedExtract) {
+  setWatchedPage(url, new Map([...(watchedPages.get(url) ?? []), [remId, extract]]));
+}
+
+function watchDocument(status: NonNullable<typeof watchedDoc>) {
+  watchedDoc = status;
+  rebuildWatchedIds();
+}
+
+/** A highlight lives while its Rem does. An extract also needs to stay Incremental or Dismissed. */
+async function isAliveExtract(plugin: ReactRNPlugin, remId: string, kind?: 'highlight') {
+  const rem = await plugin.rem.findOne(remId);
+  if (!rem) return { alive: false, incremental: false };
+  const incremental = await rem.hasPowerup(powerupCode);
+  const alive = kind === 'highlight' || incremental || (await rem.hasPowerup(dismissedPowerupCode));
+  return { alive, incremental, rem };
+}
+
+/**
+ * The page's document, as the panel's header shows it: whether it is Incremental,
+ * the reading time its history holds, and the reviews since `since`, which the
+ * Companion's clock takes out of its own unrecorded time.
+ */
+async function documentStatus(plugin: ReactRNPlugin, doc: PluginRem, since?: number) {
+  const incremental = await doc.hasPowerup(powerupCode);
+  const incRem = incremental ? await getIncrementalRemFromRem(plugin, doc) : undefined;
+  const reviews = (incRem?.history ?? []).filter((rep) => repCountsForStats(rep.eventType));
+  const totalSeconds = reviews.reduce((sum, rep) => sum + (rep.reviewTimeSeconds ?? 0), 0);
+  const timerRemId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
+  return {
+    docId: doc._id,
+    incremental,
+    /** Was Incremental, and was dismissed: Make Incremental brings it back. */
+    dismissed: !incremental && (await doc.hasPowerup(dismissedPowerupCode)),
+    priority: incRem?.priority,
+    totalSeconds,
+    lastReviewAt: reviews.length ? Math.max(...reviews.map((rep) => rep.date)) : undefined,
+    reviewsSince:
+      since === undefined
+        ? []
+        : reviews
+            .filter((rep) => rep.date >= since)
+            .map((rep) => ({
+              date: rep.date,
+              reviewTimeSeconds: rep.reviewTimeSeconds ?? 0,
+              eventType: rep.eventType,
+              companionHandoffAt: rep.context?.companionHandoffAt,
+              companionSeconds: rep.context?.companionSeconds,
+            })),
+    editorTimerRunning: !!timerRemId && timerRemId === doc._id,
+  };
+}
+
+const sameStatus = (a: DocumentStatus, b: DocumentStatus) =>
+  a.incremental === b.incremental &&
+  a.dismissed === b.dismissed &&
+  a.priority === b.priority &&
+  a.totalSeconds === b.totalSeconds &&
+  a.lastReviewAt === b.lastReviewAt &&
+  a.editorTimerRunning === b.editorTimerRunning;
 
 async function currentKbId(plugin: ReactRNPlugin): Promise<string> {
   const knowledgeBase = await plugin.kb.getCurrentKnowledgeBaseData();
@@ -125,7 +217,10 @@ async function ensureSection(plugin: ReactRNPlugin, doc: PluginRem, chain: Secti
 
 export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<unknown>> = {
   async addExtract(plugin, data) {
-    const { docId, url, text, richText, chain, opId, withPriority, priority } = data;
+    const { docId, url, text, richText, chain, opId, priority } = data;
+    // Add Highlight: the same Rem in the same place, left out of the queue.
+    const highlightOnly = data.highlight === true;
+    const withPriority = !highlightOnly && !!data.withPriority;
     const anchor: Anchor = data.anchor;
     const started = Date.now();
     await guardTestPlugin(plugin);
@@ -146,20 +241,23 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
     state.order[rem._id] = anchor.position;
     // No cascade when the priority is settled here or by the popup: a new extract
     // has no descendants to pass it to, and the popup fires its own.
-    await initIncrementalRem(plugin, rem, {
-      explicitParentId: section._id,
-      priority: typeof priority === 'number' ? priority : undefined,
-      skipInitialCascade: !!withPriority || typeof priority === 'number',
-    });
+    if (!highlightOnly) {
+      await initIncrementalRem(plugin, rem, {
+        explicitParentId: section._id,
+        priority: typeof priority === 'number' ? priority : undefined,
+        skipInitialCascade: withPriority || typeof priority === 'number',
+      });
+    }
     const elapsedMs = Date.now() - started;
 
-    state.extracts.push({ remId: rem._id, anchor, opId });
+    state.extracts.push({ remId: rem._id, anchor, opId, ...(highlightOnly ? { kind: 'highlight' as const } : {}) });
     await writePage(plugin, url, state);
+    watchExtract(url, rem._id, { parentId: section._id, kind: highlightOnly ? 'highlight' : undefined, incremental: !highlightOnly });
 
     const saved = await plugin.rem.findOne(rem._id);
     if (!saved) throw new Error('The new Rem cannot be read back.');
     const siblings = await section.getChildrenRem();
-    const incRem = await getIncrementalRemFromRem(plugin, saved);
+    const incRem = highlightOnly ? undefined : await getIncrementalRemFromRem(plugin, saved);
 
     if (withPriority) {
       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
@@ -175,7 +273,8 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
       inReadingOrder: isInReadingOrder(siblings.map((child) => child._id), state.order),
       isIncremental: await saved.hasPowerup(powerupCode),
       priority: incRem?.priority,
-      priorityPopup: !!withPriority,
+      priorityPopup: withPriority,
+      highlight: highlightOnly,
       elapsedMs,
     };
   },
@@ -183,14 +282,108 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
   async pageState(plugin, { url }) {
     const state = await readPage(plugin, url);
     const alive: PageState['extracts'] = [];
+    // A highlight made Incremental since turns blue on the page.
+    const shown: Array<PageState['extracts'][number] & { incremental: boolean }> = [];
+    const watched = new Map<string, WatchedExtract>();
     for (const extract of state.extracts) {
-      const rem = await plugin.rem.findOne(extract.remId);
-      if (rem && ((await rem.hasPowerup(powerupCode)) || (await rem.hasPowerup(dismissedPowerupCode)))) {
-        alive.push(extract);
-      }
+      const { alive: isAlive, incremental, rem } = await isAliveExtract(plugin, extract.remId, extract.kind);
+      if (!isAlive || !rem) continue;
+      alive.push(extract);
+      shown.push({ ...extract, incremental });
+      watched.set(rem._id, { parentId: rem.parent ?? undefined, kind: extract.kind, incremental });
     }
+    setWatchedPage(url, watched);
     if (alive.length !== state.extracts.length) await writePage(plugin, url, { ...state, extracts: alive });
-    return { kbId: await currentKbId(plugin), extracts: alive, readPoint: state.readPoint };
+    return { kbId: await currentKbId(plugin), extracts: shown, readPoint: state.readPoint };
+  },
+
+  async documentStatus(plugin, { docId, since }) {
+    const status = await documentStatus(plugin, await findDocument(plugin, docId), since);
+    watchDocument(status);
+    return status;
+  },
+
+  /**
+   * The Companion's reading clock, recorded as a review dated when the reading
+   * stopped. The scheduler's interval runs from that moment, so a session
+   * recorded the next morning still lands on the evening it was read.
+   */
+  async recordPageReview(plugin, { docId, reviewTimeSeconds, endedAt, url }) {
+    await guardTestPlugin(plugin);
+    const doc = await findDocument(plugin, docId);
+    if (!(await doc.hasPowerup(powerupCode))) throw new Error("The page's document is not an Incremental Rem.");
+    const seconds = Math.round(Number(reviewTimeSeconds));
+    const ended = Math.min(Number(endedAt), Date.now());
+    if (!(seconds > 0) || !Number.isFinite(ended)) throw new Error('There is no reading time to record.');
+    const spacing = await getNextSpacingDateForRem(plugin, docId, false, undefined, ended);
+    if (!spacing) throw new Error('The scheduler could not compute the next repetition.');
+    // A same-day repeat keeps the date in force; otherwise the interval runs from the reading's end.
+    const nextRepDate = spacing.sameDayRepeat
+      ? spacing.newNextRepDate
+      : ended + Math.max(0, spacing.newNextRepDate - Date.now());
+    const result = await addExternalSessionRep(plugin, docId, {
+      date: ended,
+      reviewTimeSeconds: seconds,
+      nextRepDate,
+      ...(typeof url === 'string' && /^https?:/.test(url) ? { context: { webUrl: url } } : {}),
+    });
+    if (!result.ok) throw new Error(result.error || 'Could not record the session.');
+    const status = await documentStatus(plugin, doc);
+    watchDocument(status);
+    return {
+      ...status,
+      rescheduled: result.rescheduled,
+      nextRepDate: result.rescheduled ? nextRepDate : undefined,
+      sameDayRepeat: spacing.sameDayRepeat,
+    };
+  },
+
+  /**
+   * A queue review of a page opened with Use Companion: the wall-clock time
+   * after the hand-off becomes the reading the Companion measured. Once only.
+   */
+  async refineQueueReview(plugin, { docId, date, companionSeconds }) {
+    await guardTestPlugin(plugin);
+    const doc = await findDocument(plugin, docId);
+    const incRem = await getIncrementalRemFromRem(plugin, doc);
+    const review = incRem?.history?.find((rep) => rep.date === date && rep.context?.companionHandoffAt);
+    if (!review) throw new Error('That queue review is no longer in the history.');
+    if (review.context?.companionSeconds !== undefined) return { refined: false, reviewTimeSeconds: review.reviewTimeSeconds };
+    const seconds = Math.max(0, Math.round(Number(companionSeconds)));
+    const reviewTimeSeconds = refinedReviewSeconds(review, review.context!.companionHandoffAt!, seconds);
+    const result = await updateHistoryEntry(plugin, docId, review, {
+      reviewTimeSeconds,
+      context: { companionSeconds: seconds },
+    });
+    if (!result.ok) throw new Error(result.error || 'Could not update the review.');
+    return { refined: true, reviewTimeSeconds, previousSeconds: review.reviewTimeSeconds ?? 0 };
+  },
+
+  /** Pages handed to the Companion from the queue, so it counts them before the panel shows them. */
+  async companionTargets(plugin) {
+    const kbId = await currentKbId(plugin);
+    const all = (await plugin.storage.getSynced<CompanionTargets>(companionTargetsKey)) ?? {};
+    return Object.fromEntries(Object.entries(all[kbId] ?? {}).map(([docId, { url }]) => [docId, url]));
+  },
+
+  /** Shift+Enter on the clock: the Execute Repetition popup, with the time filled in. */
+  async openReviewPopup(plugin, { docId, minutes }) {
+    await guardTestPlugin(plugin);
+    await findDocument(plugin, docId);
+    await plugin.widget.openPopup('editor_review', { remId: docId, reviewMinutes: Math.max(0, Math.round(minutes)) });
+    return { opened: true };
+  },
+
+  async makeDocumentIncremental(plugin, { docId, priority }) {
+    await guardTestPlugin(plugin);
+    const doc = await findDocument(plugin, docId);
+    if (priority !== undefined && !(Number.isInteger(priority) && priority >= 0 && priority <= 100)) {
+      throw new Error('The priority must be a whole number from 0 to 100.');
+    }
+    await initIncrementalRem(plugin, doc, { priority });
+    const status = await documentStatus(plugin, doc);
+    watchDocument(status);
+    return status;
   },
 
   async setReadPoint(plugin, { url, anchor, percent }) {
@@ -220,6 +413,53 @@ export function startCompanionListener(plugin: ReactRNPlugin) {
     window.postMessage({ ieCompanion: 'toExtension', ...message }, '*');
   // One at a time: operations read and rewrite the same stored pages.
   let queue: Promise<unknown> = Promise.resolve();
+
+  // A deleted Rem reports itself, and its parent reports a child gone. Either one
+  // gets that page's affected extracts checked, and the page reloads its
+  // highlights if one died or changed colour. The panel's document is checked the
+  // same way, for its header. A Set lookup per event: this one fires a lot.
+  const changed = new Set<string>();
+  let flushTimer: ReturnType<typeof setTimeout> | undefined;
+  const flush = async () => {
+    const ids = [...changed];
+    changed.clear();
+    for (const [url, extracts] of watchedPages) {
+      const suspects = [...extracts].filter(
+        ([remId, { parentId }]) => ids.includes(remId) || (!!parentId && ids.includes(parentId))
+      );
+      for (const [remId, watched] of suspects) {
+        const { alive, incremental } = await isAliveExtract(plugin, remId, watched.kind);
+        if (alive && incremental === watched.incremental) continue;
+        // pageState, which the page now asks for, sets this page's list anew.
+        setWatchedPage(url, new Map([...extracts].filter(([id]) => id !== remId)));
+        toExtension({ kind: 'pageChanged', url });
+        break;
+      }
+    }
+    if (watchedDoc && ids.includes(watchedDoc.docId)) await checkDocument();
+  };
+  const checkDocument = async () => {
+    const shown = watchedDoc;
+    if (!shown) return;
+    const doc = await plugin.rem.findOne(shown.docId);
+    const status = doc ? await documentStatus(plugin, doc) : undefined;
+    if (status && !sameStatus(status, shown)) {
+      watchDocument(status);
+      toExtension({ kind: 'documentChanged', status });
+    }
+  };
+  plugin.event.addListener(AppEvents.StorageSyncedChange, companionTargetsKey, () =>
+    toExtension({ kind: 'targetsChanged' })
+  );
+  // The Editor Review Timer starting or ending on the document changes no Rem.
+  plugin.event.addListener(AppEvents.StorageSessionChange, editorReviewTimerRemIdKey, () => void checkDocument());
+  plugin.event.addListener(AppEvents.GlobalRemChanged, undefined, (data) => {
+    const remId = data?.remId;
+    if (!remId || !watchedIds.has(remId)) return;
+    changed.add(remId);
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(() => void flush(), 400);
+  });
 
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.data?.ieCompanion !== 'toPlugin') return;

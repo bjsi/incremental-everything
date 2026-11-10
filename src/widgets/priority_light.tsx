@@ -4,6 +4,7 @@ import {
     useRunAsync,
     useTrackerPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { getRemCardContent } from '../lib/pdfUtils';
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
@@ -537,4 +538,4 @@ function PriorityLight() {
     );
 }
 
-renderWidget(PriorityLight);
+renderWidget(withHoverTips(PriorityLight));

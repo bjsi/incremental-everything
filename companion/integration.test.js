@@ -1,7 +1,7 @@
 // Runs content.js and panel.js under jsdom against a stand-in for Chrome's APIs,
 // from a key press on a page to the plugin's answer. Run from the repo root:
 // node --test companion/integration.test.js
-const { describe, it } = require('node:test');
+const { describe, it, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -100,7 +100,13 @@ function browser() {
   return { stored, tabs, opened, chromeFor, tabChanged: (id = 1) => tabListeners.forEach((listener) => listener(id)) };
 }
 
+// Every window made here, closed at the end: the reading clock's intervals would
+// otherwise keep the test run from exiting.
+const windows = [];
+after(() => windows.forEach((window) => window.close()));
+
 function run(dom, chromeApi, scripts, edit = (source) => source) {
+  windows.push(dom.window);
   const { window } = dom;
   window.chrome = chromeApi;
   for (const script of scripts) window.eval(edit(read(script)));
@@ -130,7 +136,7 @@ function openPage(b, url, html, id = 1) {
     dom.shadowForTests = attachShadow.call(this, options);
     return dom.shadowForTests;
   };
-  run(dom, b.chromeFor({ tab: { id, windowId: 7 }, listeners: tab.listeners }), ['anchors.js', 'content.js']);
+  run(dom, b.chromeFor({ tab: { id, windowId: 7 }, listeners: tab.listeners }), ['anchors.js', 'clock.js', 'content.js']);
   return dom;
 }
 
@@ -160,7 +166,7 @@ const pressOptX = (dom, shiftKey = false) =>
   dom.window.dispatchEvent(new dom.window.KeyboardEvent('keydown', { code: 'KeyX', altKey: true, shiftKey, cancelable: true }));
 
 function openPanel(b, { unresponsive = [], edit } = {}) {
-  const html = read('panel.html').replace('<script src="panel.js"></script>', '');
+  const html = read('panel.html').replace('<script src="panel.js"></script>', '').replace('<script src="clock.js"></script>', '');
   const dom = new JSDOM(html, { url: 'chrome-extension://abc/panel.html', runScripts: 'outside-only' });
   const { window } = dom;
   window.navigator.locks = { request: (_name, _options, task) => task({}) };
@@ -179,7 +185,7 @@ function openPanel(b, { unresponsive = [], edit } = {}) {
       },
     },
   });
-  run(dom, b.chromeFor({ url: 'chrome-extension://abc/panel.html', listeners: [] }), ['panel.js'], edit);
+  run(dom, b.chromeFor({ url: 'chrome-extension://abc/panel.html', listeners: [] }), ['clock.js', 'panel.js'], edit);
   return { dom, calls, sent };
 }
 
@@ -202,7 +208,7 @@ function startPlugin(b, answer, pluginId = 'incremental-everything-plus', kb = T
     }
   });
   const boot = (senderUrl = url) =>
-    run(dom, b.chromeFor({ url: senderUrl, listeners: [] }), ['anchors.js', 'content.js'], (source) =>
+    run(dom, b.chromeFor({ url: senderUrl, listeners: [] }), ['anchors.js', 'clock.js', 'content.js'], (source) =>
       source.replace('window !== window.top &&', 'true &&')
     );
   return { dom, seen, boot };
@@ -373,6 +379,18 @@ describe('The browser copy', () => {
     assert.equal(pageEntries(b).length, 1);
   });
 
+  it('Asks again when the plugin says an extract of this page is gone, without a reload', async () => {
+    const { plugin } = await connected(emptyState);
+    const asked = () => plugin.seen.filter((op) => op.op === 'pageState').length;
+    const before = asked();
+    plugin.dom.window.postMessage({ ieCompanion: 'toExtension', kind: 'pageChanged', url: URL_A }, '*');
+    await settle(200);
+    assert.equal(asked(), before + 1);
+    plugin.dom.window.postMessage({ ieCompanion: 'toExtension', kind: 'pageChanged', url: 'https://example.org/other' }, '*');
+    await settle(200);
+    assert.equal(asked(), before + 1);
+  });
+
   it('Removes the entry when the last extract is gone', async () => {
     const b = browser();
     b.stored[`page:${TEST_KB.id}:${URL_A}`] = { extracts: [{ remId: 'gone', anchor: { exact: 'Another paragraph.', prefix: '', suffix: '', position: 0 } }], readPoint: null };
@@ -397,7 +415,7 @@ describe('Knowledge bases', () => {
     const url = 'https://www.remnote.com/clipper?clipperId=ie-companion';
     const dom = new JSDOM('<body></body>', { url, runScripts: 'outside-only' });
     Object.defineProperty(dom.window.location, 'ancestorOrigins', { value: ['chrome-extension://abc'], configurable: true });
-    run(dom, b.chromeFor({ url, listeners: [] }), ['anchors.js', 'content.js'], (source) =>
+    run(dom, b.chromeFor({ url, listeners: [] }), ['anchors.js', 'clock.js', 'content.js'], (source) =>
       source.replace('window !== window.top &&', 'true &&')
     );
     return dom;
@@ -598,10 +616,22 @@ describe('Knowledge bases', () => {
 describe('Documents are made only when asked for', () => {
   const URL_B = 'https://other.example/page';
   const nothing = () => ({ ok: true, result: { extracts: [] } });
-  const madeOrShown = (panel) =>
-    panel.sent.filter((message) => ['focusDoc', 'getOrCreatePageDocument'].includes(message.function));
   const offer = (panel) => panel.dom.window.document.getElementById('pageOffer');
   const frameSrc = (panel) => panel.dom.window.document.getElementById('frame').src;
+  /**
+   * What made or brought up a page's document. The header's lookup of the document
+   * RemNote already shows is neither: the same URL gets the same document back.
+   */
+  const madeOrShown = (panel) => {
+    const src = frameSrc(panel);
+    const shown = new Set(src ? [new URL(src).searchParams.get('clipperURL')] : []);
+    return panel.sent.filter((message) => {
+      if (!['focusDoc', 'getOrCreatePageDocument'].includes(message.function)) return false;
+      const lookup = message.function === 'getOrCreatePageDocument' && shown.has(message.data.url);
+      shown.add(message.data.url);
+      return !lookup;
+    });
+  };
 
   async function connected(options) {
     const b = browser();
@@ -674,10 +704,12 @@ describe('Documents are made only when asked for', () => {
     const tab = b.tabs.get(1);
     tab.url = `${URL_A}/next`;
     page.window.document.title = 'Next';
+    const calls = () => panel.sent.filter((m) => m.function === 'getOrCreatePageDocument').length;
+    const before = calls();
     selectParagraph(page, '#p');
     pressOptX(page);
     await settle(150);
-    assert.deepEqual(panel.sent.filter((m) => m.function === 'getOrCreatePageDocument').length, 1);
+    assert.equal(calls(), before + 1);
   });
 
   it('An extract from another tab makes its document, and the panel stays where it is', async () => {
@@ -932,5 +964,377 @@ describe('The plugin frame', () => {
     });
     assert.equal(plugin.seen.length, 0);
     assert.equal(waiting, 1);
+  });
+});
+
+describe('The selection menu and Add Highlight', () => {
+  const nothing = () => ({ ok: true, result: { extracts: [] } });
+  const aHighlight = () => ({ ok: true, result: { remId: 'rem2', section: 'A section', highlight: true } });
+
+  async function connected(answer) {
+    const b = browser();
+    const page = openPage(b, URL_A, PAGE);
+    page.window.Range.prototype.getBoundingClientRect = () => ({ top: 200, bottom: 220, left: 40, width: 300 });
+    await settle();
+    openPanel(b);
+    const plugin = startPlugin(b, answer);
+    plugin.boot();
+    await settle(700);
+    return { b, page, plugin };
+  }
+
+  it('Comes up beside a selection, and goes when it does', async () => {
+    const { page } = await connected(nothing);
+    const menu = shadow(page).getElementById('menu');
+    assert.equal(menu.hidden, true);
+    selectParagraph(page, '#p');
+    await settle(250);
+    assert.equal(menu.hidden, false);
+    page.window.getSelection().removeAllRanges();
+    page.window.document.dispatchEvent(new page.window.Event('selectionchange'));
+    assert.equal(menu.hidden, true);
+  });
+
+  it('Add Highlight adds the selection without making it Incremental, painted yellow, and asks no priority', async () => {
+    const { page, plugin } = await connected((op) => (op.op === 'pageState' ? nothing() : aHighlight()));
+    shadow(page).getElementById('priority').checked = true;
+    selectParagraph(page, '#p');
+    await settle(250);
+    shadow(page).getElementById('highlight').click();
+    await settle(150);
+    assert.equal(promptIsOpen(page), false);
+    const { data } = plugin.seen.find((op) => op.op === 'addExtract');
+    assert.equal(data.highlight, true);
+    assert.equal(data.withPriority, undefined);
+    assert.equal(page.window.CSS.highlights.get('ie-highlight').ranges.length, 1);
+    assert.equal(page.window.CSS.highlights.get('ie-extract').ranges.length, 0);
+    assert.equal(shadow(page).getElementById('menu').hidden, true);
+  });
+
+  it('Opt+H adds a highlight, and leaves text boxes alone', async () => {
+    const { page, plugin } = await connected((op) => (op.op === 'pageState' ? nothing() : aHighlight()));
+    const pressOptH = () =>
+      page.window.dispatchEvent(new page.window.KeyboardEvent('keydown', { code: 'KeyH', altKey: true, cancelable: true }));
+    selectParagraph(page, '#p');
+    pressOptH();
+    await settle(150);
+    const added = plugin.seen.filter((op) => op.op === 'addExtract');
+    assert.equal(added.length, 1);
+    assert.equal(added[0].data.highlight, true);
+    assert.equal(promptIsOpen(page), false);
+
+    const box = page.window.document.createElement('textarea');
+    box.value = 'typed text';
+    page.window.document.body.append(box);
+    box.focus();
+    box.select();
+    page.window.document.dispatchEvent(new page.window.Event('selectionchange'));
+    pressOptH();
+    await settle(150);
+    assert.equal(plugin.seen.filter((op) => op.op === 'addExtract').length, 1);
+  });
+
+  it('A highlight made Incremental since is painted blue', async () => {
+    const anchor = { exact: 'Another paragraph.', prefix: '', suffix: '', position: 0 };
+    const state = () => ({
+      ok: true,
+      result: { kbId: TEST_KB.id, extracts: [
+        { remId: 'h1', anchor, kind: 'highlight', incremental: true },
+      ] },
+    });
+    const { page } = await connected((op) => (op.op === 'pageState' ? state() : nothing()));
+    assert.equal(page.window.CSS.highlights.get('ie-extract').ranges.length, 1);
+    assert.equal(page.window.CSS.highlights.get('ie-highlight').ranges.length, 0);
+  });
+});
+
+describe("The header's document status", () => {
+  async function connected(initial) {
+    const b = browser();
+    b.tabs.set(1, { id: 1, url: URL_A, title: 'A page', listeners: [] });
+    const panel = openPanel(b);
+    await settle();
+    const doc = { status: initial };
+    const plugin = startPlugin(b, (op) => {
+      if (op.op === 'documentStatus') return { ok: true, result: doc.status };
+      if (op.op === 'makeDocumentIncremental') return { ok: true, result: { docId: 'doc1', incremental: true, priority: op.data.priority } };
+      return { ok: true, result: { extracts: [] } };
+    });
+    plugin.boot();
+    await settle(700);
+    const $ = (id) => panel.dom.window.document.getElementById(id);
+    const type = (text, key = 'Enter') => {
+      $('makePriority').value = text;
+      $('makePriority').dispatchEvent(new panel.dom.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    };
+    return { b, panel, plugin, $, type, doc };
+  }
+
+  it('Shows ✓ Incremental, with the priority, for a document that is', async () => {
+    const { plugin, $ } = await connected({ docId: 'doc1', incremental: true, priority: 7 });
+    assert.deepEqual(plugin.seen.find((op) => op.op === 'documentStatus').data.docId, 'doc1');
+    assert.equal($('docStatus').hidden, false);
+    assert.equal($('docIncremental').hidden, false);
+    assert.equal($('docPriority').textContent, 'P7');
+    assert.equal($('makeIncremental').hidden, true);
+  });
+
+  it('Make Incremental asks for a priority, and Enter makes the document Incremental', async () => {
+    const { plugin, $, type } = await connected({ docId: 'doc1', incremental: false });
+    assert.equal($('docIncremental').hidden, true);
+    assert.equal($('makeIncremental').hidden, false);
+    $('makeIncremental').click();
+    assert.equal($('makeField').hidden, false);
+
+    type('200');
+    await settle(50);
+    assert.ok($('makePriority').classList.contains('invalid'));
+    assert.equal(plugin.seen.filter((op) => op.op === 'makeDocumentIncremental').length, 0);
+
+    type('12');
+    await settle(100);
+    const made = plugin.seen.find((op) => op.op === 'makeDocumentIncremental');
+    assert.deepEqual([made.data.docId, made.data.priority], ['doc1', 12]);
+    assert.equal($('docIncremental').hidden, false);
+    assert.equal($('docPriority').textContent, 'P12');
+    assert.equal($('makeField').hidden, true);
+  });
+
+  it('Esc puts the button back, and an empty field leaves the priority to inheritance', async () => {
+    const { plugin, $, type } = await connected({ docId: 'doc1', incremental: false });
+    $('makeIncremental').click();
+    type('', 'Escape');
+    assert.equal($('makeField').hidden, true);
+    assert.equal($('makeIncremental').hidden, false);
+    $('makeIncremental').click();
+    type('');
+    await settle(100);
+    const made = plugin.seen.find((op) => op.op === 'makeDocumentIncremental');
+    assert.equal('priority' in made.data, false);
+  });
+
+  it('Follows a change made in RemNote', async () => {
+    const { plugin, $, doc } = await connected({ docId: 'doc1', incremental: false });
+    const status = { docId: 'doc1', incremental: true, priority: 30 };
+    doc.status = status;
+    plugin.dom.window.postMessage({ ieCompanion: 'toExtension', kind: 'documentChanged', status }, '*');
+    await settle(100);
+    assert.equal($('docIncremental').hidden, false);
+    assert.equal($('docPriority').textContent, 'P30');
+  });
+});
+
+describe('The reading clock', () => {
+  const MIN = 60000;
+
+  async function connected({ status, page = true, stored = {}, answers = {} }) {
+    const b = browser();
+    Object.assign(b.stored, stored);
+    let dom;
+    if (page) {
+      dom = openPage(b, URL_A, PAGE);
+      dom.window.document.hasFocus = () => true;
+    } else {
+      b.tabs.set(1, { id: 1, url: URL_A, title: 'A page', listeners: [] });
+    }
+    await settle();
+    const panel = openPanel(b);
+    const plugin = startPlugin(b, (op) => {
+      if (answers[op.op]) return { ok: true, result: answers[op.op](op) };
+      if (op.op === 'documentStatus') return { ok: true, result: { ...status, reviewsSince: status.reviewsSince ?? [] } };
+      if (op.op === 'recordPageReview') {
+        return { ok: true, result: { ...status, totalSeconds: status.totalSeconds + op.data.reviewTimeSeconds, nextRepDate: Date.now() + 5 * 86400000 } };
+      }
+      return { ok: true, result: { extracts: [] } };
+    });
+    plugin.boot();
+    await settle(800);
+    const $ = (id) => panel.dom.window.document.getElementById(id);
+    const press = (key, shiftKey = false) =>
+      $('clockBar').dispatchEvent(new panel.dom.window.KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }));
+    return { b, dom, panel, plugin, $, press };
+  }
+
+  const incremental = { docId: 'doc1', incremental: true, priority: 12, totalSeconds: 600 };
+  const coverOf = (b) => b.stored[`cover:${TEST_KB.id}:doc1`];
+
+  it('Counts reading time on the page, and Enter records it as a review dated when it stopped', async () => {
+    const { b, plugin, $, press } = await connected({ status: incremental });
+    assert.equal(b.stored.readingTargets[`${TEST_KB.id}|${URL_A}`], 'doc1');
+    await settle(3500);
+    assert.equal($('clock').hidden, false);
+    assert.notEqual($('clockTime').textContent, '0:00');
+    assert.match($('clockTotal').textContent, /Σ 10 min/);
+
+    $('clock').click();
+    assert.equal($('clockBar').hidden, false);
+    assert.match($('clockText').textContent, /^Record \d+ s of reading/);
+    press('Enter');
+    await settle(200);
+    const recorded = plugin.seen.find((op) => op.op === 'recordPageReview');
+    assert.ok(recorded.data.reviewTimeSeconds >= 1);
+    assert.ok(Math.abs(recorded.data.endedAt - Date.now()) < 3000);
+    assert.equal(recorded.data.url, URL_A);
+    assert.equal(coverOf(b).clearedUntil, recorded.data.endedAt);
+    assert.match($('clockText').textContent, /^✓ Recorded/);
+  });
+
+  it('Takes out the time of a review recorded in RemNote while the page was read', async () => {
+    const now = Date.now();
+    const { $, b } = await connected({
+      page: false,
+      status: { ...incremental, reviewsSince: [{ date: now - 10 * MIN, reviewTimeSeconds: 300 }] },
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[now - 20 * MIN, now - 10 * MIN]] } },
+    });
+    assert.deepEqual(coverOf(b).windows, [[now - 15 * MIN, now - 10 * MIN]]);
+    await settle(1100);
+    assert.equal($('clockTime').textContent, '5:00');
+  });
+
+  it('Offers to record a past session, dated when it was read', async () => {
+    const end = Date.now() - 2 * 3600000;
+    const { $, plugin } = await connected({
+      page: false,
+      status: incremental,
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[end - 18 * MIN, end]] } },
+    });
+    await settle(1100);
+    assert.equal($('clockBar').hidden, false);
+    assert.match($('clockText').textContent, /^Unrecorded session: 18 min, last read/);
+    $('clockButtons').querySelector('button').click();
+    await settle(200);
+    const recorded = plugin.seen.find((op) => op.op === 'recordPageReview');
+    assert.deepEqual([recorded.data.reviewTimeSeconds, recorded.data.endedAt], [18 * 60, end]);
+  });
+
+  it('Keep counting leaves the past session to grow, and does not ask again', async () => {
+    const end = Date.now() - 2 * 3600000;
+    const { $, b } = await connected({
+      page: false,
+      status: incremental,
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[end - 18 * MIN, end]] } },
+    });
+    await settle(1100);
+    $('clockButtons').querySelectorAll('button')[1].click();
+    await settle(1100);
+    assert.equal(coverOf(b).keptAt, end);
+    assert.equal($('clockBar').hidden, true);
+    assert.equal($('clockTime').textContent, '18:00');
+  });
+
+  it('Shift+Enter opens the review popup with the minutes, and the review it records clears the time', async () => {
+    const now = Date.now();
+    const { $, b, plugin, press } = await connected({
+      page: false,
+      status: incremental,
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[now - 12 * MIN, now - 1000]] } },
+    });
+    $('clock').click();
+    press('Enter', true);
+    await settle(200);
+    const opened = plugin.seen.find((op) => op.op === 'openReviewPopup');
+    assert.deepEqual([opened.data.docId, opened.data.minutes], ['doc1', 12]);
+    assert.equal(plugin.seen.some((op) => op.op === 'recordPageReview'), false);
+  });
+
+  it('Does not record while the Editor Review Timer runs on the page', async () => {
+    const { $, plugin } = await connected({ page: false, status: { ...incremental, editorTimerRunning: true } });
+    $('clock').click();
+    assert.match($('clockText').textContent, /Editor Review Timer is running/);
+    assert.equal(plugin.seen.some((op) => op.op === 'recordPageReview'), false);
+  });
+
+  it("Puts the Companion's reading into a queue review of a page opened with Use Companion", async () => {
+    const handoff = Date.now() - 30 * MIN;
+    const next = handoff + 20 * MIN;
+    // Shown in the queue 5 minutes before the hand-off; Next 20 minutes after it.
+    const review = { date: next, reviewTimeSeconds: 25 * 60, companionHandoffAt: handoff };
+    let refined = false;
+    const { $, b, plugin } = await connected({
+      page: false,
+      status: incremental,
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[handoff + MIN, handoff + 11 * MIN]] } },
+      answers: {
+        documentStatus: () => ({ ...incremental, reviewsSince: [refined ? { ...review, reviewTimeSeconds: 15 * 60, companionSeconds: 600 } : review] }),
+        refineQueueReview: () => {
+          refined = true;
+          return { refined: true, reviewTimeSeconds: 15 * 60 };
+        },
+      },
+    });
+    await settle(300);
+    const call = plugin.seen.find((op) => op.op === 'refineQueueReview');
+    assert.deepEqual([call.data.docId, call.data.date, call.data.companionSeconds], ['doc1', next, 600]);
+    assert.match($('clockText').textContent, /^Added 10 min of Companion reading to the queue review/);
+    await settle(1100);
+    assert.deepEqual(coverOf(b).windows, [[handoff - 5 * MIN, next]]);
+    assert.equal($('clockTime').textContent, '0:00');
+  });
+
+  it('Leaves a queue review\'s reading off the clock at once, and refines that review after Record', async () => {
+    // Next 19 s ago; Record pressed before the refine's wait is over (the bug of Nov 6).
+    const now = Date.now();
+    const handoff = now - 3 * MIN;
+    const review = { date: now - 19000, reviewTimeSeconds: 120, companionHandoffAt: handoff };
+    const { $, b, plugin, press } = await connected({
+      page: false,
+      status: { ...incremental, reviewsSince: [review] },
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[now - 4 * MIN, now - 30000]] } },
+    });
+    assert.deepEqual(coverOf(b).windows, [[handoff, review.date]]);
+    assert.equal($('clockTime').textContent, '1:00');
+    $('clock').click();
+    press('Enter');
+    await settle(300);
+    const recorded = plugin.seen.find((op) => op.op === 'recordPageReview');
+    assert.equal(recorded.data.reviewTimeSeconds, 60);
+    assert.equal(recorded.data.endedAt, handoff);
+    await settle(1500);
+    const refine = plugin.seen.find((op) => op.op === 'refineQueueReview');
+    assert.deepEqual([refine.data.date, refine.data.companionSeconds], [review.date, 150]);
+  });
+
+  it('Checks RemNote again before recording, and leaves out a review that has just arrived', async () => {
+    const now = Date.now();
+    const status = { ...incremental, reviewsSince: [] };
+    const { $, plugin, press } = await connected({
+      page: false,
+      status,
+      stored: { [`clock:${TEST_KB.id}:doc1`]: { url: URL_A, segments: [[now - 10 * MIN, now - MIN]] } },
+    });
+    assert.equal($('clockTime').textContent, '9:00');
+    $('clock').click();
+    status.reviewsSince = [{ date: now - 2 * MIN, reviewTimeSeconds: 6 * 60 }];
+    press('Enter');
+    await settle(1600);
+    assert.equal(plugin.seen.some((op) => op.op === 'recordPageReview'), false);
+    assert.match($('clockText').textContent, /^RemNote has just recorded part of this reading\. Record the other 3 min/);
+  });
+
+  it('Keeps a handed-off review as it was when the Companion read nothing after the hand-off', async () => {
+    const handoff = Date.now() - 30 * MIN;
+    const { plugin } = await connected({
+      page: false,
+      status: { ...incremental, reviewsSince: [{ date: handoff + 20 * MIN, reviewTimeSeconds: 25 * 60, companionHandoffAt: handoff }] },
+    });
+    await settle(300);
+    assert.equal(plugin.seen.some((op) => op.op === 'refineQueueReview'), false);
+  });
+
+  it('Counts pages opened from the queue with Use Companion, before the panel shows them', async () => {
+    const { b } = await connected({
+      page: false,
+      status: incremental,
+      answers: { companionTargets: () => ({ doc9: 'https://other.example/read#top' }) },
+    });
+    assert.equal(b.stored.readingTargets[`${TEST_KB.id}|https://other.example/read`], 'doc9');
+  });
+
+  it('Shows a dismissed document, with Make Incremental again', async () => {
+    const { $ } = await connected({ page: false, status: { docId: 'doc1', incremental: false, dismissed: true, totalSeconds: 0 } });
+    assert.equal($('docDismissed').hidden, false);
+    assert.equal($('docIncremental').hidden, true);
+    assert.equal($('clock').hidden, true);
+    assert.equal($('makeIncremental').textContent, 'Make Incremental again');
   });
 });

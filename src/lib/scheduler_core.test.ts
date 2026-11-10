@@ -8,8 +8,12 @@ import {
   computeCurveInterval,
   computeMultiplierInterval,
   computeNextInterval,
+  automaticRepeatIndexes,
+  calendarDaysBetween,
   getCurrentInterval,
+  isSameDayRepeat,
   overrideForChoice,
+  sameDayRepeatIndexes,
   parseSchedulerOverride,
   previewMultiplierIntervals,
   resolveInitialInterval,
@@ -107,6 +111,80 @@ describe('current interval', () => {
   it('recovers the interval from the next-rep stamp', () => {
     const history = [entry(0, { nextRepMs: T0 + 12 * DAY })];
     assert.equal(getCurrentInterval(history), 12);
+  });
+});
+
+describe('same-day reviews', () => {
+  // Local times, so the calendar day does not depend on the machine's time zone.
+  const at = (day: number, hour: number, minute = 0) => new Date(2026, 10, day, hour, minute).getTime();
+  const rep = (date: number, scheduled: number, over: Partial<IncrementalRep> = {}): IncrementalRep => ({
+    date,
+    scheduled,
+    ...over,
+  });
+
+  it('finds the reviews after the first of a day, made before the item was due again', () => {
+    const due = at(16, 14);
+    const history = [
+      rep(at(6, 13, 59), at(6, 13, 59), { eventType: 'madeIncremental', interval: 2 }),
+      rep(at(6, 14, 0), at(8, 14), { eventType: 'externalRep', interval: 5 }), // counted
+      rep(at(6, 14, 2), at(11, 14), { interval: 10 }), // repeat
+      rep(at(6, 14, 30), due, { eventType: 'executeRepetition', interval: 10 }), // repeat
+      rep(at(16, 15), due, { interval: 12 }), // another day: counted
+    ];
+    assert.deepEqual([...sameDayRepeatIndexes(history)], [2, 3]);
+  });
+
+  it('counts a review the same day when the item was due again (an interval of 0 days)', () => {
+    const history = [
+      rep(at(6, 9), at(6, 8), { interval: 0 }),
+      rep(at(6, 18), at(6, 9), { interval: 1 }), // due again since 9:00
+    ];
+    assert.deepEqual([...sameDayRepeatIndexes(history)], []);
+  });
+
+  it('starts afresh at Made Incremental, and passes over entries that are not reviews', () => {
+    const history = [
+      rep(at(6, 9), at(6, 9), { interval: 5 }),
+      rep(at(6, 10), at(11, 9), { eventType: 'rescheduledInEditor', interval: 3 }),
+      rep(at(6, 11), at(9, 10), { eventType: 'dismissed' }),
+      rep(at(6, 12), at(6, 12), { eventType: 'madeIncremental', interval: 2 }),
+      rep(at(6, 13), at(8, 12), { interval: 5 }),
+    ];
+    assert.deepEqual([...sameDayRepeatIndexes(history)], []);
+  });
+
+  it('tells whether a review now is a repeat', () => {
+    const history = [
+      rep(at(6, 13, 59), at(6, 13, 59), { eventType: 'madeIncremental', interval: 2 }),
+      rep(at(6, 14), at(8, 14), { eventType: 'externalRep', interval: 5 }),
+    ];
+    const due = at(11, 14);
+    assert.equal(isSameDayRepeat(history, at(6, 20), due), true);
+    assert.equal(isSameDayRepeat(history, at(7, 8), due), false, 'another day');
+    assert.equal(isSameDayRepeat(history, at(6, 20), at(6, 19)), false, 'due again');
+    assert.equal(isSameDayRepeat(history.slice(0, 1), at(6, 20), due), false, 'only made Incremental today');
+    // A Companion session that ended before the review of today is judged at its own end.
+    assert.equal(isSameDayRepeat(history, at(6, 12), due), false);
+  });
+
+  it('keeps the multiplier on the interval it was on, unless a repeat chose its own', () => {
+    const history = [
+      rep(at(6, 9), at(6, 9), { eventType: 'madeIncremental', interval: 4 }),
+      rep(at(10, 9), at(10, 9), { interval: 6 }),
+      rep(at(10, 12), at(16, 9), { interval: 9 }), // the queue multiplied again
+    ];
+    const repeats = sameDayRepeatIndexes(history);
+    assert.equal(getCurrentInterval(history, automaticRepeatIndexes(history, repeats)), 6);
+    history.push(rep(at(10, 15), at(19, 12), { eventType: 'executeRepetition', interval: 20 }));
+    const more = sameDayRepeatIndexes(history);
+    assert.equal(getCurrentInterval(history, automaticRepeatIndexes(history, more)), 20, 'typed in the popup');
+  });
+
+  it('counts calendar days', () => {
+    assert.equal(calendarDaysBetween(at(6, 23), at(7, 1)), 1);
+    assert.equal(calendarDaysBetween(at(6, 14), at(16, 9)), 10);
+    assert.equal(calendarDaysBetween(at(6, 14), at(6, 9)), 0);
   });
 });
 

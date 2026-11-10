@@ -9,6 +9,7 @@ import {
     useSyncedStorageState,
     useTrackerPlugin,
 } from "@remnote/plugin-sdk";
+import { withHoverTips } from "../components/HoverTipLayer";
 import '../style.css';
 import '../App.css';
 import { timeSince } from "../lib/utils";
@@ -478,4 +479,4 @@ function HistoryItem({
     );
 }
 
-renderWidget(FlashcardHistory);
+renderWidget(withHoverTips(FlashcardHistory));

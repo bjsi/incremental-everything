@@ -11,6 +11,7 @@
 // lib/card_enablement/scan.ts for why the walk is Rem-driven.
 
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cardEnablementAnchorKey } from '../lib/consts';
 import {
@@ -773,4 +774,4 @@ function Row({
   );
 }
 
-renderWidget(CardEnablementAudit);
+renderWidget(withHoverTips(CardEnablementAudit));

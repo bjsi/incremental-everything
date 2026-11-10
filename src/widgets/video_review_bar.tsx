@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useEffect, useState } from 'react';
 import {
   dismissEditorReview,
@@ -192,4 +193,4 @@ function VideoReviewBar() {
   );
 }
 
-renderWidget(VideoReviewBar);
+renderWidget(withHoverTips(VideoReviewBar));

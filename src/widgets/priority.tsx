@@ -6,6 +6,7 @@ import {
   PluginRem,
   RemId,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getPowerupSlotByCodeSafe } from '../lib/powerup_slot_compat';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
@@ -19,9 +20,10 @@ import {
   CardPriorityInfo,
   QueueSessionCache,
   CARD_PRIORITY_CODE,
-  PRIORITY_SLOT
+  PRIORITY_SLOT,
+  estimateCardRemPercentile,
 } from '../lib/card_priority';
-import { calculateRelativePercentile, DEFAULT_PERFORMANCE_MODE, PERFORMANCE_MODE_FULL, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
+import { DEFAULT_PERFORMANCE_MODE, PERFORMANCE_MODE_FULL, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import {
   allIncrementalRemKey,
   powerupCode,
@@ -48,7 +50,7 @@ import { PriorityBadge, PrioritySlider, PrioritySliderRef } from '../components'
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import * as _ from 'remeda';
 import { useIESettingOptional } from '../lib/settings';
-import { buildUnifiedRanking, unifiedPercentileAt } from '../lib/unified_percentile';
+import { buildUnifiedRanking, scheduledCardCount, unifiedPercentileAt } from '../lib/unified_percentile';
 
 type Scope = { remId: string | null; name: string; };
 type ScopeMode = 'all' | 'document';
@@ -333,8 +335,6 @@ function Priority() {
       return {
         scopedIncRems: [],
         scopedCardRems: [],
-        incRelPriority: 50,
-        cardRelPriority: 50,
         descendantCardCount: -1, // -1 indicates "unknown" / skipped check
         prioritySourceCounts: { manual: 0, inherited: 0, default: 0 },
       };
@@ -379,8 +379,6 @@ function Priority() {
 
     let finalScopedIncRems: IncrementalRem[];
     let finalScopedCardRems: CardPriorityInfo[];
-    let finalIncRel: number | null = null;
-    let finalCardRel: number | null = null;
     let finalPrioritySourceCounts = { manual: 0, inherited: 0, default: 0 };
 
     const safeAllIncRems = allIncRems || [];
@@ -394,8 +392,6 @@ function Priority() {
       const allCardsInScope = (scopeMode === 'all') ? safeAllCardInfos : cardRemsInScope;
       finalPrioritySourceCounts = allCardsInScope.reduce((counts, rem) => ({ ...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0, incremental: 0 });
       finalScopedCardRems = (cardScopeType === 'prioritized' ? allCardsInScope.filter(c => c.source !== 'default') : allCardsInScope);
-      finalIncRel = (scopeMode === 'document') ? sessionCache.incRemDocPercentiles[rem._id] : calculateRelativePercentile(safeAllIncRems as any, rem._id);
-      finalCardRel = (scopeMode === 'document') ? sessionCache.docPercentiles[rem._id] : calculateRelativePercentile(safeAllCardInfos, rem._id);
 
     } else {
       // --- OPTIMIZED ASYNC FALLBACK PATH WITH COMPREHENSIVE SCOPE ---
@@ -444,14 +440,10 @@ function Priority() {
         tempScopedCardRems = tempScopedCardRems.filter(c => c.source !== 'default');
       }
       finalScopedCardRems = tempScopedCardRems;
-      finalIncRel = calculateRelativePercentile(finalScopedIncRems as any, rem._id);
-      finalCardRel = calculateRelativePercentile(finalScopedCardRems, rem._id);
     }
     return {
       scopedIncRems: finalScopedIncRems,
       scopedCardRems: finalScopedCardRems,
-      incRelPriority: finalIncRel || 50,
-      cardRelPriority: finalCardRel || 50,
       descendantCardCount: finalDescendantCardCount,
       prioritySourceCounts: finalPrioritySourceCounts,
     };
@@ -471,15 +463,20 @@ function Priority() {
     return Math.round((rank / total) * 1000) / 10; // Round to 1 decimal place
   }, [performanceMode, derivedData, rem, incAbsPriority, defaultIncPriority]);
 
+  // Among cards only, each card one element (a Rem with 3 cards counts 3): the
+  // Card Shield's universe, so it matches the flashcard bar's Card Shield %.
+  // This Rem's cards sit at the midpoint of their tie band at the slider's value.
   const cardRelPriority = useMemo(() => {
     if (performanceMode === PERFORMANCE_MODE_LIGHT || !derivedData || !rem) return 50;
     const p = cardAbsPriority ?? defaultCardPriority ?? 50;
-    const others = derivedData.scopedCardRems.filter(r => r.remId !== rem._id);
-    const countLowerOrEqual = others.reduce((acc, curr) => (curr.priority <= p ? acc + 1 : acc), 0);
-    const rank = countLowerOrEqual + 1;
-    const total = others.length + 1;
-    return Math.round((rank / total) * 1000) / 10;
+    return estimateCardRemPercentile(derivedData.scopedCardRems, rem._id, p) ?? 50;
   }, [performanceMode, derivedData, rem, cardAbsPriority, defaultCardPriority]);
+
+  /** Scheduled cards in the scope: the universe of `cardRelPriority`. */
+  const scopedCardCount = useMemo(
+    () => (derivedData?.scopedCardRems ?? []).reduce((n, c) => n + scheduledCardCount(c), 0),
+    [derivedData]
+  );
 
   // The headline "Relative" is on the unified scale: the item among all IncRems
   // and cards in the scope (each card one element), the scale every priority
@@ -1226,7 +1223,7 @@ function Priority() {
                   <span>Loading relative priority...</span>
                 ) : (
                   <>
-                    <span title={`Among IncRems only: ${incRelPriority}% of ${scopedIncRems.length.toLocaleString()}`}>
+                    <span style={{ cursor: 'help' }} title={`Among IncRems only: ${incRelPriority}% of ${scopedIncRems.length.toLocaleString()}`}>
                       Relative: <strong>{incRelUnified ?? incRelPriority}%</strong>
                     </span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
@@ -1349,14 +1346,14 @@ function Priority() {
                       <span>Loading relative priority...</span>
                     ) : (
                       <>
-                        <span title={`Among cards only: ${cardRelPriority}% of ${scopedCardRems.length.toLocaleString()} Rems with cards`}>
+                        <span style={{ cursor: 'help' }} title={`Among cards only: ${cardRelPriority}% of ${scopedCardCount.toLocaleString()} cards`}>
                           Relative: <strong>{cardRelUnified ?? cardRelPriority}%</strong>
                         </span>
                         <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
                         <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
                           {unifiedScopeRanking
                             ? `${unifiedScopeRanking.total.toLocaleString()} IncRems + cards`
-                            : `${scopedCardRems.length.toLocaleString()} cards`}
+                            : `${scopedCardCount.toLocaleString()} cards`}
                         </span>
                       </>
                     )}
@@ -1472,14 +1469,14 @@ function Priority() {
                   <span>Loading relative priority...</span>
                 ) : (
                   <>
-                    <span title={`Among cards only: ${cardRelPriority}% of ${scopedCardRems.length.toLocaleString()} Rems with cards`}>
+                    <span style={{ cursor: 'help' }} title={`Among cards only: ${cardRelPriority}% of ${scopedCardCount.toLocaleString()} cards`}>
                       Relative: <strong>{cardRelUnified ?? cardRelPriority}%</strong>
                     </span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
                       {unifiedScopeRanking
                         ? `${unifiedScopeRanking.total.toLocaleString()} IncRems + cards`
-                        : `${scopedCardRems.length.toLocaleString()} cards`}
+                        : `${scopedCardCount.toLocaleString()} cards`}
                     </span>
                   </>
                 )}
@@ -1515,4 +1512,4 @@ function Priority() {
   );
 }
 
-renderWidget(Priority);
+renderWidget(withHoverTips(Priority));

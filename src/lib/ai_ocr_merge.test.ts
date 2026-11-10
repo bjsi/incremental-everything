@@ -109,6 +109,29 @@ describe('pickContainedHighlights', () => {
     assert.deepEqual(pickContainedHighlights(outer, [straddling, elsewhere, otherPage, area]), []);
   });
 
+  it('matches lines whose boxes differ in height (page 93 of the Bridge Procedures Guide)', () => {
+    const r = (x1: number, y1: number, x2: number, y2: number) => rect(x1, y1, x2, y2, 93, 595, 841);
+    // The larger highlight starts in bold headings, and its line boxes come out 9.3pt tall…
+    const larger = lines(
+      r(69.64, 616.18, 256.43, 625.79), r(69.64, 638.37, 211.06, 647.69), r(70.8, 661.25, 470.53, 670.46),
+      r(70.86, 672.65, 278.79, 681.87), r(69.64, 691.93, 472.16, 701.26), r(79.4, 704.5, 241.3, 713.7),
+      r(69.64, 723.7, 421.0, 733.0), r(68.42, 743.1, 461.7, 752.4), r(80.6, 755.6, 352.6, 764.8)
+    );
+    // …where the bullets highlighted first on their own got 12.8pt boxes: only 73% box overlap.
+    const bullets = [
+      { remId: 'b1', data: lines(r(69.64, 688.6, 472.16, 701.4), r(79.4, 701.2, 241.3, 713.8)) },
+      { remId: 'b2', data: lines(r(69.64, 720.3, 402.8, 733.2)) },
+      { remId: 'b3', data: lines(r(68.42, 739.7, 461.7, 752.6), r(80.6, 752.3, 352.6, 765.0)) },
+    ];
+    for (const b of bullets) assert.equal(coveredShare(b.data, larger), 1);
+    assert.deepEqual(pickContainedHighlights(larger, bullets).map((c) => c.remId), ['b1', 'b2', 'b3']);
+  });
+
+  it('does not count a tall box as covered by one line it crosses', () => {
+    const block = { remId: 'tall', data: lines(rect(36, 505, 290, 545)) };
+    assert.deepEqual(pickContainedHighlights(outer, [block]), []);
+  });
+
   it('follows a larger highlight across pages', () => {
     const spanning = lines(rect(36, 700, 290, 800, 57), rect(36, 40, 290, 120, 58));
     const onSecondPage = { remId: 'p2', data: lines(rect(40, 60, 280, 72, 58)) };

@@ -32,6 +32,12 @@ import { VideoTranscriptButton } from './VideoTranscriptButton';
 // pauses at its end. In the queue the notes sit beside the video; in the
 // editor (components/LocalVideoEditorPlayer) the document is the notes, so the
 // video comes alone, above it.
+//
+// A card video (`cardExtra`: Link Local Video as Card Extra) explains a
+// flashcard: under its answer in the queue (widgets/card_video.tsx) and under
+// its title in the editor. It plays from the start each time and keeps no
+// position, only the file's speed; nothing it offers makes Incremental Rems,
+// so no extract buttons, and in the queue no screenshot or transcript either.
 
 const barButton: React.CSSProperties = {
   cursor: 'pointer',
@@ -57,7 +63,9 @@ export const LocalVideoViewer: React.FC<{
   inEditor?: boolean;
   /** Start playing once loaded (default). */
   autoplay?: boolean;
-}> = ({ actionItem, inEditor, autoplay = true }) => {
+  /** A card video, not an Incremental one (see above). */
+  cardExtra?: boolean;
+}> = ({ actionItem, inEditor, autoplay = true, cardExtra }) => {
   const plugin = usePlugin();
   const { file, url } = actionItem;
   const segment =
@@ -66,6 +74,9 @@ export const LocalVideoViewer: React.FC<{
       : undefined;
   const notesRemId =
     actionItem.type === 'local-video-highlight' ? actionItem.extract._id : actionItem.rem._id;
+  // The video alone, at 16:9 of the width, with no notes pane beside it.
+  const stacked = inEditor || cardExtra;
+  const relinkCommand = cardExtra ? 'Link Local Video as Card Extra' : 'Link Local Video';
   const [notesOpen, setNotesOpen] = React.useState(true);
   // Bumped after a library is re-pointed, to load the file again.
   const [reload, setReload] = React.useState(0);
@@ -74,7 +85,7 @@ export const LocalVideoViewer: React.FC<{
   // The notes pane below hosts the editor player widget too; tell it to stay
   // empty. Refreshed, so a frame torn down without cleanup lets it go.
   React.useEffect(() => {
-    if (inEditor) return;
+    if (stacked) return;
     const announce = () =>
       plugin.storage.setSession(localVideoQueueNotesKey, { remId: notesRemId, at: Date.now() });
     announce();
@@ -83,13 +94,13 @@ export const LocalVideoViewer: React.FC<{
       clearInterval(timer);
       plugin.storage.setSession(localVideoQueueNotesKey, null);
     };
-  }, [notesRemId, inEditor]);
+  }, [notesRemId, stacked]);
 
   const saved = useSavedVideoSettings(url);
   const saveRate = useSaveVideoRate(url);
   // An extract has its own position: where its last review stopped, or its start.
   const extractResume = useExtractResume(segment && notesRemId, segment);
-  const start = segment ? extractResume?.start : saved?.position;
+  const start = segment ? extractResume?.start : cardExtra ? 0 : saved?.position;
   const ready = !!saved && (!segment || !!extractResume);
   const src = ready ? `${localVideoMediaUrl(file)}${reload ? `?r=${reload}` : ''}` : null;
   const { info, connected, send, videoRef } = useHtmlVideo(src, {
@@ -100,7 +111,7 @@ export const LocalVideoViewer: React.FC<{
   });
   const position = info.currentTime ?? start ?? 0;
   useVideoPositionSaver(
-    segment ? extractPositionKey(notesRemId) : videoPositionKey(url),
+    cardExtra ? null : segment ? extractPositionKey(notesRemId) : videoPositionKey(url),
     info,
     start
   );
@@ -162,10 +173,10 @@ export const LocalVideoViewer: React.FC<{
             </button>
           </>
         ) : (
-          `The helper has no video library called “${file.library}”. Link the video again with Link Local Video.`
+          `The helper has no video library called “${file.library}”. Link the video again with ${relinkCommand}.`
         );
       case 'file':
-        return `The file isn't in the library “${file.library}” any more: ${file.path}. Link it again with Link Local Video.`;
+        return `The file isn't in the library “${file.library}” any more: ${file.path}. Link it again with ${relinkCommand}.`;
       case 'format':
         return `The video can't be played here (media error ${p.code}): RemNote's player opens MP4, M4V, MOV and WebM in the codecs Chromium supports.`;
     }
@@ -190,7 +201,7 @@ export const LocalVideoViewer: React.FC<{
 
   return (
     <div
-      style={{ height: inEditor ? undefined : '100%', display: 'flex', flexDirection: 'column' }}
+      style={{ height: stacked ? undefined : '100%', display: 'flex', flexDirection: 'column' }}
     >
       <div
         className="top-bar"
@@ -202,7 +213,7 @@ export const LocalVideoViewer: React.FC<{
           flexShrink: 0,
         }}
       >
-        {!inEditor && (
+        {!stacked && (
           <button onClick={() => setNotesOpen((open) => !open)} title="Show or hide the notes">
             📝
           </button>
@@ -246,6 +257,17 @@ export const LocalVideoViewer: React.FC<{
               </button>
             )}
           </>
+        ) : cardExtra ? (
+          <button
+            style={barButton}
+            title="Play the video from its start"
+            onClick={() => {
+              send({ command: 'seekTo', seconds: 0 });
+              send({ command: 'play' });
+            }}
+          >
+            🔄 From the start
+          </button>
         ) : (
           saved && (
             <button
@@ -264,9 +286,13 @@ export const LocalVideoViewer: React.FC<{
         )}
 
         <PlayerControls info={info} connected={connected} send={send} />
-        <VideoSnapshotButtons source={{ file }} time={info.currentTime} parentId={notesRemId} />
-        <VideoTranscriptButton target={{ parentId: notesRemId, url, range: segment }} />
-        {(!segment || allowsSubExtracts(segment)) && (
+        {(!cardExtra || inEditor) && (
+          <>
+            <VideoSnapshotButtons source={{ file }} time={info.currentTime} parentId={notesRemId} />
+            <VideoTranscriptButton target={{ parentId: notesRemId, url, range: segment }} />
+          </>
+        )}
+        {!cardExtra && (!segment || allowsSubExtracts(segment)) && (
           <PluginExtractButtons
             position={position}
             pause={() => send({ command: 'pause' })}
@@ -278,7 +304,7 @@ export const LocalVideoViewer: React.FC<{
           <span style={{ fontSize: 12, color: '#6b7280' }}>✓ end of extract reached</span>
         )}
       </div>
-      {inEditor ? (
+      {stacked ? (
         <div style={{ width: '100%', aspectRatio: problem ? undefined : '16 / 9', marginTop: 4 }}>
           {player}
         </div>

@@ -118,7 +118,7 @@ These buttons appear for **PDF highlights, HTML highlights, and Incremental Rems
 * **📝 Review Note** (compact icon, after *New Tab* and the *To Highlight / To Bookmark* buttons):
 Toggles an inline text field to attach a short **observation to this repetition's history entry** — *"stopped mid-proof"*, *"re-read section 3 first"*, *"dismissing: superseded by newer source"*. The note is parked as you type and saved with whichever action ends the review: **Next**, **Reschedule** (`Ctrl+J`), or **Dismiss** (where it becomes the *dismissal reason*). The icon stays highlighted while a note is pending. Notes appear later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), the Aggregated view, and the [Study Dashboard](Study-Dashboard.md#hierarchy-section). Each entry also gets an **automatic reading-context snapshot** (current page, page range, PDF name, last bookmark) — no typing needed for that part.
 
-* **Open URL for Web Clipper 📎** (for HTML-type Incremental Rems): When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.
+* **[Open URL · Use Companion 📎](#open-url-use-companion)** (for HTML-type Incremental Rems): opens the page in a new browser tab, to read and extract from it with the [Chrome Companion Extension](Chrome-Companion-Extension.md). The time you read there goes into this review.
 
 * **Document Notes (Sidebar):**
 When reviewing PDF or HTML Incremental Rems (including **PDF Highlights** and **HTML Highlights**), a **📝 Document Notes** icon appears in the top bar. Clicking this opens the current document in a right-sidebar widget, allowing you to view and make notes and capture thoughts side-by-side with your reading material without leaving the queue. The sidebar syncs with the active queue item automatically. For highlight IncRems, the sidebar discovers all Incremental Rems sharing the same source document and lets you pick which one's notes to view (auto-selects if there is only one).
@@ -357,9 +357,11 @@ For users who primarily work on the beta version of RemNote, a new "Preferred Re
 
 ![remnote-environment](assets/uploaded/3f69d55a-75b4-4696-9a55-61969eabefa0.png){ width="750" }
 
-### Open URL to use Web Clipper 📎
+### Open URL, Use Companion 📎 { #open-url-use-companion }
 
-This button only appears for HTML-type Incremental Rems. When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.
+This button only appears for HTML-type Incremental Rems. It opens the page in a new browser tab, where you read it and add extracts with the [Chrome Companion Extension](Chrome-Companion-Extension.md). It works with the RemNote Clipper as well.
+
+With the Companion, the page's [reading clock](Chrome-Companion-Extension.md#the-reading-clock) counts from the moment the page opens. When you come back and press **Next**, the review holds the time in the queue before you clicked plus the reading the Companion measured, not the time the item sat on screen. If you recorded the session in the Companion first, Next adds the queue's minutes to it instead of making a second review. 📖 [With the queue](Chrome-Companion-Extension.md#with-the-queue-and-the-editor-review-timer)
 
 ![open url use clipper button](assets/uploaded/c4609bf8-4250-4b58-aa1c-933607599ed2.png){ width="900" }
 
@@ -720,7 +722,7 @@ The **Incremental Rem History** widget automatically records and displays the In
 *   **Searchable History:** Easily find previously viewed items using the search bar.
 *   **Context Aware:** Shows history specific to the current Knowledge Base.
 *   **Recency Tracking:** Displays how long ago you viewed each item.
-*   **Quick Navigation:** Click any item to jump back to it.
+*   **Quick Navigation:** Click any item to jump back to it, or **Shift+click** to open it in a new pane beside your current document.
 
 This widget helps you keep track of your reading session and backtrack if needed, complementing the queue's linear flow. It's also a good companion to the **[History and Final Drill](https://www.remnote.com/plugins/final_drill_and_history)** plugin.
 

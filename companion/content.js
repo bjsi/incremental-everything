@@ -44,6 +44,16 @@ function runInRemNoteFrame() {
   window.addEventListener('storage', (event) => {
     if (event.key === KB_KEY) port.postMessage({ kind: 'kbChanged' });
   });
+  // Working in the panel is reading the page too, for the reading clock.
+  let reportedAt = 0;
+  const reportActivity = () => {
+    if (Date.now() - reportedAt < 5000) return;
+    reportedAt = Date.now();
+    port.postMessage({ kind: 'activity' });
+  };
+  for (const type of ['keydown', 'mousedown', 'wheel', 'mousemove', 'scroll']) {
+    window.addEventListener(type, reportActivity, { capture: true, passive: true });
+  }
   window.addEventListener('load', () => {
     // An embedded /clipper page waits for this before starting the app. The
     // Clipper's own content script sends it the same way.
@@ -96,9 +106,13 @@ function runInPage() {
   root.innerHTML = `
     <style>
       div, button { font: 12px system-ui, sans-serif; }
+      #dock { display: flex; gap: 4px; align-items: flex-end; justify-content: flex-end; }
       #bar { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 340px; }
+      /* Collapsed, only the selection's own Add Extract button still shows. */
+      #bar.collapsed { display: none; }
+      #toggle { padding: 5px 7px; opacity: 0.75; }
+      #toggle:hover { opacity: 1; }
       button { padding: 5px 9px; border: 0; border-radius: 6px; background: #1f2937; color: white; cursor: pointer; }
-      #extract { background: #3b82f6; }
       label { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 6px; background: #1f2937; color: white; font: 12px system-ui, sans-serif; cursor: pointer; }
       input { margin: 0; }
       #prompt { position: fixed; padding: 8px 10px; border-radius: 8px; background: #111827; color: white; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
@@ -111,20 +125,36 @@ function runInPage() {
       #kbField { max-width: 100%; }
       #kbField[hidden] { display: none; }
       #kbPick { max-width: 150px; border: 0; background: #1f2937; color: white; font: 12px system-ui, sans-serif; cursor: pointer; }
+      /* The menu that comes up beside a selection. */
+      #menu { position: fixed; display: flex; align-items: center; padding: 3px; border-radius: 8px; background: #111827; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); }
+      #menu[hidden] { display: none; }
+      #menu button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: none; font-size: 13px; }
+      #menu button:hover { background: #374151; }
+      #menu .sep { width: 1px; align-self: stretch; margin: 4px 0; background: #374151; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; }
+      #extract .dot { background: #3b82f6; }
+      #highlight .dot { background: #facc15; }
       #banner { margin-bottom: 6px; padding: 8px 10px; border-radius: 6px; background: #111827; color: white; max-width: 340px; overflow-wrap: anywhere; }
     </style>
     <div id="prompt" hidden>
       <label id="priorityField">Priority <input id="priorityInput" inputmode="numeric" maxlength="3" placeholder="inherited" autocomplete="off" /></label>
       <div id="promptHint">Enter add · Esc cancel · Shift+Enter more options</div>
     </div>
+    <div id="menu" hidden>
+      <button id="extract" title="Opt+X · makes the selection an Incremental Rem"><span class="dot"></span>Add Extract</button>
+      <span class="sep"></span>
+      <button id="highlight" title="Opt+H · adds the selection as a Rem, left out of the queue"><span class="dot"></span>Add Highlight</button>
+    </div>
     <div id="banner" hidden></div>
-    <div id="bar">
-      <label id="kbField" hidden>Send to <select id="kbPick"></select></label>
-      <label id="priorityLabel"><input id="priority" type="checkbox" />Set priority</label>
-      <button id="extract" hidden>Add Extract</button>
-      <button id="setRead">Set read point</button>
-      <button id="goRead">Go to read point</button>
-      <button id="import">Import headings</button>
+    <div id="dock">
+      <div id="bar">
+        <label id="kbField" hidden>Send to <select id="kbPick"></select></label>
+        <label id="priorityLabel"><input id="priority" type="checkbox" />Set priority</label>
+        <button id="setRead">Set read point</button>
+        <button id="goRead">Go to read point</button>
+        <button id="import">Import headings</button>
+      </div>
+      <button id="toggle"></button>
     </div>`;
   const $ = (id) => root.getElementById(id);
   let bannerTimer;
@@ -176,22 +206,28 @@ function runInPage() {
     }, 2500);
   }
 
+  /** Added with Add Highlight, and not made Incremental since. */
+  const isYellow = (extract) => extract.kind === 'highlight' && !extract.incremental;
+
   function paint(source) {
     const index = A.buildIndex(document);
     const counts = { exact: 0, edges: 0, ambiguous: 0, lost: 0 };
-    const ranges = [];
-    for (const { anchor } of extracts) {
-      const found = A.resolveAnchor(index, anchor);
+    const blue = [];
+    const yellow = [];
+    for (const extract of extracts) {
+      const found = A.resolveAnchor(index, extract.anchor);
       if (!found) {
         counts.lost++;
         continue;
       }
       counts[found.how]++;
-      ranges.push(A.toRange(document, index, found.start, found.end));
+      (isYellow(extract) ? yellow : blue).push(A.toRange(document, index, found.start, found.end));
     }
+    const ranges = [...blue, ...yellow];
     const hasApi = typeof CSS !== 'undefined' && !!CSS.highlights && typeof Highlight !== 'undefined';
     if (hasApi) {
-      CSS.highlights.set('ie-extract', new Highlight(...ranges));
+      CSS.highlights.set('ie-extract', new Highlight(...blue));
+      CSS.highlights.set('ie-highlight', new Highlight(...yellow));
       const point = readPoint && A.resolveAnchor(index, readPoint.anchor);
       if (point) CSS.highlights.set('ie-readpoint', new Highlight(A.toRange(document, index, point.start, point.end)));
       else CSS.highlights.delete('ie-readpoint');
@@ -337,7 +373,7 @@ function runInPage() {
 
   async function commitExtract({ anchor, started, payload }, options = {}) {
     if (refuseIfGone()) return;
-    const extract = { anchor };
+    const extract = { anchor, ...(options.highlight ? { kind: 'highlight' } : {}) };
     extracts.push(extract);
     window.getSelection()?.removeAllRanges();
     paint('this extract');
@@ -355,7 +391,8 @@ function runInPage() {
       const r = message.result;
       logLine(`Extract ${Math.round(performance.now() - started)} ms in all: ${JSON.stringify(r)}`);
       const priorityText = r.priority === undefined ? '' : `, priority ${r.priority}`;
-      show(`✅ Extract added${r.section ? ` to “${r.section}”` : ''}${priorityText}`, 3500);
+      const what = options.highlight ? '🖍 Highlight added' : '✅ Extract added';
+      show(`${what}${r.section ? ` to “${r.section}”` : ''}${priorityText}`, 3500);
     });
     extract.opId = id;
     saveCache();
@@ -382,6 +419,7 @@ function runInPage() {
 
   function openPrompt(captured) {
     promptFor = captured;
+    hideMenu();
     // Focusing the field takes the page's selection away, so this keeps it visible.
     setPendingHighlight(captured.range);
     const rect = captured.range.getBoundingClientRect?.();
@@ -461,17 +499,190 @@ function runInPage() {
     else commitExtract(captured);
   }
 
+  /** Like an extract, but the Rem is not made Incremental, so it has no priority to ask for. */
+  function startHighlight() {
+    if (promptFor || refuseIfGone()) return;
+    const captured = captureSelection();
+    if (captured) commitExtract(captured, { highlight: true });
+  }
+
+  // ---- The menu beside a selection ----
+
+  let mouseIsDown = false;
+  let menuTimer;
+
+  /** The selection the menu is for, or null when there is none it can act on. */
+  function selectionForMenu() {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || !selection.toString().trim() || isEditable(selection.anchorNode)) return null;
+    return selection.getRangeAt(0);
+  }
+
+  function hideMenu() {
+    clearTimeout(menuTimer);
+    $('menu').hidden = true;
+  }
+
+  /** Above the selection, or below it when there is no room, and always in the window. */
+  function placeMenu() {
+    const range = !promptFor && !mouseIsDown && selectionForMenu();
+    const rect = range && range.getBoundingClientRect?.();
+    if (!rect || rect.bottom < 0 || rect.top > innerHeight) return hideMenu();
+    const menu = $('menu');
+    menu.hidden = false;
+    const width = menu.offsetWidth || 260;
+    const height = menu.offsetHeight || 34;
+    const above = rect.top - height - 8;
+    const below = rect.bottom + 8;
+    const top = above >= 8 ? above : below + height <= innerHeight - 8 ? below : 8;
+    const left = rect.left + rect.width / 2 - width / 2;
+    menu.style.top = `${top}px`;
+    menu.style.left = `${Math.max(8, Math.min(innerWidth - width - 8, left))}px`;
+  }
+
+  /** Once the selection has settled: not while a drag is still making it. */
+  function scheduleMenu() {
+    clearTimeout(menuTimer);
+    if (mouseIsDown) return;
+    menuTimer = setTimeout(placeMenu, 150);
+  }
+
+  // ---- The reading clock: time on a page whose document is Incremental ----
+
+  const C = globalThis.IEClock;
+  /** The document this page is counted for, and its time not yet saved. */
+  let clock = null;
+  let lastActivity = Date.now();
+  let lastTick = null;
+  let lastSave = Date.now();
+  let panelFocused = false;
+  let panelActiveAt = 0;
+  let countedUrl = location.href;
+
+  const noteActivity = () => (lastActivity = Date.now());
+  const mediaPlaying = () =>
+    [...document.querySelectorAll('video, audio')].some((media) => !media.paused && !media.ended && media.readyState > 2);
+
+  /** Running, or why not: in a background tab, in another app, or idle for 3 minutes. */
+  function clockState(now) {
+    if (document.visibilityState !== 'visible') return { running: false, reason: 'background' };
+    if (!document.hasFocus() && !panelFocused) return { running: false, reason: 'unfocused' };
+    if (now - Math.max(lastActivity, panelActiveAt) > C.IDLE_MS && !mediaPlaying()) return { running: false, reason: 'idle' };
+    return { running: true };
+  }
+
+  /** Adds this page's new time to what is stored, so two tabs on one document both count. */
+  async function saveClock() {
+    const current = clock;
+    if (!current?.pending.length || extensionIsGone()) return;
+    const pending = current.pending;
+    current.pending = [];
+    lastSave = Date.now();
+    try {
+      const stored = (await chrome.storage.local.get(current.key))[current.key];
+      let segments = stored?.segments ?? [];
+      for (const [from, to] of pending) segments = C.addTime(segments, from, to);
+      await chrome.storage.local.set({ [current.key]: { url: location.href, title: document.title, segments } });
+      current.base = segments;
+    } catch {
+      current.pending = [...pending, ...current.pending];
+    }
+  }
+
+  /** The document the panel said this page belongs to, if it is Incremental. */
+  async function findClockTarget() {
+    if (extensionIsGone()) return;
+    const { readingTargets } = await chrome.storage.local.get('readingTargets');
+    const docId = kb && readingTargets?.[C.targetKey(kb.id, location.href)];
+    if (clock && clock.docId === docId && clock.kbId === kb?.id) return;
+    await saveClock();
+    if (!docId) {
+      clock = null;
+      return;
+    }
+    const key = C.clockKey(kb.id, docId);
+    const coverKey = C.coverKey(kb.id, docId);
+    const stored = await chrome.storage.local.get([key, coverKey]);
+    clock = { kbId: kb.id, docId, key, coverKey, base: stored[key]?.segments ?? [], pending: [], cover: stored[coverKey] ?? null };
+    lastTick = null;
+  }
+
+  function tickClock() {
+    if (location.href !== countedUrl) {
+      countedUrl = location.href;
+      findClockTarget();
+    }
+    if (!clock || extensionIsGone()) return;
+    const now = Date.now();
+    const state = clockState(now);
+    // A gap means the tab slept or the computer did: none of it was reading.
+    if (state.running && lastTick && now - lastTick < 5000) clock.pending = C.addTime(clock.pending, lastTick, now);
+    lastTick = state.running ? now : null;
+    if (now - lastSave > 15000) saveClock();
+    const segments = C.uncovered([...clock.base, ...clock.pending], clock.cover);
+    send({
+      ie: 'clock',
+      kbId: clock.kbId,
+      docId: clock.docId,
+      running: state.running,
+      reason: state.reason,
+      unrecordedMs: C.totalMs(segments),
+      lastReadAt: C.lastEnd(segments),
+      firstReadAt: C.firstStart(segments),
+    });
+  }
+
+  function startClock() {
+    for (const type of ['scroll', 'wheel', 'mousemove', 'mousedown', 'keydown', 'touchstart', 'selectionchange']) {
+      addEventListener(type, noteActivity, { capture: true, passive: true });
+    }
+    document.addEventListener('visibilitychange', () => {
+      noteActivity();
+      if (document.visibilityState !== 'visible') saveClock();
+    });
+    addEventListener('focus', noteActivity);
+    addEventListener('pagehide', () => saveClock());
+    chrome.storage.local.get(['panelFocus', 'panelActiveAt']).then((stored) => {
+      panelFocused = !!stored.panelFocus;
+      panelActiveAt = stored.panelActiveAt ?? 0;
+    });
+    chrome.storage.onChanged.addListener((changes) => {
+      if (changes.panelFocus) panelFocused = !!changes.panelFocus.newValue;
+      if (changes.panelActiveAt) panelActiveAt = changes.panelActiveAt.newValue ?? 0;
+      if (changes.readingTargets || changes.kb) findClockTarget();
+      if (clock && changes[clock.key]) clock.base = changes[clock.key].newValue?.segments ?? [];
+      if (clock && changes[clock.coverKey]) clock.cover = changes[clock.coverKey].newValue ?? null;
+    });
+    setInterval(tickClock, 1000);
+  }
+
+  function showCollapsed(collapsed) {
+    $('bar').classList.toggle('collapsed', collapsed);
+    $('toggle').textContent = collapsed ? '‹' : '›';
+    $('toggle').title = collapsed ? 'Show the Companion buttons' : 'Hide the Companion buttons';
+  }
+
   function attach() {
     document.documentElement.append(host);
+    showCollapsed(false);
 
-    chrome.storage.local.get('setPriority').then((stored) => {
+    chrome.storage.local.get(['setPriority', 'barCollapsed']).then((stored) => {
       $('priority').checked = !!stored.setPriority;
+      showCollapsed(!!stored.barCollapsed);
+    });
+    // One setting for every tab, so a collapsed bar stays out of the way everywhere.
+    $('toggle').addEventListener('mousedown', (event) => event.preventDefault());
+    $('toggle').addEventListener('click', () => {
+      const collapsed = !$('bar').classList.contains('collapsed');
+      showCollapsed(collapsed);
+      if (!refuseIfGone()) chrome.storage.local.set({ barCollapsed: collapsed });
     });
     $('priority').addEventListener('change', () => {
       if (!refuseIfGone()) chrome.storage.local.set({ setPriority: $('priority').checked });
     });
     chrome.storage.onChanged.addListener((changes) => {
       if (changes.setPriority) $('priority').checked = !!changes.setPriority.newValue;
+      if (changes.barCollapsed) showCollapsed(!!changes.barCollapsed.newValue);
       if (changes.kbKnown) {
         knownKbs = changes.kbKnown.newValue ?? {};
         showKbs();
@@ -479,10 +690,31 @@ function runInPage() {
       if (changes.kb) showKb(changes.kb.newValue);
     });
 
-    document.addEventListener('selectionchange', () => {
-      const selection = window.getSelection();
-      $('extract').hidden = !selection?.toString().trim() || isEditable(selection.anchorNode);
-    });
+    document.addEventListener('selectionchange', () => (selectionForMenu() ? scheduleMenu() : hideMenu()));
+    // A press in the page starts a new selection, or ends this one. One on the bar
+    // or the menu arrives with the host as its target.
+    document.addEventListener(
+      'mousedown',
+      (event) => {
+        if (event.target === host) return;
+        mouseIsDown = true;
+        hideMenu();
+      },
+      true
+    );
+    document.addEventListener(
+      'mouseup',
+      () => {
+        mouseIsDown = false;
+        scheduleMenu();
+      },
+      true
+    );
+    addEventListener('scroll', () => !$('menu').hidden && placeMenu(), { capture: true, passive: true });
+    addEventListener('resize', () => !$('menu').hidden && placeMenu());
+    // Keeps the page's selection when the menu is clicked.
+    $('menu').addEventListener('mousedown', (event) => event.preventDefault());
+    $('highlight').addEventListener('click', startHighlight);
     // Keeps the page's selection when the bar is clicked. Clicks still work.
     $('bar').addEventListener('mousedown', (event) => {
       if (event.target !== $('kbPick')) event.preventDefault();
@@ -508,17 +740,21 @@ function runInPage() {
     });
     $('priorityInput').addEventListener('input', () => $('priorityInput').classList.remove('invalid'));
 
-    // Opt+X and Opt+Shift+X, only with text selected outside an editable area. The
-    // key's code, because Option changes what `key` reports on a Mac.
+    // Opt+X and Opt+Shift+X for an extract, Opt+H for a highlight, only with text
+    // selected outside an editable area. The key's code, because Option changes
+    // what `key` reports on a Mac.
     window.addEventListener(
       'keydown',
       (event) => {
-        if (promptFor || event.code !== 'KeyX' || !event.altKey || event.ctrlKey || event.metaKey) return;
+        const extract = event.code === 'KeyX';
+        const highlight = event.code === 'KeyH' && !event.shiftKey;
+        if (promptFor || !(extract || highlight) || !event.altKey || event.ctrlKey || event.metaKey) return;
         const selection = window.getSelection();
         if (!selection?.toString().trim() || isEditable(selection.anchorNode) || isEditable(event.target)) return;
         event.preventDefault();
         event.stopPropagation();
-        startExtract(event.shiftKey || $('priority').checked);
+        if (highlight) startHighlight();
+        else startExtract(event.shiftKey || $('priority').checked);
       },
       true
     );
@@ -573,6 +809,8 @@ function runInPage() {
       kb = stored.kb ?? null;
       knownKbs = stored.kbKnown ?? {};
       showKbs();
+      startClock();
+      findClockTarget();
       await loadBrowserCopy();
       loadFromPlugin();
     });
@@ -595,7 +833,7 @@ function runInPage() {
     if (message.ie === 'opDone' || message.ie === 'readDone') {
       pending.get(message.id)?.(message);
       pending.delete(message.id);
-    } else if (message.ie === 'pluginReady') {
+    } else if (message.ie === 'pluginReady' || message.ie === 'pageChanged') {
       loadFromPlugin();
     }
     respond(true);

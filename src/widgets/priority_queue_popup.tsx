@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTrackerPlugin, RemId } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -1068,4 +1069,4 @@ export function PriorityQueuePopup() {
   );
 }
 
-renderWidget(PriorityQueuePopup);
+renderWidget(withHoverTips(PriorityQueuePopup));

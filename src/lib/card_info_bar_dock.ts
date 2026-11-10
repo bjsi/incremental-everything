@@ -48,6 +48,12 @@ const OVERLAY = '.beautiful-queue-bottom-controls-overlay';
 // Phone: the buttons are portaled out of the box, so the HOC renders no overlay.
 const ROOT_WITHOUT_OVERLAY = `${ROOT}:not(:has(> ${OVERLAY}))`;
 
+/** The bar's wrapper while it is docked over the bottom of the card (lib/mc_scissors.ts
+    hides scissors whose option has slid under it). */
+export const DOCKED_CARD_INFO_BAR = `${ROOT} ${WRAPPER}`;
+/** What holds the answer buttons in the Beautiful queue: in the box, or below it on a phone. */
+export const QUEUE_BOTTOM_CONTROLS = [OVERLAY, '.queue-beautiful-mobile-bottom-controls'];
+
 // Before the widget reports its height. One row of the bar.
 const DEFAULT_BAR_HEIGHT = 38;
 // Space between the bar and the answer buttons.

@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState } from 'react';
 import { allIncrementalRemSlimKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
 import type { SlimIncRem } from '../lib/incremental_rem/cache';
@@ -180,4 +181,4 @@ function IncRemCounter() {
   );
 }
 
-renderWidget(IncRemCounter);
+renderWidget(withHoverTips(IncRemCounter));

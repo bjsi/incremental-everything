@@ -6,6 +6,7 @@ import {
   PluginRem,
   RNPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   powerupCode,
@@ -1521,4 +1522,4 @@ async function getRemPathWithIds(plugin: RNPlugin, rem: PluginRem, stopAtId: str
 
 console.log('✅ BatchPriority: Widget module loaded');
 
-renderWidget(BatchPriority);
+renderWidget(withHoverTips(BatchPriority));

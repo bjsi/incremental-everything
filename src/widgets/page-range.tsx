@@ -5,6 +5,7 @@ import {
   useTrackerPlugin,
   ReactRNPlugin,
 } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect } from 'react';
 import {
   setIncrementalPageRange,
@@ -1099,4 +1100,4 @@ function PageRangeWidget() {
   );
 }
 
-renderWidget(PageRangeWidget);
+renderWidget(withHoverTips(PageRangeWidget));

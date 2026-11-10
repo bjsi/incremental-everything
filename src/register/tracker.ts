@@ -326,7 +326,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       let wroteCardPriority = false;
       try {
         const { setCardPriority } = await import('../lib/card_priority');
-        const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
+        const { updateCardPriorityCache, flushPendingCardPriorityUpdates } = await import('../lib/card_priority/cache');
         const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
 
         for (const remId of job.remIds) {
@@ -364,11 +364,12 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
             await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true, {
               event: job.event ?? 'popup',
             });
-            updateCardPriorityCache(plugin as any, rem._id, true, {
+            // Awaited and deferred: queued before the single flush after the loop.
+            await updateCardPriorityCache(plugin as any, rem._id, true, {
               remId: rem._id,
               priority: job.cardPriority,
               source: job.cardSource,
-            } as any);
+            } as any, { deferFlush: true });
             wroteCardPriority = true;
             cascadeRemIds.push(remId);
           }
@@ -377,10 +378,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         const writtenAt = Date.now();
         await applyIncRemCacheChanges(plugin, incCacheChanges);
         const incCachedAt = Date.now();
-        // Only when a card priority was written: flushCacheUpdatesNow forces a
-        // full percentile recalculation over the whole card-priority cache even
-        // with nothing pending, which an IncRem-only batch has no use for.
-        if (wroteCardPriority) await flushCacheUpdatesNow(plugin as any);
+        // Only when a card priority was written: an IncRem-only batch has no use
+        // for a pass over the card-priority cache.
+        if (wroteCardPriority) await flushPendingCardPriorityUpdates(plugin as any);
         const cachedAt = Date.now();
 
         if (job.triggerCascade && cascadeRemIds.length) {
@@ -884,7 +884,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
       const { setCardPriority } = await import('../lib/card_priority');
       const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
-      const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
+      const { updateCardPriorityCache, flushPendingCardPriorityUpdates } = await import('../lib/card_priority/cache');
       const isLight = await shouldUseLightMode(plugin as any);
 
       // Everything that is not per-rem is done once after the loop: the IncRem
@@ -932,9 +932,10 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
             await setCardPriority(plugin as any, rem, newP, 'manual', true, {
               event: agg.event ?? 'quick',
             });
-            updateCardPriorityCache(plugin as any, rem._id, true, {
+            // Awaited and deferred: queued before the single flush after the loop.
+            await updateCardPriorityCache(plugin as any, rem._id, true, {
               remId: rem._id, priority: newP, source: 'manual',
-            } as any);
+            } as any, { deferFlush: true });
             wroteCardPriority = true;
             messages.push(`Card ${oldP} → ${newP}`);
             didWrite = true;
@@ -949,11 +950,14 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
       if (writtenRemIds.length > 0) {
         await applyIncRemCacheChanges(plugin, incCacheChanges);
-        if (wroteCardPriority) await flushCacheUpdatesNow(plugin as any);
-
-        // Signal card-priority display widgets to refresh.
-        const { cardPriorityCacheRefreshKey } = await import('../lib/consts');
-        await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+        if (wroteCardPriority) {
+          // One flush, which also signals the display widgets.
+          await flushPendingCardPriorityUpdates(plugin as any);
+        } else {
+          // Signal card-priority display widgets to refresh.
+          const { cardPriorityCacheRefreshKey } = await import('../lib/consts');
+          await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+        }
 
         // The watcher accepts an array and applies the flashcard-prioritisation gate.
         await plugin.storage.setSession('pendingInheritanceCascade', writtenRemIds);

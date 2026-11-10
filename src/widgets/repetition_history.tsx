@@ -1,5 +1,6 @@
 import React from 'react';
 import { renderWidget, usePlugin, WidgetLocation, useRunAsync, RNPlugin } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import dayjs from 'dayjs';
@@ -22,7 +23,9 @@ import {
 } from '../lib/history_edit';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
 import { getRemSchedulerInfo } from '../lib/scheduler_choice';
-import { describeScheduler } from '../lib/scheduler_core';
+import { describeScheduler, sameDayRepeatIndexes } from '../lib/scheduler_core';
+import { useIESetting } from '../lib/settings';
+import { ignoreSameDayReviewsId } from '../lib/consts';
 import { MAX_NOTE_LENGTH } from '../lib/history_notes';
 import { priorityEventIcon, priorityEventLabel } from '../lib/priority_history';
 import { formatVideoContext } from '../lib/video_position';
@@ -132,7 +135,34 @@ function formatRepContext(ctx: NonNullable<IncrementalRep['context']>): string {
         const name = ctx.flashcardName ? `“${ctx.flashcardName}”` : 'flashcard';
         parts.push(`🃏 ${name}${label ? ` · ${label}` : ''}`);
     }
+    const companion = formatCompanionContext(ctx);
+    if (companion) parts.push(companion);
     return parts.join(' · ');
+}
+
+/** "https://en.wikipedia.org/wiki/World_War_II" → "en.wikipedia.org/wiki/World_War_II". */
+function shortUrl(url: string): string {
+    try {
+        const { host, pathname } = new URL(url);
+        return `${host.replace(/^www\./, '')}${pathname === '/' ? '' : decodeURI(pathname)}`;
+    } catch {
+        return url;
+    }
+}
+
+/** Where the Chrome Companion took part: a session it recorded, or a queue review handed to it. */
+function formatCompanionContext(ctx: NonNullable<IncrementalRep['context']>): string {
+    if (ctx.webUrl) {
+        const queue = ctx.queueSeconds ? ` · +${formatDuration(ctx.queueSeconds)} in the queue` : '';
+        return `🌐 Read in the Chrome Companion: ${shortUrl(ctx.webUrl)}${queue}`;
+    }
+    if (ctx.companionHandoffAt) {
+        const at = dayjs(ctx.companionHandoffAt).format('HH:mm');
+        return ctx.companionSeconds !== undefined
+            ? `📎 Queue, then the Chrome Companion from ${at}: ${formatDuration(ctx.companionSeconds) || '0s'} of reading there`
+            : `📎 Queue, then the Chrome Companion from ${at} (time as counted by the queue)`;
+    }
+    return '';
 }
 
 /**
@@ -279,7 +309,8 @@ function describeEntry(rep: IncrementalRep): string {
         case 'priorityChange':
             return `Priority change (${priorityEventLabel(rep.priorityEvent)}) — ${when}`;
         case 'importedRep': return `Imported flashcard review — ${when}`;
-        case 'externalRep': return `External session — ${when}`;
+        case 'externalRep':
+            return rep.context?.webUrl ? `Web page session (Companion) — ${when}` : `External session — ${when}`;
         case 'transferred':
             return `Transferred from "${displayTransferredFrom(rep)}" — ${when}`;
         default: return `Review — ${when}`;
@@ -700,6 +731,7 @@ function RepetitionHistoryPopup() {
     const [refreshKey, setRefreshKey] = React.useState(0);
     const [dialog, setDialog] = React.useState<DialogTarget | null>(null);
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
+    const ignoreSameDay = useIESetting(ignoreSameDayReviewsId);
 
     const data = useRunAsync(async () => {
         try {
@@ -978,6 +1010,8 @@ function RepetitionHistoryPopup() {
     // Sort history by date descending (most recent first). The stored index is
     // carried along so the edit/delete actions can point at the right entry in
     // the underlying (chronological) array.
+    // Same-day repeats count once for scheduling (Ignore Same-Day Reviews).
+    const sameDayRepeats = ignoreSameDay ? sameDayRepeatIndexes(history || []) : new Set<number>();
     const sortedHistory = (history || [])
         .map((rep, storedIndex) => ({ rep, storedIndex }))
         .sort((a, b) => b.rep.date - a.rep.date);
@@ -1395,7 +1429,7 @@ function RepetitionHistoryPopup() {
                             if (rep.eventType === 'rescheduledInQueue') return '📅 ';
                             if (rep.eventType === 'executeRepetition') return '⌨️ ';
                             if (rep.eventType === 'importedRep') return '🃏 ';
-                            if (rep.eventType === 'externalRep') return '📖 ';
+                            if (rep.eventType === 'externalRep') return rep.context?.webUrl ? '🌐 ' : '📖 ';
                             return '';
                         };
 
@@ -1414,6 +1448,14 @@ function RepetitionHistoryPopup() {
                                 <span>{formatDuration(rep.reviewTimeSeconds || 0) || '—'}</span>
                                 <span>{rep.interval !== undefined ? `${rep.interval}d` : '—'}</span>
                                 <span>{rep.priority !== undefined ? rep.priority : '—'}</span>
+                                {sameDayRepeats.has(storedIndex) ? (
+                                    <span
+                                        style={{ color: 'var(--rn-clr-content-tertiary)' }}
+                                        title="A second review the same day, before the item was due: scheduling counts that day once (Ignore Same-Day Reviews), and a review recorded with the setting on keeps the next review date. Its time still counts."
+                                    >
+                                        🔁 same day
+                                    </span>
+                                ) : (
                                 <span style={{
                                     color: rep.daysEarlyOrLate !== undefined && rep.daysEarlyOrLate > 0
                                         ? 'var(--rn-clr-red, #ef4444)'
@@ -1423,6 +1465,7 @@ function RepetitionHistoryPopup() {
                                 }}>
                                     {formatEarlyLate(rep)}
                                 </span>
+                                )}
                                 {canEditEntry ? actions : <span />}
                             </div>
                         );
@@ -1579,4 +1622,4 @@ function RepetitionHistoryPopup() {
     );
 }
 
-renderWidget(RepetitionHistoryPopup);
+renderWidget(withHoverTips(RepetitionHistoryPopup));

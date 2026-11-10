@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect } from 'react';
 import { powerupCode, pdfHighlightBordersEnabledKey, pdfHighlightBordersReloadKey } from '../lib/consts';
 import {
@@ -283,4 +284,4 @@ function ToggleButton({
   );
 }
 
-renderWidget(HighlightToolbar);
+renderWidget(withHoverTips(HighlightToolbar));

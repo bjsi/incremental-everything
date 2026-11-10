@@ -38,6 +38,7 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
 - **Multi-PDF support**: If the Inc Rem has **more than one PDF source**, a PDF dropdown appears just above the Page Controls. Selecting a different PDF pins it as active for this Inc Rem (★ marks the `#preferthispdf` one) — Start Timer will then open and scroll to that PDF, and any subsequent reading-time writes target it. See the [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) section for the resolution chain.
 - **Records review time**: The time you enter is saved in the repetition history.
 - **Schedules next review**: Uses the same [scheduler](IncRem-Scheduler.md) as the queue's "Next" button.
+- **Same-day review**: If the Rem was already reviewed today and isn't due yet, the popup says *"Same-day review"* and fills in the days to the date already in force. Confirm them unchanged to keep that date, or type other days. See [Same-day reviews](IncRem-Scheduler.md#same-day-reviews).
 - **Closes instantly**: **Confirm Review** closes the popup right away and the repetition is saved in the background a moment later. If it can't be saved (for example, the Rem was deleted meanwhile), a dialog tells you. If you changed the priority, the inherited priorities of the flashcards below the Rem are updated too.
 - **Indicator in history**: Shows with a ⌨️ indicator in the Repetition History widget.
 - **Ahead-of-Schedule Warning Banner**: If you review an Incremental Rem before its scheduled due date, an amber warning banner will appear at the top of the popup informing you how many days early you are:
@@ -123,6 +124,7 @@ The timer provides a range of powerful controls to manage your session without t
     * *What happens under the hood*: The plugin records your repetition in the background (logging the time spent and pushing the Next Rep Date forward), saves this reading history to the Incremental Tracker, and instantly teleports you to the editor of the *next* item in your sorted list, with a fresh, unpaused timer.
 5.  **Finish the session**: If you want to stop reviewing before the list is empty, simply click **"End Review"** on the green primary button. The destination sub-label ("and Back to IncRem List") confirms where you will land.
 6.  **Cancel Timer**: Discard the current item's timer and stay in the editor.
+7.  **↗ Go to Rem**: Return to the Rem under review in this pane. **Shift+click** opens it in a new pane beside the current document instead (or switches to the pane already showing it), so whatever you have open stays put.
 
 ### Multi-PDF Support in the Timer
 

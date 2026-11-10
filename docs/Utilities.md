@@ -27,6 +27,7 @@ Reach a Rem, a source or a figure that RemNote’s own search will not surface.
 - [Filter a Document by Images](Utilities-Finding-and-Navigating.md#filter-a-document-by-images)
 - [Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website)
 - [Readable Breadcrumbs in Rem Preview](Utilities-Finding-and-Navigating.md#readable-breadcrumbs-in-rem-preview)
+- [Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id)
 
 ## [Queue Display](Utilities-Queue-Display.md)
 
@@ -53,6 +54,13 @@ Mark a statement as true or false with one command, and make that kind of questi
 - [Remove Marking (`tfx`)](Utilities-True-or-False-Cards.md#remove-marking)
 - [Importing True/False cards from text (`tfc`)](Utilities-True-or-False-Cards.md#importing-from-text)
 - [In a Card Cluster](Utilities-True-or-False-Cards.md#card-clusters)
+
+## [Multiple-Choice Cards](Utilities-Multiple-Choice-Cards.md)
+
+Additions to RemNote's own multiple-choice cards in the queue.
+
+- [Scissors — New](Utilities-Multiple-Choice-Cards.md#scissors)
+- [True/False answer sheet — New](Utilities-Multiple-Choice-Cards.md#answer-sheet)
 
 ## [Cleaning Up](Utilities-Cleaning-Up.md)
 

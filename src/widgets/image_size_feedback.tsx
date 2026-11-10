@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
+import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
@@ -134,4 +135,4 @@ export function ImageSizeFeedback() {
   );
 }
 
-renderWidget(ImageSizeFeedback);
+renderWidget(withHoverTips(ImageSizeFeedback));

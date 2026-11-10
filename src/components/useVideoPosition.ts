@@ -48,18 +48,19 @@ export function useSaveVideoRate(url: string) {
  * reports 0, or the position an earlier card left it at.
  *
  * `positionKey` is videoPositionKey(url), or extractPositionKey(id) for an
- * extract.
+ * extract; null saves nothing (a card video always starts at its beginning).
  *
  * Returns the refs a caller needs to hand the position over elsewhere:
  * `armed` (the reported time can be trusted), `latestPosition`, `lastSaved`.
  */
-export function useVideoPositionSaver(positionKey: string, info: YouTubeEmbedInfo, startPosition: number | undefined) {
+export function useVideoPositionSaver(positionKey: string | null, info: YouTubeEmbedInfo, startPosition: number | undefined) {
   const plugin = usePlugin();
   const lastSaved = React.useRef({ at: 0, position: -1 });
   const latestPosition = React.useRef<number | undefined>();
   const armed = React.useRef(false);
   React.useEffect(() => {
     const t = info.currentTime;
+    if (!positionKey) return;
     // Only a playing or paused player says where the video is: a page that
     // has just (re)loaded reports its URL's start time until the seek lands.
     if (t === undefined || (info.playerState !== YT_PLAYING && info.playerState !== YT_PAUSED)) return;
@@ -76,7 +77,11 @@ export function useVideoPositionSaver(positionKey: string, info: YouTubeEmbedInf
   }, [info.currentTime, info.playerState]);
   React.useEffect(
     () => () => {
-      if (latestPosition.current !== undefined && latestPosition.current !== lastSaved.current.position)
+      if (
+        positionKey &&
+        latestPosition.current !== undefined &&
+        latestPosition.current !== lastSaved.current.position
+      )
         plugin.storage.setSynced(positionKey, latestPosition.current);
     },
     [positionKey]
