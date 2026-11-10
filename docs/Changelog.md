@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.212 - November 10th, 2026
+
+### ✨ New
+
+**Stall diagnostics**: When every plugin widget freezes for a while, the console now records how long, what the plugin was doing, and whether the wait was on the plugin or on RemNote.
+
+📖 [Plugin widgets freeze or vanish for a while](Troubleshooting.md#stall-diagnostics)
+
 ## v1.0.211 - November 9th, 2026
 
 ### ✨ New
