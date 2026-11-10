@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.213 - November 10th, 2026
+
+### ⚡ Improved
+
+**Startup**: The Incremental Rem cache now loads from a copy saved on your device, re-reading only the IncRems that changed (39 s → 2.4 s on 6,583 IncRems), so the plugin's widgets no longer freeze while RemNote starts.
+
+📖 [How the IncRem cache is loaded](IncRem-Scheduler.md#increm-startup-cache)
+
 ## v1.0.212 - November 10th, 2026
 
 ### ✨ New
