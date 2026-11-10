@@ -557,6 +557,9 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 - **Refresh Card Priority Cache**
   Forces a manual recalculation of the queue caching system.
 
+- **Refresh IncRem Cache**
+  Re-reads every Incremental Rem from the database, ignoring the copy saved for fast startup, and rebuilds both. 📖 [How the IncRem cache is loaded](IncRem-Scheduler.md#increm-startup-cache)
+
 - **Preserve history & remove** — `quick: phr`
   Deletes a rem's content the way native delete does (the rem **and its whole subtree**), but first **rescues all repetition history** in that subtree so your study stats survive. Normally, deleting a flashcard / Incremental / Dismissed rem discards its reviews and time-spent — and the [Study Dashboard](Study-Dashboard.md) total silently drops. This command prevents that.
 

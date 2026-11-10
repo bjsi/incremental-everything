@@ -126,6 +126,7 @@ import { createOpTimer, OpTimer } from '../lib/op_timer';
 import dayjs from 'dayjs';
 import { createTurnQueue } from '../lib/turn_queue';
 import { holdCardPriorityCacheEntry, loadCardPriorityCache, rereadCardPriorityCacheWhenCardsExist } from '../lib/card_priority/cache';
+import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
 import {
   isHiddenSlotMigrated,
   isVisiblePrioritySlotRetired,
@@ -1953,6 +1954,20 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async () => {
       await plugin.app.toast('Rebuilding card priority cache from the database…');
       await loadCardPriorityCache(plugin, { forceCold: true });
+    },
+  });
+
+  // Same reasoning for the IncRem cache, which startup also serves from a saved
+  // copy (lib/incremental_rem/persistence.ts): the command re-reads every IncRem.
+  plugin.app.registerCommand({
+    id: 'refresh-increm-cache',
+    name: 'Refresh IncRem Cache',
+    description:
+      'Re-reads every Incremental Rem from the database, ignoring the saved copy, and rebuilds both the cache and the saved copy from it.',
+    action: async () => {
+      await plugin.app.toast('Rebuilding the IncRem cache from the database…');
+      const loaded = await loadIncrementalRemCache(plugin, { forceCold: true });
+      await plugin.app.toast(`IncRem cache rebuilt: ${loaded.length} Incremental Rems.`);
     },
   });
 

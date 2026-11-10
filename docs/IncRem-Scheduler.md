@@ -208,6 +208,27 @@ The reason for having it is convenience, not memory science. Spacing improves re
 
 ---
 
+## Startup: how the IncRem cache is loaded { #increm-startup-cache }
+
+The queue, the IncRem lists, the priority badges and the Priority Queue all read one in-memory list of every Incremental Rem, built when the plugin starts. Building it from scratch means about ten reads per IncRem (its next date, priority and history). On a 6,500-IncRem library that is around 66,000 reads, which took about 40 seconds. While they ran, the plugin's widgets had to wait their turn for RemNote's answers, so the first seconds after opening RemNote felt frozen.
+
+### The saved copy
+
+The plugin keeps a copy of that list on your device and starts from it, re-reading only the IncRems that changed since it was saved. **Measured on a 6,583-IncRem knowledge base: 39 seconds from scratch, 2.4 seconds from the saved copy.** The copy is never synced: each device keeps its own.
+
+An IncRem is re-read when:
+
+* it was made Incremental since the copy was saved;
+* it was reviewed or had its priority changed, on this device or another, which RemNote records as a change to the Rem;
+* you edited its **Priority** or **Next Rep Date** row by hand while the plugin was running, which the plugin notes for the next start.
+
+The plugin reads everything from scratch instead when there is no copy yet (the first start after this update), when the copy belongs to another knowledge base or an older plugin version, at least **once every seven days**, and when a spot-check of 100 IncRems finds the copy wrong in bulk. Those full reads now go a few at a time, so widgets keep responding while they run.
+
+The seven-day limit covers the one change the plugin cannot see: a hand edit of an IncRem's Priority or Next Rep Date row made **on another device**, or with the plugin turned off.
+
+!!! tip "Forcing a full read"
+    The command **Refresh IncRem Cache** ignores the saved copy and re-reads every Incremental Rem from the database, rebuilding both the cache and the copy. Run it if an IncRem's priority or date looks wrong in the plugin's views.
+
 ## Scheduling and the Queue
 
 The scheduler described above determines **when** an Incremental Rem becomes due again. But once an item is due, how does the queue decide which item to show you first?

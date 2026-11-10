@@ -49,6 +49,7 @@ import {
   PrioritySource,
 } from '../lib/card_priority';
 import { IncrementalRem, getIncrementalRemFromRem, isKnownIncRemId } from '../lib/incremental_rem';
+import { markIncRemDirty } from '../lib/incremental_rem/persistence';
 import { flushCacheUpdatesNow, flushRatedCardsNow, updateCardPriorityCache, updateCardPriorityCacheAfterRating } from '../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { transferToDismissed } from '../lib/dismissed';
@@ -1075,6 +1076,13 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       // hot path (which is known to fire in the thousands) pays an array push.
       recordRemChangeEvent(plugin, data.remId);
 
+      // The IncRem store's dirty set (lib/incremental_rem/persistence.ts): the next
+      // startup re-reads this IncRem instead of serving it from the stored copy.
+      // Above the suppression return, so batch jobs' writes are recorded too. Free:
+      // a Set lookup and a Set add. Before the first load (undefined) every id is
+      // marked, which is harmless — the next load only looks at tagged Rems.
+      if (isKnownIncRemId(data.remId) !== false) markIncRemDirty(plugin, data.remId);
+
       // Still exactly one session read; the value may be `true` (a short batch
       // that clears itself in a finally) or a deadline written by a long or
       // interruptible job. See lib/operation_suppression.ts for why a job that
@@ -1089,6 +1097,10 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
 
       const rem = await plugin.rem.findOne(data.remId);
       if (!rem) return;
+
+      // A hand edit of an IncRem's visible Priority or Next Rep Date row changes the
+      // property CHILD, leaving the IncRem's own updatedAt untouched: mark the parent.
+      if (rem.parent && isKnownIncRemId(rem.parent)) markIncRemDirty(plugin, rem.parent);
 
       // IMPORTANT: Capture history NOW, before debounce
       //

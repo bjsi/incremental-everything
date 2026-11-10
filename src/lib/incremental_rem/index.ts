@@ -376,7 +376,12 @@ export async function requestQueueDashboardRefocus(plugin: RNPlugin, source: str
  */
 export const getIncrementalRemFromRem = async (
   plugin: RNPlugin,
-  r: PluginRem | undefined
+  r: PluginRem | undefined,
+  opts?: {
+    /** The Rem came from the powerup's taggedRem(), so it carries the powerup by
+     *  definition: skip the hasPowerup round trip (one call per IncRem on a load). */
+    knownTagged?: boolean;
+  }
 ): Promise<IncrementalRem | null> => {
   if (!r) {
     return null;
@@ -387,7 +392,7 @@ export const getIncrementalRemFromRem = async (
   // from the cache/list — that is exactly what made interval-0 (today-referenced)
   // rems disappear. We gate on the powerup and fall back to "due now" instead of
   // returning null; null is reserved for rems that genuinely aren't incremental.
-  if (!(await r.hasPowerup(powerupCode))) {
+  if (!opts?.knownTagged && !(await r.hasPowerup(powerupCode))) {
     return null;
   }
 
