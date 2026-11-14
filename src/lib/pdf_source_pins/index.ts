@@ -490,7 +490,9 @@ export async function pinOneQuote(
       [result] = await ensureSourcePins(plugin, request.sourceRemId, [{ quote: candidates[best], page: request.page }], views);
     }
   } catch (e) {
-    console.error('[SourcePins]', e);
+    const source = await plugin.rem.findOne(request.sourceRemId).catch(() => undefined);
+    const name = source ? await safeRemTextToString(plugin, source.text).catch(() => '?') : '(Rem not found)';
+    console.error(`[SourcePins] Source "${name}" (${request.sourceRemId}):`, e);
     return { error: e as Error };
   }
   console.log('[SourcePins] Result', result);
