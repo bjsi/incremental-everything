@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.232 - November 16th, 2026
 
+### ✨ New
+
+**Local Media Bridge**: added `set-text`, which rewrites rems' front and back text exactly, keeping clozes, pins and review history, and `remove`, which deletes childless rems, each only if its text is still what the caller read.
+
+📖 [Local Media Bridge → Rem operations](Local-Media-Bridge.md#operations)
+
 ### ✨ Improved
 
 **Notices**: the notice card at the top right can now be dragged out of the way; a new card still opens at the top right.

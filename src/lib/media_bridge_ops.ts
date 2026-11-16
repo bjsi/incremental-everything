@@ -3,7 +3,7 @@
  *
  * The RemNote MCP can write text, tags and documents, but cannot move a rem,
  * remove a tag, hand back an image, pin a source, set a card's type and direction,
- * add a playable audio file, or make a rem Incremental the way this
+ * add a playable audio file, rewrite rich text exactly, or make a rem Incremental the way this
  * plugin does (its slots, history, cache and inheritance cascade). Outside tools
  * queue these as jobs on the media-bridge helper (scripts/media_bridge/
  * media_bridge.py), and lib/media_bridge.ts hands them here. Each returns the
@@ -771,6 +771,119 @@ export async function runRestoreAudio(plugin: ReactRNPlugin, job: BridgeOpJob): 
   };
 }
 
+// --- set-text / remove -------------------------------------------------------
+
+/** JSON with object keys sorted, so rich text read from the DB compares equal to the SDK's copy. */
+const canon = (value: unknown): string =>
+  JSON.stringify(value ?? [], (_key, val) =>
+    val && typeof val === 'object' && !Array.isArray(val)
+      ? Object.fromEntries(Object.keys(val).sort().map((k) => [k, (val as Record<string, unknown>)[k]]))
+      : val
+  );
+
+type TextField = 'text' | 'backText';
+interface FieldEdit {
+  before: RichTextInterface;
+  after: RichTextInterface;
+}
+interface TextEdit {
+  remId: string;
+  text?: FieldEdit;
+  backText?: FieldEdit;
+}
+
+/**
+ * Replace a rem's front and/or back rich text with the exact elements given, so
+ * cloze ids, formatting, references, powerups and review history all stay. Each
+ * field is written only if it still equals `before` (sorted-key JSON); otherwise
+ * the rem is reported as a conflict and left alone. The MCP's edit_rem goes
+ * through markdown, which renumbers clozes and cannot address the back text.
+ */
+export async function runSetText(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<BridgeOpResult> {
+  const edits = (Array.isArray(job.edits) ? job.edits : []) as TextEdit[];
+  if (!edits.length) throw new OpError('No edits given.');
+  const { byId } = await findRems(plugin, edits.map((e) => e.remId));
+  const results = [];
+  for (const edit of edits) {
+    const rem = byId.get(edit.remId);
+    if (!rem) {
+      results.push({ remId: edit.remId, ok: false, error: 'rem not found' });
+      continue;
+    }
+    try {
+      const fields = (['text', 'backText'] as TextField[]).filter((f) => edit[f]);
+      const conflicts = fields.filter((f) => canon(rem[f]) !== canon(edit[f]!.before));
+      if (conflicts.length) {
+        results.push({ remId: edit.remId, ok: false, error: `changed since it was read: ${conflicts.join(', ')}`, current: Object.fromEntries(conflicts.map((f) => [f, rem[f] ?? null])) });
+        continue;
+      }
+      if (edit.text) await rem.setText(edit.text.after);
+      if (edit.backText) await rem.setBackText(edit.backText.after);
+      const after = (await plugin.rem.findOne(edit.remId)) ?? rem;
+      const differs = fields.filter((f) => canon(after[f]) !== canon(edit[f]!.after));
+      results.push({
+        remId: edit.remId,
+        ok: true,
+        title: await remTitle(plugin, after),
+        ...(differs.length ? { normalized: Object.fromEntries(differs.map((f) => [f, after[f] ?? null])) } : {}),
+      });
+    } catch (err) {
+      results.push({ remId: edit.remId, ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  const done = results.filter((r) => r.ok).length;
+  return {
+    ok: done === edits.length,
+    summary: `text set on ${plural(done, 'rem')}` + (done < edits.length ? `, ${edits.length - done} skipped` : ''),
+    results,
+  };
+}
+
+/**
+ * Delete rems that have no children, each only if its front and back text still
+ * equal what the caller read (`expect[remId] = {text, backText}`).
+ */
+export async function runRemove(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<BridgeOpResult> {
+  const expect = (job.expect ?? {}) as Record<string, { text?: RichTextInterface; backText?: RichTextInterface }>;
+  const { byId } = await findRems(plugin, job.remIds);
+  const results = [];
+  for (const remId of job.remIds) {
+    const rem = byId.get(remId);
+    const want = expect[remId];
+    if (!rem) {
+      results.push({ remId, ok: false, error: 'rem not found' });
+      continue;
+    }
+    if (!want) {
+      results.push({ remId, ok: false, error: 'no expected text given' });
+      continue;
+    }
+    try {
+      if (canon(rem.text) !== canon(want.text) || canon(rem.backText) !== canon(want.backText)) {
+        results.push({ remId, ok: false, error: 'changed since it was read' });
+        continue;
+      }
+      // rem.children is a lazy cache, [] for a document not opened this session, and
+      // removing a rem takes its subtree with it, so ask for the children for real.
+      const children = await rem.getChildrenRem();
+      if (children.length) {
+        results.push({ remId, ok: false, error: `has ${children.length} children` });
+        continue;
+      }
+      await rem.remove();
+      results.push({ remId, ok: true });
+    } catch (err) {
+      results.push({ remId, ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  const done = results.filter((r) => r.ok).length;
+  return {
+    ok: done === job.remIds.length,
+    summary: `${plural(done, 'rem')} deleted` + (done < job.remIds.length ? `, ${job.remIds.length - done} kept` : ''),
+    results,
+  };
+}
+
 // --- dispatch ----------------------------------------------------------------
 
 const OPS: Record<string, (plugin: ReactRNPlugin, job: BridgeOpJob) => Promise<BridgeOpResult>> = {
@@ -784,6 +897,8 @@ const OPS: Record<string, (plugin: ReactRNPlugin, job: BridgeOpJob) => Promise<B
   card: runCard,
   audio: runAudio,
   'restore-audio': runRestoreAudio,
+  'set-text': runSetText,
+  remove: runRemove,
 };
 
 /** Runs a non-localize job. Errors come back as `{ok: false, message}`, never thrown. */

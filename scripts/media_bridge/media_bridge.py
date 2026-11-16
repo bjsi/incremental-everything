@@ -101,7 +101,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 14  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice
+VERSION = 15  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove
 # The jobs a plugin build understands, by the protocol version it polls with.
 OPS_BY_PLUGIN_VERSION = {
     1: {"localize"},
@@ -113,6 +113,8 @@ OPS_BY_PLUGIN_VERSION = {
         "restore-audio"},
     7: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
         "restore-audio", "notice"},
+    8: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+        "restore-audio", "notice", "set-text", "remove"},
 }
 # Jobs that may name no rem at all.
 OPS_WITHOUT_REMS = {"notice"}
@@ -812,6 +814,33 @@ def audio(parent: str, path: str, caption: str | None, position: str | None, tim
     finish(result, bool(result.get("ok")))
 
 
+def _chunked_job(op: str, items: list, chunk: int, timeout: float, make) -> None:
+    """Run `op` over `items` in jobs of `chunk`; print every rem's result together."""
+    results, ok = [], True
+    for start in range(0, len(items), chunk):
+        part = items[start:start + chunk]
+        rem_ids, args = make(part)
+        result = run_job(op, rem_ids, args, timeout)
+        ok = ok and bool(result.get("ok"))
+        results.extend(result.get("results") or [{"remIds": rem_ids, "ok": False, "error": result.get("message")}])
+        print(f"{op}: {min(start + chunk, len(items))}/{len(items)} — {result.get('summary')}", file=sys.stderr)
+    done = sum(1 for r in results if r.get("ok"))
+    finish({"ok": ok, "summary": f"{done}/{len(items)} done", "results": results}, ok)
+
+
+def set_text(path: str, chunk: int, timeout: float) -> None:
+    """Edits file: JSON list of {remId, text?: {before, after}, backText?: {before, after}} (RemNote rich text)."""
+    edits = json.loads(Path(path).read_text())
+    _chunked_job("set-text", edits, chunk, timeout, lambda part: ([e["remId"] for e in part], {"edits": part}))
+
+
+def remove(path: str, chunk: int, timeout: float) -> None:
+    """Expect file: JSON {remId: {text, backText}} — each rem is deleted only if it still has exactly that text and no children."""
+    expect = json.loads(Path(path).read_text())
+    _chunked_job("remove", list(expect), chunk, timeout,
+                 lambda part: (part, {"expect": {i: expect[i] for i in part}}))
+
+
 def notice(title: str, message: str, detail: str | None, rem: str | None, tone: str, wait: float) -> None:
     """Show a notice in RemNote (the plugin's floating card, with Open Rem when a rem is given).
 
@@ -1011,6 +1040,14 @@ def main() -> None:
     p_ra.add_argument("rems", help="rem id(s), comma-separated")
     p_ra.add_argument("--chunk", type=int, default=5, help="rems per plugin job (default 5)")
     p_ra.add_argument("--timeout", type=float, default=600, help="seconds to wait for each job")
+    p_st = sub.add_parser("set-text", help="rewrite rems' rich text exactly (front/back), only where it is unchanged")
+    p_st.add_argument("edits", help="JSON file: [{remId, text?: {before, after}, backText?: {before, after}}]")
+    p_st.add_argument("--chunk", type=int, default=25, help="rems per plugin job (default 25)")
+    p_st.add_argument("--timeout", type=float, default=300, help="seconds to wait for each job")
+    p_rm = sub.add_parser("remove", help="delete childless rems whose text still matches the given JSON")
+    p_rm.add_argument("expect", help="JSON file: {remId: {text, backText}}")
+    p_rm.add_argument("--chunk", type=int, default=25)
+    p_rm.add_argument("--timeout", type=float, default=300)
     p_no = sub.add_parser("notice", help="show a notice in RemNote (floating card; Open Rem when --rem is given)")
     p_no.add_argument("--title", required=True)
     p_no.add_argument("--message", default="", help="one or two lines under the title")
@@ -1053,6 +1090,10 @@ def main() -> None:
         audio(a.parent, a.file, a.caption, a.position, a.timeout)
     elif a.cmd == "restore-audio":
         restore_audio(a.rems, max(1, a.chunk), a.timeout)
+    elif a.cmd == "set-text":
+        set_text(a.edits, max(1, a.chunk), a.timeout)
+    elif a.cmd == "remove":
+        remove(a.expect, max(1, a.chunk), a.timeout)
     elif a.cmd == "notice":
         notice(a.title, a.message, a.detail, a.rem, a.tone, a.wait)
 
