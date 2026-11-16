@@ -959,7 +959,7 @@ def _fetch_image(url: str, kb_id: str | None) -> tuple[bytes, str]:
             return path.read_bytes(), path.suffix.lower() or ".bin"
     if re.match(r"https?://", url, re.I):
         req = urllib.request.Request(url, headers={"User-Agent": "remnote-media-bridge"})
-        with urllib.request.urlopen(req, timeout=30) as res:
+        with urllib.request.urlopen(req, timeout=30, context=_tls_context()) as res:
             mime = (res.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             data = res.read()
         ext = EXT_BY_MIME.get(mime) or (Path(urlparse(url).path).suffix.lower() or ".bin")
