@@ -3,6 +3,7 @@
  *
  * The RemNote MCP can write text, tags and documents, but cannot move a rem,
  * remove a tag, hand back an image, pin a source, set a card's type and direction,
+ * set a heading level,
  * add a playable audio file, rewrite rich text exactly, or make a rem Incremental the way this
  * plugin does (its slots, history, cache and inheritance cascade). Outside tools
  * queue these as jobs on the media-bridge helper (scripts/media_bridge/
@@ -28,6 +29,7 @@ import { imageUrlsOf, isRemNoteHostedUrl, localizeMediaInRems } from './localize
 import { restoreMislabelledAudio } from './audio_restore';
 import { isPin, pinFromSourceFinder, pinOneQuote, SourceView, sourceViews } from './pdf_source_pins';
 import { quoteCandidates } from './pdf_source_pins/quote';
+import { applyHeadingLevel, clearHeading, getHeadingLevel, HeadingLevel } from './outline_restructure';
 
 export interface BridgeOpJob {
   id: string;
@@ -698,6 +700,77 @@ export async function runCard(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<
   };
 }
 
+
+// --- heading -----------------------------------------------------------------
+
+/**
+ * Set rems' heading level, like the "Set Next Heading Level" command but without
+ * its dialog and without touching any other rem. `level`:
+ *   - 'next' (default): one level deeper per generation below the nearest heading
+ *     ancestor (parent H3 → H4; parent plain, grandparent H3 → H5), clamped at H6.
+ *     No heading ancestor → the rem fails (give a level).
+ *   - 1–6: that level.
+ *   - 'none': back to a plain paragraph.
+ */
+export async function runHeading(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<BridgeOpResult> {
+  const raw = job.level === undefined ? 'next' : String(job.level);
+  if (!['next', 'none', '1', '2', '3', '4', '5', '6'].includes(raw))
+    throw new OpError(`Unknown level “${raw}”: use next, none or 1–6.`);
+  const { byId } = await findRems(plugin, job.remIds);
+
+  const results = [];
+  for (const remId of job.remIds) {
+    const rem = byId.get(remId);
+    if (!rem) {
+      results.push({ remId, ok: false, error: 'rem not found' });
+      continue;
+    }
+    try {
+      let level: HeadingLevel | null = null;
+      let from: string | undefined;
+      if (raw === 'next') {
+        let current: PluginRem | undefined = rem.parent ? await plugin.rem.findOne(rem.parent) : undefined;
+        for (let generations = 1; current && generations < 100; generations++) {
+          const found = await getHeadingLevel(current);
+          if (found) {
+            level = Math.min(found + generations, 6) as HeadingLevel;
+            from = `${current._id} (H${found})`;
+            break;
+          }
+          current = current.parent ? await plugin.rem.findOne(current.parent) : undefined;
+        }
+        if (!level) {
+          results.push({ remId, ok: false, error: 'no heading above this rem: give a level (1–6)' });
+          continue;
+        }
+      } else if (raw !== 'none') {
+        level = Number(raw) as HeadingLevel;
+      }
+      if (level) await applyHeadingLevel(rem, level);
+      else await clearHeading(rem);
+      const after = (await plugin.rem.findOne(remId)) ?? rem;
+      const now = await getHeadingLevel(after);
+      const ok = now === level;
+      results.push({
+        remId,
+        ok,
+        title: await remTitle(plugin, after),
+        level: now ? `H${now}` : 'none',
+        ...(from ? { from } : {}),
+        ...(ok ? {} : { error: 'RemNote did not keep the change' }),
+      });
+    } catch (err) {
+      results.push({ remId, ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  const done = results.filter((r) => r.ok).length;
+  return {
+    ok: done === job.remIds.length,
+    summary: `${plural(done, 'rem')} set to heading ${raw}` + (done < job.remIds.length ? `, ${job.remIds.length - done} failed` : ''),
+    results,
+  };
+}
+
 // --- audio -------------------------------------------------------------------
 
 /**
@@ -895,6 +968,7 @@ const OPS: Record<string, (plugin: ReactRNPlugin, job: BridgeOpJob) => Promise<B
   pin: runPin,
   'pin-quote': runPinQuote,
   card: runCard,
+  heading: runHeading,
   audio: runAudio,
   'restore-audio': runRestoreAudio,
   'set-text': runSetText,

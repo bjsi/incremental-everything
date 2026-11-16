@@ -8,6 +8,8 @@ This page documents the major changes and improvements for each version of the I
 
 **Local Media Bridge**: added `set-text`, which rewrites rems' front and back text exactly, keeping clozes, pins and review history, and `remove`, which deletes childless rems, each only if its text is still what the caller read.
 
+**Local Media Bridge**: added `heading`, which sets rems' heading level, by default one level deeper than the heading above them, like **Set Next Heading Level** without its dialog. The `card` documentation now shows how to make a Concept with no flashcard, which RemNote lists first in searches and in the `[` reference menu.
+
 📖 [Local Media Bridge → Rem operations](Local-Media-Bridge.md#operations)
 
 ### ✨ Improved

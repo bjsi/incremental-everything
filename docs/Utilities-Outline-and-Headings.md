@@ -117,6 +117,7 @@ When several rems are selected at once:
 - **H4–H6 are fully supported** on both detection and application — the command writes the deeper levels through the Header powerup's `Size` slot, exactly as RemNote does internally.
 - **Heading styling never aborts on a single failure:** if applying a level throws, the command logs a warning and continues with the rest of the batch.
 - A toast summarizes the result, e.g. *"Set heading on 3 rem(s). 1 skipped (no ancestor heading)."*
+- Outside tools (an AI assistant writing through the RemNote MCP) get the same result, without the dialog, from the [Local Media Bridge](Local-Media-Bridge.md#operations): `media_bridge.py heading <rem>`.
 
 ---
 
