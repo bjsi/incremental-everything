@@ -133,10 +133,10 @@ export const LocalVideoViewer: React.FC<{
     if (info.errorCode === undefined) return;
     (async () => {
       if (!(await checkVideoHelper()).reachable) return setProblem({ kind: 'helper' });
-      const library = (await listVideoLibraries()).find((l) => l.name === file.library);
+      const library = (await listVideoLibraries(plugin)).find((l) => l.name === file.library);
       if (!library?.available) return setProblem({ kind: 'library', library });
       // MEDIA_ERR_SRC_NOT_SUPPORTED is also what a 404 from the helper gives.
-      const fileThere = await checkLocalVideo(file).then(
+      const fileThere = await checkLocalVideo(plugin, file).then(
         () => true,
         () => false
       );
@@ -146,7 +146,7 @@ export const LocalVideoViewer: React.FC<{
 
   const relink = async () => {
     try {
-      if (await relinkVideoLibrary(file.library)) {
+      if (await relinkVideoLibrary(plugin, file.library)) {
         setProblem(null);
         setReload((n) => n + 1);
       }

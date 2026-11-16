@@ -1,4 +1,5 @@
 import { RNPlugin, RemId, RichTextInterface } from '@remnote/plugin-sdk';
+import { PAIRING_MESSAGE, helperHeaders, isPairingRefusal } from './helper_client';
 import { AI_OCR_HELPER_URL, markupToRichText } from './ai_ocr';
 import { findHostedImageUrl } from './localize_media';
 import { sanitizeRichTextForSetText } from './richTextSanitize';
@@ -60,16 +61,22 @@ export async function checkVideoHelper(): Promise<VideoHelperStatus> {
 }
 
 /** POSTs to the helper; throws with a message for the user when it fails or isn't running. */
-export async function callVideoHelper<T>(route: string, payload: object): Promise<T> {
+export async function callVideoHelper<T>(
+  plugin: RNPlugin,
+  route: string,
+  payload: object
+): Promise<T> {
   let body: any;
   try {
     const res = await fetch(`${AI_OCR_HELPER_URL}${route}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await helperHeaders(plugin),
       body: JSON.stringify(payload),
     });
     body = await res.json();
+    if (isPairingRefusal(res.status, body)) throw new Error(PAIRING_MESSAGE);
   } catch (e) {
+    if ((e as Error).message === PAIRING_MESSAGE) throw e;
     throw new Error(
       `The helper is not running (${AI_OCR_HELPER_URL}). Start scripts/ai_ocr_helper.py.`
     );
@@ -143,7 +150,7 @@ export async function saveVideoSnapshot(
 ): Promise<{ heading: RemId; lines: number }> {
   const { source, seconds, parentId, transcribe, onProgress } = opts;
   onProgress?.('grabbing');
-  const frame = await callVideoHelper<{ frameId: string; mime: string; image: string }>('/video-frame', {
+  const frame = await callVideoHelper<{ frameId: string; mime: string; image: string }>(plugin, '/video-frame', {
     ...source,
     seconds,
   });
@@ -160,7 +167,7 @@ export async function saveVideoSnapshot(
   if (!transcribe) return { heading: heading._id, lines: 0 };
 
   onProgress?.('transcribing');
-  const { markup } = await callVideoHelper<{ markup: string }>('/video-transcribe', {
+  const { markup } = await callVideoHelper<{ markup: string }>(plugin, '/video-transcribe', {
     frameId: frame.frameId,
   });
   if (markup.trim() === '[no text]') return { heading: heading._id, lines: 0 };

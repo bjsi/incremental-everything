@@ -1,3 +1,4 @@
+import type { RNPlugin } from '@remnote/plugin-sdk';
 /**
  * YouTube transcripts, fetched by the local helper (scripts/ai_ocr_helper.py,
  * `/video-transcript`): yt-dlp lists the caption tracks and the helper returns
@@ -49,6 +50,7 @@ export type TranscriptSource = 'captions' | 'audio' | 'auto';
  * result with segmentsInRange either way. Throws with a message for the user.
  */
 export async function fetchTranscript(
+    plugin: RNPlugin,
     videoIdOrUrl: string,
     { source = 'auto', range }: { source?: TranscriptSource; range?: { start: number; end: number } } = {}
 ): Promise<Transcript> {
@@ -57,7 +59,7 @@ export async function fetchTranscript(
     const file = parseLocalVideoUrl(videoIdOrUrl);
     const videoId = file ? file.path : extractVideoId(videoIdOrUrl);
     if (!videoId) throw new Error(`Not a YouTube video: ${videoIdOrUrl}`);
-    const transcript = await callVideoHelper<Transcript & { cached: boolean }>('/video-transcript', {
+    const transcript = await callVideoHelper<Transcript & { cached: boolean }>(plugin, '/video-transcript', {
         ...(file ? { file } : { videoId }),
         source,
         ...(range ? { start: range.start, end: range.end } : {}),

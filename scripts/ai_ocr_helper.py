@@ -32,9 +32,10 @@ Study Dashboard can keep counting the reps of Rems deleted since.
 It also searches a knowledge base (`/search`, see rem_search.py): an Anki-style
 query (AND, OR, NOT, phrases, in:, tag:, is:, prop:…) run on remnote.db, read-only,
 because RemNote's own search only ever ORs the words. Keys beyond plain text use the
-helper's own index of the knowledge base (rem_index.py, ~/.incremental-remnote/search/). That route hands out note text, so
-it needs the pairing token (below): any web page open in the browser can reach a
-localhost port, and only the plugin knows the token.
+helper's own index of the knowledge base (rem_index.py, ~/.incremental-remnote/search/).
+
+Every POST route needs the pairing token (below): any web page open in the browser
+can reach a localhost port, and only the plugin knows the token.
 
     python3 scripts/ai_ocr_helper.py          # listens on 127.0.0.1:3457
     python3 scripts/ai_ocr_helper.py --pairing-token   # prints the token to paste in the plugin
@@ -51,17 +52,22 @@ Environment:
                     (and log each Origin so it can be pinned)
     IR_SOURCE_FINDER  command of the source finder for /find-source, split like a
                     shell line (overrides source-finder.json)
+    IR_CORPUS_PROVIDER  command of the corpus provider for /corpus and /find-source
+                    (overrides corpus-provider.json; docs/Corpus-Provider.md)
     IR_WHISPER_MODEL  path of the whisper.cpp model (default whisper/ggml-large-v3-turbo-q5_0.bin)
 
 Files live in ~/.incremental-remnote/ai-ocr/:
     search-prompt.md  how Claude turns a plain-language request into a search query
                     (Search & Browse's ✨ AI), re-read per request
-    pairing-token   the secret the plugin sends with /search (created on first start,
+    pairing-token   the secret the plugin sends with every POST (created on first start,
                     readable only by you; delete it and restart to make a new one)
     prompt.md       the transcription instructions — edit freely, re-read per request
     source-finder.json  optional: {"command": ["python3", "/path/to/finder.py"]}, the
                     program /find-source runs (JSON on stdin and stdout; the contract
                     is in docs/Source-Pins.md, "Writing a source finder")
+    corpus-provider.json  optional: the same for a corpus provider, which answers
+                    /corpus {op, …} as well (docs/Corpus-Provider.md); used instead
+                    of source-finder.json when both exist
     video-prompt.md the same for video frames
     transcript-prompt.md  how Claude tidies YouTube's automatic captions
     extract-title-prompt.md  how Claude names a Video Extract from its transcript
@@ -120,7 +126,11 @@ ALLOWED_ORIGINS = {o.strip() for o in os.environ.get('IR_AI_ORIGINS', '').split(
 HOME = Path.home() / '.incremental-remnote' / 'ai-ocr'
 TOKEN_FILE = HOME / 'pairing-token'
 # Routes that hand out the knowledge base's content: only a caller with the token.
-TOKEN_ROUTES = {'/search', '/search/source', '/search/suppression', '/search/browse', '/search/ai'}
+# Every POST route needs the pairing token (X-IR-Token): the helper listens on localhost and
+# allows any Origin, so without it any web page open in the browser could run OCR on the
+# user's Claude account, read files of the knowledge base (/source) or query the corpus
+# provider. GET / (status) and GET /media/ (no CORS: pages cannot read it) stay open.
+TOKEN_ALL_POST_ROUTES = True
 TOKEN_HEADER = 'X-IR-Token'
 PDF_CACHE = HOME / 'pdf-cache'
 CROPS = HOME / 'crops'
@@ -636,46 +646,114 @@ def handle_locate(req, entry):
 
 
 SOURCE_FINDER_CONFIG = HOME / 'source-finder.json'
+CORPUS_PROVIDER_CONFIG = HOME / 'corpus-provider.json'
 SOURCE_FINDER_TIMEOUT_S = 120
+CORPUS_STATUS_TIMEOUT_S = 15
 
 
-def source_finder_command():
-    """The source finder's command (a list), from IR_SOURCE_FINDER or
-    source-finder.json, re-read per request; None when there is none."""
-    env = os.environ.get('IR_SOURCE_FINDER', '').strip()
+def _command_from(env_name, config):
+    """A command (list) from an environment variable or a {"command": …} file, re-read
+    per request; None when neither is set."""
+    import shlex
+    env = os.environ.get(env_name, '').strip()
     if env:
-        import shlex
         return [os.path.expanduser(c) for c in shlex.split(env)]
-    if SOURCE_FINDER_CONFIG.exists():
-        cfg = json.loads(SOURCE_FINDER_CONFIG.read_text(encoding='utf-8'))
-        cmd = cfg.get('command')
+    if config.exists():
+        cmd = json.loads(config.read_text(encoding='utf-8')).get('command')
         if isinstance(cmd, str):
-            import shlex
             cmd = shlex.split(cmd)
         if cmd:
             return [os.path.expanduser(str(c)) for c in cmd]
     return None
 
 
+def corpus_provider():
+    """(command, legacy) of the user's corpus provider (docs/Corpus-Provider.md).
+    corpus-provider.json / IR_CORPUS_PROVIDER first; otherwise a source finder
+    (source-finder.json / IR_SOURCE_FINDER), which is a provider with the single
+    capability find-source and gets requests without `op`. (None, False) = none."""
+    cmd = _command_from('IR_CORPUS_PROVIDER', CORPUS_PROVIDER_CONFIG)
+    if cmd:
+        return cmd, False
+    cmd = _command_from('IR_SOURCE_FINDER', SOURCE_FINDER_CONFIG)
+    return (cmd, True) if cmd else (None, False)
+
+
+def source_finder_command():
+    """Kept for callers of the old name: the command answering find-source."""
+    return corpus_provider()[0]
+
+
+def run_provider(cmd, payload, timeout=SOURCE_FINDER_TIMEOUT_S):
+    """Run the provider once: JSON in, JSON out. A non-zero exit, or an answer with
+    `error`, is raised so the plugin gets it as the reason."""
+    script = next((Path(c) for c in cmd if c.endswith('.py')), None)
+    proc = subprocess.run(cmd, input=json.dumps(payload), capture_output=True, text=True,
+                          timeout=timeout, cwd=script.parent if script else None)
+    if proc.returncode != 0:
+        raise RuntimeError(f'corpus provider failed: {(proc.stderr or proc.stdout).strip()[-400:]}')
+    out = json.loads(proc.stdout)
+    if isinstance(out, dict) and out.get('error'):
+        raise RuntimeError(f'corpus provider: {out["error"]}')
+    return out
+
+
+def _no_provider():
+    return (f'No corpus provider configured ({CORPUS_PROVIDER_CONFIG}, {SOURCE_FINDER_CONFIG}, '
+            'IR_CORPUS_PROVIDER or IR_SOURCE_FINDER).')
+
+
+def handle_corpus(req, entry):
+    """POST /corpus {op, …}: one operation of the user's corpus provider
+    (docs/Corpus-Provider.md). `status` answers {available, name, version,
+    capabilities}; any other op is passed to the provider as is and its answer
+    returned with available: true. Without a provider, available: false."""
+    op = req.get('op')
+    entry['op'] = op
+    if not op or not isinstance(op, str):
+        raise RuntimeError('no op')
+    cmd, legacy = corpus_provider()
+    if not cmd:
+        return {'available': False, 'reason': _no_provider(), 'capabilities': []}
+    if op == 'status':
+        if legacy:
+            return {'available': True, 'name': 'Source finder', 'version': None,
+                    'capabilities': ['find-source'], 'legacy': True}
+        out = run_provider(cmd, {'op': 'status'}, CORPUS_STATUS_TIMEOUT_S)
+        caps = [c for c in out.get('capabilities') or [] if isinstance(c, str)]
+        entry['capabilities'] = caps
+        return {'available': True, 'name': out.get('name'), 'version': out.get('version'),
+                'capabilities': caps}
+    if op == 'find-source':
+        return handle_find_source(req, entry)
+    if legacy:
+        return {'available': False, 'reason': f'Your source finder does not offer "{op}" '
+                                              f'(set up a corpus provider: docs/Corpus-Provider.md).'}
+    payload = {k: v for k, v in req.items() if k != 'kbId'}
+    out = run_provider(cmd, payload)
+    if not isinstance(out, dict):
+        raise RuntimeError('corpus provider: the answer is not a JSON object')
+    entry['answer'] = {k: (len(v) if isinstance(v, list) else v) for k, v in out.items()
+                       if isinstance(v, (list, str, int, float)) and k != 'error'}
+    return {'available': True, **out}
+
+
 def handle_find_source(req, entry):
     """Which RemNote PDFs a quote can be pinned from, when no source is open. The
-    user's source finder gets `{items: [{remId, ancestors, texts}]}` on stdin and
-    answers `{items: [{remId, books: [{title, cite?, how, detail?, page?,
-    pdfRemIds}]}]}`, books in the order to try. Without one, `available: false`."""
+    provider gets `{op: "find-source", items: [{remId, ancestors, texts}]}` (a
+    legacy source finder: the same without `op`) and answers `{items: [{remId,
+    books: [{title, cite?, how, detail?, page?, pdfRemIds, quote?}]}]}`, books in
+    the order to try. Without one, `available: false`."""
     items = req.get('items') or []
     entry['items'] = len(items)
-    cmd = source_finder_command()
+    cmd, legacy = corpus_provider()
     if not cmd:
-        return {'available': False, 'items': [],
-                'reason': f'No source finder configured ({SOURCE_FINDER_CONFIG} or IR_SOURCE_FINDER).'}
+        return {'available': False, 'items': [], 'reason': _no_provider()}
     order = {'items': [{'remId': it.get('remId'), 'ancestors': it.get('ancestors') or [],
                         'texts': it.get('texts') or []} for it in items]}
-    script = next((Path(c) for c in cmd if c.endswith('.py')), None)
-    proc = subprocess.run(cmd, input=json.dumps(order), capture_output=True, text=True,
-                          timeout=SOURCE_FINDER_TIMEOUT_S, cwd=script.parent if script else None)
-    if proc.returncode != 0:
-        raise RuntimeError(f'source finder failed: {(proc.stderr or proc.stdout).strip()[-400:]}')
-    out = json.loads(proc.stdout)
+    if not legacy:
+        order = {'op': 'find-source', **order}
+    out = run_provider(cmd, order)
     result = []
     for it in out.get('items') or []:
         books = [b for b in it.get('books') or [] if isinstance(b, dict) and b.get('pdfRemIds')]
@@ -1278,7 +1356,7 @@ def handle_history_status(req, entry):
 
 
 def pairing_token():
-    """The secret the plugin must send on TOKEN_ROUTES; created once, mode 600."""
+    """The secret the plugin must send on every POST route; created once, mode 600."""
     try:
         token = TOKEN_FILE.read_text().strip()
         if token:
@@ -1376,7 +1454,7 @@ def handle_search_ai(req, entry):
 MEDIA_PREFIX = '/media/'
 MEDIA_CHUNK = 1 << 20
 
-ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/find-source': handle_find_source, '/source': handle_source, '/match': handle_match,
+ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/find-source': handle_find_source, '/corpus': handle_corpus, '/source': handle_source, '/match': handle_match,
           '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
           '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy,
           '/extract-title': handle_extract_title,
@@ -1475,7 +1553,7 @@ class Handler(BaseHTTPRequestHandler):
         if ALLOWED_ORIGINS and origin not in ALLOWED_ORIGINS:
             log({'at': time.time(), 'route': self.path, 'origin': origin, 'rejected': True})
             return self.send_json(403, {'ok': False, 'error': f'origin not allowed: {origin}'})
-        if self.path in TOKEN_ROUTES:
+        if TOKEN_ALL_POST_ROUTES:
             sent = (self.headers.get(TOKEN_HEADER) or '').encode()
             if not hmac.compare_digest(sent, pairing_token().encode()):
                 log({'at': time.time(), 'route': self.path, 'origin': origin, 'rejected': 'token'})

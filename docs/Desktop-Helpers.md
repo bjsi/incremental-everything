@@ -10,6 +10,7 @@ A RemNote plugin runs sandboxed: it cannot start programs, open files on your co
 | **Local Media Bridge** | Scripts and AI assistants writing through the RemNote MCP: local images, Rem operations, [Upscale image with ChatGPT](Local-Media-Bridge.md#upscale), [Read aloud and Add pronunciation](Read-Aloud.md) | `media_bridge.py` (Python) | `127.0.0.1:3460` | [Local Media Bridge](Local-Media-Bridge.md#setup) |
 | **Logos bridge** | Reading [Logos Bible Software](Logos-Bible-Software-Integration.md) books incrementally (macOS) | `LogosBridge.app`, built by `build.sh` | `127.0.0.1:3458` | [Logos integration](Logos-Bible-Software-Integration.md#setup) |
 | **Source finder** (yours) | Telling [Pin Source Quote](Source-Pins.md#no-source-open) which book a quote comes from when no PDF is open | Any program you write, run by the AI helper | — | [Source Pins](Source-Pins.md#source-finder-setup) |
+| **Corpus provider** (yours) | A source finder that knows more of your library: also the exact text to search for a corrected quote, and the [parent selector](Corpus-Provider.md#in-the-plugin)'s section suggestion | Any program you write, run by the AI helper | — | [Corpus Provider](Corpus-Provider.md#setup) |
 
 **Checking which ones are running:** open <http://127.0.0.1:3457/> (AI helper), <http://127.0.0.1:3460/health> (Local Media Bridge) or <http://127.0.0.1:3458/ping> (Logos bridge). A running helper answers with `"ok": true`; a stopped one gives a connection error.
 
@@ -78,7 +79,15 @@ The plugin's messages call it the **AI helper**, although most of what it does i
 
     It prints `AI OCR helper on http://127.0.0.1:3457`. Leave the terminal open — or, on macOS, [start it at login](#run-at-login) instead.
 
-4. **For AI features**, install **Claude Code** ([claude.com/claude-code](https://claude.com/claude-code)) and run `claude` once in a terminal to log in. The helper uses your Claude subscription: no API key, nothing to pay beyond your plan.
+4. **Pair the plugin with it.** The helper answers only requests that carry its pairing token, because any web page open in your browser can reach a program on your computer. It creates the token the first time it starts. Print it with
+
+    ```bash
+    python3 ~/.incremental-remnote/ai_ocr_helper.py --pairing-token
+    ```
+
+    and paste it into the plugin's settings, **AI Helper Pairing Token**. Every feature that uses the helper needs it. Without it they say *the plugin is not paired*. See [the pairing token](#pairing).
+
+5. **For AI features**, install **Claude Code** ([claude.com/claude-code](https://claude.com/claude-code)) and run `claude` once in a terminal to log in. The helper uses your Claude subscription: no API key, nothing to pay beyond your plan.
 
 **To check it is running**, open <http://127.0.0.1:3457/>. The answer shows `"ok": true` and what the helper found: `claude`, `ytDlp`, `ffmpeg` and `whisper` give where each tool is (or `null`), `historyArchive` is `true` when `history_archive.py` was loaded, and `search` is `true` when `rem_search.py` was.
 
@@ -216,15 +225,13 @@ RemNote's search, the only one a plugin can use, looks for any of the words you 
 
 With `rem_search.py` and `rem_index.py` next to the helper, [Find Rem](Utilities-Finding-and-Navigating.md#search-with-the-ai-helper) searches through the helper instead, with the [Search Engine](Search-Engine.md)'s query language: every word must match, and `or`, `-word`, `"phrases"`, `in:`, `tag:`, `is:`, `source:`, slot and property values work. The helper reads RemNote's local database (`~/remnote/remnote-<id>/remnote.db`) and never writes to it. For the keys beyond plain text it keeps its own index of the knowledge base in `~/.incremental-remnote/search/`: about 180 MB for 440,000 Rems, built once in about 20 seconds, then updated before each search in a few milliseconds. The plugin also asks this index which Rems have a PDF or web page as their Source, instead of checking every IncRem.
 
-**Pair the plugin with the helper.** Any web page open in your browser can reach a program on your computer, so the helper only answers searches that carry its pairing token. It creates the token the first time it starts.
+Searching needs the plugin [paired with the helper](#pairing), like every other feature of the helper.
 
-1. Print it:
+### The pairing token { #pairing }
 
-    ```bash
-    python3 ~/.incremental-remnote/ai_ocr_helper.py --pairing-token
-    ```
+Any web page open in your browser can reach a program on your computer. Without a token, a page could make the helper transcribe with your Claude account, read files of your knowledge base, or query your [corpus provider](Corpus-Provider.md). So the helper answers a request (any `POST`) only when it carries the pairing token, which only the plugin knows. Its status page (<http://127.0.0.1:3457/>) and local video playback stay open: they reveal nothing to a web page.
 
-2. Paste it into the plugin's settings, **AI Helper Pairing Token**.
+To pair, print the token with `python3 ~/.incremental-remnote/ai_ocr_helper.py --pairing-token` and paste it into the plugin's settings, **AI Helper Pairing Token**.
 
 The token is kept in `ai-ocr/pairing-token`, readable only by your user. To make a new one, delete that file, restart the helper and paste the new token. If you run the helper on two computers, copy the file from one to the other: the plugin setting is the same on both.
 
@@ -236,12 +243,13 @@ Everything is under `~/.incremental-remnote/`:
 |---|---|
 | `ai-ocr/prompt.md`, `video-prompt.md`, `transcript-prompt.md`, `extract-title-prompt.md` | The instructions Claude follows, which you can edit (see [Customising the instructions](AI-Transcription-of-PDF-Highlights.md#prompt)) |
 | `ai-ocr/source-finder.json` | Your [source finder](Source-Pins.md#no-source-open), if you set one up |
+| `ai-ocr/corpus-provider.json` | Your [corpus provider](Corpus-Provider.md), if you set one up (used instead of `source-finder.json`) |
 | `ai-ocr/requests.log` | One line per request, with any error |
 | `ai-ocr/helper.log` | What the helper printed, when started at login |
 | `ai-ocr/crops/` | The image sent for each highlight, useful when a transcription covers more or less than you highlighted |
 | `ai-ocr/pdf-cache/`, `video-frames/`, `video-transcripts/`, `video-audio/`, `whisper/` | Caches and the speech model. Downloaded audio is deleted after a week. |
 | `history-archive/` | The [review history archive](#history-archive), one SQLite file per knowledge base |
-| `ai-ocr/pairing-token` | The token the plugin sends with [searches](#search) |
+| `ai-ocr/pairing-token` | The token the plugin sends with every request ([pairing](#pairing)) |
 | `ai-ocr/search-prompt.md` | The instructions Claude follows to turn a request into a search ([✨ AI](Search-Engine.md#ai)), which you can edit |
 | `search/` | The [Search Engine](Search-Engine.md)'s index, one SQLite file per knowledge base, readable only by you. Deleting it is safe: the helper builds it again. |
 
@@ -264,4 +272,4 @@ The AI helper accepts connections only from your own computer. What leaves it:
 - **AI features** send Anthropic, through your Claude account, only what that request needs: the image of a highlighted region and its text, a video frame, or a transcript. It is the same as pasting them into a Claude conversation.
 - **Video features** download from YouTube the video or captions you asked for.
 - **✨ AI in Search & Browse** sends Claude your request and some names from your knowledge base: scheduler names, your most-used tags, your top documents and folders. Never note text.
-- **Pin Source Quote**, the **review history archive** and **search** send nothing anywhere. The archive stays on your computer, and searches answer only the plugin, which holds the pairing token.
+- **Pin Source Quote**, the **review history archive**, **search** and the **corpus provider** send nothing anywhere (a provider you write may, if you make it). Every request answers only the plugin, which holds the [pairing token](#pairing).

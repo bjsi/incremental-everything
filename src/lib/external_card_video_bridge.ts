@@ -60,9 +60,9 @@ export function registerExternalCardVideoBridge(plugin: RNPlugin) {
       reply(plugin, CARD_VIDEO_BRIDGE_KEYS.folderAnswer, { requestId: msg!.requestId, ...value });
     try {
       const prompt = typeof msg!.prompt === 'string' && msg!.prompt ? msg!.prompt : 'Choose a folder of videos';
-      const picked = await chooseLocalVideo('folder', prompt);
+      const picked = await chooseLocalVideo(plugin, 'folder', prompt);
       if (!picked) return await answer({ status: 'cancelled' });
-      const tree = await scanVideoFolder(picked.library, picked.path);
+      const tree = await scanVideoFolder(plugin, picked.library, picked.path);
       await answer({
         status: 'ok',
         library: picked.library,

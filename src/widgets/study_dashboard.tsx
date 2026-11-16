@@ -44,6 +44,7 @@ import {
     filterGhosts,
     GhostPayload,
 } from '../lib/history_archive';
+import { helperHeaders } from '../lib/helper_client';
 
 // ---------------------------------------------------------------------------
 // Style helpers (mirroring the statistics plugin's chartHelpers)
@@ -2421,7 +2422,7 @@ function StudyDashboardPopup() {
         if (!ghostPayloadRef.current) {
             ghostPayloadRef.current = plugin.kb
                 .getCurrentKnowledgeBaseData()
-                .then((kb) => (kb?._id ? fetchGhosts(kb._id, { scan: true }) : null))
+                .then(async (kb) => (kb?._id ? fetchGhosts(kb._id, { scan: true, headers: await helperHeaders(plugin) }) : null))
                 .catch(() => null)
                 .then((p) => {
                     setGhostStatus(p ? 'on' : 'off');

@@ -2,6 +2,30 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.233 - November 16th, 2026
+
+### ✨ New
+
+**Corpus provider**: a program on your computer that knows your library (a [source finder](Source-Pins.md#no-source-open) that knows more) can now serve several features through the AI helper's new `/corpus` route. Each feature turns on only when the provider offers its capability. The **parent selector** now suggests the section a highlight comes from, marked 📚, without waiting for it. **Pin Source Quote** can search a corrected quote by the text its PDF actually holds.
+
+📖 [Corpus Provider](Corpus-Provider.md)
+
+**Pin Source Quote**: a corpus provider can give, for each book, the exact text its PDF holds (`quote-literal`), so a quote whose text was corrected (a garbled word or formula fixed) is still found and pinned.
+
+📖 [Corpus Provider → find-source](Corpus-Provider.md#op-find-source)
+
+### 📝 Changed
+
+**AI helper**: every request now needs the **pairing token**, not only searches. Without it, a web page open in your browser could make the helper transcribe with your Claude account, read files of your knowledge base or query your corpus provider. If you use the helper and have not paired it yet (Search needed it already), run `python3 ~/.incremental-remnote/ai_ocr_helper.py --pairing-token` and paste the token in **AI Helper Pairing Token**. Update the helper and the plugin together.
+
+📖 [Desktop Helpers → The pairing token](Desktop-Helpers.md#pairing)
+
+### 🐛 Fixed
+
+**Parent selector**: when rows were added above the selected one (a branch expanding), the selection could jump to whatever row took its place. It now stays on the same Rem.
+
+📖 [Create Incremental Rem → The section your library index suggests](Create-Incremental-Rem-from-PDF-Highlights.md#corpus-suggestion)
+
 ## v1.0.232 - November 16th, 2026
 
 ### ✨ New

@@ -5,7 +5,7 @@ import {
   RichTextElementRemInterface,
   RichTextInterface,
 } from '@remnote/plugin-sdk';
-import { AI_OCR_HELPER_URL } from '../ai_ocr';
+import { HelperUnreachableError as HelperDown, helperPost as sharedHelperPost } from '../helper_client';
 import { HighlightColorName, sourceHighlightColorId } from '../consts';
 import { createHtmlHighlight, createPdfHighlight } from '../pdf_highlight_create';
 import { safeRemTextToString } from '../pdfUtils';
@@ -90,25 +90,20 @@ export class SourcePinError extends Error {}
 export class HelperUnreachableError extends SourcePinError {}
 
 /**
- * POST to the local helper. Every request names the current knowledge base: the
- * helper looks for local copies of source files only in that KB's folder.
+ * POST to the local helper through the shared client (../helper_client), with its
+ * failures turned into this module's errors: callers here catch SourcePinError and
+ * stop a run on HelperUnreachableError.
  */
 async function helperPost<T>(plugin: ReactRNPlugin, path: string, body: object): Promise<T> {
-  const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())?._id;
-  let res: Response;
   try {
-    res = await fetch(`${AI_OCR_HELPER_URL}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, kbId }),
-    });
+    return await sharedHelperPost<T>(plugin, path, body);
   } catch (e) {
-    console.error('[SourcePins] Helper unreachable:', e);
-    throw new HelperUnreachableError(`AI helper is not running (${AI_OCR_HELPER_URL}). Start scripts/ai_ocr_helper.py.`);
+    if (e instanceof HelperDown) {
+      console.error('[SourcePins] Helper unreachable:', e);
+      throw new HelperUnreachableError(e.message);
+    }
+    throw new SourcePinError((e as Error).message);
   }
-  const json = await res.json().catch(() => null);
-  if (!json?.ok) throw new SourcePinError(`AI helper: ${json?.error ?? `HTTP ${res.status}`}`);
-  return json as T;
 }
 
 /** The views `rem` can be pinned in; empty when it is not a source. */
@@ -722,6 +717,12 @@ export interface FoundBook {
   /** Page to search first, when the finder knows one. */
   page?: number | null;
   pdfRemIds: string[];
+  /**
+   * The text to look for in this book's PDFs instead of the Rem's own, when the
+   * Rem's text was corrected and no longer matches the PDF letter for letter (the
+   * corpus provider's `quote-literal` capability; docs/Corpus-Provider.md).
+   */
+  quote?: string;
 }
 
 export interface FinderPinRow {
@@ -810,9 +811,13 @@ export async function pinFromSourceFinder(
           continue;
         }
         const view: SourceView = views.includes('pdf') ? 'pdf' : views[0];
+        // quote-literal: the provider's text first (what the PDF holds), then the Rem's own
+        const candidates = book.quote?.trim()
+          ? [book.quote.trim(), ...request.candidates.filter((c) => c !== book.quote?.trim())]
+          : request.candidates;
         const { result, error } = await pinOneQuote(
           plugin,
-          { ...request, sourceRemId: pdfRemId, page: book.page ?? undefined },
+          { ...request, candidates, sourceRemId: pdfRemId, page: book.page ?? undefined },
           [view]
         );
         if (error instanceof HelperUnreachableError) return { rows, stopped: error.message };

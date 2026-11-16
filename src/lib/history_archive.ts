@@ -66,14 +66,19 @@ const DEFAULT_TIMEOUT_MS = 30_000;
  */
 export async function fetchGhosts(
   kbId: string,
-  opts?: { scan?: boolean; timeoutMs?: number }
+  opts?: {
+    scan?: boolean;
+    timeoutMs?: number;
+    /** Must carry the pairing token (helper_client.helperHeaders): every POST route needs it. */
+    headers?: Record<string, string>;
+  }
 ): Promise<GhostPayload | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
     const res = await fetch(`${HISTORY_HELPER_URL}/history/ghosts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: opts?.headers ?? { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kbId, scan: !!opts?.scan }),
       signal: controller.signal,
     });

@@ -43,6 +43,8 @@ The [AI helper](Desktop-Helpers.md#ai-helper) runs the source finder. Name its c
 { "command": ["/usr/local/bin/python3", "~/my-library-index/find_pdf.py"] }
 ```
 
+A [corpus provider](Corpus-Provider.md) can take the source finder's place: it answers the same requests, can also give the exact text to search for when a quote was corrected, and serves other features. When both are set up, the corpus provider is used.
+
 Or set the `IR_SOURCE_FINDER` environment variable of the helper (`IR_SOURCE_FINDER="python3 ~/my-library-index/find_pdf.py"`). The file is read on each request, so no restart is needed after changing it. A command ending in a `.py` file runs from that file's folder.
 
 ### Writing a source finder { #writing-a-source-finder }
@@ -68,6 +70,7 @@ Answer, books in the order to try:
 - `how` (required): how the program knew, shown as is (*named in the quote*, *in its notes*, *its text matches*).
 - `page` (optional): a page to search first; the whole PDF is searched if the passage is not near it.
 - `id` and `detail` (optional): passed back by the Local Media Bridge, not shown.
+- `quote` (optional, [corpus providers](Corpus-Provider.md#op-find-source) with `quote-literal`): the text to look for instead of the Rem's own, when the Rem's text was corrected and no longer matches the PDF letter for letter.
 
 ## Pinning every quote in a subtree { #quote-rems-in-descendants }
 

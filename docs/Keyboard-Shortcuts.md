@@ -269,6 +269,7 @@ These keys are active **while a plugin popup or floating window is open** — th
 | | `Esc` | Close without copying |
 | [Floating source window](Utilities-Finding-and-Navigating.md#floating-window-interaction-closing) | `Esc` | Close the window **without** closing the queue |
 | [Select Parent popup](Create-Incremental-Rem-from-PDF-Highlights.md#keyboard-shortcuts) | `E` | Close the list and [pick the parent in the editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) |
+| | `S` | Go to the [section your corpus provider suggests](Create-Incremental-Rem-from-PDF-Highlights.md#corpus-suggestion) |
 | [Pick-in-editor card](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | `Esc` | Cancel the pick, **even while typing in the editor** |
 | | `←` / `→` + `Enter` | Move between the card's buttons and press one (when the card has focus) |
 

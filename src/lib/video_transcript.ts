@@ -138,7 +138,7 @@ export async function addVideoTranscript(
   source: TranscriptSource = 'auto'
 ): Promise<WrittenTranscript> {
   const { range } = target;
-  const transcript = await fetchTranscript(target.url, { source, range });
+  const transcript = await fetchTranscript(plugin, target.url, { source, range });
   const segments = range ? segmentsInRange(transcript.segments, range.start, range.end) : transcript.segments;
   if (!segments.length) {
     throw new Error(
@@ -185,7 +185,7 @@ export async function titleVideoExtract(plugin: RNPlugin, extractId: RemId, text
   const name = await nameOf(rem);
   if (!UNTITLED_EXTRACT.test(name)) return;
   const video = await findExtractVideoRem(plugin, rem);
-  const { title } = await callVideoHelper<{ title: string }>('/extract-title', {
+  const { title } = await callVideoHelper<{ title: string }>(plugin, '/extract-title', {
     text,
     language,
     video: video ? await nameOf(video) : undefined,
@@ -222,7 +222,7 @@ export async function tidyTranscript(
     onProgress?.(i, texts.length);
     const batch = texts.slice(i, i + TIDY_BATCH);
     try {
-      const { blocks } = await callVideoHelper<{ blocks: string[] }>('/transcript-tidy', {
+      const { blocks } = await callVideoHelper<{ blocks: string[] }>(plugin, '/transcript-tidy', {
         blocks: batch,
         language: transcript.language,
       });

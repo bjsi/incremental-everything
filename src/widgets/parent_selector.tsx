@@ -40,6 +40,7 @@ import { RemTextSegments } from '../components';
 import { applyHeadingLevel, getHeadingLevel } from '../lib/outline_restructure';
 import { HeadingBadge } from '../components/HeadingBadge';
 import { startParentPick } from '../lib/parent_pick';
+import { CorpusParentSuggestion, suggestParentFromCorpus } from '../lib/corpus';
 import { priorityColor, usePriorityColorScale } from '../components/priorityColor';
 
 // ============================================================================
@@ -252,11 +253,56 @@ const PortalBadge: React.FC<{ breadcrumb?: string }> = ({ breadcrumb }) => (
   </span>
 );
 
+/** The corpus provider's suggestion: green, so it never reads as the (blue) selection. */
+const CORPUS_GREEN = '#059669'; // emerald-600: legible on light and dark
+const CORPUS_TINT = 'rgba(16, 185, 129, 0.13)';
+
+/** A keyboard key, for the shortcut that jumps to a row (L, S). */
+const KEYCAP_WIDTH = 18;
+const keycapStyle = (accent: string | null): React.CSSProperties => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  boxSizing: 'border-box',
+  minWidth: `${KEYCAP_WIDTH}px`,
+  height: '17px',
+  padding: '0 4px',
+  borderRadius: '4px',
+  fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+  fontSize: '10px',
+  fontWeight: 700,
+  lineHeight: 1,
+  color: accent ?? 'var(--rn-clr-content-primary)',
+  background:
+    'linear-gradient(180deg, var(--rn-clr-background-primary, #ffffff) 0%, var(--rn-clr-background-secondary, #eef1f5) 100%)',
+  border: `1px solid ${accent ?? 'var(--rn-clr-border-primary, #c5ccd6)'}`,
+  // the key's lower edge, and the light catching its top
+  boxShadow: `0 2px 0 ${accent ?? 'var(--rn-clr-border-primary, #9aa4b2)'}, inset 0 1px 0 rgba(255, 255, 255, 0.7)`,
+  cursor: 'default',
+});
+
+/** Tooltip of the corpus provider's suggested row: who suggested it, where, and how it knew. */
+function corpusSuggestionTip(s: CorpusParentSuggestion): string {
+  const who = s.provider ? `your corpus index (${s.provider})` : 'your corpus index';
+  return [
+    `Suggested by ${who}${s.confidence === 'medium' ? ' — less sure' : ''}`,
+    s.path.length ? s.path.join(' › ') : null,
+    s.how || null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 interface TreeNodeRowProps {
   node: ParentTreeNode;
   isSelected: boolean;
   isLoadingChildren: boolean;
   isSuggested: boolean;
+  /** Set on the row the corpus provider suggests (docs/Corpus-Provider.md). */
+  corpusSuggestion?: CorpusParentSuggestion | null;
+  /** Keys that jump to this row (L: where the popup opened; S: the corpus suggestion). */
+  shortcutKeys?: { key: string; tip: string }[];
   onSelect: () => void;
   onToggleExpand: () => void;
   onMouseEnter: () => void;
@@ -269,12 +315,24 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
   isSelected,
   isLoadingChildren,
   isSuggested,
+  corpusSuggestion,
+  shortcutKeys,
   onSelect,
   onToggleExpand,
   onMouseEnter,
   onAddChild,
 }, ref) => {
   const indentPadding = 16 + node.depth * 20;
+  const keys = shortcutKeys ?? [];
+  const keysWidth = keys.length * KEYCAP_WIDTH + Math.max(0, keys.length - 1) * 3;
+  // Left of the arrow when the indentation has room (nested rows); a root row has
+  // only 16 px, so there the keys go right after the arrow and every arrow lines up.
+  const keysInGutter = keys.length > 0 && indentPadding - 8 >= keysWidth;
+  const keycaps = keys.map(({ key, tip }) => (
+    <kbd key={key} style={keycapStyle(key === 'S' ? CORPUS_GREEN : null)} title={tip}>
+      {key}
+    </kbd>
+  ));
 
   return (
     <div
@@ -285,14 +343,20 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
+        position: 'relative',
         padding: `8px 16px 8px ${indentPadding}px`,
         cursor: 'pointer',
+        // Emphasis, strongest first: the selected row (its background, a blue bar
+        // and a blue frame), then the suggestions — blue for this PDF's own
+        // suggestion (★), green for the corpus provider's (📚).
         backgroundColor: isSelected && isSuggested
           ? '#dbeafe'
           : isSelected
           ? 'var(--rn-clr-background-tertiary)'
           : isSuggested
           ? 'var(--rn-clr-blue-light, #eff6ff)'
+          : corpusSuggestion
+          ? CORPUS_TINT
           : 'transparent',
         borderLeft: isSelected && isSuggested
           ? '3px solid #1d4ed8'
@@ -300,12 +364,34 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
           ? '3px solid #3b82f6'
           : isSuggested
           ? '3px solid var(--rn-clr-blue, #3b82f6)'
+          : corpusSuggestion
+          ? `3px solid ${CORPUS_GREEN}`
           : '3px solid transparent',
-        outline: isSelected && isSuggested ? '1px dashed #93c5fd' : 'none',
+        boxShadow: isSelected ? 'inset 0 0 0 1px rgba(59, 130, 246, 0.55)' : 'none',
+        outline: isSelected && isSuggested
+          ? '1px dashed #93c5fd'
+          : isSelected && corpusSuggestion
+          ? `1px dashed ${CORPUS_GREEN}`
+          : 'none',
         outlineOffset: '-2px',
         transition: 'background-color 0.1s ease',
       }}
     >
+      {keysInGutter && (
+        <span
+          style={{
+            position: 'absolute',
+            left: indentPadding - 6 - keysWidth,
+            top: '50%',
+            transform: 'translateY(-55%)',
+            display: 'flex',
+            gap: '3px',
+          }}
+        >
+          {keycaps}
+        </span>
+      )}
+
       <ExpandButton
         hasChildren={node.hasChildren}
         isExpanded={node.isExpanded}
@@ -315,6 +401,8 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
           onToggleExpand();
         }}
       />
+
+      {keys.length > 0 && !keysInGutter && keycaps}
 
       {node.isIncremental && (
         <span style={{ fontSize: '12px' }} title="Incremental Rem">
@@ -328,6 +416,8 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         </span>
       )}
 
+
+
       <span
         style={{
           flex: 1,
@@ -336,12 +426,38 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
-          fontWeight: isSuggested ? 600 : 400,
+          fontWeight: isSuggested || corpusSuggestion ? 600 : 400,
         }}
-        title={isSuggested ? `Suggested — its page range contains page ${node.name}` : node.name}
+        title={
+          isSuggested
+            ? `Suggested — its page range contains page ${node.name}`
+            : corpusSuggestion
+            ? corpusSuggestionTip(corpusSuggestion)
+            : node.name
+        }
       >
         <RemTextSegments segments={node.nameSegments} />
       </span>
+
+      {corpusSuggestion && (
+        <span
+          style={{
+            flexShrink: 0,
+            padding: '1px 7px',
+            borderRadius: '9px',
+            fontSize: '10px',
+            fontWeight: 700,
+            letterSpacing: '0.02em',
+            whiteSpace: 'nowrap',
+            color: 'white',
+            backgroundColor: CORPUS_GREEN,
+            opacity: corpusSuggestion.confidence === 'high' ? 1 : 0.7,
+          }}
+          title={corpusSuggestionTip(corpusSuggestion)}
+        >
+          📚 {corpusSuggestion.confidence === 'high' ? 'Suggested' : 'Suggested?'}
+        </span>
+      )}
 
       <AddChildButton
         onClick={(e) => {
@@ -501,6 +617,12 @@ function ParentSelectorWidget() {
   const [loadingNodeId, setLoadingNodeId] = useState<RemId | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [suggestedRemId, setSuggestedRemId] = useState<RemId | null>(null);
+  // The corpus provider's suggestion (docs/Corpus-Provider.md): arrives after the
+  // list is shown, never replaces the other suggestions.
+  const [corpusSuggestion, setCorpusSuggestion] = useState<CorpusParentSuggestion | null>(null);
+  const corpusAskedRef = useRef(false);
+  const corpusSelectPendingRef = useRef<RemId | null>(null);
+  const initialSelectedRemRef = useRef<RemId | null | undefined>(undefined);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const hasInitiallyScrolled = useRef(false);
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -633,8 +755,9 @@ function ParentSelectorWidget() {
     if (contextData?.lastSelectedDestination) ids.add(contextData.lastSelectedDestination);
     if (contextData?.contextRemId) ids.add(contextData.contextRemId);
     if (suggestedRemId) ids.add(suggestedRemId);
+    if (corpusSuggestion) ids.add(corpusSuggestion.remId);
     return ids;
-  }, [contextData, suggestedRemId]);
+  }, [contextData, suggestedRemId, corpusSuggestion]);
 
   const displayOptions = useMemo(
     () => ({ headingsOnly, headingsFirst, alwaysShowRemIds: pinnedRemIds }),
@@ -650,9 +773,17 @@ function ParentSelectorWidget() {
   // Keep the highlight on the same rem when the display options reorder or
   // filter the list; if that rem is gone, just keep the index in range.
   const selectedRemIdRef = useRef<RemId | null>(null);
+
+  // The corpus suggestion asked to be selected: do it once its row is in the list.
   useEffect(() => {
-    if (selectedNode) selectedRemIdRef.current = selectedNode.remId;
-  }, [selectedNode]);
+    const pending = corpusSelectPendingRef.current;
+    if (!pending) return;
+    const idx = displayList.findIndex((n) => n.remId === pending);
+    if (idx >= 0) {
+      corpusSelectPendingRef.current = null;
+      setSelectedIndex(idx);
+    }
+  }, [displayList, corpusSuggestion]);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -664,6 +795,13 @@ function ParentSelectorWidget() {
       setSelectedIndex((prev) => Math.min(prev, Math.max(0, displayList.length - 1)));
     }
   }, [displayList, isInitialized]);
+
+  // Record the selected rem AFTER the re-locate effect above: when the list changes,
+  // that effect must see the rem selected before the change, not whatever row now
+  // sits at the old index (effects run in the order they are declared).
+  useEffect(() => {
+    if (selectedNode) selectedRemIdRef.current = selectedNode.remId;
+  }, [selectedNode]);
 
   // Scroll to selected item whenever selectedIndex changes or after initialization
   useEffect(() => {
@@ -855,6 +993,99 @@ function ParentSelectorWidget() {
     mountedAtRef.current = Date.now();
     disarmHover();
   }, [isInitialized, disarmHover]);
+
+  // ---------------------------------------------------------------------------
+  // CORPUS PROVIDER SUGGESTION (docs/Corpus-Provider.md)
+  // ---------------------------------------------------------------------------
+  // Asked once the list is on screen, never awaited before it. The suggested rem is
+  // revealed (expanded to, or given a row of its own at the top) and marked 📚. It
+  // is selected only when the popup had nothing else to suggest and the user has
+  // not moved the selection meanwhile.
+  const treeRef = useRef<ParentTreeNode[]>([]);
+  useEffect(() => {
+    treeRef.current = tree;
+  }, [tree]);
+  const aliveRef = useRef(true);
+  useEffect(
+    () => () => {
+      aliveRef.current = false;
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!isInitialized || !contextData || corpusAskedRef.current) return;
+    corpusAskedRef.current = true;
+    initialSelectedRemRef.current = selectedRemIdRef.current;
+    const { extractRemId, extractContent, pdfRemId } = contextData;
+    if (!pdfRemId || !extractRemId) return;
+    const hadOtherSuggestion =
+      !!contextData.lastSelectedDestination || !!contextData.contextRemId || !!suggestedRemId;
+
+    (async () => {
+      const text = await plugin.richText.toString(extractContent ?? []).catch(() => '');
+      const suggestion = await suggestParentFromCorpus(plugin, {
+        remId: extractRemId,
+        sourceRemId: pdfRemId,
+        page: contextData.highlightPageIndex ?? null,
+        texts: [text],
+      });
+      if (!aliveRef.current || !suggestion) return;
+
+      const base = treeRef.current;
+      let next = base;
+      try {
+        const alwaysShow = new Set([...pinnedRemIds, suggestion.remId]);
+        const { tree: expanded } = await expandToLastDestination(
+          plugin,
+          base,
+          suggestion.remId,
+          allIncrementalRems || []
+        );
+        const visible = flattenTreeForDisplay(expanded, { ...displayOptions, alwaysShowRemIds: alwaysShow }).some(
+          (n) => n.remId === suggestion.remId
+        );
+        if (visible) {
+          next = expanded;
+        } else {
+          // Outside the tree this PDF's candidates span: a row of its own at the top.
+          const rem = await plugin.rem.findOne(suggestion.remId);
+          if (rem) next = [await createTreeNode(plugin, rem, allIncrementalRems || [], 0, null), ...base];
+        }
+        if (headingsOnly && next !== base) {
+          next = await annotateHeadingDescendants(plugin, next, { recurse: true });
+        }
+      } catch (error) {
+        console.error('[ParentSelector:Widget] Error revealing the corpus suggestion:', error);
+      }
+      if (!aliveRef.current) return;
+
+      const userMoved = selectedRemIdRef.current !== initialSelectedRemRef.current;
+      const selectIt = !hadOtherSuggestion && !userMoved;
+      // The row to keep selected. Expanding to the suggestion can insert rows above
+      // the selection (a chapter opened above the last destination), so its index
+      // is recomputed against the new tree and set in the same batch as the tree.
+      const keepRemId = selectIt ? suggestion.remId : selectedRemIdRef.current;
+      setCorpusSuggestion(suggestion);
+      // Only if the user has not expanded or collapsed anything meanwhile.
+      if (next !== base && treeRef.current === base) {
+        const idx = keepRemId
+          ? flattenTreeForDisplay(next, {
+              ...displayOptions,
+              alwaysShowRemIds: new Set([...pinnedRemIds, suggestion.remId]),
+            }).findIndex((n) => n.remId === keepRemId)
+          : -1;
+        if (keepRemId) selectedRemIdRef.current = keepRemId;
+        setTree(next);
+        if (idx >= 0) setSelectedIndex(idx);
+      } else if (selectIt) {
+        selectedRemIdRef.current = suggestion.remId;
+        corpusSelectPendingRef.current = suggestion.remId;
+      }
+    })();
+    // The other values are read once, when the list is first shown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialized, contextData]);
 
   // ---------------------------------------------------------------------------
   // HANDLERS
@@ -1129,12 +1360,14 @@ function ParentSelectorWidget() {
     if (suggestedRemId) {
       return { remId: suggestedRemId, label: 'Suggested' };
     }
+    if (corpusSuggestion) {
+      return { remId: corpusSuggestion.remId, label: 'Suggested by your corpus index' };
+    }
     return null;
-  }, [contextData, suggestedRemId]);
+  }, [contextData, suggestedRemId, corpusSuggestion]);
 
-  const handleRecoverSelection = useCallback(async () => {
-    if (!recoverTarget || isCreating || creatingChildForNodeId) return;
-    const { remId } = recoverTarget;
+  const jumpToRem = useCallback(async (remId: RemId) => {
+    if (isCreating || creatingChildForNodeId) return;
 
     // Restoring is a keyboard action, so stop a resting cursor from immediately
     // undoing it the next time a row slides under the pointer.
@@ -1170,7 +1403,6 @@ function ParentSelectorWidget() {
       console.error('[ParentSelector:Widget] Error restoring selection:', error);
     }
   }, [
-    recoverTarget,
     isCreating,
     creatingChildForNodeId,
     displayList,
@@ -1182,6 +1414,16 @@ function ParentSelectorWidget() {
     pinnedRemIds,
     disarmHover,
   ]);
+
+  const handleRecoverSelection = useCallback(() => {
+    if (recoverTarget) jumpToRem(recoverTarget.remId);
+  }, [recoverTarget, jumpToRem]);
+
+  // The corpus provider's section: its own button and key (S), because it is
+  // often not the rem the popup opened on (a remembered destination wins that).
+  const handleJumpToCorpus = useCallback(() => {
+    if (corpusSuggestion) jumpToRem(corpusSuggestion.remId);
+  }, [corpusSuggestion, jumpToRem]);
 
   // ---------------------------------------------------------------------------
   // KEYBOARD NAVIGATION
@@ -1253,6 +1495,14 @@ function ParentSelectorWidget() {
           handlePickInEditor();
           break;
 
+        // 's' jumps to the section the corpus provider suggests.
+        case 's':
+        case 'S':
+          if (!corpusSuggestion) break;
+          e.preventDefault();
+          handleJumpToCorpus();
+          break;
+
         // NEW: '+' or 'n' to add a child to the selected node
         case '+':
         case '=': // Handle both + and = (without shift)
@@ -1277,6 +1527,8 @@ function ParentSelectorWidget() {
     handleClose,
     handleStartAddChild,
     handleRecoverSelection,
+    handleJumpToCorpus,
+    corpusSuggestion,
     handlePickInEditor,
     disarmHover,
   ]);
@@ -1361,6 +1613,15 @@ function ParentSelectorWidget() {
           node={node}
           isSelected={index === selectedIndex && !creatingChildForNodeId}
           isSuggested={node.remId === suggestedRemId}
+          corpusSuggestion={corpusSuggestion && node.remId === corpusSuggestion.remId ? corpusSuggestion : null}
+          shortcutKeys={[
+            ...(recoverTarget && node.remId === recoverTarget.remId
+              ? [{ key: 'L', tip: `Press L to come back here (${recoverTarget.label.toLowerCase()})` }]
+              : []),
+            ...(corpusSuggestion && node.remId === corpusSuggestion.remId
+              ? [{ key: 'S', tip: 'Press S to come back here (suggested by your corpus index)' }]
+              : []),
+          ]}
           isLoadingChildren={loadingNodeId === node.remId}
           onSelect={() => handleSelect(node)}
           onToggleExpand={() => handleToggleExpand(node)}
@@ -1474,6 +1735,29 @@ function ParentSelectorWidget() {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* The corpus provider's suggestion, when it is not what's selected. */}
+          {corpusSuggestion && selectedNode?.remId !== corpusSuggestion.remId && (
+            <button
+              onClick={handleJumpToCorpus}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '4px',
+                border: `1px solid ${CORPUS_GREEN}`,
+                background: CORPUS_TINT,
+                color: CORPUS_GREEN,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              title={`${corpusSuggestionTip(corpusSuggestion)}\n(press S)`}
+            >
+              📚 Suggested section
+            </button>
+          )}
           {/* Jump back to where the popup opened, for when the selection got
               knocked off by a stray hover. Hidden once it's already selected. */}
           {recoverTarget && selectedNode?.remId !== recoverTarget.remId && (
@@ -1549,6 +1833,11 @@ function ParentSelectorWidget() {
           {recoverTarget && (
             <>
               , <kbd style={kbdStyle}>L</kbd> to reselect {recoverTarget.label.toLowerCase()}
+            </>
+          )}
+          {corpusSuggestion && (
+            <>
+              , <kbd style={kbdStyle}>S</kbd> to go to the suggested section
             </>
           )}
         </p>
@@ -1629,6 +1918,7 @@ function ParentSelectorWidget() {
         >
           {displayList.length} item{displayList.length !== 1 ? 's' : ''}
           {contextData.lastSelectedDestination && ' • Last destination remembered'}
+          {corpusSuggestion && ' • 📚 Section suggested by your corpus index'}
         </span>
         <button
           onClick={() => selectedNode && handleSelect(selectedNode)}

@@ -21,6 +21,7 @@ import type { IncrementalRem, IncrementalRep } from './incremental_rem/types';
 import { repCountsForStats } from './incremental_rem/types';
 import { getIESetting } from './settings';
 import { fetchGhosts, filterGhosts, ghostShardKey, GhostRep } from './history_archive';
+import { helperHeaders } from './helper_client';
 
 export const AUTHORITATIVE_AGGREGATES_KEY = 'authoritativeDailyAggregates';
 export const AUTHORITATIVE_LAST_COMPUTED_KEY = 'authoritativeAggregatesLastComputed';
@@ -684,7 +685,7 @@ export async function refreshGhostAggregates(
 ): Promise<void> {
   const tag = '[HistoryArchive]';
   try {
-    const payload = await fetchGhosts(kbId, { scan: true });
+    const payload = await fetchGhosts(kbId, { scan: true, headers: await helperHeaders(plugin) });
     if (!payload) return;
     const reps = filterGhosts(payload, liveDates);
     const buckets = bucketGhostReps(reps, kbId, flashcardResponseTimeCapMs);

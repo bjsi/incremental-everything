@@ -2480,7 +2480,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       try {
         const focused = await plugin.focus.getFocusedRem();
         await plugin.app.toast('📂 Choose the folder in the dialog…');
-        const picked = await chooseLocalVideo('folder', 'Choose a folder of videos to import');
+        const picked = await chooseLocalVideo(plugin, 'folder', 'Choose a folder of videos to import');
         if (!picked) return;
         await plugin.widget.openPopup('local_video_import', {
           ...picked,
@@ -2518,7 +2518,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       try {
         if (!(await confirmNoDuplicateSource(plugin, [rem])).length) return;
         await plugin.app.toast('🎞️ Choose the video in the dialog…');
-        const file = await chooseLocalVideo('file', 'Choose a video for this Rem');
+        const file = await chooseLocalVideo(plugin, 'file', 'Choose a video for this Rem');
         if (!file) return;
         await setLocalVideo(rem, file);
         const name = localVideoTitle(file.path);
@@ -2548,7 +2548,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
       try {
         await plugin.app.toast('🎞️ Choose the video in the dialog…');
-        const file = await chooseLocalVideo('file', 'Choose the video that explains this card');
+        const file = await chooseLocalVideo(plugin, 'file', 'Choose the video that explains this card');
         if (!file) return;
         await setCardVideo(rem, file);
         const name = localVideoTitle(file.path);

@@ -1434,10 +1434,11 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     wide: true,
     title: 'AI Helper Pairing Token',
     description:
-      'Lets Find Rem search through the AI helper (scripts/ai_ocr_helper.py, http://127.0.0.1:3457), ' +
-      'which understands AND, OR, -word, "phrases" and in:"Document", and finds Rems that RemNote\'s ' +
-      'own search drops. Print the token with `python3 ai_ocr_helper.py --pairing-token` and paste it ' +
-      'here. Without it the helper refuses to search, so no web page can read your notes through it.',
+      'Pairs the plugin with the AI helper (scripts/ai_ocr_helper.py, http://127.0.0.1:3457). Every ' +
+      'feature that uses the helper needs it: AI transcription, Pin Source Quote, video snapshots and ' +
+      'transcripts, the review history archive, Find Rem\'s search and the corpus provider. Print the ' +
+      'token with `python3 ai_ocr_helper.py --pairing-token` and paste it here. Without it the helper ' +
+      'refuses every request, so no web page can use it.',
   },
 
   // --- Misc ---
