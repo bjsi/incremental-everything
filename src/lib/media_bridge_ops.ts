@@ -3,7 +3,7 @@
  *
  * The RemNote MCP can write text, tags and documents, but cannot move a rem,
  * remove a tag, hand back an image, pin a source, set a card's type and direction,
- * set a heading level,
+ * set a heading level, make a portal,
  * add a playable audio file, rewrite rich text exactly, or make a rem Incremental the way this
  * plugin does (its slots, history, cache and inheritance cascade). Outside tools
  * queue these as jobs on the media-bridge helper (scripts/media_bridge/
@@ -701,6 +701,56 @@ export async function runCard(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<
 }
 
 
+// --- portal ------------------------------------------------------------------
+
+/**
+ * Create a portal under `parentId` showing the given rems (in that order), so a
+ * rem that lives in one place of the outline also shows, in full and editable,
+ * in another (e.g. a concept rem in its section, shown inside a summary). The
+ * RemNote MCP cannot make portals: a `[[ref]]` only references. Position as in
+ * `move`: first | last | index | before | after (a sibling id).
+ */
+export async function runPortal(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<BridgeOpResult> {
+  const parentId = String(job.parentId ?? '');
+  const position = String(job.position ?? 'last');
+  const siblingId = job.siblingId === undefined ? undefined : String(job.siblingId);
+  const parent = parentId ? await plugin.rem.findOne(parentId) : undefined;
+  if (!parent) throw new OpError(`Parent not found: ${parentId || '(none given)'}`);
+  const { rems, byId } = await findRems(plugin, job.remIds);
+  const missing = job.remIds.filter((id) => !byId.has(id));
+  if (missing.length) throw new OpError(`Rem(s) not found: ${missing.join(', ')}`);
+
+  const children = (await parent.getChildrenRem()) ?? [];
+  let at = children.length;
+  if (position === 'first') at = 0;
+  else if (position === 'index') {
+    const n = Number(job.index);
+    if (!Number.isInteger(n) || n < 0) throw new OpError(`Bad index: ${job.index}`);
+    at = Math.min(n, children.length);
+  } else if (position === 'before' || position === 'after') {
+    const i = children.findIndex((child) => child._id === siblingId);
+    if (i === -1) throw new OpError(`${siblingId} is not a child of ${parentId}.`);
+    at = position === 'before' ? i : i + 1;
+  } else if (position !== 'last') throw new OpError(`Unknown position: ${position}`);
+
+  const portal = await plugin.rem.createPortal();
+  if (!portal) throw new OpError('RemNote did not create the portal.');
+  await portal.setParent(parent, at);
+  for (const rem of rems) await rem.addToPortal(portal);
+
+  const shown = ((await portal.getPortalDirectlyIncludedRem()) ?? []).map((r) => r._id);
+  const notShown = job.remIds.filter((id) => !shown.includes(id));
+  const titles = await Promise.all(rems.map((rem) => remTitle(plugin, rem)));
+  return {
+    ok: notShown.length === 0,
+    summary: `portal to ${titles.map((t) => `“${t}”`).join(', ')} under “${await remTitle(plugin, parent)}”`,
+    portalId: portal._id,
+    parentId: parent._id,
+    shown,
+    ...(notShown.length ? { message: `not in the portal: ${notShown.join(', ')}` } : {}),
+  };
+}
+
 // --- heading -----------------------------------------------------------------
 
 /**
@@ -969,6 +1019,7 @@ const OPS: Record<string, (plugin: ReactRNPlugin, job: BridgeOpJob) => Promise<B
   'pin-quote': runPinQuote,
   card: runCard,
   heading: runHeading,
+  portal: runPortal,
   audio: runAudio,
   'restore-audio': runRestoreAudio,
   'set-text': runSetText,

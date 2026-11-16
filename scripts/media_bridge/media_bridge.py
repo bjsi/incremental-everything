@@ -31,6 +31,7 @@ plugin with its own code (src/lib/media_bridge_ops.ts):
                                     Pin Source Quote: find the rem's text in the source, pin its highlight
   card <rem>[,<rem>…] [--type concept|descriptor|default] [--direction forward|backward|both|none]
   heading <rem>[,<rem>…] [--level next|1-6|none]
+  portal <rem>[,<rem>…] <parent> [first|last|N|before:<id>|after:<id>]
   audio <parent> <file> [--caption TEXT] [--position first|last|N|before:<id>|after:<id>]
                                     adds a child rem with a playable audio file (default: first child),
                                     stored in RemNote like a localized image
@@ -102,7 +103,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 16  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading
+VERSION = 17  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal
 # The jobs a plugin build understands, by the protocol version it polls with.
 OPS_BY_PLUGIN_VERSION = {
     1: {"localize"},
@@ -118,6 +119,8 @@ OPS_BY_PLUGIN_VERSION = {
         "restore-audio", "notice", "set-text", "remove"},
     9: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
         "restore-audio", "notice", "set-text", "remove", "heading"},
+    10: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+         "restore-audio", "notice", "set-text", "remove", "heading", "portal"},
 }
 # Jobs that may name no rem at all.
 OPS_WITHOUT_REMS = {"notice"}
@@ -808,6 +811,12 @@ def card(rems: str, rem_type: str | None, direction: str | None, timeout: float)
     finish(result, bool(result.get("ok")))
 
 
+def portal(rems: str, parent: str, position: str | None, timeout: float) -> None:
+    args = {"parentId": parent, **parse_position(position)}
+    result = run_job("portal", split_ids(rems), args, timeout)
+    finish(result, bool(result.get("ok")))
+
+
 def heading(rems: str, level: str, timeout: float) -> None:
     result = run_job("heading", split_ids(rems), {"level": level}, timeout)
     finish(result, bool(result.get("ok")))
@@ -1038,6 +1047,11 @@ def main() -> None:
     p_card.add_argument("--type", dest="rem_type", choices=["concept", "descriptor", "default"])
     p_card.add_argument("--direction", choices=["forward", "backward", "both", "none"])
     p_card.add_argument("--timeout", type=float, default=150)
+    p_po = sub.add_parser("portal", help="make a portal under a parent that shows these rems")
+    p_po.add_argument("rems", help="rem id, or several comma-separated (shown in this order)")
+    p_po.add_argument("parent", help="the rem the portal goes under")
+    p_po.add_argument("position", nargs="?", help="first | last (default) | 0-based index | before:<id> | after:<id>")
+    p_po.add_argument("--timeout", type=float, default=150)
     p_hd = sub.add_parser("heading", help="set rems' heading level (next = one deeper than the heading above)")
     p_hd.add_argument("rems", help="rem id, or several comma-separated")
     p_hd.add_argument("--level", default="next", choices=["next", "none", "1", "2", "3", "4", "5", "6"])
@@ -1098,6 +1112,8 @@ def main() -> None:
         pin_quote(a.rems, a.source, a.view, a.quote, a.timeout)
     elif a.cmd == "card":
         card(a.rems, a.rem_type, a.direction, a.timeout)
+    elif a.cmd == "portal":
+        portal(a.rems, a.parent, a.position, a.timeout)
     elif a.cmd == "heading":
         heading(a.rems, a.level, a.timeout)
     elif a.cmd == "audio":
