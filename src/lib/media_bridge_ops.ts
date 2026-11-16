@@ -756,8 +756,10 @@ export async function runPortal(plugin: ReactRNPlugin, job: BridgeOpJob): Promis
 /**
  * Set rems' heading level, like the "Set Next Heading Level" command but without
  * its dialog and without touching any other rem. `level`:
- *   - 'next' (default): one level deeper per generation below the nearest heading
- *     ancestor (parent H3 → H4; parent plain, grandparent H3 → H5), clamped at H6.
+ *   - 'next' (default): one level deeper than the nearest heading ancestor, however
+ *     many plain rems lie between (parent H3 → H4; parent plain, grandparent H3 → H4
+ *     too), clamped at H6. Counting generations made a concept under a plain bullet
+ *     H6 where H5 reads right.
  *     No heading ancestor → the rem fails (give a level).
  *   - 1–6: that level.
  *   - 'none': back to a plain paragraph.
@@ -783,7 +785,7 @@ export async function runHeading(plugin: ReactRNPlugin, job: BridgeOpJob): Promi
         for (let generations = 1; current && generations < 100; generations++) {
           const found = await getHeadingLevel(current);
           if (found) {
-            level = Math.min(found + generations, 6) as HeadingLevel;
+            level = Math.min(found + 1, 6) as HeadingLevel;
             from = `${current._id} (H${found})`;
             break;
           }

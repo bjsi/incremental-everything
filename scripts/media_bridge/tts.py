@@ -7,6 +7,11 @@ Engines, chosen by ear on notes that mix English and Portuguese:
     takes a single code (a list or "en-US,pt-BR" is rejected, and without a code
     Portuguese comes out Spanish). Voice drawn from an approved list. Never put style
     instructions in the text: Gemini reads them aloud.
+    Gemini TTS is generative: a call can add invented sentences, loop or skip words. So
+    calls are short (GEMINI_CALL_CHARS) and each one is transcribed with a local
+    whisper.cpp (whisper-cli + model, see verify_speech) and redone up to
+    VERIFY_ATTEMPTS times when the transcript does not match; without whisper only the
+    duration is checked. What still does not match comes back in "warnings".
   - Azure en-US-AndrewMultilingualNeural, when the script has >= 3 inline foreign terms:
     the only engine that switches language mid-sentence. Each language run goes in its
     own <voice> (inside a single <voice>, word-level <lang> is ignored).
@@ -49,6 +54,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import difflib
 import json
 import os
 import random
@@ -77,7 +83,28 @@ AZURE_VOICE = "en-US-AndrewMultilingualNeural"
 LOCALE = {"en": "en-US", "pt": "pt-BR"}
 
 INLINE_LIMIT = 3          # inline-marked terms from which "auto" picks Azure
-MAX_CALL_CHARS = 1500     # characters per API call (~2 min of speech)
+MAX_CALL_CHARS = 1500     # characters per API call (~2 min of speech): Azure, ElevenLabs
+# Gemini TTS is a generative model: on long calls it sometimes keeps talking past the
+# text (invented sentences), loops on a phrase or skips words (found 2026-11-16 on a
+# 1,420-character call: 40 s of made-up content). Short calls go wrong far less often,
+# and every Gemini call is checked by transcription (verify_speech) and redone if needed.
+GEMINI_CALL_CHARS = 600
+CALL_CHARS = {"vertex": GEMINI_CALL_CHARS, "gemini": GEMINI_CALL_CHARS}
+VERIFY_ATTEMPTS = 3       # tries per Gemini call when the transcript does not match
+# A call fails the check when more words than max(VERIFY_MIN_WORDS, VERIFY_SHARE x words)
+# are added or missing in its transcript (names and acronyms alone cost a few: whisper
+# hears "Nayak" as "NIAC"), or when it lasts far longer or shorter than the text warrants.
+VERIFY_SHARE = 0.15
+VERIFY_MIN_WORDS = 6
+# ...or when 5+ consecutive words are added (invented text, a loop) or missing (a dropped
+# clause): a misheard name or number costs 1-3, a real slip more.
+VERIFY_RUN = 5
+VERIFY_LONG = (1.4, 3.0)   # fails when seconds > expected x 1.4 + 3
+VERIFY_SHORT = (0.6, 2.0)  # fails when seconds < expected x 0.6 - 2
+WHISPER_MODEL = Path.home() / ".incremental-remnote" / "ai-ocr" / "whisper" / "ggml-large-v3-turbo-q5_0.bin"
+# Voice activity detection keeps whisper from inventing words in silences, and no carried
+# context keeps it from looping ("clark clark clark…") on a long recording.
+WHISPER_VAD = WHISPER_MODEL.with_name("ggml-silero-v5.1.2.bin")
 GAP_S = 0.7               # silence between calls
 MIN_ANSWER_PAUSE_S = 5.0
 RATE = 24000              # Hz, what both engines return
@@ -332,6 +359,40 @@ def engine_note(engine: str, n_inline: int) -> str:
     return f"{terms} read in the line's language ({ENGINES[engine]['label']} cannot switch mid-sentence)"
 
 
+def _repeats(line: str, block: str) -> bool:
+    """Does `line` (8+ words) repeat, word for word, a stretch already in `block`?"""
+    a = " ".join(re.sub(r"[^\w]+", " ", line.lower()).split())
+    b = " ".join(re.sub(r"[^\w]+", " ", block.lower()).split())
+    words = a.split()
+    if len(words) < 8:
+        return bool(a) and len(words) >= 4 and a in b
+    return any(" ".join(words[i:i + 8]) in b for i in range(0, len(words) - 7, 4))
+
+
+def _pieces(text: str, limit: int) -> list[str]:
+    """A line longer than `limit`, cut at sentence ends (or, failing that, at spaces)."""
+    if len(text) <= limit:
+        return [text]
+    out, cur = [], ""
+    for sent in re.split(r"(?<=[.!?;:])\s+", text):
+        while len(sent) > limit:
+            cut = sent.rfind(" ", 0, limit)
+            cut = cut if cut > 0 else limit
+            if cur:
+                out.append(cur)
+                cur = ""
+            out.append(sent[:cut])
+            sent = sent[cut:].lstrip()
+        if cur and len(cur) + 1 + len(sent) > limit:
+            out.append(cur)
+            cur = sent
+        else:
+            cur = f"{cur} {sent}".strip()
+    if cur:
+        out.append(cur)
+    return out
+
+
 def build_calls(items, engine: str) -> list:
     """Calls and pauses, in order.
     Gemini, ElevenLabs: (engine, lang, text)  consecutive lines of one language, no pause between.
@@ -344,11 +405,18 @@ def build_calls(items, engine: str) -> list:
             continue
         last = calls[-1] if calls else None
         if engine in BLOCK_ENGINES:
-            txt = plain(it.text)
-            if last and last[0] == engine and last[1] == it.lang and len(last[2]) + len(txt) <= MAX_CALL_CHARS:
-                calls[-1] = (engine, it.lang, last[2] + "\n\n" + txt)
-            else:
-                calls.append((engine, it.lang, txt))
+            limit = CALL_CHARS.get(engine, MAX_CALL_CHARS)
+            for txt in _pieces(plain(it.text), limit):
+                last = calls[-1] if calls else None
+                # Gemini TTS tends to loop when one call repeats a passage (forum report,
+                # gemini-3.8-flash-tts): a line already in the call starts a new one
+                repeat = (engine in TOKEN_ENGINES and last and last[0] == engine
+                          and _repeats(txt, last[2]))
+                if (last and last[0] == engine and last[1] == it.lang and not repeat
+                        and len(last[2]) + len(txt) <= limit):
+                    calls[-1] = (engine, it.lang, last[2] + "\n\n" + txt)
+                else:
+                    calls.append((engine, it.lang, txt))
         else:
             if last and last[0] == "azure" and sum(len(f.text) for f in last[1]) + len(it.text) <= MAX_CALL_CHARS:
                 last[1].append(it)
@@ -581,6 +649,111 @@ def duration(path: Path) -> float:
         return 0.0
 
 
+# --- checking what a generative engine said ------------------------------------------
+
+def _whisper() -> tuple[str, Path] | None:
+    """whisper.cpp's CLI and model, or None (then only the duration is checked).
+    tts.json: "whisperCli", "whisperModel"; "verifySpeech": false turns the check off."""
+    cfg = config()
+    if cfg.get("verifySpeech") is False:
+        return None
+    cli = cfg.get("whisperCli") or shutil.which("whisper-cli") or "/opt/homebrew/bin/whisper-cli"
+    model = Path(cfg.get("whisperModel") or WHISPER_MODEL).expanduser()
+    return (cli, model) if Path(cli).exists() and model.exists() else None
+
+
+_UNITS = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
+_TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+
+
+def _en_number(n: int) -> str:
+    """140 -> 'one hundred and forty' (British 'and'), up to 9,999; else the digits."""
+    if n < 20:
+        return _UNITS[n]
+    if n < 100:
+        return _TENS[n // 10] + ("" if n % 10 == 0 else " " + _UNITS[n % 10])
+    if n < 1000:
+        rest = n % 100
+        return _UNITS[n // 100] + " hundred" + ("" if rest == 0 else " and " + _en_number(rest))
+    if n < 10000:
+        rest = n % 1000
+        return (_UNITS[n // 1000] + " thousand"
+                + ("" if rest == 0 else (" and " if rest < 100 else " ") + _en_number(rest)))
+    return str(n)
+
+
+# British and American spellings compared as one (scripts are British, whisper American)
+_SPELLING = [(re.compile(r"oeuvre(s?)$"), r"euver\1"), (re.compile(r"oeuvr(ed|ing)$"), r"euver\1"),
+             (re.compile(r"(?<=[a-z])tre(s?)$"), r"ter\1"),
+             (re.compile(r"our(s?)$"), r"or\1"), (re.compile(r"(?<=[a-z]{3})is(e|ed|es|ing)$"), r"iz\1")]
+
+
+def _norm_words(text: str) -> list[str]:
+    t = unicodedata.normalize("NFKD", text.lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    t = re.sub(r"(\d),(\d{3})", r"\1\2", t)
+    t = re.sub(r"\d+", lambda m: _en_number(int(m.group())) if len(m.group()) <= 4 else m.group(), t)
+    out = []
+    for w in re.sub(r"[^a-z0-9]+", " ", t).split():
+        for pat, rep in _SPELLING:
+            w = pat.sub(rep, w)
+        out.append(w)
+    return out
+
+
+def transcribe(wav: Path, lang: str) -> str | None:
+    w = _whisper()
+    if not w:
+        return None
+    w16 = wav.with_name(wav.stem + "_16k.wav")
+    _ffmpeg("-i", wav, "-ar", 16000, "-ac", 1, w16)
+    try:
+        vad = Path(config().get("whisperVadModel") or WHISPER_VAD).expanduser()
+        extra = ["--vad", "-vm", str(vad)] if vad.exists() else []
+        r = subprocess.run([w[0], "-m", str(w[1]), "-f", str(w16), "-l", lang, "-nt", "-np",
+                            "-mc", "0", *extra],
+                           capture_output=True, text=True, timeout=600)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    finally:
+        w16.unlink(missing_ok=True)
+    return r.stdout if r.returncode == 0 else None
+
+
+def verify_speech(text: str, wav: Path, lang: str, engine: str) -> dict:
+    """Did the audio say the text? {seconds, expected, added, missing, problem}. `problem`
+    is None when it did. Words come from a local whisper transcript when available."""
+    n = len(_norm_words(text))
+    secs = duration(wav)
+    expected = n / WORDS_PER_MIN.get(engine, 143.0) * 60
+    res = {"seconds": round(secs, 1), "expected": round(expected, 1)}
+    problems = []
+    if secs > expected * VERIFY_LONG[0] + VERIFY_LONG[1]:
+        problems.append(f"{secs:.0f} s for ~{expected:.0f} s of text")
+    elif secs < expected * VERIFY_SHORT[0] - VERIFY_SHORT[1]:
+        problems.append(f"only {secs:.0f} s for ~{expected:.0f} s of text")
+    heard = transcribe(wav, lang)
+    if heard is not None:
+        a, b = _norm_words(text), _norm_words(heard)
+        sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
+        same = sum(m.size for m in sm.get_matching_blocks())
+        added, missing = len(b) - same, len(a) - same
+        run_add = max([j2 - j1 for op, i1, i2, j1, j2 in sm.get_opcodes() if op in ("insert", "replace")], default=0)
+        run_miss = max([i2 - i1 for op, i1, i2, j1, j2 in sm.get_opcodes() if op in ("delete", "replace")], default=0)
+        res.update(added=added, missing=missing, words=len(a), run_added=run_add, run_missing=run_miss)
+        allowed = max(VERIFY_MIN_WORDS, VERIFY_SHARE * len(a))
+        if added > allowed:
+            problems.append(f"{added} words added")
+        if missing > allowed:
+            problems.append(f"{missing} of {len(a)} words missing")
+        if run_add >= VERIFY_RUN and added <= allowed:
+            problems.append(f"{run_add} words in a row added")
+        if run_miss >= VERIFY_RUN and missing <= allowed:
+            problems.append(f"{run_miss} words in a row missing")
+    res["problem"] = "; ".join(problems) or None
+    return res
+
+
 def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None = None,
                key_set: dict | None = None,
                progress: Callable[[str], None] | None = None) -> dict:
@@ -603,6 +776,7 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix="tts-", dir=out.parent))
     tokens, done, prev_speech, parts = 0, 0, False, []
+    retries, warnings = 0, []
     try:
         for i, c in enumerate(calls):
             if c[0] == "pause":
@@ -614,10 +788,26 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
             done += 1
             log(f"{ENGINES[eng]['label']} {done}/{total}")
             w = tmp / f"s_{i:03d}.wav"
-            if eng == "vertex":
-                tokens += vertex(c[2], w, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
-            elif eng == "gemini":
-                tokens += gemini(c[1], c[2], w, ks["GEMINI_API_KEY"], voice, log)
+            if eng in TOKEN_ENGINES:
+                best = None
+                for attempt in range(1, VERIFY_ATTEMPTS + 1):
+                    wa = tmp / f"s_{i:03d}_{attempt}.wav"
+                    if eng == "vertex":
+                        tokens += vertex(c[2], wa, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
+                    else:
+                        tokens += gemini(c[1], c[2], wa, ks["GEMINI_API_KEY"], voice, log)
+                    chk = verify_speech(c[2], wa, c[1], eng)
+                    score = chk.get("added", 0) + chk.get("missing", 0) + (1000 if chk["problem"] else 0)
+                    if best is None or score < best[0]:
+                        best = (score, wa, chk)
+                    if not chk["problem"]:
+                        break
+                    retries += 1
+                    log(f"call {done}: {chk['problem']}; " + (f"trying again ({attempt + 1}/{VERIFY_ATTEMPTS})"
+                                                              if attempt < VERIFY_ATTEMPTS else "keeping the best take"))
+                shutil.move(best[1], w)
+                if best[2]["problem"]:
+                    warnings.append(f"call {done} ({c[2][:50]}…): {best[2]['problem']}")
             elif eng == "elevenlabs":
                 elevenlabs(c[1], c[2], w, ks["ELEVENLABS_API_KEY"], voice, log)
             else:
@@ -634,7 +824,8 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
     secs = round(duration(out), 1)
     summary = {"file": str(out), "engine": eng, "voice": voice, "voiceLabel": voice_label(voice),
                "seconds": secs, "characters": p["characters"], "inlineTerms": p["inlineTerms"],
-               "answerPauses": len(p["answerPauses"]), "title": p["title"]}
+               "answerPauses": len(p["answerPauses"]), "title": p["title"],
+               "retries": retries, "warnings": warnings}
     if eng in TOKEN_ENGINES:
         summary["audioTokens"] = tokens
         summary["costUsd"] = round(tokens * gemini_usd_per_m_tokens() / 1e6, 3)

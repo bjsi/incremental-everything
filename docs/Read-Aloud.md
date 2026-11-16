@@ -84,6 +84,16 @@ Prices checked in November 2026 (the helper's `tts.py` holds them; check your pr
 
 Durations are estimated from the word count at each engine's measured speaking rate (Gemini about 143 words a minute).
 
+### Gemini's audio is checked { #checked }
+
+Gemini TTS is a generative model, and now and then it does not just read: it goes on past the end of the text with sentences of its own, loops on a phrase, or skips a clause. Long calls and repeated passages make this likelier. So the helper:
+
+- sends Gemini **short calls** (about 600 characters), and never two copies of the same passage in one call;
+- **transcribes each call** on your Mac with a local [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (`brew install whisper-cpp`, and the speech model that [Incremental Video](Incremental-Video.md#setup) transcripts use, in `~/.incremental-remnote/ai-ocr/whisper/`), and compares it with the script, numbers and British or American spellings counted as the same;
+- **makes the call again**, up to 3 times, when 5 or more words in a row are added or missing, or about 15 % of the words in all, and keeps the best take. What still does not match is reported.
+
+Without whisper, only the length of each call is checked. A redone call is paid again, so a summary may cost a little more than estimated. Azure and ElevenLabs read the text as written and are not checked.
+
 ## Reading rules { #reading-rules }
 
 | In the notes | Read aloud as |
@@ -141,6 +151,8 @@ Anything an engine would read out wrongly (markdown, LaTeX, links, page numbers,
 | `elevenModel` | `eleven_multilingual_v2` | The ElevenLabs model. |
 | `llmModel` | `claude-opus-5-5` | The Claude model for Adapted and Summary (CLI and API). |
 | `geminiUsdPerMTokens`, `elevenUsdPerMChars` | list prices | Your own prices, for the estimates. |
+| `verifySpeech` | `true` | `false` turns off the [check of Gemini's audio](#checked). |
+| `whisperCli`, `whisperModel`, `whisperVadModel` | `whisper-cli` on the PATH, the AI helper's models | The transcriber used for the check. |
 
 To change what the AI is asked to do, put your own instructions in `~/.remnote-media-bridge/read-aloud-summary.md` or `read-aloud-adapted.md`. They replace that mode's task; the rules of the script format are always added.
 
@@ -162,3 +174,4 @@ python3 spoken_script.py outline.md --mode summary --lang pt --words 350
 - **Portuguese spoken with a Spanish or English accent:** the line is missing its `[pt]` mark, or the engine read a marked term in the line's language (choose Azure for many marked terms).
 - **The notice never came:** the audio is made in the window where you pressed Generate, and reloading RemNote while it runs drops the job. The helper still keeps its copy of the mp3 in `audioHome` (see [Options](#options)), so you can add that file by hand instead of paying for it again.
 - **A summary is cut off or too long:** lower the slider or the maximum, or press **Rewrite with AI**.
+- **The audio says things the notes do not, repeats itself or skips a sentence:** that is Gemini improvising (see [Gemini's audio is checked](#checked)). Without whisper on this Mac the helper cannot catch it: install it, or generate again.

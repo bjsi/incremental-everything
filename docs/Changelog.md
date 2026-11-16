@@ -16,6 +16,12 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ Improved
 
+**Read aloud** *(Gemini TTS)*: Gemini sometimes kept talking past the end of the text with sentences of its own, looped or skipped a clause. Calls are now short, a repeated passage never shares a call, and each call is transcribed with a local whisper and made again when it does not match the script.
+
+📖 [Read Aloud → Gemini's audio is checked](Read-Aloud.md#checked)
+
+**Local Media Bridge**: `heading` with `next` now sets one level below the nearest heading above, however many plain rems lie between.
+
 **Notices**: the notice card at the top right can now be dragged out of the way; a new card still opens at the top right.
 
 📖 [Local Media Bridge → Notices from outside tools](Local-Media-Bridge.md#notice)
