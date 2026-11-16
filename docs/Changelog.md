@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.232 - November 16th, 2026
+
+### ✨ Improved
+
+**Notices**: the notice card at the top right can now be dragged out of the way; a new card still opens at the top right.
+
+📖 [Local Media Bridge → Notices from outside tools](Local-Media-Bridge.md#notice)
+
 ## v1.0.231 - November 14th, 2026
 
 ### ✨ New

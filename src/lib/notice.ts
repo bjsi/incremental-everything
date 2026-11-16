@@ -20,7 +20,8 @@ export type Notice = MessageDialog & { id: string; at: number };
 
 /** Kept at most; the oldest go first. */
 const MAX_NOTICES = 10;
-const POSITION = { top: 64, right: 24 };
+/** Where the card always opens; the user can drag it elsewhere once it is up. */
+export const NOTICE_POSITION = { top: 64, right: 24 };
 
 export async function showNotice(plugin: RNPlugin, dialog: MessageDialog): Promise<void> {
   const notice: Notice = {
@@ -51,7 +52,7 @@ export function registerNoticeHost(plugin: RNPlugin) {
     busy = busy.then(async () => {
       const open = !!floatId && (await plugin.window.isFloatingWidgetOpen(floatId).catch(() => false));
       if (list.length && !open) {
-        floatId = await plugin.window.openFloatingWidget(NOTICE_FLOAT, POSITION, undefined, false);
+        floatId = await plugin.window.openFloatingWidget(NOTICE_FLOAT, NOTICE_POSITION, undefined, false);
       } else if (!list.length && open && floatId) {
         await plugin.window.closeFloatingWidget(floatId).catch(() => {});
         floatId = undefined;

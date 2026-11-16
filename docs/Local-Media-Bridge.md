@@ -178,7 +178,7 @@ Unlike `localize`, these commands never run late: if the plugin does not answer 
 python3 media_bridge.py notice --title "Paralelos: Regra 13" --message "4 books, 1 divergence" --rem AbC123
 ```
 
-`--tone` is `success` (default), `info` or `error`; `--detail` adds a smaller line. The card never takes the focus or closes a popup you are working in, and it stays until you dismiss it. The command never fails its caller: when RemNote is closed it prints `"status": "queued"`, and the notice shows as soon as a RemNote window connects to the helper.
+`--tone` is `success` (default), `info` or `error`; `--detail` adds a smaller line. The card never takes the focus or closes a popup you are working in, and it stays until you dismiss it. If it covers something, drag it anywhere but its buttons to move it out of the way; a new card always opens at the top right again. The command never fails its caller: when RemNote is closed it prints `"status": "queued"`, and the notice shows as soon as a RemNote window connects to the helper.
 
 !!! note "Plugin and helper versions"
     These operations need this plugin version and the matching `media_bridge.py`; **Upscale image with ChatGPT** needs helper version 3, [Read aloud](Read-Aloud.md) version 12, [Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id) copies silently only with version 4, `pin`, `pin-quote` and `card` need version 5, `tag` needs version 6, `restore-audio` needs version 13, and `notice` version 14 (`media_bridge.py status` shows the version). An older plugin still gets `localize` jobs; the others wait, and the command warns that the plugin does not know them yet. After updating the script, restart the helper (`media_bridge.py stop`, or `launchctl kickstart -k …` when it runs at login).

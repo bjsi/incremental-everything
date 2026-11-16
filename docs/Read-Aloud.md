@@ -14,7 +14,7 @@ Read aloud reads the notes as they are (**Literal**), lightly reworked by AI so 
 2. The popup shows the **script**, the text that will be spoken. Edit it freely.
 3. Pick a **mode** (below), an **engine** and a **voice**. The line under them shows the estimate: words, duration, cost.
 4. Press **Generate** (`⌘↵` / `Ctrl+Enter`). The popup closes and the audio is made **in the background**, so you can keep working in RemNote (a 5-minute audio takes about a minute).
-5. When the audio is in, a notice appears at the top right, with the voice, duration and cost. **Open Rem** opens the read Rem, with the new audio at its top; **Dismiss** closes the notice. It never interrupts what you are doing: a popup you have open (another Read aloud, say) stays open, and the notice waits until you dismiss it.
+5. When the audio is in, a notice appears at the top right, with the voice, duration and cost. **Open Rem** opens the read Rem, with the new audio at its top; **Dismiss** closes the notice. It never interrupts what you are doing: a popup you have open (another Read aloud, say) stays open, and the notice waits until you dismiss it. Drag it to move it if it is in the way.
 
 The audio is added as the **first child** of the read Rem, captioned `🔊 Audio (<voice>)` (`🔊 Audio Summary (<voice>)` for a summary; `Áudio` / `Resumo em Áudio` in a Portuguese note). It is stored in RemNote like an uploaded file, so it plays offline and syncs. Set **Read Aloud: Tag for Audio Rems** to tag every audio Rem, for example `AI audio`.
 
