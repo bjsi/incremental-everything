@@ -65,11 +65,15 @@ This hold is within a session. Its counterpart across days is **cooling** in the
 
 ## The Answer Buttons
 
-![The answer buttons bar: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, followed by the review-note, P Edit and help icons](assets/answer-buttons-bar.png){ width="900" }
+![The answer buttons bar on a computer: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, then the review-note, P Edit and help icons; below it the info bar with the priority, the Priority Shield, the Weighted Shield and the repetitions](assets/answer-bar-desktop.png#only-light){ width="900" }
+![The answer buttons bar on a computer: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, then the review-note, P Edit and help icons; below it the info bar with the priority, the Priority Shield, the Weighted Shield and the repetitions](assets/answer-bar-desktop-dark.png#only-dark){ width="900" }
 
 Here is a breakdown of each button and its function, from left to right. Every button after **Next** is a compact icon button — icon above, one-word label below — so the whole row fits on one line; hover over any button for its full name and shortcut.
 
 **On a phone** (or in any pane narrower than 520 px) the bar shrinks to about a third of its height: one row with **Next** and its interval, then the same actions as square icon buttons without labels, and one line of figures under it (priority, repetitions, minutes). **New Tab**, the **P Edit** hint and the help icon are left out there.
+
+![The answer buttons bar on a phone: Next with its interval, then Reschedule, Dismiss, Priority, In Editor, To Highlight and the review note as icon buttons; below it one line with the priority and the repetitions](assets/answer-bar-phone.png#only-light){ width="420" }
+![The answer buttons bar on a phone: Next with its interval, then Reschedule, Dismiss, Priority, In Editor, To Highlight and the review note as icon buttons; below it one line with the priority and the repetitions](assets/answer-bar-phone-dark.png#only-dark){ width="420" }
 
 * **[Next](#next):** (Shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Windows/Linux)
 This is your primary action. Clicking "Next" marks the item as reviewed, calculates the next time you should see it based on the scheduling algorithm, and advances to the next item in your queue. The subtitle (e.g., "×1.5 in 3 days") shows the interval that will be set, preceded by a chip naming the [scheduler](IncRem-Scheduler.md#scheduler-indicator) that produced it.
@@ -144,8 +148,6 @@ This is a non-clickable hint that appears **only for certain card types** (like 
 
 ![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
-
-![A PDF highlight in the queue: the reader on top, then the answer buttons bar and the priority info bar below it](assets/answer-buttons-new-design.png){ width="1000" }
 
 ### Saved in the background { #saved-in-the-background }
 

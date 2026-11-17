@@ -61,9 +61,10 @@ In RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) the ba
 
 ### 1.3. Answer Buttons Info Bar
 *(Incremental Rems only)*
-An info bar shown below the answer buttons when reviewing an Incremental Rem in the queue. It displays review stats, the [Priority Shield](Prioritization-&-Sorting.md#priority-shield) counter, and a **📊** button to open the [IncRem Repetition History](Repetition-History-and-Statistics.md).
+An info bar shown below the answer buttons when reviewing an Incremental Rem in the queue. It displays the priority, the [Priority Shield](Prioritization-&-Sorting.md#priority-shield) and Weighted Shield, and the repetitions and time spent; click those (or the bars icon beside them) to open the [IncRem Repetition History](Repetition-History-and-Statistics.md).
 
-![Answer Buttons Info Bar](assets/reps-info-bar.png){ width="600" }
+![The answer buttons and, below them, the info bar: priority, Priority Shield, Weighted Shield, repetitions](assets/answer-bar-desktop.png#only-light){ width="900" }
+![The answer buttons and, below them, the info bar: priority, Priority Shield, Weighted Shield, repetitions](assets/answer-bar-desktop-dark.png#only-dark){ width="900" }
 
 On a phone, or in a pane narrower than 520 px, the bar and the answer buttons above it take a [compact form](Reviewing-Items-in-the-Queue.md#the-answer-buttons): one row of icon buttons and one line of figures.
 
