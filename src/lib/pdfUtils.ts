@@ -3,6 +3,7 @@ import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin
 import { powerupCode, dismissedPowerupCode, allIncrementalRemKey } from './consts';
 import { IncrementalRem } from './incremental_rem/types';
 import { resolveRemTextToString, resolveRemTextForBreadcrumb } from './richTextRemRefs';
+import { remsWithSourceViaHelper } from './rem_search_client';
 import {
   loadPdfState,
   savePdfState,
@@ -555,6 +556,29 @@ export const findIncrementalRemForPDF = async (
     }
   }
 
+  // The AI helper's index answers "which IncRems list this PDF as a Source" in one
+  // lookup (lib/rem_search_client.ts), where the scan below reads every IncRem's
+  // Sources and descendants. Each candidate is still verified. An IncRem holding
+  // the PDF somewhere below it is its ancestor, so a walk up finds it. When neither
+  // finds one, the scan still runs: the helper reads RemNote's database on disk,
+  // which can trail an IncRem made moments ago.
+  const viaHelper = await remsWithSourceViaHelper(plugin, pdfRem._id, { incrementalOnly: true });
+  if (viaHelper) {
+    for (const id of viaHelper) {
+      const candidate = await plugin.rem.findOne(id);
+      if (!candidate || !(await candidate.hasPowerup(powerupCode))) continue;
+      if (await findPDFinRem(plugin, candidate, pdfRem._id)) {
+        console.log(`[findIncrementalRemForPDF] Found via the helper's index (${candidate._id})`);
+        return candidate;
+      }
+    }
+    const ancestor = await findIncrementalAncestor(plugin, pdfRem);
+    if (ancestor) {
+      console.log(`[findIncrementalRemForPDF] Found as an ancestor (${ancestor._id})`);
+      return ancestor;
+    }
+  }
+
   try {
     const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
     if (incPowerup) {
@@ -582,6 +606,18 @@ export const findIncrementalRemForPDF = async (
   }
 
   console.log(`[findIncrementalRemForPDF] No incremental rem found for PDF ${pdfRem._id}`);
+  return null;
+};
+
+/** The nearest IncRem above `rem` (its parent's parent and up), or null. */
+const findIncrementalAncestor = async (plugin: RNPlugin, rem: PluginRem): Promise<PluginRem | null> => {
+  let parentId = rem.parent;
+  for (let depth = 0; parentId && depth < 64; depth++) {
+    const parent = await plugin.rem.findOne(parentId);
+    if (!parent) return null;
+    if (await parent.hasPowerup(powerupCode)) return parent;
+    parentId = parent.parent;
+  }
   return null;
 };
 
@@ -974,9 +1010,13 @@ export const getCacheRemsForPDF = async (
 
   try {
     console.log('\n===== CACHE: Scanning session cache for new rems =====');
-    const allIncrementalRems =
-      (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-    console.log(`Scanning ${allIncrementalRems.length} incremental rems in cache`);
+    // With the AI helper, only the IncRems its index lists for this PDF are checked
+    // (one lookup) instead of every IncRem in the session cache.
+    const viaHelper = await remsWithSourceViaHelper(plugin, pdfRemId, { incrementalOnly: true });
+    const allIncrementalRems: Array<{ remId: string }> = viaHelper
+      ? viaHelper.map((remId) => ({ remId }))
+      : (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    console.log(`Scanning ${allIncrementalRems.length} incremental rems ${viaHelper ? "from the helper's index" : 'in cache'}`);
 
     for (const incRemInfo of allIncrementalRems) {
       if (processedIds.has(incRemInfo.remId)) continue;
@@ -1168,20 +1208,24 @@ export const findAllRemsForPDF = async (
 
     const processedRemIds = new Set<string>();
 
-    // PART 1: Search all incremental rems from cache
-    const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+    // PART 1: every Rem the AI helper's index lists with this PDF as a Source, IncRem
+    // or not (one lookup); without the helper, every IncRem in the session cache.
+    const viaHelper = await remsWithSourceViaHelper(plugin, pdfRemId);
+    const candidates = viaHelper ?? (
+      (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || []
+    ).map((r) => r.remId);
 
-    for (const incRemInfo of allIncrementalRems) {
-      if (processedRemIds.has(incRemInfo.remId)) continue;
+    for (const remId of candidates) {
+      if (processedRemIds.has(remId)) continue;
 
-      const rem = await plugin.rem.findOne(incRemInfo.remId);
+      const rem = await plugin.rem.findOne(remId);
       if (!rem) continue;
 
       // Skip PDF highlights - we want parent rems only
       const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
       if (isPdfHighlight) continue;
 
-      // Check if this incremental rem has the target PDF
+      // Check that this rem has the target PDF
       const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
 
       if (foundPDF && foundPDF._id === pdfRemId) {
@@ -1189,7 +1233,8 @@ export const findAllRemsForPDF = async (
         result.push({
           remId: rem._id,
           name: remText,
-          isIncremental: true
+          // The cache lists IncRems only; the helper lists every Rem with the Source.
+          isIncremental: viaHelper ? await rem.hasPowerup(powerupCode) : true,
         });
         processedRemIds.add(rem._id);
       }
@@ -1259,13 +1304,17 @@ export const findAllRemsForHTML = async (
 
     const processedRemIds = new Set<string>();
 
-    // PART 1: Search all incremental rems from cache
-    const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+    // PART 1: every Rem the AI helper's index lists with this article as a Source,
+    // IncRem or not (one lookup); without the helper, every IncRem in the session cache.
+    const viaHelper = await remsWithSourceViaHelper(plugin, htmlRemId);
+    const candidates = viaHelper ?? (
+      (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || []
+    ).map((r) => r.remId);
 
-    for (const incRemInfo of allIncrementalRems) {
-      if (processedRemIds.has(incRemInfo.remId)) continue;
+    for (const remId of candidates) {
+      if (processedRemIds.has(remId)) continue;
 
-      const rem = await plugin.rem.findOne(incRemInfo.remId);
+      const rem = await plugin.rem.findOne(remId);
       if (!rem) continue;
 
       // Skip highlight rems — we want host-doc-level IncRems only
@@ -1278,7 +1327,7 @@ export const findAllRemsForHTML = async (
         result.push({
           remId: rem._id,
           name: remText,
-          isIncremental: true
+          isIncremental: viaHelper ? await rem.hasPowerup(powerupCode) : true,
         });
         processedRemIds.add(rem._id);
       }

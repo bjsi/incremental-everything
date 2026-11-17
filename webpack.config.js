@@ -4,7 +4,7 @@ var path = require('path');
 
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { ESBuildMinifyPlugin } = require('esbuild-loader');
-const { ProvidePlugin, BannerPlugin } = require('webpack');
+const { ProvidePlugin, BannerPlugin, optimize } = require('webpack');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 
@@ -86,6 +86,12 @@ const config = {
       },
       raw: true,
     }),
+    // One chunk per entry: a dynamic import() must never become a lazily loaded
+    // chunk. RemNote evaluates those as classic scripts, and the banner above
+    // puts `import.meta` in every non-sandbox file, so the chunk dies with
+    // "Cannot use 'import.meta' outside a module" + ChunkLoadError (v1.0.222's
+    // 9304.js, and twice before). Folding them into the entry costs nothing.
+    new optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
     new CopyPlugin({
       patterns: [
         { from: 'public', to: '' },

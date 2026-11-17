@@ -28,11 +28,13 @@ import {
   UNSCHEDULED_CAUSE_REMEDY,
   UNSCHEDULED_CAUSE_SHORT,
   UnscheduledCause,
+  HELPER_CAUSES,
   buildSuppressionReport,
   getVerifiedRems,
   isIncRemNearby,
   reEnableRems,
   resolveAnomalyRemContext,
+  resolveSuppressedRemTexts,
   setManyRemsVerified,
   setRemVerified,
 } from '../lib/card_analytics_export';
@@ -45,6 +47,7 @@ import {
 } from '../lib/consts';
 import { parseWeightsString } from '../lib/fsrs';
 import { getPausedRemIds } from '../lib/paused_decks';
+import { suppressionCausesViaHelper } from '../lib/rem_search_client';
 import { buildAncestorBreadcrumb } from '../lib/richTextRemRefs';
 import { RemText } from './RemText';
 import { openRemInBrowserTab } from '../lib/remHelpers';
@@ -516,7 +519,13 @@ export function SuppressedCardsView() {
       // Suppression is a property of the KB right now, not of a review window,
       // so this view always runs over the full history.
       const { startMs, endMs } = resolvePeriod('all', '', '');
-      const pausedRemIds = await getPausedRemIds(plugin);
+      // The AI helper's index knows every card's cause from stored fields the
+      // plugin can't read (lib/rem_search_client.ts). With it, the paused-deck scan
+      // and the Rem-by-Rem context walk are skipped; without it, both run as before.
+      setPhase('Asking the AI helper…');
+      const helper = await suppressionCausesViaHelper(plugin);
+      setPhase('Replaying every card…');
+      const pausedRemIds = helper ? null : await getPausedRemIds(plugin);
 
       const rows: CardAnalyticsRow[] = [];
       await computeCardAnalyticsBreakdown(
@@ -533,14 +542,34 @@ export function SuppressedCardsView() {
 
       setPhase('Resolving Rems…');
       setProgress({ done: 0, total: 0 });
-      const context = await resolveAnomalyRemContext(
-        plugin as any,
-        rows,
-        REM_CONTEXT_CAP,
-        (done, total) => setProgress({ done, total }),
-      );
-
-      const built = buildSuppressionReport(rows, context, !!pausedRemIds);
+      let built: SuppressionReport;
+      if (helper) {
+        for (const r of rows) r.inPausedDeck = helper.causes.get(r.cardId) === 'paused';
+        const suppressed = (r: CardAnalyticsRow) => r.scheduleState === 'unscheduled' || r.inPausedDeck;
+        const context = await resolveSuppressedRemTexts(
+          plugin as any,
+          rows,
+          suppressed,
+          helper.inTable,
+          REM_CONTEXT_CAP,
+          (done, total) => setProgress({ done, total }),
+        );
+        // A card the helper doesn't list (written after its last look at the
+        // database) gets "undetermined" rather than a guess from partial context.
+        const causeOf = (r: CardAnalyticsRow): UnscheduledCause | undefined => {
+          const cause = helper.causes.get(r.cardId);
+          return cause ? HELPER_CAUSES[cause] : 'not-surfaced-unknown';
+        };
+        built = { ...buildSuppressionReport(rows, context, true, causeOf), viaHelper: true };
+      } else {
+        const context = await resolveAnomalyRemContext(
+          plugin as any,
+          rows,
+          REM_CONTEXT_CAP,
+          (done, total) => setProgress({ done, total }),
+        );
+        built = buildSuppressionReport(rows, context, !!pausedRemIds);
+      }
       await plugin.storage.setSession(suppressionReportKey, built);
       setReport(built);
       setState('ready');
@@ -685,6 +714,7 @@ export function SuppressedCardsView() {
           {summary.unscheduledTotal.toLocaleString()} unscheduled +{' '}
           {summary.pausedTotal.toLocaleString()} paused) · computed{' '}
           {formatTimeAgo(report.computedAt)}
+          {report.viaHelper && <span> · causes read by the AI helper</span>}
           {!report.pausedScanApplied && (
             <span style={{ color: '#f59e0b', fontWeight: 600 }}>
               {' '}

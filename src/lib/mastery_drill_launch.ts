@@ -39,6 +39,8 @@ export interface NativeDrillState {
    * inside a Card Cluster this is the sibling shown, not the cluster's anchor.
    */
   currentCardId?: string;
+  /** The drill card shown before the current one, usually the one just rated: Edit Later (Previous). */
+  previousCardId?: string;
 }
 
 export async function openMasteryDrill(plugin: RNPlugin, mode?: MasteryDrillMode): Promise<void> {

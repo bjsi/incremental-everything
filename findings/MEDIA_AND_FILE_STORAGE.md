@@ -32,12 +32,26 @@ span.AudioVideoNode
 
 `audio[src]` is the only place the address reaches the DOM, and it is the *resolved* one: the outside address for a linked file; for a stored file the S3 address or a local/blob URL, never `%LOCAL_FILE%`. So `audio[src^="http"]:not([src*="remnote-user-data"])` selects linked audio, and `:has()` lifts that to the box. The "Mark Audio That Is Only Linked" setting is built on it (`src/register/settings.ts`).
 
+## Playing audio from a plugin
+
+Read in the running bundle (1.30.4, `build_overrides/`), with a stored file checked by `curl`, November 16, 2026. Used by the Audio Playlist (`src/lib/audio_playlist.ts`).
+
+- **RemNote has no audio library.** The inline player is `AudioVideoNode` (chunk 72624): a bare `<audio>` and a 28 px bar of its own. Position and speed are component state, and `onEnded` only releases an autoplay lock, so nothing plays the next audio and nothing is remembered. Phones run the same bundle in a Capacitor shell.
+- **A stored audio is a public file.** `https://remnote-user-data.s3.amazonaws.com/<name>.mpga` answers `audio/mpeg`, honours `Range`, and sends `Access-Control-Allow-Origin: *` even to `Origin: null` (a sandboxed plugin frame), with `range` allowed in the preflight. A plugin can use it as an `<audio src>` and can also `fetch` its first bytes, which is how the playlist reads a file's length without a media element.
+- **Files cannot be joined.** The main KB mixes 24 kHz mono (TTS), 44.1 kHz stereo (course audio) and 48 kHz clips under a second. One element with a timeline laid over the tracks is the way to play them as one.
+- **`getDescendants()` comes in document order.** The host builds it depth-first over each Rem's ordered children (`allDescendantIdsAsync`), so a branch needs one call and no `positionAmongstSiblings()`. This is how the code reads, not a promise of the SDK.
+- **A floating widget is the place for the element.** The floating layer is mounted in `RootAppContainer` with no phone exclusion, so it survives navigation and the queue. An Escape that reaches the host document closes every float, and there is no "closed" event: the index has to poll `isFloatingWidgetOpen` and reopen.
+- **Change track inside the `ended` handler.** Give the same element its next `src` and call `play()` there, not in a React effect. Reported by the user on an iPhone (November 16, 2026): RemNote's audio keeps playing with the screen locked and shows lock-screen controls.
+- **A source change fires `timeupdate` at 0 before anything loads.** A seek owed to the new track must survive it: apply it at `loadedmetadata`, and only consider it done once `readyState >= 1`.
+
 ## Uploading from a plugin
 
 The SDK (0.0.46) exposes nothing that uploads. Two calls reach RemNote's upload code as a side effect:
 
 **1. `richText.parseFromMarkdown` uploads a data-URI image.** The markdown image rule hands `![](data:image/…;base64,…)` to `uploadPastedDataURIImage`, which stores the bytes and puts the stored address in the returned image element. The answer comes back in the same call.
 - The URI must match `^data:(image\/[a-z0-9.+-]+);base64,…$`: an `image/` MIME with no parameters. Audio cannot go this way.
+- **Never relabel audio as an image to get it through.** `data:image/mp3;base64,<mp3 bytes>` *is* uploaded, but RemNote keeps the declared type: the file is stored with **no extension** (`%LOCAL_FILE%<128 chars>`) and S3 serves it as `image/mp3`. The desktop app plays it (from the local copy, which Chromium sniffs); the iOS app streams it from S3, trusts the type and shows *"The operation is not supported."* Found 13 November 2026 on 115 audio Rems imported this way by the Sierra Pilots Importer in October. Door 2 is the audio route: it stores the file with the Content-Type it is served with (an MP3 served as `audio/mpeg` becomes `.mpga`, `audio/mpeg`).
+- A stored name without an extension is not always such a file: a native 2024 upload of ADTS AAC also has none, but S3 serves it as `audio/aac`. Check the served type before calling a file mislabelled.
 - RemNote raises its own "Uploading pasted image…" toast.
 
 **2. `rem.createSingleRemWithMarkdown` queues the created Rem for re-upload.** The Rem goes through the paste importer, which ends with `reUploadExternalImagesInBackground()`. That job fetches the `url` of every *image element* in the Rem, uploads whatever comes back, and rewrites the element. It does not check that the response is a picture, so `![](https://…/word.mp3)` ends up as a stored `.mpga`.
@@ -67,4 +81,5 @@ The main window is created with `webSecurity: true, sandbox: true, contextIsolat
 - **The main process reads only RemNote's own folders.** Every file IPC (`ipc_read_file`, `get_data_url_for_file`…) passes the path through a guard that accepts `~/remnote`, `~/remnote-dev`, the knowledge-base folders, and paths the user picked in an open dialog (a picked file grants only that file; a picked folder grants the folder). Anything else throws *RemNote can only use files inside its own folders, not …*.
 - **Markdown import.** A bare `.md` whose images are `file://` links imports with every image broken, even when the image sits next to the `.md`: picking the `.md` grants only the `.md`. A **`.zip`** is handled by a different path: each image's address is looked up *inside the archive* (exact path, `./`-prefixed, or by trailing file name) and the bytes are uploaded, so the Rem gets a `%LOCAL_FILE%` copy. Package the `.md` with its images, linked by relative path, into a zip (`~/.claude/tools/pdf-remnote/mdzip.py` does this).
 - **Getting a local image in from outside the app** (scripts, the MCP): serve it over http and have the plugin run door 2 on the Rem. That is the Local Media Bridge (`scripts/media_bridge/media_bridge.py`, `src/lib/media_bridge.ts`, docs `Local-Media-Bridge.md`).
+- **Audio from another plugin, or audio already stored as `image/…`**: the helper's `POST /files` keeps bytes (or a RemNote-stored file, read from disk or S3) under the type sniffed from the bytes and serves them; door 2 then stores them as audio. Other plugins reach it through the `store-media` request of the bridge for other plugins (`src/lib/external_media_bridge.ts`, protocol v3); mislabelled audio is repaired with `media_bridge.py restore-audio <rem ids>` (`src/lib/audio_restore.ts`). Door 2 only fetches http(s) and `app:` addresses: a `data:` URI fails RemNote's URL check (`is-url`, which wants `scheme://`), so a helper serving the bytes is required.
 

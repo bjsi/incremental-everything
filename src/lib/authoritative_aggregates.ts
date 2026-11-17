@@ -20,6 +20,8 @@ import type { PracticedQueueSession } from '../widgets/practiced_queues';
 import type { IncrementalRem, IncrementalRep } from './incremental_rem/types';
 import { repCountsForStats } from './incremental_rem/types';
 import { getIESetting } from './settings';
+import { fetchGhosts, filterGhosts, ghostShardKey, GhostRep } from './history_archive';
+import { helperHeaders } from './helper_client';
 
 export const AUTHORITATIVE_AGGREGATES_KEY = 'authoritativeDailyAggregates';
 export const AUTHORITATIVE_LAST_COMPUTED_KEY = 'authoritativeAggregatesLastComputed';
@@ -291,11 +293,17 @@ function isRealIncRemRep(eventType: IncrementalRep['eventType']): boolean {
 }
 
 /** Buckets one Incremental/Dismissed history's real reviews. Returns how many it counted. */
-function bucketIncRemHistory(history: unknown, kbId: string, buckets: DailyAggregate[]): number {
+function bucketIncRemHistory(
+  history: unknown,
+  kbId: string,
+  buckets: DailyAggregate[],
+  liveDates?: Set<number>
+): number {
   if (!Array.isArray(history)) return 0;
   let counted = 0;
   for (const rep of history as IncrementalRep[]) {
     if (!rep || typeof rep.date !== 'number') continue;
+    liveDates?.add(rep.date);
     if (!isRealIncRemRep(rep.eventType)) continue;
     const b = findOrCreateBucket(buckets, getLocalDateKey(rep.date), kbId);
     b.incRemsCount += 1;
@@ -317,7 +325,8 @@ export function bucketCardReviews(
   kbId: string,
   flashcardResponseTimeCapMs: number,
   buckets: DailyAggregate[],
-  options?: ComputeOptions
+  options?: ComputeOptions,
+  liveDates?: Set<number>
 ): number {
   let cardRepCount = 0;
   for (let i = 0; i < allCards.length; i++) {
@@ -326,6 +335,7 @@ export function bucketCardReviews(
     const history = card?.repetitionHistory || [];
     for (const rep of history) {
       if (!rep || typeof rep.date !== 'number') continue;
+      liveDates?.add(rep.date);
       if (!isRealCardScore(rep.score)) continue;
       const b = findOrCreateBucket(buckets, getLocalDateKey(rep.date), kbId);
       const t = Math.min(Math.max(0, rep.responseTime || 0), flashcardResponseTimeCapMs);
@@ -354,7 +364,8 @@ async function processHistorySlots(
   options: ComputeOptions | undefined,
   fromPct: number,
   toPct: number,
-  label: string
+  label: string,
+  liveDates?: Set<number>
 ) {
   if (rems.length === 0) {
     options?.onProgress?.({ percent: toPct, label: `${label}: 0/0` });
@@ -372,7 +383,7 @@ async function processHistorySlots(
       )
     );
     for (const history of histories) {
-      bucketIncRemHistory(history, kbId, buckets);
+      bucketIncRemHistory(history, kbId, buckets, liveDates);
     }
     const done = Math.min(i + HISTORY_FETCH_CHUNK, rems.length);
     const pct = fromPct + (toPct - fromPct) * (done / rems.length);
@@ -399,6 +410,9 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
     (await getIESetting(plugin, flashcardResponseTimeLimitId)) * 1000;
 
   const buckets: DailyAggregate[] = [];
+  // Every rep timestamp the live histories hold, counted or not: the test that
+  // keeps a deleted Rem's rep from being counted twice (history_archive.ts).
+  const liveDates = new Set<number>();
 
   // ── 1. Cards ────────────────────────────────────────────────────────────
   options?.onProgress?.({ percent: 0, label: 'Loading cards…' });
@@ -409,7 +423,7 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
     label: `Processing ${allCards.length} cards…`,
   });
 
-  const cardRepCount = bucketCardReviews(allCards, kbId, flashcardResponseTimeCapMs, buckets, options);
+  const cardRepCount = bucketCardReviews(allCards, kbId, flashcardResponseTimeCapMs, buckets, options, liveDates);
   options?.onProgress?.({
     percent: 0.4,
     label: `Cards done (${cardRepCount} reps)`,
@@ -432,7 +446,8 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
     options,
     0.42,
     0.75,
-    'IncRems'
+    'IncRems',
+    liveDates
   );
 
   // ── 3. Dismissed powerup history ────────────────────────────────────────
@@ -451,9 +466,15 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
     kbId,
     options,
     0.77,
-    1.0,
-    'Dismissed'
+    0.97,
+    'Dismissed',
+    liveDates
   );
+
+  // ── 4. Reviews of deleted Rems, from the desktop helper (if it runs) ─────
+  if (options?.signal?.aborted) throw new Error('Aborted');
+  options?.onProgress?.({ percent: 0.97, label: 'Deleted Rems…' });
+  await refreshGhostAggregates(plugin, kbId, liveDates, flashcardResponseTimeCapMs);
 
   options?.onProgress?.({ percent: 1, label: 'Done' });
   return buckets;
@@ -561,7 +582,8 @@ export async function refreshAuthoritativeAggregatesFromCardRead(
     }
     const capMs = (await getIESetting(plugin, flashcardResponseTimeLimitId)) * 1000;
     const buckets: DailyAggregate[] = [];
-    const cardReps = bucketCardReviews(cards, kbId, capMs, buckets);
+    const liveDates = new Set<number>();
+    const cardReps = bucketCardReviews(cards, kbId, capMs, buckets, undefined, liveDates);
 
     // Incremental Rem histories come from the session cache once it is complete.
     const deadline = Date.now() + STARTUP_INC_CACHE_WAIT_MS;
@@ -574,12 +596,12 @@ export async function refreshAuthoritativeAggregatesFromCardRead(
     }
     const incRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
     let incReps = 0;
-    for (const inc of incRems) incReps += bucketIncRemHistory(inc?.history, kbId, buckets);
+    for (const inc of incRems) incReps += bucketIncRemHistory(inc?.history, kbId, buckets, liveDates);
 
     // Dismissed histories are cached nowhere: read their slots.
     const dismPowerup = await plugin.powerup.getPowerupByCode(dismissedPowerupCode);
     const dismRems = (await dismPowerup?.taggedRem()) || [];
-    await processHistorySlots(dismRems as any, dismissedPowerupCode, dismissedHistorySlotCode, buckets, kbId, undefined, 0, 1, 'Dismissed');
+    await processHistorySlots(dismRems as any, dismissedPowerupCode, dismissedHistorySlotCode, buckets, kbId, undefined, 0, 1, 'Dismissed', liveDates);
 
     const payload = encodeAuthoritativeAggregates(buckets);
     const stored = await plugin.storage.getSynced(authoritativeShardKey(kbId));
@@ -594,12 +616,139 @@ export async function refreshAuthoritativeAggregatesFromCardRead(
         `and ${dismRems.length} dismissed histories, ${unchanged ? 'unchanged, only the timestamp written' : 'saved'}, ` +
         `in ${Date.now() - startedAt}ms`
     );
+    // After the shard, so the summary never waits on the helper. Same live set.
+    await refreshGhostAggregates(plugin, kbId, liveDates, capMs);
   } catch (e) {
     console.warn(`${tag}: failed`, e);
   } finally {
     holder.cards = null;
     startupRefreshInFlight = false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Reviews of deleted Rems
+//
+// The walks above see only live data, so a deleted Rem's reviews leave the
+// totals at the next recompute. The desktop helper archives every rep it reads
+// in remnote.db (lib/history_archive.ts). Its "ghosts", minus any timestamp a
+// live history still holds, are bucketed with the same predicates and cap and
+// written to their own synced key, `ghostDailyAggregates_<kbId>`.
+//
+// A key of their own because only a device with the helper can compute them:
+// a recompute on mobile or the web rewrites the authoritative shard and must
+// not wipe them. When the helper doesn't answer, the key keeps its last value.
+// ---------------------------------------------------------------------------
+
+/** Ghost reps → day buckets, by the rules the live walks use. */
+export function bucketGhostReps(
+  reps: GhostRep[],
+  kbId: string,
+  flashcardResponseTimeCapMs: number
+): DailyAggregate[] {
+  const buckets: DailyAggregate[] = [];
+  for (const r of reps) {
+    if (r.kind === 'card') {
+      const score = r.score ?? undefined;
+      if (!isRealCardScore(score)) continue;
+      const b = findOrCreateBucket(buckets, getLocalDateKey(r.date), kbId);
+      const t = Math.min(Math.max(0, r.time || 0), flashcardResponseTimeCapMs);
+      b.cardsCount += 1;
+      b.cardsTime += t;
+      b.totalTime += t;
+      if (score === QueueInteractionScore.AGAIN) b.forgotCount += 1;
+    } else {
+      // Dismissed reps count as IncRem reps, as in the live walk. A legacy rep
+      // without an eventType arrives as null and counts, like undefined does.
+      const event = (r.event ?? undefined) as IncrementalRep['eventType'];
+      if (!isRealIncRemRep(event)) continue;
+      const b = findOrCreateBucket(buckets, getLocalDateKey(r.date), kbId);
+      const t = Math.max(0, r.time || 0);
+      b.incRemsCount += 1;
+      b.incRemsTime += t;
+      b.totalTime += t;
+    }
+  }
+  return buckets;
+}
+
+/**
+ * Ask the helper for this KB's ghosts, drop those the live histories hold, and
+ * store their buckets. Quiet no-op when the helper isn't running. Writes only
+ * when the result changed.
+ */
+export async function refreshGhostAggregates(
+  plugin: RNPlugin,
+  kbId: string,
+  liveDates: Set<number>,
+  flashcardResponseTimeCapMs: number
+): Promise<void> {
+  const tag = '[HistoryArchive]';
+  try {
+    const payload = await fetchGhosts(kbId, { scan: true, headers: await helperHeaders(plugin) });
+    if (!payload) return;
+    const reps = filterGhosts(payload, liveDates);
+    const buckets = bucketGhostReps(reps, kbId, flashcardResponseTimeCapMs);
+    const counted = buckets.reduce((n, b) => n + b.cardsCount + b.incRemsCount, 0);
+    const store = { ...encodeAuthoritativeAggregates(buckets), n: counted, at: Date.now() };
+    const stored = (await plugin.storage.getSynced(ghostShardKey(kbId))) as any;
+    const same =
+      !!stored &&
+      stored.n === store.n &&
+      JSON.stringify(stored.kbs ?? null) === JSON.stringify(store.kbs);
+    if (!same) await plugin.storage.setSynced(ghostShardKey(kbId), store);
+    console.log(
+      `${tag} ${payload.reps.length} archived reps of deleted items, ${reps.length} not in any live history, ` +
+        `${counted} counted in ${buckets.length} days — ${same ? 'unchanged' : 'saved'}`
+    );
+  } catch (e) {
+    console.warn(`${tag} ghost refresh failed`, e);
+  }
+}
+
+/** How many reps the stored ghost key adds (0 when there is none). */
+export function ghostRepCount(ghostRaw: unknown): number {
+  const n = (ghostRaw as any)?.n;
+  return typeof n === 'number' ? n : 0;
+}
+
+/**
+ * The authoritative buckets plus the ghost ones, summed per day, for
+ * aggregatePeriodStatsCombined. Ghost days after the authoritative compute's
+ * day are left out: listener sessions after `lastComputed` already count those
+ * reps (a review today, then its Rem deleted). With no authoritative data the
+ * combiner falls back to the listener alone, so ghosts are not added either.
+ */
+export function mergeGhostBuckets(
+  authoritative: DailyAggregate[],
+  ghostRaw: unknown,
+  kbId: string,
+  lastComputed: number
+): DailyAggregate[] {
+  if (authoritative.length === 0 || !(lastComputed > 0)) return authoritative;
+  const ghosts = filterAuthoritativeForKb(ghostRaw, kbId);
+  if (ghosts.length === 0) return authoritative;
+  const lastDay = getLocalDateKey(lastComputed);
+  const out = new Map(authoritative.map((b) => [b.date, b] as const));
+  for (const g of ghosts) {
+    if (g.date > lastDay) continue;
+    const a = out.get(g.date);
+    out.set(
+      g.date,
+      a
+        ? {
+            ...a,
+            totalTime: a.totalTime + g.totalTime,
+            cardsCount: a.cardsCount + g.cardsCount,
+            cardsTime: a.cardsTime + g.cardsTime,
+            incRemsCount: a.incRemsCount + g.incRemsCount,
+            incRemsTime: a.incRemsTime + g.incRemsTime,
+            forgotCount: a.forgotCount + g.forgotCount,
+          }
+        : g
+    );
+  }
+  return Array.from(out.values());
 }
 
 /**

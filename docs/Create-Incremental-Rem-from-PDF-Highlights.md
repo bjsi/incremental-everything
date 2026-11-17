@@ -60,7 +60,16 @@ The popup opens on your last destination (or its suggestion) and scrolls it into
 
 - **Hover only takes over once the mouse genuinely moves**, and arrow-key navigation disarms it again — so a resting cursor can't undo a keyboard selection.
 - **Clicks are ignored for a moment after the popup opens**, so a quick second click can't create the Rem under whatever row landed beneath the cursor.
-- If the selection still drifts, press **`L`** or click the **↩ Last destination** / **↩ Suggested** button in the header to jump back to it. If you collapsed the path in the meantime, it re-expands to reach it.
+- If the selection still drifts, press **`L`** or click the **↩ Last destination** / **↩ Suggested** button in the header to jump back to it. If you collapsed the path in the meantime, it re-expands to reach it. The row it returns to carries an **`L`** key badge.
+
+### The Section Your Library Index Suggests 📚 { #corpus-suggestion }
+
+With a [corpus provider](Corpus-Provider.md) set up (a program that knows your library and where your notes for each section are), the popup also asks it which section of your notes the highlight comes from. The answer arrives a moment after the list appears, without delaying it:
+
+- **Its row** gets a green tint, a green bar and a **📚 Suggested** label (*Suggested?* when the provider is less sure). The tooltip shows the section's breadcrumb and how the provider knew. The row you have selected always keeps the stronger look: its background, a blue bar and a blue frame.
+- **Jumping to it:** press **`S`** or click **📚 Suggested section** in the header. The row carries an **`S`** key badge, just as the `L` row carries an `L`.
+- **It never takes over:** the popup still opens on your last destination or on the IncRem you are reviewing. The suggestion is selected only when there was nothing else to suggest and you have not moved the selection. Revealing it (expanding a chapter above your selection, say) keeps your selection where it was.
+- **Outside the tree:** if the suggested Rem is outside the tree the popup shows, it gets a row of its own at the top.
 
 ### Picking the Parent in the Editor { #pick-in-editor }
 
@@ -86,6 +95,7 @@ The card works with the keyboard too: when it has focus, the arrow keys move bet
 | `Enter` | Select as destination |
 | `+` or `n` | Create a new child under selected node |
 | `L` | Reselect the last/suggested destination |
+| `S` | Go to the [section your library index suggests](#corpus-suggestion) (with a corpus provider) |
 | `E` | [Pick the parent in the editor](#pick-in-editor) instead |
 | `Escape` | Close popup |
 

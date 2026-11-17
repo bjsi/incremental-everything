@@ -21,3 +21,4 @@ export type { IncRemWithDetails, DocumentInfo, IncRemListState } from './IncRemT
 export { WeightedShieldTooltip } from './WeightedShieldTooltip';
 export { RemText, RemTextSegments } from './RemText';
 export { ReadPointIcon } from './ReadPointIcon';
+export { ReadPointCrumbs } from './ReadPointCrumbs';

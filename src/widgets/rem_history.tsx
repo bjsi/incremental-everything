@@ -21,6 +21,11 @@ import {
     migrateLegacyHistory,
 } from "../lib/history_shards";
 import { openRemInNewPane } from '../lib/remHelpers';
+import { PriorityBadge } from "../components";
+import { InlinePriorityEditor } from "../components/InlineEditors";
+import { getCardPriority, CardPriorityInfo, CARD_PRIORITY_CODE } from "../lib/card_priority";
+import { getIncrementalRemFromRem } from "../lib/incremental_rem";
+import { pendingPrioritySaveKey, powerupCode } from "../lib/consts";
 
 const NUM_TO_LOAD_IN_BATCH = 20;
 
@@ -246,6 +251,65 @@ function RemHistoryItem({
 }: RemHistoryItemProps) {
     const plugin = usePlugin();
 
+    // Priority badges, as in the Flashcard and IncRem histories — but only for a
+    // Rem that carries the powerup itself. A visited Rem is often a plain note or
+    // a document, and an inherited card priority would be noise here (and an
+    // ancestor walk per row).
+    const [incPriority, setIncPriority] = useState<number | null>(null);
+    const [cardPriorityInfo, setCardPriorityInfo] = useState<CardPriorityInfo | null>(null);
+    const [editing, setEditing] = useState<{ kind: 'inc' | 'card'; value: number } | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadPriorities() {
+            const rem = await plugin.rem.findOne(remId);
+            if (!rem || cancelled) return;
+            const [isIncRem, hasCardPriority] = await Promise.all([
+                rem.hasPowerup(powerupCode),
+                rem.hasPowerup(CARD_PRIORITY_CODE),
+            ]);
+            if (cancelled) return;
+            const [incRem, cardInfo] = await Promise.all([
+                isIncRem ? getIncrementalRemFromRem(plugin, rem, { knownTagged: true }) : null,
+                hasCardPriority ? getCardPriority(plugin, rem) : null,
+            ]);
+            if (cancelled) return;
+            setIncPriority(incRem ? incRem.priority : null);
+            setCardPriorityInfo(cardInfo);
+        }
+        loadPriorities().catch(console.error);
+        return () => { cancelled = true; };
+    }, [plugin, remId]);
+
+    // Delegate the DB write to the persistent background tracker (index.tsx) via
+    // pendingPrioritySaveKey, like the other two histories: the widget never
+    // writes to the DB itself, so the save survives the sidebar closing.
+    const savePriority = () => {
+        if (editing === null) return;
+        const { kind, value } = editing;
+        setEditing(null);
+
+        plugin.storage.setSession(pendingPrioritySaveKey, {
+            remId,
+            incPriority: kind === 'inc' ? value : null,
+            cardPriority: kind === 'card' ? value : null,
+            cardSource: 'manual',
+            // The badge only shows when the Rem already carries the powerup.
+            needsAddPowerup: false,
+            triggerCascade: true,
+            event: 'editor',
+        }).catch(console.error);
+
+        // Optimistically reflect the change in the badge.
+        if (kind === 'inc') setIncPriority(value);
+        else setCardPriorityInfo((prev) =>
+            prev ? { ...prev, priority: value, source: 'manual' } : prev
+        );
+    };
+
+    const toggleEditor = (kind: 'inc' | 'card', current: number) =>
+        setEditing((prev) => (prev?.kind === kind ? null : { kind, value: current }));
+
     // Shift+click opens the Rem in a new pane beside the current document
     // (or focuses the pane already showing it) instead of replacing it.
     const openRem = async (remId: RemId, inNewPane = false) => {
@@ -258,6 +322,8 @@ function RemHistoryItem({
             plugin.window.openRem(rem);
         }
     };
+
+    const hasBadges = incPriority !== null || cardPriorityInfo !== null;
 
     return (
         <div className="px-1 py-4 w-full" style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }} key={remId}>
@@ -276,19 +342,59 @@ function RemHistoryItem({
                         }}
                     />
                 </div>
-                <div className="flex-grow min-w-0"
-                    onClick={(e) => openRem(remId, e.shiftKey)}
-                    // Keep Shift+click from selecting text across the list.
-                    onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
-                    title="Click to open · Shift+click to open in a new pane"
-                >
-                    <RemViewer
-                        remId={remId}
-                        width="100%"
-                        className="font-medium cursor-pointer line-clamp-2"
-                    />
-                    <div className="text-xs rn-clr-content-tertiary">
-                        {timeSince(new Date(data.time))}
+                <div className="flex-grow min-w-0">
+                    {hasBadges && (
+                        <div className="flex items-center justify-end gap-1.5 mb-0.5">
+                            {incPriority !== null && (
+                                <span
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleEditor('inc', incPriority);
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                    title="IncRem priority · click to change"
+                                >
+                                    <PriorityBadge
+                                        priority={incPriority}
+                                        compact
+                                        useAbsoluteColoring
+                                    />
+                                </span>
+                            )}
+                            {cardPriorityInfo && (
+                                <span
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleEditor('card', cardPriorityInfo.priority);
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                    title="Card priority · click to change"
+                                >
+                                    <PriorityBadge
+                                        priority={cardPriorityInfo.priority}
+                                        compact
+                                        useAbsoluteColoring
+                                        source={cardPriorityInfo.source}
+                                        isCardPriority
+                                    />
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    <div
+                        onClick={(e) => openRem(remId, e.shiftKey)}
+                        // Keep Shift+click from selecting text across the list.
+                        onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
+                        title="Click to open · Shift+click to open in a new pane"
+                    >
+                        <RemViewer
+                            remId={remId}
+                            width="100%"
+                            className="font-medium cursor-pointer line-clamp-2"
+                        />
+                        <div className="text-xs rn-clr-content-tertiary">
+                            {timeSince(new Date(data.time))}
+                        </div>
                     </div>
                 </div>
                 <div
@@ -307,6 +413,16 @@ function RemHistoryItem({
                     />
                 </div>
             </div>
+            {editing !== null && (
+                <div className="px-1 pb-1" onClick={(e) => e.stopPropagation()}>
+                    <InlinePriorityEditor
+                        value={editing.value}
+                        onChange={(value) => setEditing((prev) => (prev ? { ...prev, value } : prev))}
+                        onSave={savePriority}
+                        onCancel={() => setEditing(null)}
+                    />
+                </div>
+            )}
             {open && (
                 <div className="m-2">
                     <RemHierarchyEditorTree height="auto" width="100%" remId={remId} />

@@ -28,11 +28,14 @@ import { mediaBridgeEnabledId } from './consts';
 import { collectExternalMedia, localizeMediaInRems } from './localize_media';
 import { runBridgeOp } from './media_bridge_ops';
 import { getIESetting } from './settings';
+import { showNotice } from './notice';
 
-export const MEDIA_BRIDGE_URL = 'http://127.0.0.1:3460';
+import { MEDIA_BRIDGE_URL } from './media_bridge_url';
+
+export { MEDIA_BRIDGE_URL };
 const POLL_WAIT_S = 25;
 /** The bridge protocol this build speaks; see OPS_BY_PLUGIN_VERSION in media_bridge.py. */
-const PROTOCOL_VERSION = 2;
+const PROTOCOL_VERSION = 10;
 const RETRY_MS = 30_000;
 /**
  * A rem written through the MCP reaches this client by sync, a moment after the
@@ -120,6 +123,7 @@ async function pollLoop(plugin: ReactRNPlugin, generation: number) {
     // A job taken by a loop that was switched off is redelivered by the helper.
     if (generation !== loopGeneration) break;
     if (!job.op || job.op === 'localize') await handleJob(plugin, job);
+    else if (job.op === 'notice') await handleNoticeJob(plugin, job);
     else await handleOpJob(plugin, job as MediaJob & { op: string });
   }
 }
@@ -142,6 +146,30 @@ async function waitForRemsToExist(plugin: ReactRNPlugin, remIds: string[]) {
     const found = (await plugin.rem.findMany(remIds)) ?? [];
     if (found.length === new Set(remIds).size || Date.now() >= deadline) return;
     await sleep(SYNC_POLL_MS);
+  }
+}
+
+/**
+ * `media_bridge.py notice`: an outside tool (a Claude Code command that wrote into
+ * RemNote) says it is done. Shown at once as a notice (lib/notice.ts), with Open Rem
+ * for the rem it names; the rem may still be on its way by sync, which Open Rem
+ * tolerates.
+ */
+async function handleNoticeJob(plugin: ReactRNPlugin, job: MediaJob) {
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined);
+  const tone = job.tone === 'error' || job.tone === 'info' ? job.tone : 'success';
+  try {
+    await showNotice(plugin, {
+      title: str(job.title) ?? 'Done',
+      message: str(job.message) ?? '',
+      detail: str(job.detail),
+      tone,
+      openRemId: job.remIds[0],
+    });
+    await postJSON('/result', { jobId: job.id, op: job.op, ok: true, summary: 'notice shown' });
+  } catch (err) {
+    console.error(`${LOG} job ${job.id}: notice not shown`, err);
+    await postJSON('/result', { jobId: job.id, op: job.op, ok: false, message: String(err) }).catch(() => undefined);
   }
 }
 

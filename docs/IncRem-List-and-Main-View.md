@@ -13,8 +13,11 @@ The **IncRem List** popup shows Incremental Rems scoped to the **current documen
 - **Heading format:** `📚 Inc Rems · Document Name` — shows the scoped document name (truncated at 30 characters with a full-name tooltip on hover)
 - **Scope:** Only shows IncRems that are descendants of the current document
 - **Use case:** Quick access to all Incremental Rems within the document you're currently reading
+- **Read Point row:** when the document is itself a Rem-type IncRem with a [read point](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point), the counter bar adds a second row with the path to it, its date, a **Go to Read Point** button and a **History ↗** button
 
 ![IncRem List Widget under the Document Title](assets/increm-list-widget.png){ width="800" }
+
+<iframe src="../demos/increm-counter.html" title="IncRem Counter demo" loading="lazy" style="width:100%;height:400px;border:0;display:block"></iframe>
 
 ### All Inc Rems (Main View)
 
@@ -185,6 +188,8 @@ The plugin provides two priority distribution graphs at different scopes, helpin
 The **IncRem Counter badge** includes a **📊 button** (to the left of "View All") that toggles an inline priority distribution graph for the **current document**.
 
 ![Priority Distribution Graph icon on the IncRem Counter badge](assets/priority-graph-icon.png){ width="600" }
+
+<iframe src="../demos/increm-counter.html?view=graph" title="Document Priority Distribution Graph demo" loading="lazy" style="width:100%;height:640px;border:0;display:block"></iframe>
 
 - **How to view:** Click the 📊 icon on the IncRem Counter badge below the document title
 - **Scope:** Only IncRems within the current document's scope

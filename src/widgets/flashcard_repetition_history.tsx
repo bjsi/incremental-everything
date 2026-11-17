@@ -267,7 +267,10 @@ interface CardStats {
     lapses: number;
     /** Share of `gradeableCount` that was not a lapse; null when nothing is graded. */
     retention: number | null;
-    /** No repetitions at all — RemNote's "New Card". */
+    /**
+     * Nothing graded since the last RESET — RemNote's "New Card". A reset card
+     * is new again even though its history is long.
+     */
     isNew: boolean;
     cardAgeText: string;
     cardAgeMs: number;
@@ -310,7 +313,12 @@ function computeCardStats(card: any): CardStats {
     const cardAgeDays = Math.max(0, Math.floor(cardAgeMs / (1000 * 60 * 60 * 24)));
     const cardAgeText = formatStabilityDays(cardAgeDays);
 
-    const lastRep = sortedHistory.length > 0 ? sortedHistory[sortedHistory.length - 1] : null;
+    const isNew = gradeableReps.length === 0;
+    // A new card has no "last practice": after a RESET, the RESET entry itself is
+    // the newest one, and RemNote dates the card's due time slightly BEFORE it. Read
+    // as a practice, that gave a negative interval and a stale date in the past, so
+    // every freshly reset card was flagged STALE.
+    const lastRep = isNew ? null : activeHistory[activeHistory.length - 1];
     const lastPracticeDate = lastRep ? new Date(lastRep.date) : null;
     const nextRepDate = card.nextRepetitionTime ? new Date(card.nextRepetitionTime) : null;
 
@@ -346,9 +354,12 @@ function computeCardStats(card: any): CardStats {
     let nextIntervalMs: number | null = null;
     if (lastRep && nextRepDate) {
         nextIntervalMs = nextRepDate.getTime() - lastRep.date;
-        // Stale means overdue by more than twice the last interval.
-        staleDate = new Date(lastRep.date + 2 * nextIntervalMs);
-        isStale = Date.now() > staleDate.getTime();
+        // Stale means overdue by more than twice the last interval. A due date at
+        // or before the last practice gives no interval to double.
+        if (nextIntervalMs > 0) {
+            staleDate = new Date(lastRep.date + 2 * nextIntervalMs);
+            isStale = Date.now() > staleDate.getTime();
+        }
     }
 
     return {
@@ -358,7 +369,7 @@ function computeCardStats(card: any): CardStats {
         gradeableCount: gradeableReps.length,
         lapses,
         retention,
-        isNew: sortedHistory.length === 0,
+        isNew,
         cardAgeText,
         cardAgeMs,
         firstRepDate,
@@ -523,6 +534,15 @@ function RemTotalsHeader({ totals }: { totals: RemTotals }) {
  * and the scheduler does not count them. So a card whose Again projection reads
  * `6w` is shown by RemNote's own Forgot button as `1 hour` — both correct, a
  * relearning step apart. Left unsaid, the two numbers look like a contradiction.
+ *
+ * RESET SRS
+ *
+ * The same SDK call accepts `QueueInteractionScore.RESET`. The host's bridge
+ * handler looks up the ONE card by id and appends to that card's history only,
+ * exactly what RemNote's own `resetRepetitionHistory` does (minus its guard
+ * against a second consecutive RESET, so the button refuses that itself). The
+ * Rem's other cards are untouched. Two clicks, because the reset is not undone
+ * from here: the history stays, but the schedule restarts as a new card.
  */
 function AddRepetitionPanel({
     cardId,
@@ -536,6 +556,7 @@ function AddRepetitionPanel({
     const plugin = usePlugin();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [resetArmed, setResetArmed] = useState(false);
 
     const grades: { score: QueueInteractionScore; label: string; days: number | null }[] = [
         { score: QueueInteractionScore.AGAIN, label: 'Again', days: finalState?.nextInterval.again ?? null },
@@ -565,9 +586,39 @@ function AddRepetitionPanel({
         }
     };
 
+    const resetSrs = async () => {
+        if (busy) return;
+        if (!resetArmed) {
+            setResetArmed(true);
+            return;
+        }
+        setResetArmed(false);
+        setBusy(true);
+        try {
+            const card = await plugin.card.findOne(cardId);
+            if (!card) {
+                await plugin.app.toast('Could not find that card.');
+                return;
+            }
+            const last = card.repetitionHistory?.at(-1);
+            if (last?.score === QueueInteractionScore.RESET) {
+                await plugin.app.toast('This card is already reset.');
+                return;
+            }
+            await card.updateCardRepetitionStatus(QueueInteractionScore.RESET);
+            await plugin.app.toast('Reset the schedule of this card.');
+            onRecorded();
+        } catch (err) {
+            console.error('[FlashcardHistory] failed to reset the card', err);
+            await plugin.app.toast('Could not reset that card.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     if (!open) {
         return (
-            <div style={{ padding: '2px 8px 6px' }}>
+            <div style={{ padding: '2px 8px 6px', display: 'flex', gap: 6, alignItems: 'center' }}>
                 <button
                     style={buttonStyle}
                     onClick={() => setOpen(true)}
@@ -575,6 +626,32 @@ function AddRepetitionPanel({
                 >
                     ➕ Repetition
                 </button>
+                <button
+                    style={{
+                        ...buttonStyle,
+                        color: '#dc2626',
+                        border: resetArmed ? '1px solid #dc2626' : buttonStyle.border,
+                        fontWeight: resetArmed ? 600 : undefined,
+                        cursor: busy ? 'wait' : 'pointer',
+                    }}
+                    disabled={busy}
+                    onClick={resetSrs}
+                    onBlur={() => setResetArmed(false)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Escape') setResetArmed(false);
+                    }}
+                    title={
+                        'Append a RESET to this card only: its schedule restarts as a new card. ' +
+                        'The past repetitions stay in the history. Other cards of this Rem are not touched.'
+                    }
+                >
+                    {resetArmed ? '⟲ Click again to reset this card' : '⟲ Reset SRS'}
+                </button>
+                {resetArmed && (
+                    <button style={buttonStyle} onClick={() => setResetArmed(false)}>
+                        Cancel
+                    </button>
+                )}
             </div>
         );
     }
@@ -1108,6 +1185,25 @@ function FlashcardRepetitionHistory() {
                                     title="The card you were reviewing"
                                 >
                                     IN QUEUE
+                                </span>
+                            )}
+                            {stats.isNew && (
+                                <span
+                                    style={{
+                                        padding: '1px 5px',
+                                        backgroundColor: '#3b82f6',
+                                        color: 'white',
+                                        borderRadius: 4,
+                                        fontSize: 9,
+                                        fontWeight: 'bold',
+                                    }}
+                                    title={
+                                        stats.sortedHistory.length > 0
+                                            ? 'Nothing graded since the last reset: the card is new again'
+                                            : 'Never practised'
+                                    }
+                                >
+                                    NEW
                                 </span>
                             )}
                             {stats.isStale && (

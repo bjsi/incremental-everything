@@ -33,7 +33,7 @@ A full suite of history and practice tools now built into the right sidebar:
 - **Visited Rem History**: jump back to any document you navigated to recently.
 - **Flashcard History**: find and open any flashcard you've reviewed, searchable by front and back text.
 - **Practiced Queues Dashboard**: real-time session metrics (speed, retention, card age) and a full history of every practice session, with Export/Import backup.
-- **Mastery Drill**: a focused re-practice queue for cards you rated *Forgot* or *Hard* — inspired by SuperMemo's Final Drill. Open with the `Mastery Drill` command or via the Left Sidebar notification.
+- **[Mastery Drill](https://hugomarins.github.io/incremental-remnote/Mastery-Drill/)**: a focused re-practice queue for cards you rated *Forgot* or *Hard* — inspired by SuperMemo's Final Drill. Open with the `Mastery Drill` command or via the Left Sidebar notification.
 
 👉 [Full documentation](https://hugomarins.github.io/incremental-remnote/History-Queue-Dashboard-and-Mastery-Drill/)
 
@@ -55,6 +55,7 @@ Beyond the core learning loop, Incremental RemNote ships **dozens of standalone 
 
 ### 🔌 Integrations
 
+- **Chrome Companion**: Read web pages incrementally in Chrome. Select text to make it an Incremental Rem, see your extracts highlighted on the page, and pick up where you stopped reading. [Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/incremental-remnote-compa/jdmbkbchgkfmipijdolpkhehjmehaagf) · [Learn more](https://hugomarins.github.io/incremental-remnote/Chrome-Companion-Extension/)
 - **Logos Bible Software** *(macOS)*: Read your Logos books incrementally — import books, extract passages and keep bookmarks with shortcuts pressed in Logos. [Learn more](https://hugomarins.github.io/incremental-remnote/Logos-Bible-Software-Integration/)
 
 ## Installation
@@ -102,7 +103,7 @@ This README covers the basics. For the comprehensive guides, please visit the **
 - 0 is for your most important material and 100 is for the least important.
 - **Change Priority**: Click the button in the queue or press `Alt+P` to open the full priority popup.
 - **Quick Shortcuts**: Use `Ctrl+Opt+Up` / `Ctrl+Opt+Down` to adjust priority instantly without breaking flow.
-- **Sorting Criteria**: Use the queue menu to adjust the balance between **Structure** (strict priority) and **Exploration** (randomness), and control the ratio of Flashcards to Reading material.
+- **Sorting Criteria**: Use the queue's ⋮ menu → **Incremental RemNote…** to adjust the balance between **Structure** (strict priority) and **Exploration** (randomness), and control the ratio of Flashcards to Reading material.
 
 ### Scheduling
 
@@ -133,6 +134,18 @@ The plugin now features **Automatic Light Mode**.
 ![PDF Highlight Toolbar](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/pdfhighlight-toolbar.png)
 
 ![Highlight](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
+
+#### 🌐 Web pages in Chrome: the Companion
+
+Read any web page incrementally with the **Incremental RemNote Companion**, a Chrome extension that opens RemNote in the side panel beside the page.
+
+- Select text on the page to make it an Incremental Rem, with a priority you type right there. Images and LaTeX come along.
+- Your extracts stay highlighted on the page, and a read point remembers where you stopped.
+- Import the page's headings as nested Rems, and track reading time with the panel's clock.
+
+**[Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/incremental-remnote-compa/jdmbkbchgkfmipijdolpkhehjmehaagf)** · 📖 [Chrome Companion in the User's Manual](https://hugomarins.github.io/incremental-remnote/Chrome-Companion-Extension/)
+
+![Extracts marked blue on a Wikipedia page, and the same text in the Companion panel with its image and LaTeX imported](https://hugomarins.github.io/incremental-remnote/assets/companion-assets/extracted-image-latex.png)
 
 ### Incremental Writing
 

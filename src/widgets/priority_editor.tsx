@@ -14,7 +14,7 @@ import { PriorityDeltaEntry } from '../lib/quick_priority';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { formatDuration } from '../lib/utils';
 import { priorityScalePercentile, usePriorityColorScale } from '../components/priorityColor';
-import { PriorityBadge, ReadPointIcon } from '../components';
+import { PriorityBadge, ReadPointCrumbs, ReadPointIcon } from '../components';
 import {
   getActivePdfForIncRem,
   setActivePdfForIncRem,
@@ -1056,30 +1056,7 @@ export function PriorityEditor() {
               {/* Path from this Rem down to the bookmarked descendant. The Rem
                   itself is implicit — the panel is attached to it. */}
               <div className="text-[10px] leading-relaxed" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                {readPoint.path.map((segment, i) => {
-                  const isLast = i === readPoint.path.length - 1;
-                  const id = readPoint.pathIds[i];
-                  return (
-                    <span key={id || i}>
-                      {i > 0 && <span style={{ opacity: 0.6, margin: '0 3px' }}>›</span>}
-                      <span
-                        onClick={() => { if (id) openAndFocusRem(plugin as any, id); }}
-                        title={`${segment}\n\nClick to open this rem`}
-                        style={{
-                          cursor: 'pointer',
-                          fontWeight: isLast ? 600 : 400,
-                          color: isLast ? 'var(--rn-clr-blue, #3b82f6)' : 'inherit',
-                          textDecoration: 'underline',
-                          textDecorationStyle: 'dotted',
-                        }}
-                      >
-                        {segment.length > READ_POINT_SEGMENT_CHARS
-                          ? segment.slice(0, READ_POINT_SEGMENT_CHARS) + '…'
-                          : segment}
-                      </span>
-                    </span>
-                  );
-                })}
+                <ReadPointCrumbs plugin={plugin as any} readPoint={readPoint} segmentChars={READ_POINT_SEGMENT_CHARS} />
               </div>
 
               {!readPoint.withinTarget && (

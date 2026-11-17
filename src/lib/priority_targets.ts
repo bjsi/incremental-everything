@@ -16,6 +16,7 @@ import { currentIncRemKey, powerupCode, prioritySlotCode } from './consts';
 import { CARD_PRIORITY_CODE, getCardPriorityValue } from './card_priority';
 import { getEffectiveSelectionWithSource } from './editor_selection';
 import { getQueueVisibleCard } from './queue_visible_card';
+import { isQueueUrl } from './open_in_window';
 
 export type PriorityTargets = {
   remIds: string[];
@@ -147,7 +148,8 @@ export async function resolvePriorityTargets(
 
   // Queue: the visible card wins unless the user explicitly selected something
   // else. Same precedence the two commands had before, just factored out.
-  if (url.includes('/flashcards')) {
+  // isQueueUrl, not '/flashcards': Learn New runs on /need_to_learn/….
+  if (isQueueUrl(url)) {
     // Cluster-aware: the sibling on screen, not the cluster's anchor card.
     const currentQueueItem = await getQueueVisibleCard(plugin);
     const currentIncRemId =

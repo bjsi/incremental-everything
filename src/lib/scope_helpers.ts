@@ -400,3 +400,106 @@ async function logScopeAttribution(
     `[buildComprehensiveScope]   TOTAL: ${totRemsWithCards} rems-with-cards, ${totCards} cards (${totDue} due)`
   );
 }
+
+/**
+ * A rem that appears in a document only through a portal or a table view — it
+ * lives elsewhere in the knowledge base, so it is not among the document's
+ * descendants.
+ */
+export interface PortalIncludedRem {
+  rem: PluginRem;
+  /** The outermost shown rem this one sits under (itself when it is one). */
+  rootId: RemId;
+  /** The last body rem before it in document order — normally the portal that shows it. Null if none precedes it. */
+  anchorId: RemId | null;
+}
+
+/** How many shown rems we expand (getDescendants) concurrently. */
+const PORTAL_ROOT_CONCURRENCY = 12;
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+/**
+ * Gathers the rems a document shows through portals and table views but does
+ * not own, plus the descendants of those rems (a table row's cells, which is
+ * where table flashcards live).
+ *
+ * ONE call on the scope rem, as buildComprehensiveScope does. RemNote's
+ * `allRemInDocumentOrPortal` walks the document itself, and at each portal
+ * child takes what that portal shows in view — for a table view, the rows that
+ * pass its column filters (the same `visibleChildrenRem` the table renderer
+ * draws). It does not recurse into portals nested inside portal content, and
+ * neither do we: doing that from the plugin turned one call into thousands of
+ * bridge round-trips. Do NOT use `getPortalDirectlyIncludedRem()` here — it
+ * ignores table filters and returns every row of the table.
+ *
+ * `bodyRems` is the scope rem and its descendants; they are never returned.
+ * Results follow document order: each shown rem right after the portal that
+ * shows it, descendants after their root.
+ */
+export async function gatherPortalIncludedRems(
+  scopeRem: PluginRem,
+  bodyRems: PluginRem[],
+  isStale: () => boolean = () => false
+): Promise<PortalIncludedRem[]> {
+  const bodyIds = new Set<RemId>(bodyRems.map(r => r._id));
+
+  let inDocument: PluginRem[] = [];
+  try {
+    inDocument = (await scopeRem.allRemInDocumentOrPortal()) ?? [];
+  } catch {
+    return [];
+  }
+  if (isStale()) return [];
+
+  const outside = inDocument.filter(r => r?._id && !bodyIds.has(r._id));
+  if (outside.length === 0) return [];
+  const outsideIds = new Set(outside.map(r => r._id));
+
+  // Anchor each shown rem on the last body rem before it in document order.
+  const anchorOf = new Map<RemId, RemId | null>();
+  let lastBodyId: RemId | null = null;
+  for (const r of inDocument) {
+    if (!r?._id) continue;
+    if (bodyIds.has(r._id)) lastBodyId = r._id;
+    else anchorOf.set(r._id, lastBodyId);
+  }
+
+  // Roots: shown rems whose parent is not shown too. A portal lists only what
+  // is expanded, but every descendant of a shown rem belongs to it — a table
+  // row's cells most of all.
+  const roots = outside.filter(r => !(r.parent && outsideIds.has(r.parent)));
+  const expanded = await mapWithConcurrency(roots, PORTAL_ROOT_CONCURRENCY, async root => ({
+    root,
+    descendants: isStale() ? [] : await root.getDescendants().catch(() => [] as PluginRem[]),
+  }));
+  if (isStale()) return [];
+
+  const seen = new Set<RemId>(bodyIds);
+  const result: PortalIncludedRem[] = [];
+  for (const { root, descendants } of expanded) {
+    const anchorId = anchorOf.get(root._id) ?? null;
+    for (const r of [root, ...descendants]) {
+      if (seen.has(r._id)) continue;
+      seen.add(r._id);
+      result.push({ rem: r, rootId: root._id, anchorId });
+    }
+  }
+
+  console.log(
+    `[gatherPortalIncludedRems] ${outside.length} rem(s) shown through portals/table views ` +
+      `(${roots.length} root(s)) → ${result.length} rem(s) with descendants`
+  );
+  return result;
+}

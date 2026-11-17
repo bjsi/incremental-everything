@@ -5,7 +5,7 @@ import '../style.css';
 import '../App.css';
 import { MasteryDrillHeader } from '../components/MasteryDrillHeader';
 import { oldItemThresholdId } from '../lib/consts';
-import { dropFromLiveQueue, removeFromDrill } from '../lib/mastery_drill_actions';
+import { dropFromLiveQueue, markDrillCardEditLater, removeFromDrill } from '../lib/mastery_drill_actions';
 import { FinalDrillEntry, summarizeDrill } from '../lib/mastery_drill_cooling';
 import {
   MasteryDrillPanelRequest,
@@ -24,7 +24,8 @@ const REFRESH_MS = 60_000;
  * unless that drill is on screen (lib/mastery_drill_native publishes the state).
  *
  * The popup drill's header (components/MasteryDrillHeader) without its card row:
- * Go to Rem, Edit Later, editing and priority are the regular queue's own. The
+ * Go to Rem, editing and priority are the regular queue's own; Edit Later, for the
+ * card on screen or the previous one, is added. The
  * popup swaps its window for a panel; here each panel opens in a popup
  * (widgets/mastery_drill_panel.tsx).
  */
@@ -72,6 +73,37 @@ function MasteryDrillQueueBar() {
     );
   };
 
+  const editLaterCurrent = async (message: string) => {
+    const cardId = state.currentCardId;
+    if (!cardId) {
+      await plugin.app.toast('No drill card on screen.');
+      return;
+    }
+    if (!(await markDrillCardEditLater(plugin, cardId, message))) {
+      await plugin.app.toast('Could not find the card on screen.');
+      return;
+    }
+    const dropped = await dropFromLiveQueue(plugin, cardId);
+    await plugin.app.toast(
+      dropped
+        ? 'Card marked for Edit Later and removed from the drill.'
+        : 'Card marked for Edit Later and removed from the drill. It stays on screen until you rate it.'
+    );
+  };
+
+  const editLaterPrevious = async (message: string) => {
+    const cardId = state.previousCardId;
+    if (!cardId) {
+      await plugin.app.toast('No previous drill card yet.');
+      return;
+    }
+    if (!(await markDrillCardEditLater(plugin, cardId, message))) {
+      await plugin.app.toast('Could not find the previous card.');
+      return;
+    }
+    await plugin.app.toast('Previous card marked for Edit Later and removed from the drill.');
+  };
+
   return (
     <div style={{ paddingBottom: '2px' }}>
       <MasteryDrillHeader
@@ -86,6 +118,8 @@ function MasteryDrillQueueBar() {
         onClearLowPriority={() => openPanel({ view: 'clear-low' })}
         onClearOld={() => openPanel({ view: 'clear-old' })}
         onRemoveCurrent={removeCurrent}
+        onEditLaterCurrent={editLaterCurrent}
+        onEditLaterPrevious={editLaterPrevious}
         notice={
           state.buried ? (
             <>

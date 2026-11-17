@@ -37,6 +37,14 @@ import '../style.css';
 import '../App.css';
 import { getIESetting } from '../lib/settings';
 import { SharedLoadSlot, emptySlot, sharedLoad } from '../lib/shared_load';
+import {
+    buildGhostNodes,
+    DELETED_ROOT_ID,
+    fetchGhosts,
+    filterGhosts,
+    GhostPayload,
+} from '../lib/history_archive';
+import { helperHeaders } from '../lib/helper_client';
 
 // ---------------------------------------------------------------------------
 // Style helpers (mirroring the statistics plugin's chartHelpers)
@@ -91,6 +99,9 @@ interface RemData {
     incHistory: IncrementalRep[];
     dismHistory: IncrementalRep[];
     cards: CardData[]; // cards directly attached to this rem
+    /** A deleted Rem, rebuilt from the helper's history archive (lib/history_archive.ts). */
+    deleted?: boolean;
+    deletedAt?: number | null;
 }
 
 interface PeriodStats {
@@ -626,21 +637,7 @@ async function loadDocumentData(
     }
 
     onProgress(0.95, 'Building tree…');
-
-    // Build child map (period-independent — just the static hierarchy).
-    const allNodeIds = new Set<string>([...Object.keys(remDataById), ...Object.keys(stubData)]);
-    const childMap: Record<string, string[]> = {};
-    const rawRootIds: string[] = [];
-
-    for (const id of allNodeIds) {
-        const parentId = (remDataById[id]?.parentId ?? stubData[id]?.parentId) || null;
-        if (parentId && allNodeIds.has(parentId)) {
-            (childMap[parentId] ||= []).push(id);
-        } else {
-            rawRootIds.push(id);
-        }
-    }
-
+    const { childMap, rawRootIds } = buildDocHierarchy(remDataById, stubData);
     onProgress(1, 'Loaded');
 
     return {
@@ -652,6 +649,200 @@ async function loadDocumentData(
         childMap,
         rawRootIds,
     };
+}
+
+/** Child map and roots of document data (period-independent — just the static hierarchy). */
+function buildDocHierarchy(
+    remDataById: Record<string, RemData>,
+    stubData: Record<string, { parentId: string | null; remText: any }>
+): { childMap: Record<string, string[]>; rawRootIds: string[] } {
+    const allNodeIds = new Set<string>([...Object.keys(remDataById), ...Object.keys(stubData)]);
+    const childMap: Record<string, string[]> = {};
+    const rawRootIds: string[] = [];
+    for (const id of allNodeIds) {
+        const parentId = (remDataById[id]?.parentId ?? stubData[id]?.parentId) || null;
+        if (parentId && allNodeIds.has(parentId)) {
+            (childMap[parentId] ||= []).push(id);
+        } else {
+            rawRootIds.push(id);
+        }
+    }
+    return { childMap, rawRootIds };
+}
+
+// ---------------------------------------------------------------------------
+// Deleted Rems (the helper's history archive)
+//
+// Reviews of deleted Rems come back as RemData flagged `deleted`, placed under
+// their nearest live ancestor (or DELETED_ROOT_ID), so the Summary, the Graphs
+// and the tree count them through the same code as live Rems. A ghost rep whose
+// timestamp any loaded live history holds is dropped first (Preserve history &
+// remove, Dismiss, Transfer keep the date). The helper already did that against
+// the whole DB when it scanned, so the loaded histories only need to catch
+// changes since.
+// ---------------------------------------------------------------------------
+
+function liveRepDates(rems: Iterable<RemData>): Set<number> {
+    const out = new Set<number>();
+    for (const rd of rems) {
+        for (const h of [rd.incHistory, rd.dismHistory]) {
+            for (const rep of h) if (rep && typeof rep.date === 'number') out.add(rep.date);
+        }
+        for (const c of rd.cards) {
+            for (const rep of c.history || []) if (rep && typeof rep.date === 'number') out.add(rep.date);
+        }
+    }
+    return out;
+}
+
+function ghostRemDataList(payload: GhostPayload, live: Set<number>): RemData[] {
+    const nodes = buildGhostNodes(filterGhosts(payload, live), payload.rems);
+    const out: RemData[] = nodes.map((n) => ({
+        id: n.id,
+        parentId: n.parentId,
+        remText: [n.text],
+        isInc: n.incHistory.length > 0,
+        isDism: n.dismHistory.length > 0,
+        incHistory: n.incHistory as IncrementalRep[],
+        dismHistory: n.dismHistory as IncrementalRep[],
+        cards: n.cards.map((c) => ({ id: c.id, remId: n.id, history: c.history })),
+        deleted: true,
+        deletedAt: n.deletedAt,
+    }));
+    if (nodes.some((n) => n.parentId === DELETED_ROOT_ID)) {
+        out.push({
+            id: DELETED_ROOT_ID,
+            parentId: null,
+            remText: ['Deleted Rems with no surviving ancestor'],
+            isInc: false,
+            isDism: false,
+            incHistory: [],
+            dismHistory: [],
+            cards: [],
+            deleted: true,
+            deletedAt: null,
+        });
+    }
+    return out;
+}
+
+/** Global data plus the deleted Rems, chained to their live ancestors. Leaves `data` untouched. */
+async function withGhostsGlobal(
+    plugin: ReturnType<typeof usePlugin>,
+    data: LoadedGlobalData,
+    payload: GhostPayload
+): Promise<LoadedGlobalData> {
+    const ghosts = ghostRemDataList(payload, liveRepDates(data.remDataById.values()));
+    if (ghosts.length === 0) return data;
+    const remDataById = new Map(data.remDataById);
+    const parentChainCache = new Map(data.parentChainCache);
+    const remTextCache = new Map(data.remTextCache);
+    const parentByRemId = new Map(data.parentByRemId);
+    const ghostById = new Map(ghosts.map((g) => [g.id, g] as const));
+    for (const g of ghosts) remDataById.set(g.id, g);
+
+    // A live anchor's chain, from the caches or by findOne, as loadGlobalData does.
+    const liveChain = async (id: string): Promise<string[]> => {
+        const path: string[] = [];
+        let cur: string | null = id;
+        while (cur && !parentChainCache.has(cur) && !path.includes(cur)) {
+            path.push(cur);
+            let p: string | null;
+            if (parentByRemId.has(cur)) {
+                p = parentByRemId.get(cur) || null;
+            } else {
+                const found: PluginRem | undefined = await plugin.rem.findOne(cur);
+                p = found ? found.parent || null : null;
+                parentByRemId.set(cur, p);
+                if (found && !remTextCache.has(cur)) remTextCache.set(cur, found.text);
+            }
+            cur = p;
+        }
+        let tail = cur ? parentChainCache.get(cur) || [] : [];
+        for (let i = path.length - 1; i >= 0; i--) {
+            tail = [path[i], ...tail];
+            parentChainCache.set(path[i], tail);
+        }
+        return parentChainCache.get(id) || [id];
+    };
+    const ghostChain = async (id: string): Promise<string[]> => {
+        const cached = parentChainCache.get(id);
+        if (cached) return cached;
+        const g = ghostById.get(id)!;
+        let rest: string[];
+        if (!g.parentId) rest = [];
+        else if (ghostById.has(g.parentId)) rest = await ghostChain(g.parentId);
+        else rest = await liveChain(g.parentId);
+        const chain = [id, ...rest];
+        parentChainCache.set(id, chain);
+        return chain;
+    };
+    for (const g of ghosts) {
+        remTextCache.set(g.id, g.remText);
+        await ghostChain(g.id);
+    }
+    return { remDataById, parentChainCache, remTextCache, parentByRemId };
+}
+
+/** Document data plus the deleted Rems whose nearest live ancestor is in the document. */
+function withGhostsDocument(data: LoadedDocumentData, payload: GhostPayload): LoadedDocumentData {
+    const ghosts = ghostRemDataList(payload, liveRepDates(data.remDataList));
+    if (ghosts.length === 0) return data;
+    const ghostById = new Map(ghosts.map((g) => [g.id, g] as const));
+    const parentOf = (id: string) =>
+        (data.remDataById[id]?.parentId ?? data.stubData[id]?.parentId) || null;
+    const inDocument = (id: string): boolean => {
+        const seen = new Set<string>();
+        for (let cur: string | null = id; cur && !seen.has(cur); cur = parentOf(cur)) {
+            if (cur === data.rootRemId) return true;
+            seen.add(cur);
+        }
+        return false;
+    };
+    const anchorOf = (g: RemData): string | null => {
+        let cur: string | null = g.parentId;
+        const seen = new Set<string>();
+        while (cur && ghostById.has(cur) && !seen.has(cur)) {
+            seen.add(cur);
+            cur = ghostById.get(cur)!.parentId;
+        }
+        return cur && cur !== DELETED_ROOT_ID ? cur : null;
+    };
+    const kept = ghosts.filter((g) => {
+        if (g.id === DELETED_ROOT_ID) return false;
+        const anchor = anchorOf(g);
+        return !!anchor && inDocument(anchor);
+    });
+    if (kept.length === 0) return data;
+    const remDataById = { ...data.remDataById };
+    for (const g of kept) remDataById[g.id] = g;
+    const { childMap, rawRootIds } = buildDocHierarchy(remDataById, data.stubData);
+    return {
+        ...data,
+        remDataList: [...data.remDataList, ...kept],
+        remDataById,
+        childMap,
+        rawRootIds,
+    };
+}
+
+/** Reviews and time of the deleted Rems in a period, for the Summary note. */
+function deletedRemsInPeriod(
+    rems: Iterable<RemData>,
+    startMs: number,
+    endMs: number,
+    cardCapMs: number,
+    ignorePreReset: boolean
+): { reps: number; timeMs: number } {
+    let reps = 0;
+    let timeMs = 0;
+    for (const rd of rems) {
+        if (!rd.deleted) continue;
+        const { self } = statsFromRem(rd, startMs, endMs, cardCapMs, ignorePreReset);
+        reps += self.cardReps + self.incRemReps;
+        timeMs += self.cardTimeMs + self.incRemTimeSec * 1000;
+    }
+    return { reps, timeMs };
 }
 
 // Aggregate already-loaded document data for a specific period. Pure in-memory work.
@@ -1694,6 +1885,7 @@ function HierarchyRow({
     const remembered = Math.max(0, a.cardReps - a.cardForgot);
     const retention = retentionPercent(remembered, a.cardReps) ?? 0;
     const isStructural = !node.selfData;
+    const isDeleted = !!node.selfData?.deleted;
 
     // Subtle per-level shading so the eye can follow the hierarchy. Uses a neutral
     // grey with alpha so it works in both light and dark themes. Caps at depth 6 to
@@ -1740,6 +1932,19 @@ function HierarchyRow({
                 >
                     {hasChildren ? (expanded ? '▼' : '▶') : '•'}
                 </div>
+                {isDeleted && (
+                    <span
+                        style={{ marginRight: 4, cursor: 'help', flexShrink: 0 }}
+                        title={
+                            node.selfData?.deletedAt
+                                ? `Deleted on ${new Date(node.selfData.deletedAt).toLocaleDateString()}. Its reviews come from the helper's history archive.`
+                                : "Deleted. Its reviews come from the helper's history archive."
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        🗑
+                    </span>
+                )}
                 {node.selfData?.isInc && (
                     <span style={{ color: '#22c55e', marginRight: 4 }}>●</span>
                 )}
@@ -1752,8 +1957,8 @@ function HierarchyRow({
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        fontStyle: isStructural ? 'italic' : 'normal',
-                        color: isStructural ? 'var(--rn-clr-content-tertiary)' : undefined,
+                        fontStyle: isStructural || isDeleted ? 'italic' : 'normal',
+                        color: isStructural || isDeleted ? 'var(--rn-clr-content-tertiary)' : undefined,
                     }}
                 >
                     {nameSegments === undefined ? (
@@ -1824,6 +2029,7 @@ function HierarchyRow({
             <div style={{ textAlign: 'right' }}>
                 <SpeedCell cardReps={a.cardReps} cardTimeMs={a.cardTimeMs} />
             </div>
+            {isDeleted ? <div /> : (
             <button
                 onClick={async (e) => {
                     e.stopPropagation();
@@ -1849,6 +2055,7 @@ function HierarchyRow({
             >
                 ↗
             </button>
+            )}
         </div>
     );
 }
@@ -1987,7 +2194,9 @@ function StudyDashboardPopup() {
 
     const ctx = useRunAsync(async () => {
         try {
-            return await plugin.widget.getWidgetContext<WidgetLocation.Popup>();
+            // Never undefined once resolved: undefined means "still loading",
+            // which the first load waits on.
+            return (await plugin.widget.getWidgetContext<WidgetLocation.Popup>()) ?? null;
         } catch {
             return null;
         }
@@ -2003,7 +2212,18 @@ function StudyDashboardPopup() {
     // importing documents whose foreign repetition history would otherwise
     // skew retention, time, and CPM.
     const [ignorePreReset, setIgnorePreReset] = useState<boolean>(false);
+    // Deleted Rems from the desktop helper's history archive. On by default.
+    const [includeDeleted, setIncludeDeleted] = useState<boolean>(true);
     const [contextMode, setContextMode] = useState<ContextMode>('global');
+    // The Menu Hub opens the dashboard on a document or queue scope and asks for
+    // Document mode up front (`startInDocument`); the command keeps Global. The
+    // first load waits for this, or it would load the whole KB only to drop it.
+    const [modeInitialized, setModeInitialized] = useState(false);
+    useEffect(() => {
+        if (ctx === undefined || modeInitialized) return;
+        if (ctxRemId && (ctx as any)?.contextData?.startInDocument) setContextMode('document');
+        setModeInitialized(true);
+    }, [ctx, ctxRemId, modeInitialized]);
     const [tab, setTab] = useState<DashboardTab>('overview');
     const [granularity, setGranularity] = useState<TimelineGranularity>('day');
     // Stacked by default: the bar height then *is* the bucket's total time.
@@ -2076,6 +2296,7 @@ function StudyDashboardPopup() {
                 customStart?: string;
                 customEnd?: string;
                 ignorePreReset?: boolean;
+                includeDeleted?: boolean;
                 tab?: DashboardTab;
                 granularity?: TimelineGranularity;
                 stackedTime?: boolean;
@@ -2088,6 +2309,9 @@ function StudyDashboardPopup() {
                 if (saved?.customEnd !== undefined) setCustomEnd(saved.customEnd);
                 if (typeof saved?.ignorePreReset === 'boolean') {
                     setIgnorePreReset(saved.ignorePreReset);
+                }
+                if (typeof saved?.includeDeleted === 'boolean') {
+                    setIncludeDeleted(saved.includeDeleted);
                 }
                 if (saved?.tab === 'overview' || saved?.tab === 'graphs') setTab(saved.tab);
                 if (
@@ -2116,6 +2340,7 @@ function StudyDashboardPopup() {
                 customStart,
                 customEnd,
                 ignorePreReset,
+                includeDeleted,
                 tab,
                 granularity,
                 stackedTime,
@@ -2128,6 +2353,7 @@ function StudyDashboardPopup() {
         customStart,
         customEnd,
         ignorePreReset,
+        includeDeleted,
         tab,
         granularity,
         stackedTime,
@@ -2150,6 +2376,14 @@ function StudyDashboardPopup() {
     );
     const [summary, setSummary] = useState<SummaryStats | null>(null);
     const [timelineDays, setTimelineDays] = useState<TimelineDay[] | null>(null);
+    // The helper's answer, fetched once per opening: undefined while asked,
+    // null when it isn't running.
+    const ghostPayloadRef = useRef<Promise<GhostPayload | null> | null>(null);
+    const [ghostStatus, setGhostStatus] = useState<'loading' | 'off' | 'on'>('loading');
+    const [deletedInPeriod, setDeletedInPeriod] = useState<{ reps: number; timeMs: number } | null>(null);
+    // Live data with the deleted Rems added, per loaded data object.
+    const ghostGlobalRef = useRef<{ base: LoadedGlobalData; data: LoadedGlobalData } | null>(null);
+    const ghostDocRef = useRef<{ base: LoadedDocumentData; data: LoadedDocumentData } | null>(null);
     const runIdRef = useRef(0);
     // Cached global-mode raw data — survives across period changes.
     // Invalidated only when the context switches into Global from scratch (per session).
@@ -2181,6 +2415,20 @@ function StudyDashboardPopup() {
         setGlobalTops(undefined);
         setSummary(null);
         setTimelineDays(null);
+        setDeletedInPeriod(null);
+
+        // Ask the helper alongside the live load. It scans remnote.db first (~4 s),
+        // so a Rem deleted since its last background scan is included.
+        if (!ghostPayloadRef.current) {
+            ghostPayloadRef.current = plugin.kb
+                .getCurrentKnowledgeBaseData()
+                .then(async (kb) => (kb?._id ? fetchGhosts(kb._id, { scan: true, headers: await helperHeaders(plugin) }) : null))
+                .catch(() => null)
+                .then((p) => {
+                    setGhostStatus(p ? 'on' : 'off');
+                    return p;
+                });
+        }
 
         try {
             if (contextMode === 'document' && ctxRemId) {
@@ -2208,8 +2456,19 @@ function StudyDashboardPopup() {
                     docDataRef.current = loaded;
                 }
                 if (runId !== runIdRef.current) return;
+                let docData = docDataRef.current!;
+                if (includeDeleted) {
+                    const payload = await ghostPayloadRef.current;
+                    if (runId !== runIdRef.current) return;
+                    if (payload) {
+                        if (ghostDocRef.current?.base !== docData) {
+                            ghostDocRef.current = { base: docData, data: withGhostsDocument(docData, payload) };
+                        }
+                        docData = ghostDocRef.current.data;
+                    }
+                }
                 const { tree, summary: s } = aggregateDocumentData(
-                    docDataRef.current!,
+                    docData,
                     startMs,
                     endMs,
                     cardCapMs,
@@ -2222,9 +2481,12 @@ function StudyDashboardPopup() {
                 if (runId !== runIdRef.current) return;
                 setDocTree(tree);
                 setSummary(s);
+                setDeletedInPeriod(
+                    deletedRemsInPeriod(docData.remDataList, startMs, endMs, cardCapMs, ignorePreReset)
+                );
                 setTimelineDays(
                     buildTimelineDays(
-                        docDataRef.current!.remDataList,
+                        docData.remDataList,
                         startMs,
                         endMs,
                         cardCapMs,
@@ -2243,8 +2505,24 @@ function StudyDashboardPopup() {
                     globalDataRef.current = loaded;
                 }
                 if (runId !== runIdRef.current) return;
+                let globalData = globalDataRef.current;
+                if (includeDeleted) {
+                    const payload = await ghostPayloadRef.current;
+                    if (runId !== runIdRef.current) return;
+                    if (payload) {
+                        if (ghostGlobalRef.current?.base !== globalData) {
+                            reportLoad(0.99, 'Placing deleted Rems…');
+                            ghostGlobalRef.current = {
+                                base: globalData,
+                                data: await withGhostsGlobal(plugin, globalData, payload),
+                            };
+                            if (runId !== runIdRef.current) return;
+                        }
+                        globalData = ghostGlobalRef.current.data;
+                    }
+                }
                 const r = aggregateGlobalData(
-                    globalDataRef.current,
+                    globalData,
                     startMs,
                     endMs,
                     cardCapMs,
@@ -2258,9 +2536,12 @@ function StudyDashboardPopup() {
                 setGlobalTops(r.topLevels);
                 setGlobalSubtreesByTop(r.subtreesByTop);
                 setSummary(r.summary);
+                setDeletedInPeriod(
+                    deletedRemsInPeriod(globalData.remDataById.values(), startMs, endMs, cardCapMs, ignorePreReset)
+                );
                 setTimelineDays(
                     buildTimelineDays(
-                        globalDataRef.current.remDataById.values(),
+                        globalData.remDataById.values(),
                         startMs,
                         endMs,
                         cardCapMs,
@@ -2275,12 +2556,12 @@ function StudyDashboardPopup() {
                 setProgress({ running: false, percent: 1, label: '' });
             }
         }
-    }, [plugin, contextMode, ctxRemId, scope, startMs, endMs, cardCapMs, ignorePreReset]);
+    }, [plugin, contextMode, ctxRemId, scope, startMs, endMs, cardCapMs, ignorePreReset, includeDeleted]);
 
     useEffect(() => {
-        if (cardCapMs == null) return;
+        if (cardCapMs == null || !modeInitialized) return;
         run();
-    }, [run, cardCapMs]);
+    }, [run, cardCapMs, modeInitialized]);
 
     const containerStyle: React.CSSProperties = {
         width: '900px',
@@ -2524,6 +2805,27 @@ function StudyDashboardPopup() {
                         <span className="opacity-50" style={{ fontSize: '10px' }}>
                             (recomputes stats; does not modify stored history)
                         </span>
+                        <label
+                            className="flex items-center gap-2 cursor-pointer"
+                            style={{ marginLeft: 'auto', opacity: ghostStatus === 'off' ? 0.5 : 1 }}
+                            title={
+                                ghostStatus === 'off'
+                                    ? 'The history archive helper (scripts/ai_ocr_helper.py) is not running, so deleted Rems cannot be shown.'
+                                    : "Count the reviews of Rems you have deleted, kept by the desktop helper's history archive. They show in the tree with 🗑."
+                            }
+                        >
+                            <input
+                                type="checkbox"
+                                checked={includeDeleted}
+                                disabled={ghostStatus === 'off'}
+                                onChange={(e) => setIncludeDeleted(e.target.checked)}
+                                className="form-checkbox h-3.5 w-3.5"
+                                style={{ accentColor: ACCENT_COLOR }}
+                            />
+                            <span className="opacity-80">
+                                Include deleted Rems{ghostStatus === 'off' ? ' (helper not running)' : ''}
+                            </span>
+                        </label>
                     </div>
                 </div>
 
@@ -2598,6 +2900,15 @@ function StudyDashboardPopup() {
                             Summary
                         </div>
                         <SummaryCard summary={summary} />
+                        {includeDeleted && deletedInPeriod && deletedInPeriod.reps > 0 && (
+                            <div
+                                style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary)', marginTop: 6 }}
+                                title="Reviews of Rems you have since deleted, from the desktop helper's history archive. They are marked 🗑 in the hierarchy."
+                            >
+                                🗑 Includes {deletedInPeriod.reps.toLocaleString()} reps (
+                                {formatMs(deletedInPeriod.timeMs)}) from deleted Rems.
+                            </div>
+                        )}
                     </div>
                 )}
 

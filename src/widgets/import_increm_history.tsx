@@ -16,6 +16,7 @@ import {
 import { IncrementalRep, IncrementalRem } from '../lib/incremental_rem/types';
 import { getDailyDocReferenceForDate, sleep } from '../lib/utils';
 import { syncPriorityBand } from '../lib/priority_bands';
+import { resolveRemTextAsTitle } from '../lib/richTextRemRefs';
 
 /**
  * Import Incremental Rems with History
@@ -114,13 +115,23 @@ interface ImportResult {
   failed: { name: string; error: string }[];
 }
 
+/**
+ * A Rem's text as an import key. Pins are left out and references show their
+ * text (resolveRemTextAsTitle), so a chapter the user pinned something to
+ * after an import still matches its title on a re-run; RemNote's own
+ * toString would have expanded the pin into the pinned Rem's whole text.
+ */
 async function remTextToString(plugin: RNPlugin, rem: PluginRem): Promise<string> {
+  if (!rem.text?.length) return '';
   try {
-    return ((await plugin.richText.toString(rem.text || [])) || '').trim();
+    return await resolveRemTextAsTitle(plugin, rem.text);
   } catch {
     return '';
   }
 }
+
+/** A title from the import file, spaced the way remTextToString spaces a Rem's text. */
+const titleKey = (title: string) => title.replace(/\s+/g, ' ').trim();
 
 /** Map of child text → rem, used to make the import resume-safe. */
 async function childrenByText(plugin: RNPlugin, parent: PluginRem): Promise<Map<string, PluginRem>> {
@@ -238,7 +249,7 @@ async function runImport(
 
     for (const book of payload.books) {
       try {
-        let bookRem = existingBooks.get(book.title);
+        let bookRem = existingBooks.get(titleKey(book.title));
         let existingChapters: Map<string, PluginRem> | undefined;
         if (!bookRem) {
           const created = await plugin.rem.createRem();
@@ -261,7 +272,7 @@ async function runImport(
         for (const chapter of book.chapters) {
           setProgress({ done, total, current: `${book.title} / ${chapter.title}` });
           try {
-            let chapterRem = existingChapters?.get(chapter.title);
+            let chapterRem = existingChapters?.get(titleKey(chapter.title));
             if (!chapterRem) {
               const created = await plugin.rem.createRem();
               if (!created) throw new Error('createRem returned undefined');

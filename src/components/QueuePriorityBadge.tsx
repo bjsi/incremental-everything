@@ -17,13 +17,12 @@ import { getQueueVisibleCard } from '../lib/queue_visible_card';
 
 /**
  * The current queue item's priority badge; click opens the priority popup.
- * Shared by the Compact queue's toolbar widget and the Beautiful queue's
- * below-top-bar widget.
+ * Shown by the queue's toolbar widget (widgets/queue_toolbar_priority.tsx).
  *
- * @param active false stops the 500ms card poll and renders nothing — for an
- *   instance the host has hidden (see useHostShown).
+ * @param active false stops the 500ms card poll and renders nothing.
+ * @param hideIncRem renders nothing while the item is an Incremental Rem.
  */
-export function QueuePriorityBadge({ active = true }: { active?: boolean }) {
+export function QueuePriorityBadge({ active = true, hideIncRem = false }: { active?: boolean; hideIncRem?: boolean }) {
   const plugin = usePlugin();
 
   const isEnabled = useIESetting(displayQueueToolbarPriorityId);
@@ -113,6 +112,7 @@ export function QueuePriorityBadge({ active = true }: { active?: boolean }) {
   if (!active || !isEnabled || !contextData) return null;
 
   const { rem, incRemInfo } = contextData;
+  if (incRemInfo && hideIncRem) return null;
 
   let priority: number | undefined;
   let percentile: number | undefined | null;

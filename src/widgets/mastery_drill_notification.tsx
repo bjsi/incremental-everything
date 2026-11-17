@@ -1,6 +1,7 @@
 
 import { renderWidget, usePlugin, useTrackerPlugin } from "@remnote/plugin-sdk";
 import { withHoverTips } from "../components/HoverTipLayer";
+import { DrillIcon } from "../components/DrillIcon";
 import React, { useEffect, useState } from "react";
 import '../style.css';
 import '../App.css';
@@ -165,11 +166,9 @@ export const FinalDrillNotification = () => {
         <div style={containerStyle} className="flex flex-col gap-2 p-3 rounded-lg mb-2">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <img
-                        src="https://cdn-icons-png.flaticon.com/512/3534/3534117.png"
-                        alt="Drill"
-                        className="w-6 h-6"
-                    />
+                    <span style={{ color: "var(--rn-clr-content-primary)", display: "inline-flex" }}>
+                        <DrillIcon size={22} accent="#ef4444" />
+                    </span>
                     <span className="font-semibold text-sm">Mastery Drill</span>
                 </div>
                 <button

@@ -1,56 +1,32 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT, EXTRACT_EDITOR_FLOAT } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
-/* Shows each queue badge/timer widget in one queue variant only. RemNote wraps
-   each location widget as
-     div.fade-in-first-load.<location class> > div > iframe
-   and a hidden iframe is how the widget learns to stop polling (useHostShown).
+/* The regular-queue Mastery Drill bar sits at QueueBelowTopBar. Registering anything
+   there drops RemNote's own h-2 spacer (it renders only when the location is empty), so
+   the bar's wrapper keeps that 0.5rem. The slot is a flex child of the queue box without
+   shrink-0: once a revealed answer overflows the box, flexbox would squeeze the wrapper
+   and its overflow:hidden clip the bar.
 
-   Compact: the toolbar widgets live in the top bar. queue_beautiful_bar sits in
-   .rn-queue (which carries .queue-beautiful-box only in Beautiful) and is hidden.
-   Registering anything at QueueBelowTopBar drops RemNote's own h-2 spacer there
-   (it renders only when the location is empty), so its wrapper keeps that 0.5rem.
-
-   Beautiful: RemNote now mounts QueueToolbar widgets in the chrome's action row
-   (.queue-beautiful-chrome-actions), where the badge looks out of place — so our
-   two are hidden there and queue_beautiful_bar carries them. Its wrapper leaves
-   the flow and overlays the card box's top-right corner: the box already opens
-   with 40px of blank space (that 0.5rem spacer + the card content's pt-8) above
-   the breadcrumbs, and the ~36px badge row fits inside it. The spacer moves to
-   the next sibling so the card sits exactly where RemNote puts it. The width cap
-   keeps the transparent iframe from swallowing clicks across the whole strip
-   when the card content scrolls under it; lib/queue_beautiful_bar_fit narrows
-   it further, to the widget's reported content width. */
-const QUEUE_VARIANT_CSS = `
-  .queue-beautiful-chrome-actions .rn-queue__widget-toolbar:has(> div > iframe[data-plugin-id="incremental-everything"]:is([src*="widgetName=queue_toolbar_priority&"], [src*="widgetName=no_inc_timer_indicator&"])) {
-    display: none;
+   The queue's own badge and timer are one widget at QueueToolbar, in both variants
+   (queue_toolbar_priority). When the Beautiful queue first shipped its chrome showed no
+   QueueToolbar widgets, so a second widget carried them at QueueBelowTopBar; RemNote
+   now mounts them in the chrome's actions on a computer, and that workaround is gone.
+   On a phone the Beautiful chrome still mounts none. */
+// The other half of the toolbar widget's see-through page (useTransparentFrame in
+// widgets/queue_toolbar_priority.tsx): its iframe element's colour scheme is pinned to
+// the page's, whatever the queue chrome around it inherits.
+const TOOLBAR_FRAME_CSS = `
+  iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_toolbar_priority&"] {
+    color-scheme: light !important;
   }
-  .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) {
+`;
+
+const QUEUE_BELOW_TOP_BAR_CSS = `
+  .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=mastery_drill_queue_bar&"]) {
     min-height: 0.5rem;
     flex-shrink: 0;
-  }
-  /* The slot is a flex child of the queue box without shrink-0: once a revealed answer
-     overflows the box, flexbox squeezes the wrapper and its overflow:hidden clips the bar. */
-  .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=mastery_drill_queue_bar&"]) {
-    flex-shrink: 0;
-  }
-  /* In Beautiful the overlay below also covers the drill bar's right end. Both are sized to
-     the overlay's content by lib/queue_beautiful_bar_fit; the width below is the fallback. */
-  .rn-queue:not(.queue-beautiful-box) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"] {
-    display: none;
-  }
-  .queue-beautiful-box > .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: min(360px, 60%);
-    min-height: 0;
-    z-index: 5;
-  }
-  .queue-beautiful-box > .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) + * {
-    margin-top: 0.5rem;
   }
 `;
 
@@ -126,6 +102,40 @@ const SOURCE_FLOATING_POPUPS_CSS = `
       position: relative;
       z-index: 60;
     }
+  }
+`;
+
+// The Extract Editor is a float too, holding a real editor: its slash menu, reference
+// search and formatting bar are host popups, which would open under it for the same
+// reason. Same lift, same exclusion.
+//
+// The bar that appears over selected text (bold, highlight, cloze…) is not in that
+// portal: RemNote portals it straight into <body> as .rn-selected-text-menu, at z 30
+// (40 over a popup), so it too opened under the float (z 50). It goes between the
+// float and the lifted portal, where its own dropdowns open.
+const EXTRACT_EDITOR_POPUPS_CSS = `
+  @media (pointer: fine) {
+    body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) #controlled-popup-portal {
+      position: relative;
+      z-index: 60;
+    }
+  }
+  body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) .rn-selected-text-menu {
+    z-index: 55 !important;
+  }
+
+  /* On a phone the DocumentViewer is RemNote's mobile document page, which opens with
+     its own top bar (PageHeaderMobile: back arrow, breadcrumb, actions) and a spacer
+     the height of the screen's safe area (--safe-area-inset-top). In a floating panel
+     these covered the first lines of the Rem, and moved with the panel when dragged.
+     Inside the panel the safe area is zero, and the bar is the plugin's own (Done). */
+  div.absolute.z-50:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) {
+    --safe-area-inset-top: 0px !important;
+  }
+  div.absolute.z-50:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) .rn-page-header-mobile,
+  div.absolute.z-50:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) [data-covers-top-area="true"],
+  div.absolute.z-50:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) div[aria-hidden="true"][class*="-mt-safe"] {
+    display: none !important;
   }
 `;
 
@@ -278,13 +288,8 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerWidget('no_inc_timer_indicator', WidgetLocation.QueueToolbar, {
-    dimensions: {
-      width: 'auto',
-      height: 'auto',
-    },
-  });
-
+  // The queue's toolbar: the No-Inc countdown and the priority badge, one iframe for
+  // both queue variants (widgets/queue_toolbar_priority.tsx).
   plugin.app.registerWidget('queue_toolbar_priority', WidgetLocation.QueueToolbar, {
     dimensions: {
       width: 'auto',
@@ -292,16 +297,8 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // Beautiful queue variant: carries the two widgets above at QueueBelowTopBar
-  // (top of the card box). QUEUE_VARIANT_CSS hides it in Compact, and hides the
-  // two above in the Beautiful chrome, so each variant shows one copy.
-  plugin.app.registerWidget('queue_beautiful_bar', WidgetLocation.QueueBelowTopBar, {
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
-  await plugin.app.registerCSS('queue-beautiful-bar', QUEUE_VARIANT_CSS);
+  await plugin.app.registerCSS('queue-below-top-bar', QUEUE_BELOW_TOP_BAR_CSS);
+  await plugin.app.registerCSS('queue-toolbar-frame', TOOLBAR_FRAME_CSS);
   await plugin.app.registerCSS('sidebar-end-padding', SIDEBAR_END_PADDING_CSS);
   await plugin.app.registerCSS('editor-review-timer-sticky', EDITOR_REVIEW_TIMER_STICKY_CSS);
 
@@ -386,6 +383,14 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Copy Rem ID's picker: the focused Rem, its sources, the PDF open in the pane.
+  plugin.app.registerWidget('copy_rem_id_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 480,
+      height: 'auto',
+    },
+  });
+
   // Scan → review → delete for entries left behind in Priority Review Documents.
   // Tall and scrollable because the review stage is also the diagnostic: it lists
   // every document with what it still carries, and you tick which ones to clean.
@@ -429,6 +434,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   // The timer's controls over RemNote's video page; opened by lib/video_review_bar.ts.
   plugin.app.registerWidget('video_review_bar', WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+
+  // The Audio Playlist player (lib/audio_playlist.ts), opened and kept open by the index.
+  // 'auto' both ways: it sizes itself, to a panel or to a bar, and to a phone's width.
+  plugin.app.registerWidget(AUDIO_PLAYLIST_FLOAT, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+
+  // Notices of background work (lib/notice.ts), opened and closed by the index.
+  plugin.app.registerWidget('notice_float', WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 'auto' },
   });
 
@@ -587,6 +603,18 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Search & Browse (components/SearchBrowseView.tsx): a floating panel over the
+  // AI helper's Search Engine. Floating, not a popup, so it can collapse to a small
+  // bar while you work in the editor and come back with its search and scroll
+  // intact. Width follows RemNote's window ('90vw'); the height (a number, by the
+  // type) is fitted to the display, and the panel trims itself to the window.
+  plugin.app.registerWidget('search_browse_floating', WidgetLocation.FloatingWidget, {
+    dimensions: {
+      width: '90vw',
+      height: screenFittedHeight(640, 1300, 0.86),
+    },
+  });
+
   // Wide variant: same component, registered at ~2× width so the `wsh` command
   // can show Incremental Rems and Cards side-by-side when both groups are present.
   plugin.app.registerWidget('weighted_shield_popup_wide', WidgetLocation.Popup, {
@@ -651,8 +679,21 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
       height: screenFittedHeight(640, 1100),
     },
   });
+  // Read aloud: editable script, the helper's estimate, Generate (lib/read_aloud.ts).
+  plugin.app.registerWidget(READ_ALOUD_POPUP, WidgetLocation.Popup, {
+    dimensions: {
+      width: 820,
+      height: screenFittedHeight(560, 900),
+    },
+  });
   plugin.app.registerWidget('image_size_feedback', WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 'auto' },
+  });
+
+  // Menu Hub: the Document and Queue menus' actions in a panel that stays open,
+  // opened by their "Incremental RemNote…" items (lib/menu_hub_actions.ts).
+  plugin.app.registerWidget(menuHubWidgetId, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 300 },
   });
 
   // Floating (non-blocking) variant of the Source popup — opens to the side so
@@ -673,6 +714,13 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
   await plugin.app.registerCSS('source-floating-popups', SOURCE_FLOATING_POPUPS_CSS);
+
+  // The Extract Editor (lib/extract_editor.ts): an editable document page over the
+  // queue's read-only Extract Viewer. Sized by its content, which the opener sets.
+  plugin.app.registerWidget(EXTRACT_EDITOR_FLOAT, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+  await plugin.app.registerCSS('extract-editor-popups', EXTRACT_EDITOR_POPUPS_CSS);
 
   // Outline Restructure preview popup (Before | After + per-rem preserve toggles).
   plugin.app.registerWidget('outline_restructure_preview', WidgetLocation.Popup, {

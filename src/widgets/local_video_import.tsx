@@ -74,7 +74,7 @@ export function LocalVideoImportPopup() {
       setPriority(Math.min(100, Math.max(0, (await getIESetting(plugin, defaultPriorityId)) || 10)));
       try {
         const [tree, existing] = await Promise.all([
-          scanVideoFolder(data.library, data.path),
+          scanVideoFolder(plugin, data.library, data.path),
           existingLocalVideos(plugin),
         ]);
         setPhase({

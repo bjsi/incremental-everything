@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { DrillIcon } from '../components/DrillIcon';
 import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import '../style.css';
@@ -46,9 +47,10 @@ import { openMasteryDrill as launchMasteryDrill } from '../lib/mastery_drill_lau
  * The "Incremental RemNote" sidebar hub.
  *
  * The plugin's surface is spread across a slash-command list, a settings popup,
- * two document menus and a dozen shortcuts, none of which announce themselves.
- * This panel is the one fixed place that does: five things a new user needs
- * within reach, and one tip per session from the onboarding pile.
+ * a Menu Hub behind the document and queue menus, and a dozen shortcuts, none
+ * of which announce themselves. This panel is the one fixed place that does:
+ * five things a new user needs within reach, and one tip per session from the
+ * onboarding pile.
  *
  * It sits in `SidebarEnd` next to the Mastery Drill notification, and is not
  * gated behind a setting — it is the entry point, so it has to be there before
@@ -341,12 +343,13 @@ const GlobeIcon = ({ size = 18 }: IconProps) => {
   );
 };
 
+/** The Mastery Drill's own icon (components/DrillIcon), at the row's size and weight. */
+/**
+ * The Mastery Drill's own icon (components/DrillIcon), as in the drill bar: the outline
+ * in the row's colour, only the centre dot in rose.
+ */
 const TargetIcon = ({ size = 18 }: IconProps) => (
-  <svg {...iconAttrs(size)} aria-hidden>
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="12" r="6" />
-    <circle cx="12" cy="12" r="2" />
-  </svg>
+  <DrillIcon size={size} accent="#f43f5e" strokeWidth={iconAttrs(size).strokeWidth as number} />
 );
 
 const KeyboardIcon = ({ size = 18 }: IconProps) => (

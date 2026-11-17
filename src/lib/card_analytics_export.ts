@@ -17,6 +17,7 @@
  */
 
 import { RNPlugin, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import type { HelperSuppressionCause } from './rem_search_protocol';
 import { CardAnalyticsRow } from './card_analytics';
 import { safeRemTextToString } from './pdfUtils';
 import { powerupCode as INCREMENTAL_POWERUP_CODE } from './consts';
@@ -430,6 +431,7 @@ export function summarizeRows(
   rows: CardAnalyticsRow[],
   context?: Map<string, RemContext>,
   pausedScanApplied = false,
+  causeOf?: (row: CardAnalyticsRow) => UnscheduledCause | undefined,
 ): ExportSummary {
   const rollups = rollupByRem(rows);
   const causeCounts = new Map<UnscheduledCause, { cards: number; newCards: number }>();
@@ -509,7 +511,7 @@ export function summarizeRows(
     // it belongs in the cause breakdown either way.
     if (r.scheduleState === 'unscheduled' || r.inPausedDeck) {
       if (r.scheduleState === 'unscheduled') summary.unscheduledTotal++;
-      const cause = classifyUnscheduled(context?.get(r.remId), r);
+      const cause = causeOf?.(r) ?? classifyUnscheduled(context?.get(r.remId), r);
       const entry = causeCounts.get(cause) ?? { cards: 0, newCards: 0 };
       entry.cards++;
       if (r.isNew) entry.newCards++;
@@ -617,6 +619,71 @@ async function ancestorFacts(rem: any, cache: Map<string, AncestorFacts>): Promi
  * never surface, so they are the ones worth the IPC cost. Most important
  * (lowest priority number) first, capped at `maxRems`.
  */
+/** The helper's names for suppression causes (rem_search.py SUPPRESSED) → this module's. */
+export const HELPER_CAUSES: Record<HelperSuppressionCause, UnscheduledCause> = {
+  paused: 'paused-document',
+  ancestor: 'cards-disabled-ancestor',
+  rem: 'cards-disabled-rem',
+  table: 'cards-disabled-table',
+  direction: 'direction-disabled',
+  cloze: 'card-disabled-individually',
+  removed: 'markup-removed',
+  other: 'not-surfaced-unknown',
+  missing: 'rem-missing',
+};
+
+/**
+ * Rem context when the helper already gave every card its cause: only what the
+ * Suppressed Cards list shows (front, back, cloze words, table), resolved for the
+ * Rems with a suppressed card, best priority first. A few bridge calls per Rem,
+ * where resolveAnomalyRemContext walks ancestors and reads cards and switches.
+ */
+export async function resolveSuppressedRemTexts(
+  plugin: RNPlugin,
+  rows: CardAnalyticsRow[],
+  suppressed: (row: CardAnalyticsRow) => boolean,
+  inTable: Set<string>,
+  maxRems: number,
+  onProgress?: (done: number, total: number) => void,
+): Promise<Map<string, RemContext>> {
+  const byRem = new Map<string, number>();
+  for (const r of rows) {
+    if (!suppressed(r)) continue;
+    const prev = byRem.get(r.remId);
+    if (prev === undefined || r.priority < prev) byRem.set(r.remId, r.priority);
+  }
+  const targets = Array.from(byRem.entries())
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, maxRems)
+    .map(([remId]) => remId);
+  const out = new Map<string, RemContext>();
+  for (let i = 0; i < targets.length; i++) {
+    const remId = targets[i];
+    const rem = await plugin.rem.findOne(remId).catch(() => undefined);
+    const hasBack = !!rem && Array.isArray(rem.backText) && rem.backText.length > 0;
+    out.set(remId, {
+      text: rem ? await safeRemTextToString(plugin, rem.text) : '',
+      enablePractice: null,
+      practiceDirection: null,
+      disableCardsOwn: false,
+      disableCardsAncestor: false,
+      disablingAncestorId: null,
+      clozeIds: rem ? Array.from(collectClozeIds(rem.text)) : [],
+      hasBackText: hasBack,
+      backText: hasBack ? await safeRemTextToString(plugin, rem!.backText) : '',
+      clozeTexts: rem ? collectClozeTexts(rem.text) : [],
+      isTableOwn: false,
+      inTable: inTable.has(remId),
+      cardsViaGetCards: null,
+      inPausedDocument: false,
+      missing: !rem,
+    });
+    if ((i + 1) % 25 === 0) onProgress?.(i + 1, targets.length);
+  }
+  onProgress?.(targets.length, targets.length);
+  return out;
+}
+
 export async function resolveAnomalyRemContext(
   plugin: RNPlugin,
   rows: CardAnalyticsRow[],
@@ -1261,14 +1328,17 @@ export interface SuppressionReport {
   entries: SuppressedRemEntry[];
   computedAt: number;
   pausedScanApplied: boolean;
+  /** Causes read from the AI helper's index rather than inferred Rem by Rem. */
+  viaHelper?: boolean;
 }
 
 export function buildSuppressionReport(
   rows: CardAnalyticsRow[],
   context: Map<string, RemContext>,
   pausedScanApplied: boolean,
+  causeOf?: (row: CardAnalyticsRow) => UnscheduledCause | undefined,
 ): SuppressionReport {
-  const summary = summarizeRows(rows, context, pausedScanApplied);
+  const summary = summarizeRows(rows, context, pausedScanApplied, causeOf);
   const rollups = new Map<string, number>();
   for (const r of rows) rollups.set(r.remId, (rollups.get(r.remId) ?? 0) + 1);
 
@@ -1276,7 +1346,7 @@ export function buildSuppressionReport(
   for (const r of rows) {
     if (r.scheduleState !== 'unscheduled' && !r.inPausedDeck) continue;
     const ctx = context.get(r.remId);
-    const cause = classifyUnscheduled(ctx, r);
+    const cause = causeOf?.(r) ?? classifyUnscheduled(ctx, r);
     const key = `${r.bucket}|${cause}|${r.remId}`;
     let entry = byKey.get(key);
     if (!entry) {

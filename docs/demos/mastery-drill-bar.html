@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mastery Drill Bar</title>
+<!--
+  Interactive demo for docs/History-Queue-Dashboard-and-Mastery-Drill.md#queue-management,
+  embedded there and in the Changelog in an iframe. A mock of the regular-queue drill
+  bar (src/components/MasteryDrillHeader.tsx, design "Captioned clusters") with the
+  drill icon (src/components/DrillIcon.tsx), inside the Beautiful queue's card box.
+  Example numbers only; nothing runs.
+
+  Theme: follows the manual's light/dark toggle (Material's data-md-color-scheme
+  on the parent page, same origin), else the OS setting.
+-->
+<style>
+:root {
+  --box: #ffffff; --box-ring: #e5e7eb; --text: #1f2937; --sub: #6b7280;
+  --btn: #374151; --cap: #9aa1ad; --track: #f5f6f8; --track-border: #e6e8ec; --hover: #ffffff;
+  --count: #e11d48; --edit: #ea580c; --clear: #dc2626;
+  --old: #a16207; --old-bg: #fde68a; --old-ink: #78350f;
+  --input-border: #d1d5db; --status: #6b7280;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+:root.dark {
+  --box: #1b1c22; --box-ring: #2c2e36; --text: #e5e7eb; --sub: #9ca3af;
+  --btn: #d1d5db; --cap: #7a808c; --track: #23252d; --track-border: #33363f; --hover: #30333c;
+  --count: #fb7185; --edit: #fb923c; --clear: #f87171;
+  --old: #facc15; --old-bg: rgba(250, 204, 21, .2); --old-ink: #fde047;
+  --input-border: #3f424d; --status: #9ca3af;
+  color-scheme: dark;
+}
+html, body { margin: 0; background: transparent; color: var(--text); }
+body { padding: 4px 2px 8px; font-size: 13px; -webkit-font-smoothing: antialiased; }
+
+.box { position: relative; background: var(--box); box-shadow: 0 0 0 1px var(--box-ring); border-radius: 16px; padding: 10px 14px 18px; }
+.p50 { position: absolute; top: 10px; right: 16px; background: #3b82f6; color: #fff; font-weight: 600; font-size: 12px; padding: 3px 10px; border-radius: 5px; }
+
+.row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 6px 14px; padding-right: 64px; }
+.stat, .cluster { display: flex; flex-direction: column; gap: 2px; }
+.title { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text); white-space: nowrap; line-height: 14px; }
+.cap { font-size: 9.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--cap); padding-left: 3px; white-space: nowrap; line-height: 12px; }
+.cluster.edit .cap { color: var(--edit); }
+.cluster.clear .cap { color: var(--clear); }
+.line { display: flex; align-items: center; gap: 6px; height: 28px; white-space: nowrap; }
+.icon { color: var(--text); display: inline-flex; }
+.count { font-size: 12.5px; font-weight: 600; color: var(--count); cursor: pointer; font-variant-numeric: tabular-nums; }
+.count:hover { text-decoration: underline; text-underline-offset: 2px; }
+.cooling { font-size: 12px; color: var(--cap); }
+.track { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--track); border: 1px solid var(--track-border); }
+.track button {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border: 0; border-radius: 6px;
+  background: transparent; cursor: pointer; white-space: nowrap; font: inherit; font-size: 12px; font-weight: 500; color: var(--btn);
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+.track button:hover { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.track button:focus-visible { outline: 2px solid #3b82f6; outline-offset: 1px; }
+.track button svg { width: 13px; height: 13px; opacity: .7; }
+.track button.old { color: var(--old); }
+.track button.old .n { font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 0 5px; background: var(--old-bg); color: var(--old-ink); }
+
+.note { display: none; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--sub); }
+.note.open { display: flex; }
+.note input { flex: 1; max-width: 380px; font: inherit; font-size: 12px; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--input-border); background: transparent; color: var(--text); outline: none; }
+.note input:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,.18); }
+.note button { font: inherit; font-size: 12px; border-radius: 6px; padding: 4px 10px; cursor: pointer; border: 1px solid var(--input-border); background: transparent; color: var(--sub); }
+.note button.set { background: #f97316; border-color: #f97316; color: #fff; }
+
+.crumbs { margin-top: 16px; font-size: 13px; color: var(--sub); }
+.crumbs span { margin: 0 7px; opacity: .6; }
+.q { margin-top: 8px; font-size: 15px; }
+.status { min-height: 1.4em; margin-top: 10px; text-align: center; color: var(--status); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="box">
+  <div class="p50">P50</div>
+  <div class="row">
+    <div class="stat">
+      <span class="title">Mastery Drill</span>
+      <div class="line">
+        <span class="icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5V7h-3.5"/>
+            <circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="1.4" fill="var(--count)" stroke="var(--count)"/>
+          </svg>
+        </span>
+        <span class="count" data-say="Opens the Card List, with every card in the drill.">14 remaining</span>
+        <span class="cooling" title="Cards still waiting out their delay">· 6 cooling</span>
+      </div>
+    </div>
+    <div class="cluster">
+      <span class="cap">Card</span>
+      <div class="track">
+        <button data-say="Opens the Card List: every card in the drill, and whether RemNote can show it."><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 4h10M3 8h10M3 12h6"/></svg>List</button>
+        <button data-say="Takes the card on screen out of the drill without rating it."><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>Remove</button>
+      </div>
+    </div>
+    <div class="cluster edit">
+      <span class="cap">Edit later</span>
+      <div class="track">
+        <button data-note="current">Current</button>
+        <button data-note="previous">Previous</button>
+      </div>
+    </div>
+    <div class="cluster clear">
+      <span class="cap">Clear</span>
+      <div class="track">
+        <button data-say="Asks to confirm, then empties the drill.">All</button>
+        <button data-say="Opens the priority distribution of the drill cards, to remove those above a threshold.">Low priority</button>
+        <button class="old" data-say="Removes the 14 cards that have been ready for more than 7 days.">Old <span class="n">14 &gt; 7d</span></button>
+      </div>
+    </div>
+  </div>
+  <div class="note" id="note">
+    <span id="noteLabel">Edit Later note:</span>
+    <input id="noteInput" placeholder="Mastery Drill">
+    <button class="set" id="noteSet">Set</button>
+    <button id="noteCancel">Cancel</button>
+  </div>
+  <div class="crumbs">English<span>›</span>Vocab<span>›</span>Verb</div>
+  <div class="q">Wit · Past tense → Recall the description</div>
+</div>
+<div class="status" id="status">Hover or click the buttons. <em>(A mock: nothing runs.)</em></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let target = null;
+function say(text) { $("status").textContent = text; fit(); }
+document.querySelectorAll("[data-say]").forEach((el) => el.addEventListener("click", () => say(el.dataset.say)));
+document.querySelectorAll("[data-note]").forEach((el) => el.addEventListener("click", () => {
+  target = el.dataset.note;
+  $("noteLabel").textContent = target === "previous" ? "Edit Later note (previous card):" : "Edit Later note:";
+  $("noteInput").value = "";
+  $("note").classList.add("open");
+  $("noteInput").focus();
+  say(target === "previous"
+    ? "Tags the card you just rated Edit Later — its rating stays — and takes it out of the drill."
+    : "Tags the card on screen Edit Later and takes it out of the drill.");
+}));
+function closeNote(done) {
+  $("note").classList.remove("open");
+  if (done) say(`Edit Later set on the ${target} card${$("noteInput").value ? `, note: “${$("noteInput").value}”` : ""}.`);
+  fit();
+}
+$("noteSet").addEventListener("click", () => closeNote(true));
+$("noteCancel").addEventListener("click", () => closeNote(false));
+$("noteInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") closeNote(true);
+  else if (e.key === "Escape") closeNote(false);
+});
+
+// ---- Theme: the manual's own toggle when embedded, else the OS ----
+function applyTheme() {
+  let dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+  try {
+    const scheme = window.parent !== window && parent.document.body.getAttribute("data-md-color-scheme");
+    if (scheme) dark = scheme === "slate";
+  } catch (e) { /* not same-origin: keep the OS setting */ }
+  document.documentElement.classList.toggle("dark", dark);
+}
+applyTheme();
+try {
+  if (window.parent !== window) new parent.MutationObserver(applyTheme).observe(parent.document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
+} catch (e) {}
+if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+
+// ---- Size the iframe to the content (the bar wraps on narrow screens) ----
+function fit() {
+  try { if (window.frameElement) window.frameElement.style.height = document.documentElement.scrollHeight + "px"; } catch (e) {}
+}
+window.addEventListener("load", fit);
+window.addEventListener("resize", fit);
+</script>
+</body>
+</html>

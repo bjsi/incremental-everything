@@ -11,6 +11,10 @@ interface DraggableButtonProps {
   onDragUp?: () => Promise<void> | void;
   onDragDown?: () => Promise<void> | void;
   style?: React.CSSProperties;
+  /** For the element around the button: how it sits in the caller's row (flex, width). */
+  wrapperStyle?: React.CSSProperties;
+  /** Leave out the ↕ drag hint (the drag still works): for a button short of room. */
+  hideGrip?: boolean;
   title?: string;
 }
 
@@ -30,6 +34,8 @@ export function DraggableButton({
   onDragUp,
   onDragDown,
   style,
+  wrapperStyle,
+  hideGrip = false,
   title,
 }: DraggableButtonProps) {
   const [dragMode, setDragMode] = React.useState<'up' | 'down' | null>(null);
@@ -120,16 +126,14 @@ export function DraggableButton({
   const dragFeedbackStyle: React.CSSProperties =
     dragMode === 'up'
       ? {
-        transform: 'translateY(-4px)',
-        boxShadow: '0 8px 18px rgba(59,130,246,0.25)',
+        transform: 'translateY(-3px)',
         borderColor: 'var(--rn-clr-blue, #3b82f6)',
         backgroundColor: 'var(--rn-clr-blue-light, #e0ecff)',
         color: 'var(--rn-clr-blue-dark, #1e3a8a)',
       }
       : dragMode === 'down'
         ? {
-          transform: 'translateY(4px)',
-          boxShadow: '0 8px 18px rgba(16,185,129,0.18)',
+          transform: 'translateY(3px)',
           borderColor: 'var(--rn-clr-green, #10b981)',
           backgroundColor: 'var(--rn-clr-green-light, #dcfce7)',
           color: 'var(--rn-clr-green-dark, #064e3b)',
@@ -144,7 +148,7 @@ export function DraggableButton({
         : null;
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', overflow: 'visible', zIndex: 1 }} title={title}>
+    <div style={{ position: 'relative', display: 'inline-flex', overflow: 'visible', zIndex: 1, ...wrapperStyle }} title={title}>
       <button
         onClick={async () => {
           if (skipNextClick.current) {
@@ -163,24 +167,33 @@ export function DraggableButton({
           ...variantStyles,
           ...dragFeedbackStyle,
           userSelect: 'none',
+          touchAction: 'none',
+          transition: 'transform 0.12s ease, background-color 0.15s ease, filter 0.15s ease',
           ...style,
+        }}
+        onMouseEnter={(e) => {
+          if (!dragMode) e.currentTarget.style.filter = styles.hoverFilter;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.filter = 'none';
         }}
       >
         {dragMode ? (
           <span style={{ fontWeight: 700, fontSize: '12px' }}>{activeContent}</span>
         ) : (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
             {children}
-            <span
+            {!hideGrip && (<span
               aria-hidden
               style={{
                 fontSize: '11px',
+                flex: 'none',
                 opacity: 0.6,
                 animation: 'bobDragHint 900ms ease-in-out infinite',
               }}
             >
               ↕
-            </span>
+            </span>)}
           </span>
         )}
       </button>

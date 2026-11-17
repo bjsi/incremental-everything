@@ -640,6 +640,7 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         getDailyDocReferenceForDate(plugin, nextRepDate),
       ]);
       if (!dateRef) {
+        console.warn(`[initIncrementalRem] No daily document for ${nextRepDate.toISOString()} — ${rem._id} was not made incremental.`);
         return;
       }
       const todayRef =

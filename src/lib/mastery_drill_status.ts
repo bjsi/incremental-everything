@@ -1,10 +1,11 @@
-import { QueueInteractionScore, RNPlugin } from '@remnote/plugin-sdk';
+import { Card, PluginRem, QueueInteractionScore, RNPlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import {
   disableFinalDrillNotificationId,
   enableMasteryDrillId,
   masteryDrillHardIntervalPercentId,
   masteryDrillHardMaxDaysId,
+  masteryDrillMaxPriorityId,
   masteryDrillMinDelayMinutesId,
 } from './consts';
 import { getIESetting, useIESetting } from './settings';
@@ -62,10 +63,32 @@ export const ratingReturnsAtOnce = (score: QueueInteractionScore | undefined, c:
   returnsAtOnce(score === QueueInteractionScore.HARD, c);
 
 /**
- * The drill entry for a card just rated Again or Hard. For Hard it reads the new
- * interval off the card: RemNote writes the rating and the next due date
- * together. If the card's last rating is not that fresh Hard one, the interval
- * is left out and the card gets the Minimum Delay, as before.
+ * Whether a card of this Rem may enter the drill, per the Priority Cap. Reads the
+ * priority only when the cap is set below 100. A Rem that cannot be read is let in.
+ */
+export async function drillAcceptsRem(plugin: RNPlugin, rem: PluginRem | null | undefined): Promise<boolean> {
+  const cap = Number(await getIESetting(plugin, masteryDrillMaxPriorityId));
+  if (!Number.isFinite(cap) || cap >= 100 || !rem) return true;
+  try {
+    // Loaded here, not at the top: the card-priority module drags in most of the SDK's
+    // built-in tables, and this file is imported by node tests (cluster_rating_readback).
+    const { getCardPriorityValue } = await import('./card_priority');
+    return (await getCardPriorityValue(plugin, rem)) <= cap;
+  } catch (e) {
+    console.warn('[MasteryDrill] could not read the priority of', rem._id, e);
+    return true;
+  }
+}
+
+/**
+ * The drill entry for a card just rated Again or Hard, or null when the Priority Cap
+ * keeps the card out of the drill.
+ *
+ * It reads the interval the rating gave off the card: RemNote writes the rating and
+ * the next due date together. For Hard it is the new interval (intervalMs); for Again
+ * it is the scheduler's relearning step (relearnMs), which the card waits out when it
+ * is longer than the Minimum Delay. If the card's last rating is not that fresh one,
+ * the interval is left out and the card gets the Minimum Delay, as before.
  */
 export async function buildDrillEntry(
   plugin: RNPlugin,
@@ -73,24 +96,78 @@ export async function buildDrillEntry(
   kbId: string | undefined,
   score: QueueInteractionScore,
   addedAt = Date.now()
-): Promise<Exclude<FinalDrillEntry, string>> {
+): Promise<Exclude<FinalDrillEntry, string> | null> {
   const entry: Exclude<FinalDrillEntry, string> = { cardId, kbId, addedAt };
-  if (score !== QueueInteractionScore.HARD) return entry;
+  let card: Card | undefined;
   try {
-    const card = await plugin.card.findOne(cardId);
-    const history = card?.repetitionHistory ?? [];
-    let rep: { score: QueueInteractionScore; date: number } | undefined;
-    for (let i = history.length - 1; i >= 0 && !rep; i--) {
-      if (history[i].score !== QueueInteractionScore.TOO_EARLY) rep = history[i];
-    }
-    const next = card?.nextRepetitionTime;
-    if (rep?.score === QueueInteractionScore.HARD && Math.abs(addedAt - rep.date) <= FRESH_RATING_MS && next && next > rep.date) {
-      entry.intervalMs = next - rep.date;
-    }
+    card = await plugin.card.findOne(cardId);
   } catch (e) {
-    console.warn('[MasteryDrill] could not read the Hard interval of', cardId, e);
+    console.warn('[MasteryDrill] could not read card', cardId, e);
+  }
+  if (card?.remId && !(await drillAcceptsRem(plugin, await plugin.rem.findOne(card.remId)))) {
+    console.log(`[MasteryDrill] ${cardId} not sent to the drill: its priority is below the Priority Cap.`);
+    return null;
+  }
+  const interval = freshRatingInterval(card, score, addedAt);
+  if (interval !== undefined) {
+    if (score === QueueInteractionScore.HARD) entry.intervalMs = interval;
+    else if (score === QueueInteractionScore.AGAIN) entry.relearnMs = interval;
   }
   return entry;
+}
+
+/**
+ * The interval this rating gave the card (next due date minus the rating), when the
+ * card's last real rating is this score and was made around `addedAt`.
+ */
+function freshRatingInterval(card: Card | undefined, score: QueueInteractionScore, addedAt: number): number | undefined {
+  const history = card?.repetitionHistory ?? [];
+  let rep: { score: QueueInteractionScore; date: number } | undefined;
+  for (let i = history.length - 1; i >= 0 && !rep; i--) {
+    if (history[i].score !== QueueInteractionScore.TOO_EARLY) rep = history[i];
+  }
+  const next = card?.nextRepetitionTime;
+  if (rep?.score === score && Math.abs(addedAt - rep.date) <= FRESH_RATING_MS && next && next > rep.date) {
+    return next - rep.date;
+  }
+  return undefined;
+}
+
+/**
+ * Gives the Again entries written before relearnMs existed their relearning step, read
+ * from each card. Once per knowledge base; entries of other knowledge bases are left
+ * alone (their cards can't be read from here).
+ */
+export async function backfillDrillRelearnSteps(plugin: RNPlugin): Promise<void> {
+  const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())?._id;
+  if (!kbId) return;
+  const doneKey = `finalDrillRelearnBackfill_${kbId}`;
+  if (await plugin.storage.getSynced(doneKey)) return;
+  const items = ((await plugin.storage.getSynced(finalDrillIdsKey)) as FinalDrillEntry[]) || [];
+  const found = new Map<string, number>();
+  for (const item of items) {
+    if (typeof item === 'string' || item.kbId !== kbId || !item.addedAt || item.intervalMs || item.relearnMs) continue;
+    try {
+      const interval = freshRatingInterval(await plugin.card.findOne(item.cardId), QueueInteractionScore.AGAIN, item.addedAt);
+      if (interval) found.set(`${item.cardId}@${item.addedAt}`, interval);
+    } catch {
+      // A card that can't be read keeps the Minimum Delay.
+    }
+  }
+  if (found.size > 0) {
+    // Read again: a rating may have changed the list while the cards were read.
+    const latest = ((await plugin.storage.getSynced(finalDrillIdsKey)) as FinalDrillEntry[]) || [];
+    await plugin.storage.setSynced(
+      finalDrillIdsKey,
+      latest.map((item) => {
+        if (typeof item === 'string') return item;
+        const relearnMs = found.get(`${item.cardId}@${item.addedAt}`);
+        return relearnMs && !item.relearnMs ? { ...item, relearnMs } : item;
+      })
+    );
+  }
+  await plugin.storage.setSynced(doneKey, Date.now());
+  console.log(`[MasteryDrill] relearning steps read for ${found.size} Again entries.`);
 }
 
 /** Session key the drill sets to re-open the notification after a partial run. */

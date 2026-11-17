@@ -6,14 +6,14 @@ A **source pin** is a pin reference to the highlight that holds a passage: click
 
 ## Requirements { #requirements }
 
-- The local helper, running — see [Setup](AI-Transcription-of-PDF-Highlights.md#setup). Pin Source Quote only needs Python and PyMuPDF; no AI and no Claude account are involved.
+- The [AI helper](Desktop-Helpers.md#ai-helper), running — see [Setting up the AI helper](Desktop-Helpers.md#setup). Pin Source Quote only needs Python and PyMuPDF; no AI and no Claude account are involved.
 - RemNote **desktop**.
 - The source must already have its **Highlights** document, which RemNote creates with the first highlight. For a PDF or article you have never highlighted, make one highlight first.
 
 ## Using it { #pin-source-quote }
 
 1. Open the source in a pane: a **PDF**, a **saved web article** (RemNote's reader view of a page), or a **PDF in Text Reader mode**. It can sit next to your notes or in another RemNote window: the command looks in the current window first, then in the others.
-2. Focus the Rem whose text comes from that source, or select several Rems.
+2. Focus the Rem whose text comes from that source, or select several Rems. In the queue (the Learn New queue included), the card on screen is the target; a Rem selected in the previewer (`P`) takes its place.
 3. Run **Pin Source Quote**: `Opt+Shift+Q` / `Alt+Shift+Q`, or quick code `psq`.
 
 A toast reports where the passage was found and what was reused or created — for example *📌 PDF p.95: reused 0, created 1*.
@@ -25,13 +25,64 @@ A toast reports where the passage was found and what was reused or created — f
 - The PDF is searched **page by page**; a sentence that runs across a page break is not matched yet.
 - If the same short phrase appears **word for word** more than once, the first occurrence is pinned.
 
+## With no source open: a source finder { #no-source-open }
+
+If no PDF or article is open in any RemNote window, Pin Source Quote can still pin the quote when you have set up a **source finder**: a program on your computer that knows your books, for example a search index of your library. Given a quote, it says which book the quote comes from and which of your PDF Rems to try, in order. The quote is pinned from the first of them that holds the passage, in its page view.
+
+The source finder gets each quote's text and the Rems above it, so it can tell the book from an attribution in the quote (*“…” (BPG 5.2.1)*), from the notes the quote sits in, or from the text itself. A book split into several PDFs is handled by listing them all.
+
+Since the PDF was not in front of you, a **confirmation dialog** follows instead of a toast. For each quote it shows the PDF and page it was pinned from, the book and how the source finder knew, and the highlights reused or created. The quotes that were not found are listed with the PDFs that were tried. If a pin points to the wrong PDF, remove it, open the right PDF and run the command again.
+
+Without a source finder, the command asks you to open the source, as before.
+
+### Setting one up { #source-finder-setup }
+
+The [AI helper](Desktop-Helpers.md#ai-helper) runs the source finder. Name its command in `~/.incremental-remnote/ai-ocr/source-finder.json`:
+
+```json
+{ "command": ["/usr/local/bin/python3", "~/my-library-index/find_pdf.py"] }
+```
+
+A [corpus provider](Corpus-Provider.md) can take the source finder's place: it answers the same requests, can also give the exact text to search for when a quote was corrected, and serves other features. When both are set up, the corpus provider is used.
+
+Or set the `IR_SOURCE_FINDER` environment variable of the helper (`IR_SOURCE_FINDER="python3 ~/my-library-index/find_pdf.py"`). The file is read on each request, so no restart is needed after changing it. A command ending in a `.py` file runs from that file's folder.
+
+### Writing a source finder { #writing-a-source-finder }
+
+The helper writes one JSON request to the program's standard input and reads one JSON answer from its standard output (exit code 0; anything else is reported as a failure). All the quotes of one run come in a single request.
+
+Request:
+
+```json
+{ "items": [ { "remId": "AbC123", "ancestors": ["parent id", "grandparent id"], "texts": ["front", "back"] } ] }
+```
+
+Answer, books in the order to try:
+
+```json
+{ "items": [ { "remId": "AbC123", "books": [
+    { "title": "Bridge Procedures Guide, 6th ed.", "cite": "BPG", "how": "named in the quote",
+      "page": 66, "pdfRemIds": ["PdF000"] } ] } ] }
+```
+
+- `pdfRemIds` (required): the RemNote PDF Rems of that book, in the order to try.
+- `title` (required) and `cite` (optional, short): how the book is shown in the dialog.
+- `how` (required): how the program knew, shown as is (*named in the quote*, *in its notes*, *its text matches*).
+- `page` (optional): a page to search first; the whole PDF is searched if the passage is not near it.
+- `id` and `detail` (optional): passed back by the Local Media Bridge, not shown.
+- `quote` (optional, [corpus providers](Corpus-Provider.md#op-find-source) with `quote-literal`): the text to look for instead of the Rem's own, when the Rem's text was corrected and no longer matches the PDF letter for letter.
+
 ## Pinning every quote in a subtree { #quote-rems-in-descendants }
 
-**Pin Source Quote (Quote Rems in descendants)** — `Ctrl+Opt+Shift+Q` / `Ctrl+Alt+Shift+Q` (`Ctrl` on macOS too), or quick code `psqd` — runs Pin Source Quote on every Rem formatted as a **Quote** in the focused Rem and all its descendants, the focused Rem included. With several Rems selected, it covers each of them and their descendants.
+**Pin Source Quote (Quote Rems in descendants)** — `Ctrl+Opt+Shift+Q` / `Ctrl+Alt+Shift+Q` (`Ctrl` on macOS too), or quick code `psqd` — runs Pin Source Quote on every Rem formatted as a **Quote** in the focused Rem and all its descendants, the focused Rem included. With several Rems selected, it covers each of them and their descendants; in the queue, the card's Rem and its descendants.
 
 Other Rems in the subtree are left alone. The run works like a [multi-Rem selection](#pin-source-quote): one question about [which view](#text-reader) for a PDF with a Text Reader version, a final toast with the totals, and the passages not found listed together at the end.
 
 Running it again on the same subtree adds nothing twice, but every Quote Rem is looked up in the source again, so a second run takes as long as the first.
+
+## From outside RemNote { #from-outside }
+
+Scripts and AI assistants writing notes through the RemNote MCP can run Pin Source Quote too, through the [Local Media Bridge](Local-Media-Bridge.md#operations): `media_bridge.py pin-quote <rem> --source <PDF or article rem>`. The source is named, so it does not need to be open; without `--source`, each Rem's source comes from your [source finder](#no-source-open) and the JSON answer says which PDF and page each quote was pinned from. `--quote` gives the passage to look for when the Rem's text is not exactly the source's. `media_bridge.py pin` turns references to highlights that a tool already wrote into pins.
 
 ## Reusing highlights { #reusing-highlights }
 
@@ -80,8 +131,9 @@ This happens after the Rem is created and never slows down or interrupts Create 
 
 | Message | What to do |
 |---|---|
-| *Open the source PDF or web article in a pane first (in any RemNote window).* | Open the source next to your notes or in another RemNote window, then run the command again. A source just opened in another window can take a couple of seconds to be seen. |
-| *AI helper is not running* | Start the helper ([Setup](AI-Transcription-of-PDF-Highlights.md#setup)). |
+| *Open the source PDF or web article in a pane first (in any RemNote window).* | Open the source next to your notes or in another RemNote window, then run the command again. A source just opened in another window can take a couple of seconds to be seen. Without a source open, it also means no [source finder](#no-source-open) is set up. |
+| *Passage not found in the PDFs of its book* | The source finder named a book, but none of the PDFs it listed holds the passage: the one you use may be a different edition, or missing from its list. Open the right PDF and run the command again. |
+| *AI helper is not running* | Start the helper ([Setting up the AI helper](Desktop-Helpers.md#setup)). |
 | *This PDF has no Highlights document yet — make one highlight in it first.* | Highlight anything in the source once, so RemNote creates its Highlights document, then try again. |
 | *Passage not found* | Check that the Rem's text was taken from this source, and that the right PDF or article is open. |
 

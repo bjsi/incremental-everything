@@ -30,10 +30,13 @@ import {
     aggregatePeriodStatsCombined,
     computeAuthoritativeAggregatesForCurrentKb,
     filterAuthoritativeForKb,
+    ghostRepCount,
+    mergeGhostBuckets,
     logAuthoritativeDiff,
     saveAuthoritativeAggregates,
     type ProgressUpdate,
 } from "../lib/authoritative_aggregates";
+import { ghostShardKey } from "../lib/history_archive";
 import { computeMonthlyShieldCatchUp, MonthlyShieldCatchUp } from "../lib/shield_history";
 import { CardForgettingCurve } from "../components/CardForgettingCurve";
 import { CardSchedulerLabel } from "../components/OtherSchedulers";
@@ -445,6 +448,11 @@ function PracticedQueues() {
         AUTHORITATIVE_LAST_COMPUTED_KEY,
         0
     );
+    // Reviews of deleted Rems, from the desktop helper's archive (lib/history_archive.ts).
+    const [ghostRaw] = useSyncedStorageState<unknown>(
+        currentKbId ? ghostShardKey(currentKbId) : "",
+        null
+    );
     const [activeSession] = useSessionStorageState<PracticedQueueSession | null>("activeQueueSession", null);
     const showForgettingCurve = useIESetting(showQueueDashboardCurveId);
     // The curve can show the previous card instead of the current one. The
@@ -510,8 +518,14 @@ function PracticedQueues() {
 
     const filteredAuthoritative = useMemo(() => {
         if (!currentKbId) return [];
-        return filterAuthoritativeForKb(authoritativeRaw, currentKbId);
-    }, [authoritativeRaw, currentKbId]);
+        return mergeGhostBuckets(
+            filterAuthoritativeForKb(authoritativeRaw, currentKbId),
+            ghostRaw,
+            currentKbId,
+            authoritativeLastComputed
+        );
+    }, [authoritativeRaw, ghostRaw, currentKbId, authoritativeLastComputed]);
+    const deletedRemReps = useMemo(() => ghostRepCount(ghostRaw), [ghostRaw]);
 
     const totalAllKbsCount = useMemo(() => {
         const rawCount = (historyRaw || []).filter(Boolean).length;
@@ -878,6 +892,14 @@ function PracticedQueues() {
                                     ? `Updated ${formatLastComputed(authoritativeLastComputed)}`
                                     : "Not yet computed"}
                             </span>
+                            {deletedRemReps > 0 && authoritativeLastComputed > 0 && (
+                                <span
+                                    className="text-[10px] rn-clr-content-tertiary"
+                                    title="Reviews of Rems you have since deleted, kept by the desktop helper's history archive. They are included in the figures below."
+                                >
+                                    · incl. {deletedRemReps.toLocaleString()} from deleted Rems
+                                </span>
+                            )}
                             <button
                                 onClick={handleRecompute}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border rn-clr-border-opaque rn-clr-content-secondary hover:rn-clr-background-secondary transition-colors"

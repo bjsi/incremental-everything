@@ -28,10 +28,12 @@ import { RNPlugin } from '@remnote/plugin-sdk';
      window is hidden, when Chromium throttles timers anyway).
    - A cheap bridge probe (a session read) every 5 s. An answer slower than 3 s opens
      a stall episode: a start report, a progress line every 20 s, an end summary.
-   Which job was running is read from the console lines around a report: the
-   jobs already log when they are picked up and complete. (An earlier version
-   kept them in a ring by wrapping console.log, but a wrapper makes DevTools
-   attribute EVERY log line of the plugin to the wrapper's own file and line.)
+   Which job was running: every report lists the calls the frame sent and got
+   answers to while it was blocked, with the storage key and the size of any large
+   payload — copying a big value in or out of a postMessage is our main thread's
+   work, and the key names the job. (An earlier version kept the jobs' log lines in
+   a ring by wrapping console.log, but a wrapper makes DevTools attribute EVERY log
+   line of the plugin to the wrapper's own file and line.)
 
    Everything is silent until something is slow. */
 
@@ -39,6 +41,11 @@ const SLOW_CALL_MS = 3000;
 const WIDGET_REPORT_EVERY_MS = 60_000;
 const LONG_TASK_REPORT_MS = 1000;
 const RATE_WINDOW_S = 10;
+/** Per-second call counts are kept this long, so a report can cover a long block. */
+const BUCKET_KEEP_S = 120;
+/** A payload this big (array items, string chars or object keys) is recorded by name. */
+const LARGE_ITEMS = 500;
+const LARGE_CHARS = 200_000;
 
 const TICK_MS = 500;
 const MAIN_BLOCK_MS = 2000;
@@ -49,7 +56,14 @@ const STALL_QUIET_MS = 5000;
 const PROGRESS_EVERY_MS = 20_000;
 
 type InFlightCall = { method: string; startedAt: number };
-type Bucket = { sec: number; total: number; byMethod: Map<string, number> };
+type Bucket = {
+  sec: number;
+  total: number;
+  byMethod: Map<string, number>;
+  answered: number;
+  answeredByMethod: Map<string, number>;
+};
+type LargePayload = { at: number; method: string; key?: string; dir: 'sent' | 'answer'; size: string; n: number };
 type SlowCall = { method: string; ms: number; endedAt: number };
 type LongTask = { at: number; ms: number; who: string };
 
@@ -68,6 +82,7 @@ const inFlight = new Map<number, InFlightCall>();
 const buckets: Bucket[] = [];
 const slowCalls: SlowCall[] = [];
 const longTasks: LongTask[] = [];
+const largePayloads: LargePayload[] = [];
 
 const fmtS = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 const fmtTime = (at: number) => new Date(at).toLocaleTimeString();
@@ -87,16 +102,85 @@ function topEntries(counts: Map<string, number>, n: number): string {
 
 // ---------------------------------------------------------------- bridge calls
 
-function countCall(method: string, now: number) {
+function bucketFor(now: number): Bucket {
   const sec = Math.floor(now / 1000);
   let bucket = buckets[buckets.length - 1];
   if (!bucket || bucket.sec !== sec) {
-    bucket = { sec, total: 0, byMethod: new Map() };
+    bucket = { sec, total: 0, byMethod: new Map(), answered: 0, answeredByMethod: new Map() };
     buckets.push(bucket);
-    while (buckets.length > 0 && buckets[0].sec <= sec - RATE_WINDOW_S) buckets.shift();
+    while (buckets.length > 0 && buckets[0].sec <= sec - BUCKET_KEEP_S) buckets.shift();
   }
+  return bucket;
+}
+
+function countCall(method: string, now: number) {
+  const bucket = bucketFor(now);
   bucket.total++;
   bucket.byMethod.set(method, (bucket.byMethod.get(method) ?? 0) + 1);
+}
+
+function countAnswer(method: string, now: number) {
+  const bucket = bucketFor(now);
+  bucket.answered++;
+  bucket.answeredByMethod.set(method, (bucket.answeredByMethod.get(method) ?? 0) + 1);
+}
+
+/** A cheap size for a payload: its item, char or key count. Never walks nested values. */
+function roughSize(v: unknown): { n: number; size: string } | null {
+  if (typeof v === 'string') return v.length >= LARGE_CHARS ? { n: v.length, size: `${v.length.toLocaleString()} chars` } : null;
+  if (Array.isArray(v)) return v.length >= LARGE_ITEMS ? { n: v.length, size: `${v.length.toLocaleString()} items` } : null;
+  if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
+    const n = Object.keys(v).length;
+    return n >= LARGE_ITEMS ? { n, size: `${n.toLocaleString()} keys` } : null;
+  }
+  return null;
+}
+
+/** The largest top-level value among the call's arguments ({key, value} for storage). */
+function largestArg(args: unknown): { n: number; size: string } | null {
+  if (!args || typeof args !== 'object') return roughSize(args);
+  let best: { n: number; size: string } | null = null;
+  for (const v of Array.isArray(args) ? args : Object.values(args)) {
+    const s = roughSize(v);
+    if (s && (!best || s.n > best.n)) best = s;
+  }
+  return best;
+}
+
+function noteLarge(method: string, args: unknown, dir: LargePayload['dir'], found: { n: number; size: string }) {
+  const key = (args as any)?.key;
+  pushCapped(
+    largePayloads,
+    { at: Date.now(), method, key: typeof key === 'string' ? key : undefined, dir, size: found.size, n: found.n },
+    100
+  );
+}
+
+/** What the frame sent and got answered between `from` and `to`, by method. */
+function describeCallsBetween(from: number, to: number): string {
+  const first = Math.floor(from / 1000);
+  const last = Math.floor(to / 1000);
+  const sent = new Map<string, number>();
+  const answered = new Map<string, number>();
+  let sentTotal = 0;
+  let answeredTotal = 0;
+  for (const b of buckets) {
+    if (b.sec < first || b.sec > last) continue;
+    sentTotal += b.total;
+    answeredTotal += b.answered;
+    b.byMethod.forEach((v, k) => sent.set(k, (sent.get(k) ?? 0) + v));
+    b.answeredByMethod.forEach((v, k) => answered.set(k, (answered.get(k) ?? 0) + v));
+  }
+  const parts = [
+    sentTotal ? `${sentTotal} sent (${topEntries(sent, 5)})` : 'none sent',
+    answeredTotal ? `${answeredTotal} answered (${topEntries(answered, 5)})` : 'none answered',
+  ];
+  const large = largePayloads
+    .filter((p) => p.at >= from && p.at <= to)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 6)
+    .map((p) => `${p.method}${p.key ? ` "${p.key}"` : ''} ${p.dir === 'sent' ? 'sent' : 'answered with'} ${p.size} at ${fmtTime(p.at)}`);
+  return `${parts.join(', ')}; large payloads: ${large.length ? large.join('; ') : 'none'}`;
 }
 
 function recentCallRate(now: number): { total: number; byMethod: Map<string, number> } {
@@ -155,13 +239,28 @@ function installBridgeTracking() {
     countCall(method, startedAt);
     if (widgetInstanceId === undefined && this?.widgetInstanceId != null) widgetInstanceId = this.widgetInstanceId;
 
+    try {
+      const big = largestArg(args);
+      if (big) noteLarge(method, args, 'sent', big);
+    } catch {
+      // sizing is best effort
+    }
+
     const result: Promise<unknown> = original.call(this, methodName, args, namespace);
-    const settle = () => {
+    const settle = (value?: unknown) => {
       inFlight.delete(id);
-      const ms = Date.now() - startedAt;
+      const now = Date.now();
+      countAnswer(method, now);
+      try {
+        const big = roughSize(value);
+        if (big) noteLarge(method, args, 'answer', big);
+      } catch {
+        // sizing is best effort
+      }
+      const ms = now - startedAt;
       if (ms >= SLOW_CALL_MS) noteSlowCall(method, ms);
     };
-    result.then(settle, settle);
+    result.then(settle, () => settle());
     return result;
   };
 }
@@ -238,7 +337,8 @@ function maybeReportWidget(trigger: string) {
   console.warn(
     `[StallDiag] widget "${frameName}"${widgetInstanceId !== undefined ? ` #${widgetInstanceId}` : ''} (${trigger}) — ` +
       `${slowPart}; ${describeInFlight(now)}; ${describeCallRate(now)}; ` +
-      `own long tasks: ${describeLongTasks(since)}`
+      `own long tasks: ${describeLongTasks(since)}; ` +
+      `calls in the last 10s: ${describeCallsBetween(now - 10_000, now)}`
   );
 }
 
@@ -355,7 +455,8 @@ class StallMonitor {
     }
     console.warn(
       `[StallDiag] main thread blocked for ${fmtS(ms)} (ended ${fmtTime(now)}) — every widget of the plugin was frozen meanwhile.\n` +
-        `Long tasks: ${describeLongTasks(now - ms - 2000)}. The plugin's log lines just above show what was running.`
+        `Long tasks: ${describeLongTasks(now - ms - 2000)}.\n` +
+        `Index calls while blocked: ${describeCallsBetween(now - ms - 1000, now)}.`
     );
   }
 
@@ -380,7 +481,7 @@ class StallMonitor {
       `  index calls: ${describeInFlight(now)}; ${describeCallRate(now)}\n` +
       `  last probe: ${this.lastProbeAt ? `${fmtS(this.lastProbeMs)} at ${fmtTime(this.lastProbeAt)}` : 'none yet'}\n` +
       `  long tasks: ${describeLongTasks(longTasksSince)}\n` +
-      `  The plugin's log lines just above show which job was running.`
+      `  index calls since then: ${describeCallsBetween(longTasksSince, now)}`
     );
   }
 }

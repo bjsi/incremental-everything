@@ -22,6 +22,7 @@ import { registerPluginSettings } from '../register/settings';
 import { registerWidgets } from '../register/widgets';
 import { registerMenus } from '../register/menus';
 import { registerCommands } from '../register/commands';
+import { registerMediaBridgeCommands } from '../register/media_bridge_commands';
 import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
 import { registerPrefetchTrackers } from '../lib/queue_prefetch';
 import {
@@ -34,17 +35,20 @@ import {
 } from '../register/queue_display_commands';
 import { registerMcScissors } from '../lib/mc_scissors';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, queueBeautifulBarWidthKey, editorReviewTimerHeightsKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
-import { registerQueueBeautifulBarFitCss } from '../lib/queue_beautiful_bar_fit';
 import { registerEditorReviewTimerHeadersCss } from '../lib/editor_review_timer_sticky';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
+import { registerNoticeHost } from '../lib/notice';
+import { registerAudioPlaylist } from '../lib/audio_playlist';
+import { registerExtractEditorHost } from '../lib/extract_editor';
 import { registerLogosBridge } from '../lib/logos_bridge';
 import { registerMediaBridge } from '../lib/media_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
 import { registerExternalCardVideoBridge } from '../lib/external_card_video_bridge';
+import { registerExternalMediaBridge } from '../lib/external_media_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { registerOpenInWindowListener } from '../lib/open_in_window';
 import { registerFollowQueueSources, startFollowingQueueSources } from '../lib/follow_queue_sources';
@@ -123,6 +127,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerEventListeners(plugin, resetSessionItemCounter);
 
   registerIncrementalRemTracker(plugin);
+  registerNoticeHost(plugin);
   // A full load was measured at 29s; the deadline only has to catch a load that died.
   const incRemSettled = startup.track(
     'incRemCache',
@@ -154,6 +159,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   // (docs/Priority-Bridge-for-Other-Plugins.md). Card videos first: the
   // priority bridge announces `ready`, on which clients resend both.
   registerExternalCardVideoBridge(plugin);
+  registerExternalMediaBridge(plugin);
   registerExternalPriorityBridge(plugin);
   // Publishes this window's open PDFs/articles so a command run in another
   // RemNote window can find them.
@@ -165,6 +171,10 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerWidgets(plugin);
   // The review timer's floating bar over RemNote's video page.
   registerVideoReviewBar(plugin);
+  // Audio Playlist: its commands, and keeping its floating player open while wanted.
+  registerAudioPlaylist(plugin);
+  // The Extract Editor over a queue card closes when that card goes.
+  registerExtractEditorHost(plugin);
   // Runs Cycle Image Size's presses, and what its popup and floating widget ask for.
   registerImageSizeSession(plugin);
 
@@ -193,13 +203,6 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     const barHeight = await rp.storage.getSession<number>(cardInfoBarHeightKey);
     await registerCardInfoBarDockCss(plugin, barHeight);
-  });
-
-  // The Beautiful queue's top-right strip fits queue_beautiful_bar's content, which the
-  // widget reports (lib/queue_beautiful_bar_fit). Also runs at activation with the default.
-  plugin.track(async (rp) => {
-    const width = await rp.storage.getSession<number>(queueBeautifulBarWidthKey);
-    await registerQueueBeautifulBarFitCss(plugin, width);
   });
 
   // The pinned Editor Review Timer sits where RemNote draws its sticky headers, so
@@ -249,6 +252,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerPinReferenceCSS(plugin);
 
   await registerCommands(plugin);
+  // Upscale image / Read aloud: registered only while the Local Media Bridge setting is on.
+  registerMediaBridgeCommands(plugin);
 
   // Remove Parent / Remove Grandparent commands are always available — they
   // wrap powerups that are always registered and don't conflict with anything.

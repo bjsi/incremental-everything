@@ -20,14 +20,17 @@ import {
   currentIncrementalRemTypeKey,
   currentHostDocumentIdKey,
   incremNotesSidebarRemIdKey,
+  extractEditorTargetKey,
 } from '../lib/consts';
+import { ExtractEditorTarget } from '../lib/extract_editor';
 import { findAllRemsForPDF, findAllRemsForHTML, isHtmlSource } from '../lib/pdfUtils';
 
 // Types where showing the document notes sidebar makes sense.
-// 'rem' is included so plain Incremental-Rem extracts get an EDITABLE notes
-// surface here: the in-queue ExtractViewer is read-only because an editable
-// DocumentViewer can't hold focus inside the queue (Flashcard) pane, so all
-// rem editing is routed to this sidebar pane (which holds focus correctly).
+// 'rem' is included so a plain Incremental-Rem extract can be edited here too, when
+// the user asks for it ("Sidebar →" on its queue card). Its usual editor is the Extract
+// Editor, a float over the card (lib/extract_editor.ts): an editable DocumentViewer
+// cannot keep the focus inside the queue's own frame, and this pane is no longer
+// opened for those Rems automatically.
 const DOCUMENT_TYPES = new Set(['pdf', 'html', 'pdf-highlight', 'html-highlight', 'rem']);
 const HIGHLIGHT_TYPES = new Set(['pdf-highlight', 'html-highlight']);
 
@@ -68,6 +71,14 @@ function IncremNotesSidebar() {
   // ignored instead of mis-showing the previous rem over a non-rem item.
   const remExtractId = useTrackerPlugin(
     (rp) => rp.storage.getSession<string>(incremNotesSidebarRemIdKey),
+    []
+  );
+
+  // The Extract Editor (lib/extract_editor.ts) shows the same document page over the
+  // queue's card. Two pages of one Rem share a focus path and take the caret from each
+  // other, so while that editor is on this Rem, this pane steps aside.
+  const floatingEditorRemId = useTrackerPlugin(
+    async (rp) => (await rp.storage.getSession<ExtractEditorTarget>(extractEditorTargetKey))?.remId,
     []
   );
 
@@ -257,6 +268,15 @@ function IncremNotesSidebar() {
             </button>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (viewerRemId && floatingEditorRemId === viewerRemId) {
+    return (
+      <div style={emptyStateStyle}>
+        <span style={{ fontSize: '24px' }}>✎</span>
+        <span>This Rem is open in the editor over the queue.<br />Press <b>Done</b> there to edit it here instead.</span>
       </div>
     );
   }

@@ -68,6 +68,25 @@ export async function resolveRemTextForBreadcrumb(
 }
 
 /**
+ * A Rem's name for a one-line title (a panel header, a graph's title): normal
+ * rem references show their text in `[ ]`, as in breadcrumbs, and reference
+ * pins are left out. `plugin.richText.toString()` expands a pin into the whole
+ * Rem it points at, images and all, which ran a document's title into its
+ * pinned Rem's text and image URLs. Whitespace collapses to single spaces.
+ * Returns 'Untitled' only when genuinely empty.
+ */
+export async function resolveRemTextAsTitle(plugin: RNPlugin, richText: unknown): Promise<string> {
+  const segments = await resolveRemTextSegments(plugin, richText);
+  const text = segments
+    .filter((s) => s.kind !== 'pin')
+    .map((s) => s.text)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text || 'Untitled';
+}
+
+/**
  * Resolve a rem's rich text into lightweight display segments:
  *  - Plain text and normal rem references (text wrapped in `[ ]`) become `text` segments.
  *  - Pin references become `pin` segments carrying the referenced rem's text, so the

@@ -48,7 +48,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   Displays a comprehensive history popup. For Incremental Rems, opens the [IncRem Repetition History](Repetition-History-and-Statistics.md). For regular flashcards, opens the [Flashcard Repetition History](Reviewing-Items-in-the-Queue.md#flashcard-repetition-history).
 
 - **[Open Study Dashboard](Study-Dashboard.md)** — `quick: sdb`
-  Opens the [Study Dashboard](Study-Dashboard.md): a filterable summary of Incremental, Dismissed, and Flashcard activity (Global or Document scope, with multiple period presets and a custom date range), plus an expandable hierarchy of every rem with activity showing total time, reps, retention, and speed, and a [Graphs tab](Study-Dashboard.md#graphs-tab) plotting reviews, time, retention, speed and the answer-grade split per day, week, month or year. Auto-detects the focused rem in the editor or the current card in the queue to use as the Document-mode root; falls back to Global mode otherwise.
+  Opens the [Study Dashboard](Study-Dashboard.md): a filterable summary of Incremental, Dismissed, and Flashcard activity (Global or Document scope, with multiple period presets and a custom date range), plus an expandable hierarchy of every rem with activity showing total time, reps, retention, and speed, and a [Graphs tab](Study-Dashboard.md#graphs-tab) plotting reviews, time, retention, speed and the answer-grade split per day, week, month or year. Auto-detects the focused rem in the editor or the current card in the queue to use as the Document-mode root; falls back to Global mode otherwise. From the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) it opens in Document mode on the document or the queue's scope.
 
 - **[Execute Incremental Rem Repetition (Review in Editor)](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command)** (`Ctrl+Shift+J`) — `quick: er`
   Open the Editor Review Timer to log a spaced-repetition event directly from your document, without needing to enter the queue.
@@ -80,7 +80,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   **Access:**
 
   - Via the **Command Palette**: search for "Batch Priority Change".
-  - From the **Document Menu** (`...` on a Rem) to act on it and its descendants.
+  - From the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) (⋯ → **Incremental RemNote…** on a document) to act on it and its descendants.
 
   **Priority Operations:**
 
@@ -90,8 +90,6 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   - **Adjust Proportionally**: Remaps priorities to a new range while maintaining relative spacing.
 
   **Advanced Features:** Interactive table with filtering by name/type/priority range, sorting by any column, "Preview Changes" mode, and CSV export.
-
-  ![Batch Priority Change — Document Menu](assets/uploaded/8589e1e8-1af1-410c-b705-5b56c9e6ee56.png){ width="250" }
 
   ![batch priority change widget](assets/batch-priority-change-widget-new.png){ width="900" }
 
@@ -106,14 +104,14 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   - Intelligently handles IncRems — use their existing IncRem priority as their Card Priority.
   - Safely updates rems with existing `manual` or `incremental` priorities by requiring explicit "Overwrite" confirmation, with color-coded badges distinguishing **Manual CP** (amber) from **Incremental CP** (green).
 
-  **Access:** Focus a tag rem and run the command from the Command Palette, or use the Document Menu.
+  **Access:** Focus a tag rem and run the command from the Command Palette, or use the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) on it.
 
   ![Batch Card Priority Assignment by Tag](assets/uploaded/b4fed324-d03d-4fb6-871f-2c643ed63467.png){ width="450" }
 
 ## Special Operations
 
 - **[Priority Queue](Priority-Review-Document.md#the-priority-queue-popup)** (`Opt+Shift+L` / `Alt+Shift+L`) — `quick: prq`
-  Opens the Priority Queue popup for the focused document or the whole knowledge base: the persistent review document that is topped up to a fill target with your highest-priority due items and drained as you review them — refresh, drain, refill, practise, and the Cooling list. Also in the document menu, the queue menu, and on the **Priority Queue** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
+  Opens the Priority Queue popup for the focused document or the whole knowledge base: the persistent review document that is topped up to a fill target with your highest-priority due items and drained as you review them — refresh, drain, refill, practise, and the Cooling list. Also in the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) of a document or of the queue, and on the **Priority Queue** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
 
 - **[Learn - Practice Priority Queue (Full Knowledge Base)](Priority-Review-Document.md#practise-it)** (`Cmd+L` / `Ctrl+L`) — `quick: learn`
   The plugin's main action: opens the queue straight on the full-KB Priority Queue document, the same route as its Practice button and the **▶** button of the [Incremental RemNote panel](Getting-Started.md#the-incremental-plugin-panel).
@@ -153,14 +151,18 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Cancel Parent Pick](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** — `quick: cpp`
   Drops the Rem waiting for a parent and closes its card, like `Esc`.
 
-- **No Inc Rem for 15 min** (Queue Menu)
+### Queue Menu Actions { #queue-menu-actions }
+
+In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) opened from the queue's ⋮ menu → **Incremental RemNote…**.
+
+<iframe src="../demos/menu-hub.html?view=queue" title="Queue menu and Menu Hub demo" loading="lazy" style="width:100%;height:440px;border:0;display:block"></iframe>
+
+- **No Inc Rems for 15 min**
   Temporarily disables the injection of Incremental Rems into your queue for 15 minutes, allowing you to focus purely on flashcards. A timer countdown widget appears in the queue to show the remaining time.
 
-- **Toggle Inc Rems in this device** (Queue Menu)
+- **Disable / Enable Inc Rems on this device**
   Permanently toggle whether Incremental Rems should appear in the queue on the current device (saved to local storage). Useful for devices with smaller screens where the reading interface is cluttered. A yellow banner will appear for 10 seconds whenever you enter the queue to remind you if they are disabled.
 
-
-  ![Queue Menu in Mobile](assets/queue-menu-mobile.png){ width="400" }
 
   ![Queue in Mobile showing No Inc Rem in this Device indicator](assets/queue-mobile-devicenoincrem-indicator.png){ width="400" }
 
@@ -187,7 +189,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 ## Utilities
 
 - **Mastery Drill** — `quick: dri`
-  Opens the [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill) — a focused re-practice queue for cards rated *Forgot* or *Hard*. Cards are added automatically as you review; they leave the drill once rated *Good* or *Easy*. It opens in the popup or in RemNote's own queue, per [Where the Drill Runs](History-Queue-Dashboard-and-Mastery-Drill.md#where-the-drill-runs).
+  Opens the [Mastery Drill](Mastery-Drill.md) — a focused re-practice queue for cards rated *Forgot* or *Hard*. Cards are added automatically as you review; they leave the drill once rated *Good* or *Easy*. It opens in the popup or in RemNote's own queue, per [Where the Drill Runs](Mastery-Drill.md#where-the-drill-runs).
 
 - **Mastery Drill (popup)** / **Mastery Drill (regular queue)**
   Open the drill in that place, whatever *Where the Drill Runs* says.
@@ -203,7 +205,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   > When you **author** a text layer, write `\[…\]` / `\(…\)`, not `$$…$$` / `$…$`. RemNote unescapes markdown inside dollar-delimited spans before the math parser sees them, which strips the backslash from `\,` `\;` `\{` `\}` `\%` `\\` — the formula still renders, just wrongly (a thin space becomes a literal comma). Dollar delimiters are recognised by this command for PDFs you did not author.
 
 - **AI Transcribe PDF Highlight** — `quick: ait`
-  Replaces the focused PDF highlight's raw text with an AI transcription of the highlighted region: clean text, formulas as LaTeX, list markers kept. Same as the **✨** button in the PDF highlight toolbar. Needs the local helper — see [AI Transcription of PDF Highlights](AI-Transcription-of-PDF-Highlights.md#setup).
+  Replaces the focused PDF highlight's raw text with an AI transcription of the highlighted region: clean text, formulas as LaTeX, list markers kept. Same as the **✨** button in the PDF highlight toolbar. Needs the [AI helper](Desktop-Helpers.md#ai-helper) and Claude Code — see [AI Transcription of PDF Highlights → Setup](AI-Transcription-of-PDF-Highlights.md#setup).
 
 - **Open in Logos** — `quick: olg`
   Opens the focused extract at its passage in Logos, or the book's Incremental Rem at its Logos bookmark, looking up through the parents when the focused Rem has neither. Registered only while the **Logos Bible Software Bridge** setting is on; needs the LogosBridge helper — see [Logos Bible Software Integration](Logos-Bible-Software-Integration.md#review).
@@ -212,7 +214,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   Puts back the text that the last AI transcription replaced on the focused highlight. The previous text is kept on the device where you transcribed. See [Undoing a transcription](AI-Transcription-of-PDF-Highlights.md#restore).
 
 - **[Pin Source Quote](Source-Pins.md#pin-source-quote)** (`Opt+Shift+Q` / `Alt+Shift+Q`) — `quick: psq`
-  Pins the source of the focused Rem's text: finds the passage in the PDF or saved web article open in a pane and appends a pin to its highlight, reusing a highlight that already covers it or creating one. Works in a PDF's page view, a saved web article and a PDF's Text Reader view (asking which, when a PDF has both). Needs the local helper — see [Source Pins](Source-Pins.md).
+  Pins the source of the focused or selected Rems' text (in the queue, the card on screen): finds the passage in the PDF or saved web article open in a pane and appends a pin to its highlight, reusing a highlight that already covers it or creating one. Works in a PDF's page view, a saved web article and a PDF's Text Reader view (asking which, when a PDF has both). Needs the local helper — see [Source Pins](Source-Pins.md).
 
 - **[Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants)** (`Ctrl+Opt+Shift+Q` / `Ctrl+Alt+Shift+Q`) — `quick: psqd`
   Runs Pin Source Quote on every Rem formatted as a Quote in the focused Rem and all its descendants, or in each selected Rem's subtree; other Rems are left alone.
@@ -229,6 +231,28 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - <a id="upscale-image-with-chatgpt"></a>**Upscale image with ChatGPT** — `quick: upi`
   Regenerates the focused Rem's image (each image in turn, front and back) at a higher resolution with ChatGPT's image model, then shows the original beside the result with an automatic check for changes. **Replace image** swaps the new image into the Rem in place; nothing changes until you press it. Keep the popup open while it works (about 45 seconds per image). Needs the **Local Media Bridge** setting, its helper and the Codex CLI signed in with a paid ChatGPT plan.
   📖 See [Local Media Bridge → Upscale an image with ChatGPT](Local-Media-Bridge.md#upscale).
+
+- <a id="read-aloud"></a>**Read aloud** — `quick: ra`
+  Turns the focused Rem (or document) and everything under it into a spoken audio file and adds it as the Rem's first child, stored in RemNote. A popup shows the script to be spoken, editable, with three modes (**Literal**, **Adapted** by AI, or an AI **Summary** of the length you set), the engine and voice (Gemini TTS, Azure or ElevenLabs, with your own key) and the estimated duration and cost; nothing is paid for until **Generate**. Needs the **Local Media Bridge** setting and its helper (version 12).
+  📖 See [Read Aloud](Read-Aloud.md).
+
+- <a id="add-pronunciation"></a>**Add pronunciation (Extra Card Detail)** — `quick: pron`
+  Reads the focused or selected Rems aloud, front and back only (in the queue, the card on screen), plays the audio, and adds it as each Rem's first child, captioned 🔊, with the **Extra Card Detail** powerup and the plugin's **Pronunciation** powerup (a speaking-head icon). No popup; the suggested engine and a random voice. Needs the same setup as Read aloud.
+  📖 See [Read Aloud → Add pronunciation](Read-Aloud.md#pronunciation).
+
+  *Upscale image with ChatGPT*, *Read aloud* and *Add pronunciation* are registered only while the **Local Media Bridge** setting is on.
+
+- <a id="audio-playlist"></a>**Audio Playlist: Play This Branch** — `quick: apb`
+  Plays every audio under the selected Rems, the Rem with the cursor or the open document, one after the other, in a floating player that remembers where you stopped. With nothing to play under the cursor, the whole document plays.
+
+- **Audio Playlist: Play Rems Tagged With This Rem** — `quick: apt`
+  Plays every audio in the Rems tagged with the focused Rem or the open document (a tag's own page), across the knowledge base.
+
+- **Audio Playlist: Open Player** — `quick: apo`
+  Opens the player on the playlist heard last, paused where it stopped.
+
+  The first two are also in the document's [Menu Hub](Plugin-Widgets-Reference.md#menu-hub), which is how to start a playlist on a phone.
+  📖 See [Audio Playlist](Audio-Playlist.md).
 
 - <a id="cycle-image-size"></a>**Cycle Image Size (Fit / Large / Medium / Small / Original)** (`Opt+Shift+G` / `Alt+Shift+G`) — `quick: cis`
   Resizes the images of a card or Rem, including imported ones the queue can show zoomed in and cut off. Each press moves them one step along **Fit → Large → Medium → Small → Original**, and a small bar shows the size set.
@@ -289,7 +313,7 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 ### Other utilities
 
 - **[Copy Rem ID](Utilities-Finding-and-Navigating.md#copy-rem-id)** (`Ctrl+Opt+I`) — `quick: id`
-  Copies the ID of the focused Rem, or of each selected Rem (one per line), to the clipboard; in the queue, the current card's Rem. Silent through the [Local Media Bridge](Local-Media-Bridge.md) helper when it runs, otherwise via a small popup where `Enter` or `⌘C` copies.
+  Copies the ID of the focused Rem, or of each selected Rem (one per line), to the clipboard; in the queue, the current card's Rem; with only a PDF or web page open, that document. On a Rem with sources, or when another Rem is still focused behind an open PDF, a [picker](Utilities-Finding-and-Navigating.md#copy-rem-id-picker) lets you choose which ID to copy. Silent through the [Local Media Bridge](Local-Media-Bridge.md) helper when it runs, otherwise via a small popup where `Enter` or `⌘C` copies.
 
 - **Toggle Ignore Tag** (`Ctrl+Shift+I`) — `quick: ign`
   Adds or removes the `#ignore` tag on the **focused editor Rem**, or on a **multi-rem selection** (select several rems in the outline and run it from the Omnibar). The plugin registers CSS so ignored rems and their descendants are rendered smaller and slightly dimmed (full opacity returns on hover/focus), and the `#ignore` chip itself is hidden from the editor tag bar to keep the document clean.
@@ -411,6 +435,11 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   - **Accent-insensitive** (`navegacao interior` → `Navegação Interior`); **selection-aware** (selected text seeds the search and is replaced by the reference on insert).
 
   📖 See [Utilities → Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open).
+
+- **Search & Browse** — `quick: sb`
+  Opens a table of everything a [Search Engine](Search-Engine.md) query finds, like Anki's Browser: Rems or cards, sortable columns (priority, due date, interval, reps, lapses, FSRS stability, difficulty and retrievability…), searches written in plain language by **✨ AI**, bulk card priority, switching cards back on, copying ids, saved searches and a practice document per saved search. It floats over the editor and collapses to a bar at the bottom right when you open a Rem; running `sb` again brings it back where you left it. **Desktop app on a Mac only**, with the AI helper running.
+
+  📖 See [Search Engine → Search & Browse](Search-Engine.md#browse).
 
 - **Open Hovered Source in Popup** (`Opt+O` / `Alt+O`)
   Opens the **PDF or web article behind a hovered reference pin in a centered modal popup — without leaving the queue.** Clicking a pin directly navigates away and tears down the queue (losing your position and rating ability); this command shows the source on top of the queue instead. **Hover** the pin, then press the shortcut.

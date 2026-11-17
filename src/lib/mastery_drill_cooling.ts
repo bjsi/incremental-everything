@@ -20,13 +20,21 @@ export type FinalDrillEntry =
        * time so a change to the Hard settings applies to cards already waiting.
        */
       intervalMs?: number;
+      /**
+       * Set only for an Again rating: the relearning step the card's scheduler gave it
+       * (its next due date minus the rating). The card waits at least this long, so a
+       * scheduler whose relearning step is longer than the Minimum Delay (an SM-2
+       * scheduler with a 1-day step) keeps the card out of the drill until it is due.
+       */
+      relearnMs?: number;
     };
 
 /**
  * How long a drill card waits after the rating that put it there.
  *
  * Again is a lapse: the drill is a relearning step, so the card comes back after
- * the Minimum Delay while the failure is fresh. Hard is a pass the scheduler
+ * the Minimum Delay while the failure is fresh — or once the scheduler's own
+ * relearning step is over, whichever is later. Hard is a pass the scheduler
  * already rewarded, maybe with a year. Drilling it three hours later only tests
  * the review you just did; the useful check is whether it holds once it has left
  * working memory. So a Hard card waits a share of its new interval, between the
@@ -52,9 +60,15 @@ export function toCooling(minDelayMinutes: unknown, hardPercent: unknown, hardMa
   };
 }
 
-/** The wait for this entry. Legacy entries (no date) and Again ratings get the Minimum Delay. */
+/**
+ * The wait for this entry. Again ratings wait for the Minimum Delay or their relearning
+ * step, whichever is longer; legacy entries and ratings whose interval could not be read
+ * get the Minimum Delay.
+ */
 export function drillCoolingMs(item: FinalDrillEntry, c: DrillCooling): number {
-  if (typeof item === 'string' || !item.intervalMs) return c.minDelayMs;
+  if (typeof item === 'string') return c.minDelayMs;
+  if (item.relearnMs) return Math.max(c.minDelayMs, item.relearnMs);
+  if (!item.intervalMs) return c.minDelayMs;
   return Math.max(c.minDelayMs, Math.min(c.hardShare * item.intervalMs, c.hardMaxMs));
 }
 
@@ -67,9 +81,12 @@ export function drillReadyAt(item: FinalDrillEntry, c: DrillCooling): number {
 export const isDrillEntryCooling = (item: FinalDrillEntry, c: DrillCooling, now: number) =>
   drillReadyAt(item, c) > now;
 
-/** Whether a card just rated Again (or Hard) may come straight back into the same drill session. */
+/**
+ * Whether a card just rated Again (or Hard) may come straight back into the same drill session.
+ * Never for Again: it waits out its scheduler's relearning step, which is always ahead.
+ */
 export function returnsAtOnce(isHard: boolean, c: DrillCooling): boolean {
-  return c.minDelayMs <= 0 && (!isHard || c.hardShare <= 0);
+  return isHard && c.minDelayMs <= 0 && c.hardShare <= 0;
 }
 
 /** A wait as "40 min", "5 h" or "3 days". */

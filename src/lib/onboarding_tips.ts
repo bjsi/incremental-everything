@@ -393,6 +393,13 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     body: '“ttp” — Transfer Incremental Data to Parent hands priority, history and schedule to the parent.',
     docsPath: 'Create-Incremental-Rem-from-PDF-Highlights/#transfer-to-parent',
   },
+  {
+    id: 'mastery-drill',
+    category: 'advanced',
+    title: 'Mastery Drill',
+    body: 'Mastery Drill re-practises your Again/Hard cards until they stick. Turn it on in settings (“is”).',
+    docsPath: 'Mastery-Drill/',
+  },
 ];
 
 /**

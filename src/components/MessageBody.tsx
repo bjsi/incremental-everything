@@ -15,7 +15,7 @@ export function MessageBody({ dialog }: { dialog: MessageDialog | null }) {
   return (
     <>
       <div className="flex items-center gap-2">
-        <span style={{ fontSize: 18 }}>{dialog.tone === 'error' ? '⚠️' : 'ℹ️'}</span>
+        <span style={{ fontSize: 18 }}>{dialog.tone === 'error' ? '⚠️' : dialog.tone === 'success' ? '📌' : 'ℹ️'}</span>
         <span className="font-semibold text-base">{dialog.title}</span>
       </div>
       <div className="text-sm">{dialog.message}</div>
@@ -25,6 +25,27 @@ export function MessageBody({ dialog }: { dialog: MessageDialog | null }) {
           style={{ background: 'var(--rn-clr-background-elevation-10)', color: 'var(--rn-clr-content-secondary)' }}
         >
           {dialog.quote}
+        </div>
+      )}
+      {!!dialog.items?.length && (
+        <div className="flex flex-col gap-2" style={{ maxHeight: 360, overflowY: 'auto' }}>
+          {dialog.items.map((item, k) => (
+            <div
+              key={k}
+              className="text-xs p-2 rounded flex flex-col gap-1"
+              style={{
+                background: 'var(--rn-clr-background-elevation-10)',
+                borderLeft: `3px solid ${item.tone === 'miss' ? '#F59E0B' : item.tone === 'ok' ? '#10B981' : 'transparent'}`,
+              }}
+            >
+              <div className="italic" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                {item.title}
+              </div>
+              {item.lines.map((line, j) => (
+                <div key={j}>{line}</div>
+              ))}
+            </div>
+          ))}
         </div>
       )}
       {dialog.detail && (

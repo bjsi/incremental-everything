@@ -5,11 +5,9 @@ import { formatCountdown } from '../lib/utils';
 
 /**
  * "No Inc Rem Mode" countdown, or a short-lived "Inc Rems disabled (Device)"
- * notice. Shared by the Compact queue's toolbar widget and the Beautiful
- * queue's below-top-bar widget.
+ * notice, in the queue's toolbar widget (widgets/queue_toolbar_priority.tsx).
  *
- * @param active false stops the 1s clock and renders nothing — for an instance
- *   the host has hidden (see useHostShown).
+ * @param active false stops the 1s clock and renders nothing.
  */
 export function NoIncTimerIndicator({ active = true }: { active?: boolean }) {
   const plugin = usePlugin();

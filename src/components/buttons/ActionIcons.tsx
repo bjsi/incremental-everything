@@ -85,3 +85,40 @@ export const BookmarkIcon = ({ size }: { size?: number }) => (
     <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
   </StrokeIcon>
 );
+
+/** A sheet with a pencil corner: the review note. */
+export const NoteIcon = ({ size }: { size?: number }) => (
+  <StrokeIcon size={size}>
+    <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4" />
+    <path d="M2 6h4" />
+    <path d="M2 10h4" />
+    <path d="M2 14h4" />
+    <path d="M2 18h4" />
+    <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" />
+  </StrokeIcon>
+);
+
+export const HelpIcon = ({ size }: { size?: number }) => (
+  <StrokeIcon size={size}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <path d="M12 17h.01" />
+  </StrokeIcon>
+);
+
+/** Bars: the repetition history. */
+export const HistoryIcon = ({ size }: { size?: number }) => (
+  <StrokeIcon size={size}>
+    <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+    <path d="M18 17V9" />
+    <path d="M13 17V5" />
+    <path d="M8 17v-3" />
+  </StrokeIcon>
+);
+
+export const LinkIcon = ({ size }: { size?: number }) => (
+  <StrokeIcon size={size}>
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </StrokeIcon>
+);

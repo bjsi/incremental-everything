@@ -44,6 +44,8 @@ import {
   initialIntervalForHighlightsId,
   initialIntervalForRemsId,
   collapseQueueTopBar,
+  statisticsQueueButtonId,
+  StatisticsQueueButton,
   defaultPriorityId,
   defaultCardPriorityId,
   priorityStepSizeId,
@@ -84,6 +86,8 @@ import {
   logosBridgeEnabledId,
   logosAutoOpenId,
   mediaBridgeEnabledId,
+  readAloudTagId,
+  aiHelperPairingTokenId,
   enableFlashcardPrioritisationId,
   performanceModeId,
   alwaysUseLightModeOnMobileId,
@@ -104,6 +108,7 @@ import {
   masteryDrillMinDelayMinutesId,
   masteryDrillHardIntervalPercentId,
   masteryDrillHardMaxDaysId,
+  masteryDrillMaxPriorityId,
   disableFinalDrillNotificationId,
   masteryDrillModeId,
   MasteryDrillMode,
@@ -156,6 +161,7 @@ export interface IESettings {
 
   // Queue display
   [collapseQueueTopBar]: boolean;
+  [statisticsQueueButtonId]: StatisticsQueueButton;
   [displayPriorityShieldId]: boolean;
   [deferSpoilerIncRemsId]: boolean;
   [autoRefreshPriorityQueueId]: boolean;
@@ -192,6 +198,8 @@ export interface IESettings {
   [logosBridgeEnabledId]: boolean;
   [logosAutoOpenId]: boolean;
   [mediaBridgeEnabledId]: boolean;
+  [readAloudTagId]: string;
+  [aiHelperPairingTokenId]: string;
   [enableFlashcardPrioritisationId]: boolean;
   [performanceModeId]: PerformanceMode;
   [alwaysUseLightModeOnMobileId]: boolean;
@@ -217,6 +225,7 @@ export interface IESettings {
   [masteryDrillMinDelayMinutesId]: number;
   [masteryDrillHardIntervalPercentId]: number;
   [masteryDrillHardMaxDaysId]: number;
+  [masteryDrillMaxPriorityId]: number;
   [disableFinalDrillNotificationId]: boolean;
   [masteryDrillModeId]: MasteryDrillMode;
   [masteryDrillRevealDelayId]: number;
@@ -259,6 +268,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [priorityEditorDisplayModeId]: 'all',
 
   [collapseQueueTopBar]: false,
+  [statisticsQueueButtonId]: 'hide-phone',
   [displayPriorityShieldId]: true,
   [deferSpoilerIncRemsId]: true,
   [autoRefreshPriorityQueueId]: true,
@@ -293,6 +303,8 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [logosBridgeEnabledId]: false,
   [logosAutoOpenId]: false,
   [mediaBridgeEnabledId]: false,
+  [readAloudTagId]: '',
+  [aiHelperPairingTokenId]: '',
   [enableFlashcardPrioritisationId]: false,
   [performanceModeId]: 'light',
   [alwaysUseLightModeOnMobileId]: true,
@@ -315,6 +327,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [masteryDrillMinDelayMinutesId]: 180,
   [masteryDrillHardIntervalPercentId]: 5,
   [masteryDrillHardMaxDaysId]: 7,
+  [masteryDrillMaxPriorityId]: 100,
   [disableFinalDrillNotificationId]: false,
   [masteryDrillModeId]: 'native',
   [masteryDrillRevealDelayId]: 500,
@@ -426,7 +439,7 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
   masteryDrill: {
     label: 'Mastery Drill',
     blurb: 'Deliberate practice of poorly-rated cards.',
-    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#mastery-drill',
+    helpPath: 'Mastery-Drill/',
   },
   queueDashboard: {
     label: 'Queue Dashboard',
@@ -742,6 +755,21 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     description:
       'Frees vertical space during Incremental Rem review by collapsing the queue top bar to a ' +
       'thin strip; hover to reveal it. No effect on regular flashcard turns.',
+  },
+  [statisticsQueueButtonId]: {
+    kind: 'dropdown',
+    group: 'queue',
+    reloadRequired: true,
+    title: 'Statistics Plugin Button in the Queue',
+    description:
+      'The Statistics plugin (if installed) adds a button to the queue. On a phone it takes a whole ' +
+      'row at the top of the card, because RemNote has no toolbar there for it. Hide it on phones ' +
+      'only, or everywhere; the command "Open Statistics" still opens it.',
+    options: [
+      { value: 'show', label: 'Shown' },
+      { value: 'hide-phone', label: 'Hidden on phones' },
+      { value: 'hide', label: 'Hidden everywhere' },
+    ],
   },
   [displayPriorityShieldId]: {
     kind: 'boolean',
@@ -1147,8 +1175,10 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     title: 'Mastery Drill Minimum Delay',
     description:
       'A card rated Again or Hard will not appear in the drill until this long after its last ' +
-      'review, so the same card is not repeated too soon. Hard cards with long intervals wait ' +
-      'longer (see the two settings below).',
+      'review, so the same card is not repeated too soon. A card rated Again also waits for the ' +
+      "relearning step its scheduler gave it, when that is longer: with a 1-day step, it stays " +
+      'out of the drill until it is due. Hard cards with long intervals wait longer (see the two ' +
+      'settings below).',
   },
   [masteryDrillHardIntervalPercentId]: {
     kind: 'number',
@@ -1163,7 +1193,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'returns to the drill, so you recall it from long-term memory rather than from the review ' +
       'you just did. Never shorter than the Minimum Delay, never longer than the maximum below. ' +
       '5% means a card sent 60 days out waits 3 days. Cards rated Again always use the Minimum ' +
-      'Delay. 0 gives Hard cards the Minimum Delay too.',
+      'Delay (or their relearning step, if longer). 0 gives Hard cards the Minimum Delay too.',
   },
   [masteryDrillHardMaxDaysId]: {
     kind: 'number',
@@ -1177,6 +1207,19 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     description:
       'The longest a card rated Hard waits before it returns to the drill, however long its ' +
       'interval. A 1-year card at 5% would wait 18 days; the default 7 days caps it.',
+  },
+  [masteryDrillMaxPriorityId]: {
+    kind: 'number',
+    group: 'masteryDrill',
+    showWhen: { id: enableMasteryDrillId, equals: true },
+    min: 0,
+    max: 100,
+    integer: true,
+    title: 'Mastery Drill Priority Cap',
+    description:
+      'Only cards with this priority or a more important one (a number this low or lower) go to ' +
+      'the drill when you rate them Again or Hard. Lower-priority material is left to its normal ' +
+      'schedule. 100 sends every card. Cards already in the drill stay until you rate them.',
   },
   [disableFinalDrillNotificationId]: {
     kind: 'boolean',
@@ -1388,7 +1431,33 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'http://127.0.0.1:3460). Since RemNote 1.29 a file:// image written from outside is never ' +
       'uploaded; this does it, the same way as "Store linked images & audio in RemNote". The helper ' +
       'can also ask the plugin to move rems, remove tags, read out images and make rems Incremental. ' +
-      'Leave off unless you use the helper.',
+      'It also runs "Upscale image with ChatGPT" and "Read aloud", whose commands appear only while ' +
+      'this is on. Leave off unless you use the helper.',
+  },
+  [readAloudTagId]: {
+    kind: 'string',
+    group: 'integrations',
+    showWhen: { id: mediaBridgeEnabledId, equals: true },
+    helpPath: 'Local-Media-Bridge/',
+    placeholder: 'No tag',
+    title: 'Read Aloud: Tag for Audio Rems',
+    description:
+      'Name of a tag to put on every audio rem that "Read aloud" adds (created if it does not exist). ' +
+      'Leave empty for no tag.',
+  },
+  [aiHelperPairingTokenId]: {
+    kind: 'string',
+    group: 'integrations',
+    helpPath: 'Desktop-Helpers/',
+    placeholder: 'Not paired',
+    wide: true,
+    title: 'AI Helper Pairing Token',
+    description:
+      'Pairs the plugin with the AI helper (scripts/ai_ocr_helper.py, http://127.0.0.1:3457). Every ' +
+      'feature that uses the helper needs it: AI transcription, Pin Source Quote, video snapshots and ' +
+      'transcripts, the review history archive, Find Rem\'s search and the corpus provider. Print the ' +
+      'token with `python3 ai_ocr_helper.py --pairing-token` and paste it here. Without it the helper ' +
+      'refuses every request, so no web page can use it.',
   },
 
   // --- Misc ---

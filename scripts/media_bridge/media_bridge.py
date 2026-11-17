@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local Media Bridge: get local images into RemNote's own storage from outside the app,
-and run a few rem operations the RemNote MCP lacks (move, untag, get-image, incrementalize).
+and run a few rem operations the RemNote MCP lacks (move, tag, untag, get-image, incrementalize,
+pin, pin-quote, card, audio).
 
 Why: since RemNote 1.29 the desktop window runs sandboxed (webSecurity on), so an
 image written into a rem as `![](file:///…)` — e.g. by the RemNote MCP — is never
@@ -20,9 +21,23 @@ The same job channel carries the operations the RemNote MCP cannot do, each run 
 plugin with its own code (src/lib/media_bridge_ops.ts):
 
   move <rem>[,<rem>…] <parent> [first|last|N|before:<id>|after:<id>]
+  tag <rem>[,<rem>…] <tag rem id>   adds a tag (works on PDF rems, which the MCP's tag_rems refuses)
   untag <rem>[,<rem>…] <tag id | tag name | powerup:<code>>
   get-image <rem> [--out DIR]       copies the rem's images to files, prints their paths
   incrementalize <rem>[,<rem>…] [--priority N]
+  pin <rem>[,<rem>…] [--refs <id>[,<id>…]] [--unpin]   references → 📌 pins (default: highlight refs)
+  pin-quote <rem>[,<rem>…] [--source <pdf/article rem>] [--view pdf|html|both] [--quote TEXT]
+                                    without --source: your source finder names each rem's book and PDF
+                                    Pin Source Quote: find the rem's text in the source, pin its highlight
+  card <rem>[,<rem>…] [--type concept|descriptor|default] [--direction forward|backward|both|none]
+  heading <rem>[,<rem>…] [--level next|1-6|none]
+  portal <rem>[,<rem>…] <parent> [first|last|N|before:<id>|after:<id>]
+  audio <parent> <file> [--caption TEXT] [--position first|last|N|before:<id>|after:<id>]
+                                    adds a child rem with a playable audio file (default: first child),
+                                    stored in RemNote like a localized image
+  restore-audio <rem>[,<rem>…]      stores again, under its real audio type, every audio of these rems
+                                    that was stored as an image (no file extension, served as image/…,
+                                    which iOS refuses to play), and points the player at the new copy
 
 Each prints the plugin's JSON answer; exit 0 = done, 1 = failed (or partly), 2 = timeout.
 
@@ -32,12 +47,34 @@ Standard library only. Files older than 30 days are removed from the store.
 Endpoints (127.0.0.1:3460, CORS open, for the plugin iframe):
   GET  /health                 {ok, version, pluginSeenSecondsAgo}
   GET  /files/<name>           a stored file
+  POST /files[?name=…]         raw bytes → {url, type, bytes}: kept in the store under their real
+                               type (sniffed from the bytes), served at url. With a JSON body
+                               {url, kbId?} for a file RemNote already stores (%LOCAL_FILE%… or its
+                               S3 address): read from this computer's copy, else downloaded. Used by
+                               restore-audio, and by other plugins (through Incremental RemNote's
+                               store-media bridge) to get audio stored with its real type.
   POST /jobs {op?, remIds, …}  → {jobId}   (op defaults to "localize")
   GET  /jobs/<id>              {status: queued|taken|done, result?}
   POST /upscale {remId, url, kbId?, extra?} → {taskId}   (plugin → helper: the
                                "Upscale image with ChatGPT" command; runs upscale_image.py,
                                i.e. Codex CLI image generation + the fidelity check)
   GET  /upscale/<id>           {status: queued|running|done, stage, result?}
+  POST /tts/plan {script, engine?, voice?}  what a /tts run would do: errors, every engine
+                               (available = its keys are set, voices, note, estimate), the
+                               suggested one, and for the planned engine: voices, calls,
+                               characters, estSeconds, estCostUsd. No API call.
+  POST /tts {script, engine?, voice?, remId?, subject?, purpose?} → {taskId}; purpose
+                               "pronunciation" keeps the copy in tts.py's pronunciationHome   (plugin → helper: the
+                               "Read aloud" command; runs tts.py: Gemini or Azure TTS, mp3)
+  POST /tts/write {mode: adapted|summary, source, lang, title?, targetWords?, instructions?}
+                               → {taskId}: an LLM writes the spoken script from the plugin's
+                               outline (spoken_script.py: `claude -p`, Anthropic API fallback);
+                               result {script, errors, via, model, costUsd, fallbackReason?}
+  POST /tts/play {url}         plays one of the helper's served audio files on this computer
+                               (ffplay, or afplay on macOS): "Add pronunciation" when RemNote
+                               refuses to autoplay in the plugin
+  GET  /tts/<id>               {status: running|done, stage, result?}; result.url serves the
+                               mp3 for the `audio` op; a copy is kept in tts.py's audioHome
   GET  /next?wait=25&v=2       plugin long-poll → {id, op, remIds, …} or 204. A plugin
                                polling without v=2 is an older build: it gets only
                                localize jobs, the rest wait for a build that knows them.
@@ -66,9 +103,27 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 4  # 3: /upscale, 4: /clipboard
+VERSION = 17  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal
 # The jobs a plugin build understands, by the protocol version it polls with.
-OPS_BY_PLUGIN_VERSION = {1: {"localize"}, 2: {"localize", "move", "untag", "get-image", "incrementalize"}}
+OPS_BY_PLUGIN_VERSION = {
+    1: {"localize"},
+    2: {"localize", "move", "untag", "get-image", "incrementalize"},
+    3: {"localize", "move", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card"},
+    4: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card"},
+    5: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio"},
+    6: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+        "restore-audio"},
+    7: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+        "restore-audio", "notice"},
+    8: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+        "restore-audio", "notice", "set-text", "remove"},
+    9: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+        "restore-audio", "notice", "set-text", "remove", "heading"},
+    10: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+         "restore-audio", "notice", "set-text", "remove", "heading", "portal"},
+}
+# Jobs that may name no rem at all.
+OPS_WITHOUT_REMS = {"notice"}
 KNOWN_OPS = OPS_BY_PLUGIN_VERSION[max(OPS_BY_PLUGIN_VERSION)]
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("REMNOTE_MEDIA_BRIDGE_PORT", "3460"))
@@ -79,6 +134,13 @@ LOG_FILE = HOME / "bridge.log"
 OUT_DIR = HOME / "out"
 REMNOTE_DATA = Path(os.environ.get("REMNOTE_DATA_DIR", Path.home() / "remnote"))
 MAX_AGE_S = 30 * 24 * 3600
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+REMNOTE_FILE_HOST = "https://remnote-user-data.s3.amazonaws.com/"
+# Served types where mimetypes' table is missing or differs by platform.
+CTYPE_BY_EXT = {
+    ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".wav": "audio/wav", ".ogg": "audio/ogg",
+    ".webm": "audio/webm", ".flac": "audio/flac",
+}
 REDELIVER_AFTER_S = 120  # a localize job taken but never answered goes back to the queue
 # Only localize is safe to run twice. Any other job taken and never answered (the
 # plugin reloaded mid-job) is marked lost instead, so it cannot run later, after
@@ -86,6 +148,8 @@ REDELIVER_AFTER_S = 120  # a localize job taken but never answered goes back to 
 REPEATABLE_OPS = {"localize"}
 
 UPSCALE_SCRIPT = Path(__file__).resolve().parent / "upscale_image.py"
+TTS_SCRIPT = Path(__file__).resolve().parent / "tts.py"
+SPOKEN_SCRIPT = Path(__file__).resolve().parent / "spoken_script.py"
 UPSCALE_HOME = Path(os.environ.get("REMNOTE_UPSCALE_HOME", Path.home() / "Pictures" / "remnote-upscale"))
 
 # --- server --------------------------------------------------------------------
@@ -161,10 +225,17 @@ class Handler(BaseHTTPRequestHandler):
             path = (STORE / name).resolve()
             if path.parent != STORE.resolve() or not path.is_file():
                 return self._json(404, {"error": "not found"})
-            ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            ctype = CTYPE_BY_EXT.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
             return self._send(200, path.read_bytes(), ctype)
         if url.path.startswith("/upscale/"):
             task = _tasks.get(url.path[len("/upscale/"):])
+            if not task:
+                return self._json(404, {"error": "no such task (helper restarted?)"})
+            out = {k: task.get(k) for k in ("id", "remId", "status", "stage", "result")}
+            out["elapsed"] = round(time.time() - task["createdAt"])
+            return self._json(200, out)
+        if url.path.startswith("/tts/"):
+            task = _tts_tasks.get(url.path[len("/tts/"):])
             if not task:
                 return self._json(404, {"error": "no such task (helper restarted?)"})
             out = {k: task.get(k) for k in ("id", "remId", "status", "stage", "result")}
@@ -195,15 +266,37 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {**job["args"], "id": job["id"], "op": job["op"], "remIds": job["remIds"]})
         self._json(404, {"error": "unknown path"})
 
+    def _post_file(self, query: dict) -> None:
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > MAX_UPLOAD_BYTES:
+            return self._json(413, {"error": "file too large"})
+        raw = self.rfile.read(n)
+        declared = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        try:
+            if declared == "application/json":
+                req = json.loads(raw or b"{}")
+                data = _fetch_stored(str(req.get("url") or ""), req.get("kbId"))
+                stem = "restored"
+            else:
+                data, stem = raw, query.get("name", ["upload"])[0]
+            url = _store_bytes(data, stem, declared)
+        except (ValueError, FileNotFoundError, OSError, urllib.error.URLError) as err:
+            return self._json(400, {"error": str(err)})
+        name = unquote(urlparse(url).path.rsplit("/", 1)[-1])
+        ctype = CTYPE_BY_EXT.get(Path(name).suffix) or mimetypes.guess_type(name)[0]
+        return self._json(200, {"url": url, "type": ctype, "bytes": len(data)})
+
     def do_POST(self):
         url = urlparse(self.path)
+        if url.path == "/files":  # a binary body: read before _body() parses it as JSON
+            return self._post_file(parse_qs(url.query))
         body = self._body()
         if url.path == "/jobs":
             op = body.pop("op", None) or "localize"
             if op not in KNOWN_OPS:
                 return self._json(400, {"error": f"unknown op {op!r}"})
             rem_ids = [r for r in body.pop("remIds", []) if isinstance(r, str) and r]
-            if not rem_ids:
+            if not rem_ids and op not in OPS_WITHOUT_REMS:
                 return self._json(400, {"error": "remIds required"})
             job = {
                 "id": uuid.uuid4().hex[:12], "op": op, "remIds": rem_ids, "args": body,
@@ -231,6 +324,68 @@ class Handler(BaseHTTPRequestHandler):
             }
             _tasks[task["id"]] = task
             threading.Thread(target=_run_upscale, args=(task,), daemon=True).start()
+            return self._json(200, {"taskId": task["id"]})
+        if url.path == "/tts/play":
+            path = urlparse(str(body.get("url") or "")).path
+            if not path.startswith("/files/"):
+                return self._json(400, {"error": "url must be one of this helper's /files/ addresses"})
+            name = Path(unquote(path[len("/files/"):])).name  # no folders: only the store
+            file = STORE / name
+            if not file.is_file():
+                return self._json(404, {"error": "no such file"})
+            player = shutil.which("ffplay", path=os.pathsep.join([os.environ.get("PATH", ""), "/opt/homebrew/bin", "/usr/local/bin"]))
+            cmd = ([player, "-nodisp", "-autoexit", "-loglevel", "quiet", str(file)] if player
+                   else ["afplay", str(file)] if shutil.which("afplay") else None)
+            if not cmd:
+                return self._json(501, {"error": "no audio player (install ffmpeg)"})
+            subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return self._json(200, {"ok": True})
+        if url.path == "/tts/write":
+            source = body.get("source")
+            if not isinstance(source, str) or not source.strip():
+                return self._json(400, {"error": "source required"})
+            mode = body.get("mode")
+            if mode not in ("adapted", "summary"):
+                return self._json(400, {"error": f"unknown mode {mode!r}"})
+            try:
+                target = int(body["targetWords"]) if body.get("targetWords") else None
+            except (TypeError, ValueError):
+                return self._json(400, {"error": "targetWords must be a number"})
+            try:
+                _spoken_module()
+            except Exception as err:
+                return self._json(500, {"error": f"spoken_script.py did not load: {err}"})
+            task = {
+                "id": uuid.uuid4().hex[:12], "remId": str(body.get("remId") or ""), "mode": mode,
+                "source": source, "lang": body.get("lang") if body.get("lang") in ("pt", "en") else "en",
+                "title": str(body.get("title") or ""), "targetWords": target,
+                "instructions": str(body.get("instructions") or ""),
+                "status": "running", "stage": "starting", "result": None, "createdAt": time.time(),
+            }
+            _tts_tasks[task["id"]] = task
+            threading.Thread(target=_run_write, args=(task,), daemon=True).start()
+            return self._json(200, {"taskId": task["id"]})
+        if url.path in ("/tts", "/tts/plan"):
+            script = body.get("script")
+            if not isinstance(script, str) or not script.strip():
+                return self._json(400, {"error": "script required"})
+            engine = body.get("engine") or "auto"
+            try:
+                tts = _tts_module()
+            except Exception as err:
+                return self._json(500, {"error": f"tts.py did not load: {err}"})
+            if engine not in ("auto", *tts.ENGINES):
+                return self._json(400, {"error": f"unknown engine {engine!r}"})
+            if url.path == "/tts/plan":
+                return self._json(200, tts.plan(script, engine, body.get("voice")))
+            task = {
+                "id": uuid.uuid4().hex[:12], "remId": str(body.get("remId") or ""), "script": script,
+                "engine": engine, "voice": body.get("voice") or None, "subject": body.get("subject") or "",
+                "purpose": "pronunciation" if body.get("purpose") == "pronunciation" else "read-aloud",
+                "status": "running", "stage": "starting", "result": None, "createdAt": time.time(),
+            }
+            _tts_tasks[task["id"]] = task
+            threading.Thread(target=_run_tts, args=(task,), daemon=True).start()
             return self._json(200, {"taskId": task["id"]})
         if url.path == "/clipboard":
             text = body.get("text")
@@ -318,6 +473,91 @@ def _run_upscale(task: dict) -> None:
               file=sys.stderr, flush=True)
 
 
+# --- text to speech (plugin → helper) -------------------------------------------------------
+
+_tts_tasks: dict[str, dict] = {}
+_tts_lock = threading.Lock()  # one synthesis at a time (Gemini's per-minute limit)
+_tts_mod = None
+
+
+def _tts_module():
+    """tts.py, loaded by path: under -I the script's folder is not on sys.path."""
+    global _tts_mod
+    if _tts_mod is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("remnote_bridge_tts", TTS_SCRIPT)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod  # dataclasses look their module up there
+        spec.loader.exec_module(mod)
+        _tts_mod = mod
+    return _tts_mod
+
+
+_spoken_mod = None
+
+
+def _spoken_module():
+    """spoken_script.py (loads tts.py first, under the same module name)."""
+    global _spoken_mod
+    if _spoken_mod is None:
+        _tts_module()
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("remnote_bridge_spoken", SPOKEN_SCRIPT)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        _spoken_mod = mod
+    return _spoken_mod
+
+
+def _run_write(task: dict) -> None:
+    tid = task["id"]
+    try:
+        spoken = _spoken_module()
+        res = spoken.write(task["mode"], task["source"], task["lang"], task["title"],
+                           task["targetWords"], task["instructions"],
+                           progress=lambda msg: task.__setitem__("stage", msg))
+        task["result"] = {"ok": True, **res}
+    except Exception as err:  # reported to the plugin, which shows it
+        task["result"] = {"ok": False, "message": str(err)}
+    finally:
+        task["status"] = "done"
+        task["stage"] = "done"
+        r = task["result"] or {}
+        print(f"{time.strftime('%H:%M:%S')} tts-write {tid} {task['mode']} {task['remId']}: "
+              f"{'ok ' + str(r.get('via')) + ' US$' + str(r.get('costUsd')) if r.get('ok') else r.get('message')}",
+              file=sys.stderr, flush=True)
+
+
+def _run_tts(task: dict) -> None:
+    tid = task["id"]
+    try:
+        tts = _tts_module()
+        task["stage"] = "waiting for another audio" if _tts_lock.locked() else "starting"
+        with _tts_lock:
+            out = OUT_DIR / f"tts-{tid}.mp3"
+            res = tts.synthesize(task["script"], out, task["engine"], task["voice"],
+                                 progress=lambda msg: task.__setitem__("stage", msg))
+        task["stage"] = "saving"
+        subject = task["subject"] or res.get("title") or "audio"
+        folder = tts.pronunciation_home() if task.get("purpose") == "pronunciation" else None
+        kept = tts.keep_copy(task["script"], out, task["remId"] or "norem", subject, folder)
+        name = f"{kept.stem}.mp3"
+        shutil.copyfile(out, STORE / name)
+        out.unlink(missing_ok=True)
+        task["result"] = {"ok": True, **{k: v for k, v in res.items() if k != "file"},
+                          "url": f"{BASE}/files/{quote(name)}", "saved": str(kept)}
+    except Exception as err:  # reported to the plugin, which shows it
+        task["result"] = {"ok": False, "message": str(err)}
+    finally:
+        task["status"] = "done"
+        task["stage"] = "done"
+        r = task["result"] or {}
+        print(f"{time.strftime('%H:%M:%S')} tts {tid} {task['remId']}: "
+              f"{'ok ' + str(r.get('seconds')) + ' s ' + str(r.get('voice')) if r.get('ok') else r.get('message')}",
+              file=sys.stderr, flush=True)
+
+
 def _prune_store() -> None:
     cutoff = time.time() - MAX_AGE_S
     for f in STORE.glob("*"):
@@ -370,18 +610,98 @@ def ensure_running() -> dict:
     sys.exit(f"media bridge did not start; see {LOG_FILE}")
 
 
+def _store(path: str) -> str:
+    """Copy a file into the helper's store and return its http URL."""
+    src = Path(path).expanduser().resolve()
+    if not src.is_file():
+        sys.exit(f"not a file: {path}")
+    STORE.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha1(src.read_bytes()).hexdigest()[:10]
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", src.stem).strip("-") or "file"
+    name = f"{digest}-{stem}{src.suffix.lower()}"
+    shutil.copyfile(src, STORE / name)
+    return f"{BASE}/files/{quote(name)}"
+
+
+def _sniff_ext(data: bytes) -> str | None:
+    """The file's real extension from its first bytes, whatever it was labelled."""
+    head = data[:16]
+    if head[:3] == b"ID3" or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0 and head[1] & 0x06):
+        return ".mp3"  # ID3 tag, or an MPEG audio frame (layer bits set; ADTS AAC has them clear)
+    if head[4:8] == b"ftyp":
+        return ".m4a" if head[8:12] in (b"M4A ", b"M4B ") else ".mp4"
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return ".wav"
+    if head[:4] == b"OggS":
+        return ".ogg"
+    if head[:4] == b"fLaC":
+        return ".flac"
+    if head[:4] == b"\x1a\x45\xdf\xa3":
+        return ".webm"
+    if head[:8] == b"\x89PNG\r\n\x1a\n":
+        return ".png"
+    if head[:3] == b"\xff\xd8\xff":
+        return ".jpg"
+    if head[:4] == b"GIF8":
+        return ".gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return ".webp"
+    return None
+
+
+def _store_bytes(data: bytes, stem: str, declared: str = "") -> str:
+    """Keep bytes in the store under their real type; returns the http URL that serves them."""
+    if not data:
+        raise ValueError("empty file")
+    ext = _sniff_ext(data) or (mimetypes.guess_extension(declared) if declared else None)
+    if not ext:
+        raise ValueError(f"unknown file type (declared {declared or 'nothing'})")
+    STORE.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha1(data).hexdigest()[:10]
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(stem).stem).strip("-") or "file"
+    name = f"{digest}-{stem}{ext}"
+    path = STORE / name
+    if not path.is_file():
+        tmp = path.with_name(path.name + ".part")
+        tmp.write_bytes(data)
+        tmp.replace(path)
+    return f"{BASE}/files/{quote(name)}"
+
+
+def _tls_context():
+    """The python.org build has no CA certificates of its own: certifi's, else macOS's."""
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        cafile = "/etc/ssl/cert.pem"
+        return ssl.create_default_context(cafile=cafile) if os.path.exists(cafile) else ssl.create_default_context()
+
+
+def _fetch_stored(url: str, kb_id: str | None) -> bytes:
+    """A file RemNote stores: this computer's copy, else RemNote's S3. Nothing else is fetched."""
+    if url.startswith("%LOCAL_FILE%"):
+        name = url[len("%LOCAL_FILE%"):]
+    elif url.startswith(REMNOTE_FILE_HOST):
+        name = urlparse(url).path.lstrip("/")
+    else:
+        raise ValueError("only files stored by RemNote (%LOCAL_FILE%… or its S3 address)")
+    local = _local_file(name, kb_id)
+    if local:
+        return local.read_bytes()
+    req = urllib.request.Request(REMNOTE_FILE_HOST + quote(unquote(name)), headers={"User-Agent": "remnote-media-bridge"})
+    with urllib.request.urlopen(req, timeout=120, context=_tls_context()) as res:
+        data = res.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise ValueError("file too large")
+    return data
+
+
 def put(paths: list[str]) -> None:
     ensure_running()
-    STORE.mkdir(parents=True, exist_ok=True)
     for p in paths:
-        src = Path(p).expanduser().resolve()
-        if not src.is_file():
-            sys.exit(f"not a file: {p}")
-        digest = hashlib.sha1(src.read_bytes()).hexdigest()[:10]
-        stem = re.sub(r"[^A-Za-z0-9._-]+", "-", src.stem).strip("-") or "file"
-        name = f"{digest}-{stem}{src.suffix.lower()}"
-        shutil.copyfile(src, STORE / name)
-        print(f"{BASE}/files/{quote(name)}")
+        print(_store(p))
 
 
 def run_job(op: str, rem_ids: list[str], args: dict, timeout: float) -> dict:
@@ -455,9 +775,135 @@ def move(rems: str, parent: str, position: str | None, expect_parent: str | None
     finish(result, bool(result.get("ok")))
 
 
+def tag(rems: str, tag_id: str, timeout: float) -> None:
+    result = run_job("tag", split_ids(rems), {"tag": tag_id}, timeout)
+    finish(result, bool(result.get("ok")))
+
+
 def untag(rems: str, tag: str, drop_properties: bool, timeout: float) -> None:
     result = run_job("untag", split_ids(rems), {"tag": tag, "removeProperties": drop_properties}, timeout)
     finish(result, bool(result.get("ok")))
+
+
+def pin(rems: str, refs: str | None, unpin: bool, timeout: float) -> None:
+    args: dict = {"unpin": unpin}
+    if refs:
+        args["refIds"] = split_ids(refs)
+    result = run_job("pin", split_ids(rems), args, timeout)
+    finish(result, bool(result.get("ok")))
+
+
+def pin_quote(rems: str, source: str, view: str | None, quote: str | None, timeout: float) -> None:
+    args: dict = {"sourceId": source} if source else {}
+    if view:
+        args["view"] = view
+    if quote:
+        args["quote"] = quote
+    result = run_job("pin-quote", split_ids(rems), args, timeout)
+    finish(result, bool(result.get("ok")))
+
+
+def card(rems: str, rem_type: str | None, direction: str | None, timeout: float) -> None:
+    if not rem_type and not direction:
+        sys.exit("give --type and/or --direction")
+    args = {k: v for k, v in (("remType", rem_type), ("direction", direction)) if v}
+    result = run_job("card", split_ids(rems), args, timeout)
+    finish(result, bool(result.get("ok")))
+
+
+def portal(rems: str, parent: str, position: str | None, timeout: float) -> None:
+    args = {"parentId": parent, **parse_position(position)}
+    result = run_job("portal", split_ids(rems), args, timeout)
+    finish(result, bool(result.get("ok")))
+
+
+def heading(rems: str, level: str, timeout: float) -> None:
+    result = run_job("heading", split_ids(rems), {"level": level}, timeout)
+    finish(result, bool(result.get("ok")))
+
+
+def audio(parent: str, path: str, caption: str | None, position: str | None, timeout: float) -> None:
+    ensure_running()
+    args = {"url": _store(path), **parse_position(position or "first")}
+    if caption:
+        args["caption"] = caption
+    result = run_job("audio", [parent], args, timeout)
+    finish(result, bool(result.get("ok")))
+
+
+def _chunked_job(op: str, items: list, chunk: int, timeout: float, make) -> None:
+    """Run `op` over `items` in jobs of `chunk`; print every rem's result together."""
+    results, ok = [], True
+    for start in range(0, len(items), chunk):
+        part = items[start:start + chunk]
+        rem_ids, args = make(part)
+        result = run_job(op, rem_ids, args, timeout)
+        ok = ok and bool(result.get("ok"))
+        results.extend(result.get("results") or [{"remIds": rem_ids, "ok": False, "error": result.get("message")}])
+        print(f"{op}: {min(start + chunk, len(items))}/{len(items)} — {result.get('summary')}", file=sys.stderr)
+    done = sum(1 for r in results if r.get("ok"))
+    finish({"ok": ok, "summary": f"{done}/{len(items)} done", "results": results}, ok)
+
+
+def set_text(path: str, chunk: int, timeout: float) -> None:
+    """Edits file: JSON list of {remId, text?: {before, after}, backText?: {before, after}} (RemNote rich text)."""
+    edits = json.loads(Path(path).read_text())
+    _chunked_job("set-text", edits, chunk, timeout, lambda part: ([e["remId"] for e in part], {"edits": part}))
+
+
+def remove(path: str, chunk: int, timeout: float) -> None:
+    """Expect file: JSON {remId: {text, backText}} — each rem is deleted only if it still has exactly that text and no children."""
+    expect = json.loads(Path(path).read_text())
+    _chunked_job("remove", list(expect), chunk, timeout,
+                 lambda part: (part, {"expect": {i: expect[i] for i in part}}))
+
+
+def notice(title: str, message: str, detail: str | None, rem: str | None, tone: str, wait: float) -> None:
+    """Show a notice in RemNote (the plugin's floating card, with Open Rem when a rem is given).
+
+    Never fails the caller: when RemNote is closed or the plugin has not polled yet, the
+    job stays queued in the helper and shows as soon as a RemNote window polls.
+    """
+    h = ensure_running()
+    if h.get("version", 1) < VERSION:
+        sys.exit(
+            f"the running helper is an older version ({h.get('version')}); restart it so it knows 'notice': "
+            f"`{Path(__file__).name} stop` (or `launchctl kickstart -k gui/$(id -u)/com.incrementalremnote.media-bridge`)"
+        )
+    args = {"title": title, "message": message, "tone": tone}
+    if detail:
+        args["detail"] = detail
+    job_id = _request("POST", "/jobs", {"op": "notice", "remIds": [rem] if rem else [], **args})["jobId"]
+    deadline = time.time() + wait
+    while time.time() < deadline:
+        job = _request("GET", f"/jobs/{job_id}")
+        if job and job["status"] == "done":
+            finish({"jobId": job_id, "status": "shown", **(job["result"] or {})}, True)
+        time.sleep(0.5)
+    finish({"jobId": job_id, "status": "queued",
+            "message": "RemNote has not picked it up yet; it shows when a RemNote window polls the bridge"}, True)
+
+
+def restore_audio(rems: str, chunk: int, timeout: float) -> None:
+    """Runs in small jobs: a job taken and unanswered for REDELIVER_AFTER_S counts as lost."""
+    ids = split_ids(rems)
+    total: dict = {"ok": True, "fixed": [], "failed": [], "untouched": [], "files": 0}
+    for start in range(0, len(ids), chunk):
+        part = ids[start:start + chunk]
+        result = run_job("restore-audio", part, {}, timeout)
+        print(f"{min(start + chunk, len(ids))}/{len(ids)}: {result.get('summary')}", file=sys.stderr, flush=True)
+        if not result.get("ok"):
+            total["ok"] = False
+        for key in ("fixed", "failed", "untouched"):
+            total[key] += result.get(key) or []
+        total["files"] += result.get("files") or 0
+        if result.get("error") or result.get("message"):
+            total.setdefault("errors", []).append(result.get("error") or result.get("message"))
+    total["summary"] = (
+        f"{len(total['fixed'])} rem(s) fixed ({total['files']} file(s)), {len(total['failed'])} failed, "
+        f"{len(total['untouched'])} without audio to restore"
+    )
+    finish(total, bool(total["ok"]) and not total["failed"])
 
 
 def incrementalize(rems: str, priority: int | None, timeout: float) -> None:
@@ -513,7 +959,7 @@ def _fetch_image(url: str, kb_id: str | None) -> tuple[bytes, str]:
             return path.read_bytes(), path.suffix.lower() or ".bin"
     if re.match(r"https?://", url, re.I):
         req = urllib.request.Request(url, headers={"User-Agent": "remnote-media-bridge"})
-        with urllib.request.urlopen(req, timeout=30) as res:
+        with urllib.request.urlopen(req, timeout=30, context=_tls_context()) as res:
             mime = (res.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             data = res.read()
         ext = EXT_BY_MIME.get(mime) or (Path(urlparse(url).path).suffix.lower() or ".bin")
@@ -566,6 +1012,10 @@ def main() -> None:
     p_mv.add_argument("--expect-parent", help="refuse unless each rem's current parent is this id")
     p_mv.add_argument("--dry-run", action="store_true", help="report what would move, change nothing")
     p_mv.add_argument("--timeout", type=float, default=150)
+    p_tg = sub.add_parser("tag", help="add a tag (by its rem id) to rems, PDF rems included")
+    p_tg.add_argument("rems", help="rem id, or several comma-separated")
+    p_tg.add_argument("tag", help="the tag rem's id")
+    p_tg.add_argument("--timeout", type=float, default=150)
     p_un = sub.add_parser("untag", help="remove a tag (or a built-in powerup such as Extra Card Detail) from rems")
     p_un.add_argument("rems", help="rem id, or several comma-separated")
     p_un.add_argument("tag", help="tag rem id, tag name (as shown), or powerup:<code> (e.g. powerup:x)")
@@ -579,6 +1029,59 @@ def main() -> None:
     p_in.add_argument("rems", help="rem id, or several comma-separated")
     p_in.add_argument("--priority", type=int, help="0-100; omitted = inherited/default, as the plugin's own command")
     p_in.add_argument("--timeout", type=float, default=180)
+    p_pin = sub.add_parser("pin", help="show references as 📌 pins (default: every reference to a highlight)")
+    p_pin.add_argument("rems", help="rem id, or several comma-separated")
+    p_pin.add_argument("--refs", help="only these referenced rem ids (comma-separated); waits for them to sync")
+    p_pin.add_argument("--unpin", action="store_true", help="turn pins back into plain references")
+    p_pin.add_argument("--timeout", type=float, default=150)
+    p_pq = sub.add_parser("pin-quote", help="Pin Source Quote: find each rem's text in a PDF/article and pin it")
+    p_pq.add_argument("rems", help="rem id, or several comma-separated")
+    p_pq.add_argument("--source", help="the PDF or saved web article rem; without it, your source finder "
+                      "(via the AI helper's /find-source) names each rem's book and the PDFs to try")
+    p_pq.add_argument("--view", choices=["pdf", "html", "both"], help="for a PDF with a Text Reader version "
+                      "(default: the PDF page view)")
+    p_pq.add_argument("--quote", help="passage to look for instead of the rem's own text (one rem only)")
+    p_pq.add_argument("--timeout", type=float, default=300)
+    p_card = sub.add_parser("card", help="set rems' type (concept/descriptor) and practice direction, text untouched")
+    p_card.add_argument("rems", help="rem id, or several comma-separated")
+    p_card.add_argument("--type", dest="rem_type", choices=["concept", "descriptor", "default"])
+    p_card.add_argument("--direction", choices=["forward", "backward", "both", "none"])
+    p_card.add_argument("--timeout", type=float, default=150)
+    p_po = sub.add_parser("portal", help="make a portal under a parent that shows these rems")
+    p_po.add_argument("rems", help="rem id, or several comma-separated (shown in this order)")
+    p_po.add_argument("parent", help="the rem the portal goes under")
+    p_po.add_argument("position", nargs="?", help="first | last (default) | 0-based index | before:<id> | after:<id>")
+    p_po.add_argument("--timeout", type=float, default=150)
+    p_hd = sub.add_parser("heading", help="set rems' heading level (next = one deeper than the heading above)")
+    p_hd.add_argument("rems", help="rem id, or several comma-separated")
+    p_hd.add_argument("--level", default="next", choices=["next", "none", "1", "2", "3", "4", "5", "6"])
+    p_hd.add_argument("--timeout", type=float, default=150)
+    p_au = sub.add_parser("audio", help="add a child rem that plays an audio file (stored in RemNote)")
+    p_au.add_argument("parent", help="rem to put the audio rem under")
+    p_au.add_argument("file", help="audio file (mp3, m4a, wav…)")
+    p_au.add_argument("--caption", help="text before the player, e.g. '🔊 Áudio'")
+    p_au.add_argument("--position", help="first (default), last, a 0-based index, before:<remId> or after:<remId>")
+    p_au.add_argument("--timeout", type=float, default=180)
+    p_ra = sub.add_parser("restore-audio", help="store again, as audio, the audio of these rems that RemNote stored as an image")
+    p_ra.add_argument("rems", help="rem id(s), comma-separated")
+    p_ra.add_argument("--chunk", type=int, default=5, help="rems per plugin job (default 5)")
+    p_ra.add_argument("--timeout", type=float, default=600, help="seconds to wait for each job")
+    p_st = sub.add_parser("set-text", help="rewrite rems' rich text exactly (front/back), only where it is unchanged")
+    p_st.add_argument("edits", help="JSON file: [{remId, text?: {before, after}, backText?: {before, after}}]")
+    p_st.add_argument("--chunk", type=int, default=25, help="rems per plugin job (default 25)")
+    p_st.add_argument("--timeout", type=float, default=300, help="seconds to wait for each job")
+    p_rm = sub.add_parser("remove", help="delete childless rems whose text still matches the given JSON")
+    p_rm.add_argument("expect", help="JSON file: {remId: {text, backText}}")
+    p_rm.add_argument("--chunk", type=int, default=25)
+    p_rm.add_argument("--timeout", type=float, default=300)
+    p_no = sub.add_parser("notice", help="show a notice in RemNote (floating card; Open Rem when --rem is given)")
+    p_no.add_argument("--title", required=True)
+    p_no.add_argument("--message", default="", help="one or two lines under the title")
+    p_no.add_argument("--detail", help="smaller text under the message")
+    p_no.add_argument("--rem", help="rem id the Open Rem button opens")
+    p_no.add_argument("--tone", choices=["success", "info", "error"], default="success")
+    p_no.add_argument("--wait", type=float, default=10,
+                      help="seconds to wait for RemNote to show it (it stays queued after that)")
     a = ap.parse_args()
     if a.cmd == "serve":
         serve()
@@ -595,12 +1098,34 @@ def main() -> None:
         localize(a.remIds, a.timeout)
     elif a.cmd == "move":
         move(a.rems, a.parent, a.position, a.expect_parent, a.dry_run, a.timeout)
+    elif a.cmd == "tag":
+        tag(a.rems, a.tag, a.timeout)
     elif a.cmd == "untag":
         untag(a.rems, a.tag, a.drop_properties, a.timeout)
     elif a.cmd == "get-image":
         get_image(a.rem, a.out, a.timeout)
     elif a.cmd == "incrementalize":
         incrementalize(a.rems, a.priority, a.timeout)
+    elif a.cmd == "pin":
+        pin(a.rems, a.refs, a.unpin, a.timeout)
+    elif a.cmd == "pin-quote":
+        pin_quote(a.rems, a.source, a.view, a.quote, a.timeout)
+    elif a.cmd == "card":
+        card(a.rems, a.rem_type, a.direction, a.timeout)
+    elif a.cmd == "portal":
+        portal(a.rems, a.parent, a.position, a.timeout)
+    elif a.cmd == "heading":
+        heading(a.rems, a.level, a.timeout)
+    elif a.cmd == "audio":
+        audio(a.parent, a.file, a.caption, a.position, a.timeout)
+    elif a.cmd == "restore-audio":
+        restore_audio(a.rems, max(1, a.chunk), a.timeout)
+    elif a.cmd == "set-text":
+        set_text(a.edits, max(1, a.chunk), a.timeout)
+    elif a.cmd == "remove":
+        remove(a.expect, max(1, a.chunk), a.timeout)
+    elif a.cmd == "notice":
+        notice(a.title, a.message, a.detail, a.rem, a.tone, a.wait)
 
 
 if __name__ == "__main__":

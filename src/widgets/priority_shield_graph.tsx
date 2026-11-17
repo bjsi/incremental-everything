@@ -31,6 +31,7 @@ import {
   buildIncRemRows,
   buildPriorityRows,
 } from '../lib/shield_graph_data';
+import { resolveRemTextAsTitle } from '../lib/richTextRemRefs';
 
 const DOCS_PATH = 'Prioritization-%26-Sorting/#priority-shield-history';
 
@@ -191,7 +192,8 @@ function PriorityShieldGraph() {
     if (!effectiveDocScopeId) return null;
     const rem = await plugin.rem.findOne(effectiveDocScopeId);
     if (!rem?.text) return 'Document';
-    return await plugin.richText.toString(rem.text) || 'Document';
+    const name = await resolveRemTextAsTitle(plugin, rem.text);
+    return name === 'Untitled' ? 'Document' : name;
   }, [effectiveDocScopeId]);
 
   /**
@@ -874,7 +876,7 @@ function PriorityShieldGraph() {
           <b>Relative Priority</b> <i>percentile</i> is the item's relative rank within the {hasDocData ? 'respective scope' : 'Knowledge Base'}; this gives you a clearer metric for managing your learning load.
           The higher the percentile of your Relative Priority shield, the more your top priority material is safeguarded and processed.
           If your graph oscillates around priority of 4%, you will know that only top 4% of your learning material is guaranteed a timely repetition.
-          You can increase that number by doing more work, reducing inflow of new material, deprioritizing less important Incremental Rems / Flashcards, or reducing the randomization degree for the due Incremental Rems queue / Flashcards queue in the <b>Sorting Criteria</b> queue menu (the three-dot icon).
+          You can increase that number by doing more work, reducing inflow of new material, deprioritizing less important Incremental Rems / Flashcards, or reducing the randomization degree for the due Incremental Rems queue / Flashcards queue in the <b>Sorting Criteria</b> (the queue's ⋮ menu → <b>Incremental RemNote…</b>).
         </p>
 
         <p className="mb-3">

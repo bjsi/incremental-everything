@@ -52,3 +52,30 @@ export async function copyTextToClipboard(
   }
   await plugin.widget.openPopup(copyTextPopupWidgetId, { text, label, toast: clipboardToastText(label, text) });
 }
+
+/**
+ * Copy from inside a popup's own key or click handler, where that gesture lets
+ * execCommand('copy') through. Call it synchronously from the handler, before
+ * any await. Falls back to the bridge, then to copy_text_popup. Resolves false
+ * when copy_text_popup took over: the caller must not close its popup then,
+ * since that would close the replacement.
+ */
+export async function copyTextFromGesture(plugin: RNPlugin, text: string, label: string): Promise<boolean> {
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  area.remove();
+  if (ok || (await copyViaBridge(plugin, text))) {
+    await plugin.app.toast(clipboardToastText(label, text));
+    return true;
+  }
+  await plugin.widget.openPopup(copyTextPopupWidgetId, { text, label, toast: clipboardToastText(label, text) });
+  return false;
+}

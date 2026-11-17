@@ -37,8 +37,11 @@ import { getIESetting } from './settings';
  * PROTOCOL v2 adds card videos (lib/external_card_video_bridge.ts), on keys of
  * the same `ie-bridge.v1.` family; v1 clients are unaffected. A client tells
  * them apart by the version in `pong` / `ready`.
+ *
+ * PROTOCOL v3 adds store-media (lib/external_media_bridge.ts): audio stored in
+ * RemNote under its real type, through the Local Media Bridge helper.
  */
-export const PRIORITY_BRIDGE_VERSION = 2;
+export const PRIORITY_BRIDGE_VERSION = 3;
 export const PRIORITY_BRIDGE_KEYS = {
   ready: 'ie-bridge.v1.ready',
   ping: 'ie-bridge.v1.ping',

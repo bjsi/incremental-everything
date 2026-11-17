@@ -18,7 +18,7 @@ What you get:
 
 ## How it works { #how-it-works }
 
-A RemNote plugin cannot start programs on your computer, so the plugin works with a **small helper** that you run locally:
+A RemNote plugin cannot start programs on your computer, so the plugin works with the **[AI helper](Desktop-Helpers.md#ai-helper)**, a small program you run on your computer:
 
 1. The plugin sends the helper the highlight's **exact position** on the page, plus its raw text.
 2. The helper renders **just that region** of the PDF as an image and hands it to your own **Claude Code** (`claude`) command.
@@ -26,88 +26,14 @@ A RemNote plugin cannot start programs on your computer, so the plugin works wit
 
 It runs on **your Claude subscription** — no API key, nothing to pay beyond your plan. A highlight takes about 3–5 seconds. The helper only accepts connections from your own computer.
 
-**Requirements:** RemNote **desktop**, **Python 3**, and **Claude Code** logged in to your Claude account.
-
-The same helper also powers [Pin Source Quote](Source-Pins.md), which needs only Python and PyMuPDF — no Claude account.
+**Requirements:** RemNote **desktop**, the [AI helper](Desktop-Helpers.md#ai-helper), and **Claude Code** logged in to your Claude account.
 
 ## Setup { #setup }
 
-1. **Install Claude Code** ([claude.com/claude-code](https://claude.com/claude-code)) and run `claude` once in a terminal to log in.
-2. **Install PyMuPDF**, the PDF renderer the helper uses:
+1. **Set up the AI helper**, with [start at login](Desktop-Helpers.md#run-at-login) on macOS: see [Setting up the AI helper](Desktop-Helpers.md#setup).
+2. **Install Claude Code** ([claude.com/claude-code](https://claude.com/claude-code)) and run `claude` once in a terminal to log in.
 
-    ```bash
-    pip3 install pymupdf
-    ```
-
-3. **Download the helper:**
-
-    ```bash
-    mkdir -p ~/.incremental-remnote
-    curl -o ~/.incremental-remnote/ai_ocr_helper.py \
-      https://raw.githubusercontent.com/hugomarins/incremental-remnote/main/scripts/ai_ocr_helper.py
-    ```
-
-4. **Start it:**
-
-    ```bash
-    python3 ~/.incremental-remnote/ai_ocr_helper.py
-    ```
-
-    It prints `AI OCR helper on http://127.0.0.1:3457`. Leave the terminal open — or, on macOS, [start it at login](#run-at-login) instead.
-
-To check it is running, open <http://127.0.0.1:3457/> or run `curl http://127.0.0.1:3457/`: the answer shows `"ok": true` and where it found `claude`.
-
-### Start the helper at login (macOS) { #run-at-login }
-
-So you never have to start it by hand, register it as a login item:
-
-1. Find your Python's full path — it must be the one where you installed PyMuPDF:
-
-    ```bash
-    python3 -c "import sys; print(sys.executable)"
-    ```
-
-2. Save the following as `~/Library/LaunchAgents/com.incrementalremnote.ai-ocr-helper.plist`, replacing `PYTHON_PATH` with that path and `YOU` with your macOS user name (launchd does not expand `~`):
-
-    ```xml
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    <plist version="1.0">
-    <dict>
-        <key>Label</key>
-        <string>com.incrementalremnote.ai-ocr-helper</string>
-        <key>ProgramArguments</key>
-        <array>
-            <string>PYTHON_PATH</string>
-            <string>/Users/YOU/.incremental-remnote/ai_ocr_helper.py</string>
-        </array>
-        <key>RunAtLoad</key>
-        <true/>
-        <key>KeepAlive</key>
-        <true/>
-        <key>StandardOutPath</key>
-        <string>/Users/YOU/.incremental-remnote/ai-ocr/helper.log</string>
-        <key>StandardErrorPath</key>
-        <string>/Users/YOU/.incremental-remnote/ai-ocr/helper.log</string>
-    </dict>
-    </plist>
-    ```
-
-3. Load it (stop any copy you started in a terminal first):
-
-    ```bash
-    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.incrementalremnote.ai-ocr-helper.plist
-    ```
-
-macOS now starts the helper at every login and restarts it if it stops.
-
-| To… | Run |
-|---|---|
-| Restart it (after updating the script) | `launchctl kickstart -k gui/$(id -u)/com.incrementalremnote.ai-ocr-helper` |
-| Turn it off | `launchctl bootout gui/$(id -u)/com.incrementalremnote.ai-ocr-helper` |
-| Turn it back on | `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.incrementalremnote.ai-ocr-helper.plist` |
-
-On Windows or Linux the helper is the same Python script — start it by hand, or with your system's startup mechanism. Only macOS has been tested.
+Open <http://127.0.0.1:3457/> to check: `claude` says where the helper found Claude Code.
 
 ## Using it { #using-it }
 
@@ -172,11 +98,11 @@ Keep to the markup the plugin converts into rich text — anything else arrives 
 
 | Message | What to do |
 |---|---|
-| *AI helper is not running* | Start the helper ([Setup](#setup), step 4) and check <http://127.0.0.1:3457/>. |
+| *AI helper is not running* | Start the helper ([AI helper setup](Desktop-Helpers.md#setup)) and check <http://127.0.0.1:3457/>. |
 | *AI transcription failed: claude CLI not found* | Install Claude Code. The helper looks for `claude` on your `PATH` and in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`. |
 | *This highlight has no position data* | It was made in the PDF Text Reader. Highlight the passage in the PDF view instead. |
 | *AI transcription failed: …* (anything else) | Run `claude` in a terminal to confirm you are logged in, then look at the helper's records below. |
 
-The helper keeps its records in `~/.incremental-remnote/ai-ocr/`: `requests.log` (one line per highlight, with any error), `helper.log` (when started at login) and `crops/` (the image sent for each highlight — useful when a transcription covers more or less than you highlighted).
+The helper keeps its records in `~/.incremental-remnote/ai-ocr/`: `requests.log` (one line per highlight, with any error), `helper.log` (when started at login) and `crops/` (the image sent for each highlight — useful when a transcription covers more or less than you highlighted). See [Files the AI helper keeps](Desktop-Helpers.md#files).
 
 **Privacy:** the image of the highlighted region and the highlight's text are sent to Anthropic through your Claude account, exactly as when you paste an image into a Claude conversation. Nothing else from your knowledge base is sent.

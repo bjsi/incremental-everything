@@ -56,6 +56,7 @@ extra:
 
 markdown_extensions:
   - attr_list
+  - def_list
   - md_in_html
   - admonition
   - pymdownx.details
@@ -92,12 +93,17 @@ nav:
       - Create Incremental Rem from PDF Highlights: Create-Incremental-Rem-from-PDF-Highlights.md
       - AI Transcription of PDF Highlights: AI-Transcription-of-PDF-Highlights.md
       - Source Pins: Source-Pins.md
+      - Corpus Provider: Corpus-Provider.md
+      - Read Aloud: Read-Aloud.md
+      - Audio Playlist: Audio-Playlist.md
       - Incremental Video: Incremental-Video.md
       - IncRem List & Main View: IncRem-List-and-Main-View.md
-      - History, Queue Dashboard & Mastery Drill: History-Queue-Dashboard-and-Mastery-Drill.md
+      - History & Queue Dashboard: History-Queue-Dashboard-and-Mastery-Drill.md
+      - Mastery Drill: Mastery-Drill.md
       - "Repetition History & Statistics": Repetition-History-and-Statistics.md
       - Study Dashboard: Study-Dashboard.md
     - 6. Integrations:
+      - Desktop Helpers: Desktop-Helpers.md
       - Chrome Companion Extension: Chrome-Companion-Extension.md
       - Companion Privacy Policy: Companion-Privacy-Policy.md
       - Logos Bible Software: Logos-Bible-Software-Integration.md
@@ -108,6 +114,7 @@ nav:
       - Text & Lists: Utilities-Text-and-Lists.md
       - Outline & Headings: Utilities-Outline-and-Headings.md
       - Finding & Navigating: Utilities-Finding-and-Navigating.md
+      - Search Engine: Search-Engine.md
       - Queue Display: Utilities-Queue-Display.md
       - True or False Cards: Utilities-True-or-False-Cards.md
       - Multiple-Choice Cards: Utilities-Multiple-Choice-Cards.md

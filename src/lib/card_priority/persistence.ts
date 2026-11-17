@@ -61,7 +61,7 @@
 // only create a second, staler copy.
 
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { allCardPriorityInfoKey } from '../consts';
+import { allCardPriorityInfoKey, cardPriorityCacheVersionKey } from '../consts';
 import { CardPriorityInfo, PrioritySource } from './types';
 import { getPausedRemIds } from '../paused_decks';
 
@@ -138,6 +138,8 @@ export async function writeCardPriorityCache(
       )
     : infos;
   await plugin.storage.setSession(allCardPriorityInfoKey, stamped);
+  // After the write: a reader that sees the new stamp is sure to get the new list.
+  await plugin.storage.setSession(cardPriorityCacheVersionKey, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 }
 
 // ── Dirty set ───────────────────────────────────────────────────────────────

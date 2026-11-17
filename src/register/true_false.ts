@@ -1,3 +1,4 @@
+import { extraDetailsItem } from '../lib/extra_details_css';
 import { AppEvents, PluginRem, ReactRNPlugin, RemType, SelectionType } from '@remnote/plugin-sdk';
 import { getEffectiveSelection } from '../lib/editor_selection';
 import { getQueueVisibleCard } from '../lib/queue_visible_card';
@@ -68,20 +69,24 @@ const discIcon = (color: string, path: string) =>
       `</svg>`
   );
 const whiteIcon = (path: string) =>
-  svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${stroke(path, '16 16', 4)}</svg>`);
+  svgUrl(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${stroke(path, '16 16', 4)}</svg>`
+  );
 
 const queueCard = (slug: string) => `.rn-question-rem[data-queue-rem-container-tags~="${slug}"]`;
 const editorRow = (slug: string) => `.rn-editor__rem__body[data-rem-tags~="${slug}"]`;
 
 const verdictCss = (slug: string, color: string, tint: string, path: string) => `
-/* Editor: the bullet becomes the verdict. The ring stays, so a collapsed branch
+/* Editor (and the queue's Extra details): the bullet becomes the verdict. The ring stays, so a collapsed branch
    still shows. The bullet sits several wrappers below the row (confirmed
    2026-10-03 against live DOM), hence the descendant combinator; the editor is
    a flat list, so a row never contains another row's bullet. */
-${editorRow(slug)} .rem-bullet__container {
+${editorRow(slug)} .rem-bullet__container,
+${extraDetailsItem(slug)} > .rem-bullet__container {
   background: ${discIcon(color, path)} center / 16px 16px no-repeat;
 }
-${editorRow(slug)} .rem-bullet__container .rem-bullet__core {
+${editorRow(slug)} .rem-bullet__container .rem-bullet__core,
+${extraDetailsItem(slug)} > .rem-bullet__container .rem-bullet__core {
   fill: transparent;
 }
 ${editorRow(slug)} .hierarchy-editor__tag-bar__tag {
@@ -192,7 +197,8 @@ const CLUSTER_VISIBLE_REM_KEY = 'clusterVisibleRemId';
 const CLUSTER_ROW =
   '.cluster-answer-container:not(.cluster-answer-container .cluster-answer-container) > :is(.min-w-0.items-start, .justify-between)';
 const CLUSTER_ANSWER = ':is(.mx-2 ~ .RichTextViewer, .rn-fill-in-blank--revealed)';
-const CLUSTER_DELIMITER = ':is(span.mx-2:has(~ .RichTextViewer), span:not([class]):has(+ .rn-fill-in-blank--revealed))';
+const CLUSTER_DELIMITER =
+  ':is(span.mx-2:has(~ .RichTextViewer), span:not([class]):has(+ .rn-fill-in-blank--revealed))';
 
 const VERDICT_STYLE: Record<Verdict, { color: string; tint: string; path: string }> = {
   true: { color: GREEN, tint: '22, 163, 74', path: CHECK_PATH },
@@ -256,7 +262,11 @@ const BARE_ANSWER_CSS = `
 let clusterCssVerdict: Verdict | null = null;
 let bareAnswerCss = false;
 
-async function setClusterCardCss(plugin: ReactRNPlugin, verdict: Verdict | null, bareAnswer: boolean) {
+async function setClusterCardCss(
+  plugin: ReactRNPlugin,
+  verdict: Verdict | null,
+  bareAnswer: boolean
+) {
   if (bareAnswer !== bareAnswerCss) {
     bareAnswerCss = bareAnswer;
     await plugin.app.registerCSS(BARE_ANSWER_CSS_ID, bareAnswer ? BARE_ANSWER_CSS : '');
@@ -274,7 +284,8 @@ async function applyClusterCardCss(plugin: ReactRNPlugin, remId: string | undefi
     if (rem) {
       if (await rem.hasPowerup(TRUE_FALSE_TRUE_POWERUP_CODE)) verdict = 'true';
       else if (await rem.hasPowerup(TRUE_FALSE_FALSE_POWERUP_CODE)) verdict = 'false';
-      if (verdict) bareAnswer = isBareVerdictBack(rem.backText, await backReferenceText(plugin, rem));
+      if (verdict)
+        bareAnswer = isBareVerdictBack(rem.backText, await backReferenceText(plugin, rem));
     }
   } catch {
     /* unreadable Rem: clear */
@@ -300,7 +311,9 @@ export function registerTrueFalseClusterTracker(plugin: ReactRNPlugin) {
     const card = await plugin.queue.getCurrentCard().catch(() => undefined);
     await applyClusterCardCss(plugin, card?.remId);
   });
-  plugin.event.addListener(AppEvents.QueueExit, undefined, () => setClusterCardCss(plugin, null, false));
+  plugin.event.addListener(AppEvents.QueueExit, undefined, () =>
+    setClusterCardCss(plugin, null, false)
+  );
   // Leaving by navigation fires no QueueExit. Only while something is registered
   // is the URL read at all; entering a queue also fires URLChange, hence the check.
   plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
@@ -316,13 +329,15 @@ export async function registerTrueFalsePowerups(plugin: ReactRNPlugin) {
   await plugin.app.registerPowerup({
     name: 'TFT',
     code: TRUE_FALSE_TRUE_POWERUP_CODE,
-    description: 'A True/False card whose statement is TRUE. Set with the "True/False: Mark as True" command.',
+    description:
+      'A True/False card whose statement is TRUE. Set with the "True/False: Mark as True" command.',
     options: { slots: [] },
   });
   await plugin.app.registerPowerup({
     name: 'TFF',
     code: TRUE_FALSE_FALSE_POWERUP_CODE,
-    description: 'A True/False card whose statement is FALSE. Set with the "True/False: Mark as False" command.',
+    description:
+      'A True/False card whose statement is FALSE. Set with the "True/False: Mark as False" command.',
     options: { slots: [] },
   });
   await plugin.app.registerCSS('true-false-cards', TRUE_FALSE_CSS);
@@ -352,7 +367,10 @@ async function targetRems(plugin: ReactRNPlugin): Promise<{ rems: PluginRem[]; i
   return { rems: focused ? [focused] : [], inQueue: false };
 }
 
-async function backReferenceText(plugin: ReactRNPlugin, rem: PluginRem): Promise<Record<string, string>> {
+async function backReferenceText(
+  plugin: ReactRNPlugin,
+  rem: PluginRem
+): Promise<Record<string, string>> {
   const refText: Record<string, string> = {};
   for (const id of referencedRemIds(rem.backText)) {
     const target = await plugin.rem.findOne(id);
@@ -435,7 +453,8 @@ async function runMarkCommand(plugin: ReactRNPlugin, verdict: Verdict) {
   );
 }
 
-const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+const plural = (count: number, one: string, many = `${one}s`) =>
+  `${count} ${count === 1 ? one : many}`;
 
 /* A question card: forward and/or backward, nothing clozed, not a concept or a
    descriptor (those are cards with a back too). A Rem with both directions off has
@@ -455,7 +474,12 @@ interface JudgeScan {
 }
 
 async function scanForJudgment(plugin: ReactRNPlugin, rems: PluginRem[]): Promise<JudgeScan> {
-  const scan: JudgeScan = { byMark: { true: [], false: [] }, byWord: [], alreadyMarked: 0, bothMarks: 0 };
+  const scan: JudgeScan = {
+    byMark: { true: [], false: [] },
+    byWord: [],
+    alreadyMarked: 0,
+    bothMarks: 0,
+  };
   for (const rem of rems) {
     // The back comes with the Rem, so everything without a verdict costs nothing.
     if (!rem.backText?.length) continue;
@@ -489,13 +513,19 @@ const nothingToJudgeMessage = (scan: JudgeScan, scanned: number) => {
     return `Nothing to change: ${plural(scan.alreadyMarked, 'card')} already marked.`;
   }
   if (scan.bothMarks > 0) {
-    return `Nothing marked: ${plural(scan.bothMarks, 'card')} with a back saying both true and false` +
-      (scan.alreadyMarked > 0 ? `, ${scan.alreadyMarked} already marked.` : '.');
+    return (
+      `Nothing marked: ${plural(scan.bothMarks, 'card')} with a back saying both true and false` +
+      (scan.alreadyMarked > 0 ? `, ${scan.alreadyMarked} already marked.` : '.')
+    );
   }
   return `No question card without clozes and with a verdict on the back (${plural(scanned, 'Rem')} checked).`;
 };
 
-async function applyJudgment(plugin: ReactRNPlugin, remIds: Record<Verdict, string[]>, inQueue: boolean) {
+async function applyJudgment(
+  plugin: ReactRNPlugin,
+  remIds: Record<Verdict, string[]>,
+  inQueue: boolean
+) {
   const total = remIds.true.length + remIds.false.length;
   let marked = 0;
   try {
@@ -524,9 +554,14 @@ async function applyJudgment(plugin: ReactRNPlugin, remIds: Record<Verdict, stri
   );
 }
 
-const judgmentsToApply = (scan: JudgeScan, rejectedRemIds: string[] = []): Record<Verdict, string[]> => {
+const judgmentsToApply = (
+  scan: JudgeScan,
+  rejectedRemIds: string[] = []
+): Record<Verdict, string[]> => {
   const accepted = (verdict: Verdict) =>
-    scan.byWord.filter((item) => item.verdict === verdict && !rejectedRemIds.includes(item.remId)).map((item) => item.remId);
+    scan.byWord
+      .filter((item) => item.verdict === verdict && !rejectedRemIds.includes(item.remId))
+      .map((item) => item.remId);
   return {
     true: [...scan.byMark.true, ...accepted('true')],
     false: [...scan.byMark.false, ...accepted('false')],
@@ -588,7 +623,8 @@ export async function registerTrueFalseCommands(plugin: ReactRNPlugin) {
   await plugin.app.registerCommand({
     id: `${TRUE_FALSE_TRUE_POWERUP_CODE}Cmd`,
     name: 'True/False: Mark as True',
-    description: 'Turn the selected statement(s) into True/False cards answered ✅, keeping whatever the back already holds.',
+    description:
+      'Turn the selected statement(s) into True/False cards answered ✅, keeping whatever the back already holds.',
     keyboardShortcut: 'ctrl+shift+t',
     quickCode: 'tft',
     action: async () => runMarkCommand(plugin, 'true'),
@@ -597,7 +633,8 @@ export async function registerTrueFalseCommands(plugin: ReactRNPlugin) {
   await plugin.app.registerCommand({
     id: `${TRUE_FALSE_FALSE_POWERUP_CODE}Cmd`,
     name: 'True/False: Mark as False',
-    description: 'Turn the selected statement(s) into True/False cards answered ❌, keeping whatever the back already holds.',
+    description:
+      'Turn the selected statement(s) into True/False cards answered ❌, keeping whatever the back already holds.',
     keyboardShortcut: 'ctrl+shift+f',
     quickCode: 'tff',
     action: async () => runMarkCommand(plugin, 'false'),
@@ -625,7 +662,8 @@ export async function registerTrueFalseCommands(plugin: ReactRNPlugin) {
   await plugin.app.registerCommand({
     id: 'trueFalseClearCmd',
     name: 'True/False: Remove Marking',
-    description: 'Remove the True/False styling from the selected Rem(s). The card and its back text are left as they are.',
+    description:
+      'Remove the True/False styling from the selected Rem(s). The card and its back text are left as they are.',
     quickCode: 'tfx',
     action: async () => {
       const { rems } = await targetRems(plugin);

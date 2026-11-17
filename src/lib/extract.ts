@@ -86,12 +86,29 @@ export const createExtract = async (
   }
 
   if (!selection) {
-    // plugin.editor.getSelection() returns undefined when focus is inside the
-    // PDF iframe. plugin.reader.addHighlight() also returns null in that
-    // context — it requires a RemNote-internal pending highlight available
-    // only through the PDFHighlightToolbar widget flow. Keyboard shortcuts
-    // cannot create PDF highlights.
-    return;
+    // No live selection, no getSelectedRem, no fresh cache. Happens when the
+    // editor still has a focused Rem but DOM focus moved elsewhere — a click on
+    // an audio/video player's controls, a floating widget (the review timer),
+    // another plugin iframe — and the cursor was never placed back. Opt+P
+    // already falls back to the focused Rem (resolvePriorityTargets); without
+    // the same fallback here Opt+X did nothing at all, without a word.
+    //
+    // Also the PDF case: getSelection() is undefined while focus is inside the
+    // PDF iframe, and plugin.reader.addHighlight() returns null there (it needs
+    // a pending highlight that only the PDFHighlightToolbar flow provides), so
+    // a shortcut cannot create a PDF highlight. The toast below names the Rem
+    // the fallback picked, so a press in a PDF that lands on the last focused
+    // editor Rem is visible rather than silent.
+    const focused = await plugin.focus.getFocusedRem();
+    if (!focused) {
+      console.log('[Extract] Nothing selected and no focused Rem — nothing to make incremental.');
+      await plugin.app.toast('Nothing to make incremental: click into a Rem or select one first.');
+      return;
+    }
+    console.log(`[Extract] No selection; using the focused Rem ${focused._id}`);
+    selection = { type: SelectionType.Rem, remIds: [focused._id] } as any;
+    const name = (await plugin.richText.toString(focused.text ?? []).catch(() => '')).trim();
+    void plugin.app.toast(`Making the focused Rem incremental: ${name.slice(0, 60) || focused._id}`);
   }
 
   if (

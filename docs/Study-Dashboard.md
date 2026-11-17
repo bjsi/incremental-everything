@@ -26,7 +26,8 @@ Below the **Context / Period** box the popup has two tabs. The filters live *abo
 ## Opening it
 
 - **Command Palette:** *Open Study Dashboard* (quick code `sdb`)
-- The dashboard always opens in **Global** mode by default.
+- **[Menu Hub](Plugin-Widgets-Reference.md#menu-hub):** a document's ⋯ menu or the queue's ⋮ menu → **Incremental RemNote…** → *Study Dashboard*. It opens in **Document** mode on that document, or on the queue's document or folder (Global for a queue over all flashcards).
+- From the command, the dashboard always opens in **Global** mode by default.
 - If a rem is focused in the editor (or you're reviewing a card in the queue), the command passes it along as the Document-mode root — you can switch to **Document** inside the popup at any time. Without a rem context, the *Document* radio is greyed out and Global is the only option.
 
 ---
@@ -97,6 +98,7 @@ The hierarchy lists every rem with activity *inside the selected period*, organi
 - The ↗ icon on each row opens the rem in the editor (PDF-aware: PDF highlights/extracts open as a page).
 - Branches with zero reps in the period are **pruned at every level**. If you change to *All*, more rems re-appear.
 - **Structural ancestor nodes** — rems that have no own data but are needed to keep the tree connected — render in italics with reduced opacity. Their numbers are the bottom-up aggregate of their descendants.
+- Rems marked **🗑** have been deleted. Their reviews come from the helper's archive; see [Deleted Rems](#deleted-rems).
 
 The [period demo above](#period) shows both halves of this: the tree re-counting as the period widens, and branches expanding level by level.
 
@@ -117,6 +119,39 @@ In Global mode, a "top-level rem" is the highest ancestor (where `parent === nul
 ### Document mode — root
 
 In Document mode the root row is the rem the dashboard was opened from (or its closest in-scope ancestor when in Comprehensive mode, see below).
+
+---
+
+## Deleted Rems { #deleted-rems }
+
+RemNote keeps a card's reviews only inside the card itself. Deleting a Rem sends its cards to the trash, and RemNote empties the trash after two weeks, so those reviews drop out of every total, the ones here included. The time you spent on them is still part of your study.
+
+With the [AI helper](Desktop-Helpers.md#ai-helper) running, the plugin keeps them. Every six hours, and each time you open the dashboard, the helper copies every review it finds in RemNote's local database into an archive of its own, trashed Rems included. It only reads RemNote's database and never writes to it.
+
+**Include deleted Rems** (beside the Context options, on by default) adds those reviews back:
+
+- The Summary, the Graphs and the Hierarchy count them, and a line under the Summary says how much they add: *🗑 Includes N reps (time) from deleted Rems*.
+- In the hierarchy they show with **🗑**, under the nearest ancestor that still exists. Hover the icon for the deletion date. They have no Open button, since there is nothing left to open.
+- Cards deleted from a Rem that still exists go under a **Removed cards** row beneath that Rem. Deleted Rems with nothing left above them go under **Deleted Rems with no surviving ancestor**.
+- In Document mode, only the deleted Rems that sat inside the document are counted.
+
+A review that still exists somewhere is counted once. That covers Preserve history & remove, Dismiss and Transfer, which copy reviews onto another Rem.
+
+The [Practiced Queues](History-Queue-Dashboard-and-Mastery-Drill.md#refresh-statistics-authoritative-summary-recompute) summary counts them too, on every device, once a desktop with the helper has refreshed its statistics.
+
+If the helper isn't running, the checkbox reads *(helper not running)* and the dashboard shows only what RemNote still holds. The archive starts when the helper does, and it can catch only what is still in RemNote's two-week trash at that point.
+
+To look up a deleted card itself, with each of its reviews, see [Finding a deleted card](Desktop-Helpers.md#find-deleted-cards).
+
+### Recovering reviews from old backups { #recover-from-backups }
+
+Reviews deleted before the helper ran can still be in your old RemNote backups or exports. `history_backfill.py` (in the plugin's `scripts/` folder; keep it next to `history_archive.py`) reads them and archives every review your knowledge base no longer holds. It looks for the place each review's Rem had in your tree today, first by id, then by the names of its ancestors.
+
+```bash
+python3 history_backfill.py --kb <knowledge base id> --dry-run <backup files…>
+```
+
+It reads `.db` and `.db.zip` backups, JSON exports (`.zip`, `.rem`) and knowledge base folders. `--dry-run` reports what it would add, and `--list` takes a file with one backup path per line. Each added review is tagged with its backup's name, so they can be told apart and removed. If some of the history was imported from someone else's knowledge base, pass that knowledge base's id with `--exclude-kb`, and the reviews it also holds are left out. Afterwards, `history_backfill_verify.py --kb <id>` checks a sample of the added reviews against your knowledge base today, to confirm none of them are still there under another id.
 
 ---
 

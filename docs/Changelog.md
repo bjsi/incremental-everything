@@ -2,6 +2,365 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.240 - November 17th, 2026
+
+### 📝 Changed
+
+**Answer buttons on a phone**: **Next** no longer cuts its interval short. The scheduler chip (`×1.5`) and the interval sit in two small lines beside the word, at the button's usual height, and months and years are shortened to `m` and `y` (`in 1.3 m`, `in 2.5 y`). On the narrowest phones the icon buttons get a little smaller, and Next shrinks rather than pushing a button onto a second row.
+
+📖 [Reviewing Items in the Queue → The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
+
+## v1.0.239 - November 17th, 2026
+
+### 📝 Changed
+
+**Answer buttons**: the **P Edit** hint is gone. An Incremental Rem is edited with **✎ Edit** on its card, **In Editor** or **New Tab**; RemNote's `P` key still opens the previewer.
+
+📖 [Reviewing Items in the Queue → The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
+
+## v1.0.238 - November 17th, 2026
+
+### 🐛 Fixed
+
+**Editor over the card, on a phone**: the first lines of the Rem were hidden under a bar at the top of the panel, even after dragging it. That was RemNote's own phone page bar (back arrow, breadcrumb, actions) and a band the height of the screen's top safe area, which RemNote's document page brings along; inside the panel both are gone, and the Rem starts at the top.
+
+📖 [Reviewing Items in the Queue → The editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor)
+
+**Priority badge in the Beautiful queue**: in RemNote's light theme it showed in a white box on the queue's dark top bar. The box was the browser's backdrop for a frame whose colour scheme differs from its surroundings, not a background of the plugin's; the badge now sits straight on the bar.
+
+📖 [Queue Toolbar Priority](Plugin-Widgets-Reference.md#12-queue-toolbar-priority)
+
+## v1.0.237 - November 17th, 2026
+
+### 📝 Changed
+
+**Queue toolbar**: the priority badge and the *No Inc Rem* countdown are one widget again, in RemNote's own toolbar, in both queue variants: in the Beautiful queue they now sit among the queue's buttons at the top right of the window, where RemNote shows toolbar widgets again, instead of in the card's corner. On a phone the badge is left out for Incremental Rems; RemNote's Beautiful queue on a phone shows no toolbar widgets at all.
+
+📖 [Queue Toolbar Priority](Plugin-Widgets-Reference.md#12-queue-toolbar-priority)
+
+**Statistics plugin button**: a new setting, **Statistics Plugin Button in the Queue**, hides that plugin's queue button on phones (where it takes a whole row of the card) or everywhere. Off by default.
+
+📖 [Settings → Queue Display](Plugin-Settings-Reference.md)
+
+**Queue on a phone**: a plain Rem's card starts at the top of the queue; its *Back to isolated view* button is in the card's header (**← Isolated**) instead of floating above it in a 48 px band.
+
+### 🐛 Fixed
+
+**Editor over the card**: it now also closes when the queue moves on to another Incremental Rem; it used to close only when a flashcard came next, and stayed open over the next Incremental Rem. On a phone it is laid exactly over the card, measured rather than assumed.
+
+📖 [Reviewing Items in the Queue → The editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor)
+
+## v1.0.236 - November 17th, 2026
+
+### 🐛 Fixed
+
+**Editor over the card**: it closes when a flashcard comes next and when you leave the queue; it used to stay on screen. On a phone its bar with **Done** is at the bottom of the panel, because RemNote's own page bar covered it at the top and left no way to close the panel; the card's **✎ Edit** button reads **✓ Done** while it is open.
+
+📖 [Reviewing Items in the Queue → The editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor)
+
+## v1.0.235 - November 17th, 2026
+
+### ✨ New
+
+**Edit an extract in the queue**: a plain Rem-type Incremental Rem now has an **✎ Edit** button on its queue card. It opens RemNote's own editor for the Rem in a panel over the card, with the formatting bar, native clozes, `/` commands, the command palette and the plugin's commands on the focused Rem (Create Cloze Deletion, Extract, priorities). The queue's keys are off while you type, and **Done** brings the card back. It works on a phone, where there is no right sidebar: the editor takes the upper part of the screen, above the keyboard.
+
+📖 [Reviewing Items in the Queue → The editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor)
+
+### 📝 Changed
+
+**Answer buttons**: redrawn flat, at one height, with icons in place of the emoji for the review note, help and repetition history, and a slimmer figures bar. On a phone, or in any pane narrower than 520 px, the bar shrinks to about a third of its height: one row with **Next** and icon-only buttons, and one line of figures. **New Tab**, the **P Edit** hint and the help icon are left out there.
+
+📖 [Reviewing Items in the Queue → The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
+
+**Document Notes sidebar**: it no longer opens by itself when a Rem-type Incremental Rem comes up in the queue, so the right sidebar stays on the Practiced Queues dashboard. Open it by hand with **Sidebar →** on the card. While the editor over the card is open on a Rem, the sidebar shows a note instead of a second copy of the same page, since two editors on one Rem took the cursor from each other.
+
+## v1.0.234 - November 17th, 2026
+
+### ✨ New
+
+**Audio Playlist**: plays the audios in your notes one after the other, as if they were a single recording, in a floating player that stays on screen across documents and the flashcard queue. Make a playlist from a document or any Rem and everything under it, from the Rems carrying a tag across the knowledge base, or from a branch narrowed to a tag. One position bar and clock cover the whole playlist; −15 / +15 cross from one audio to the next; speed goes from 0.75× to 2×. The position in each playlist is remembered and synced, so one paused on the computer resumes on the phone. Each audio is named after the Rem it belongs to, with the levels above it. It works on the phone, with no helper and no setup: open a document's **⋯** menu → **Incremental RemNote…** → **Audio Playlist (this document)**.
+
+Try it (the plugin's own player, over an invented document):
+
+<iframe src="../demos/audio-playlist.html" title="Audio Playlist demo" loading="lazy" style="width:100%;height:560px;border:0;display:block"></iframe>
+
+📖 [Audio Playlist](Audio-Playlist.md)
+
+## v1.0.233 - November 16th, 2026
+
+### ✨ New
+
+**Corpus provider**: a program on your computer that knows your library (a [source finder](Source-Pins.md#no-source-open) that knows more) can now serve several features through the AI helper's new `/corpus` route. Each feature turns on only when the provider offers its capability. The **parent selector** now suggests the section a highlight comes from, marked 📚, without waiting for it. **Pin Source Quote** can search a corrected quote by the text its PDF actually holds.
+
+📖 [Corpus Provider](Corpus-Provider.md)
+
+**Pin Source Quote**: a corpus provider can give, for each book, the exact text its PDF holds (`quote-literal`), so a quote whose text was corrected (a garbled word or formula fixed) is still found and pinned.
+
+📖 [Corpus Provider → find-source](Corpus-Provider.md#op-find-source)
+
+### 📝 Changed
+
+**AI helper**: every request now needs the **pairing token**, not only searches. Without it, a web page open in your browser could make the helper transcribe with your Claude account, read files of your knowledge base or query your corpus provider. If you use the helper and have not paired it yet (Search needed it already), run `python3 ~/.incremental-remnote/ai_ocr_helper.py --pairing-token` and paste the token in **AI Helper Pairing Token**. Update the helper and the plugin together.
+
+📖 [Desktop Helpers → The pairing token](Desktop-Helpers.md#pairing)
+
+### 🐛 Fixed
+
+**Parent selector**: when rows were added above the selected one (a branch expanding), the selection could jump to whatever row took its place. It now stays on the same Rem.
+
+📖 [Create Incremental Rem → The section your library index suggests](Create-Incremental-Rem-from-PDF-Highlights.md#corpus-suggestion)
+
+## v1.0.232 - November 16th, 2026
+
+### ✨ New
+
+**Local Media Bridge**: added `set-text`, which rewrites rems' front and back text exactly, keeping clozes, pins and review history, and `remove`, which deletes childless rems, each only if its text is still what the caller read.
+
+**Local Media Bridge**: added `portal`, which creates a portal under a parent showing the given rems, so a rem filed in one place of your notes shows in full in another; the RemNote MCP can only reference.
+
+**Local Media Bridge**: added `heading`, which sets rems' heading level, by default one level deeper than the heading above them, like **Set Next Heading Level** without its dialog. The `card` documentation now shows how to make a Concept with no flashcard, which RemNote lists first in searches and in the `[` reference menu.
+
+📖 [Local Media Bridge → Rem operations](Local-Media-Bridge.md#operations)
+
+### ✨ Improved
+
+**Read aloud** *(Gemini TTS)*: Gemini sometimes kept talking past the end of the text with sentences of its own, looped or skipped a clause. Calls are now short, a repeated passage never shares a call, and each call is transcribed with a local whisper and made again when it does not match the script.
+
+📖 [Read Aloud → Gemini's audio is checked](Read-Aloud.md#checked)
+
+**Local Media Bridge**: `heading` with `next` now sets one level below the nearest heading above, however many plain rems lie between.
+
+**Notices**: the notice card at the top right can now be dragged out of the way; a new card still opens at the top right.
+
+📖 [Local Media Bridge → Notices from outside tools](Local-Media-Bridge.md#notice)
+
+## v1.0.231 - November 14th, 2026
+
+### ✨ New
+
+**Search Engine** *(desktop app on a Mac only, with the AI helper)*: Find Rem now searches with an Anki-style query language: every word must match (RemNote's own search could drop such Rems), with `or`, `-word`, `"phrases"`, `in:"Document"`, `tag:`, `is:`, `source:`, `refs:`, slot and property values, card states and reviews (`is:due`, `rated:7:forgot`, `prop:lapses>3`), FSRS stability, difficulty and retrievability computed with each card's own scheduler (`prop:r<0.7`, `scheduler:vocabulary`), suppressed cards by cause (`suppressed:table`), and `*` wildcards; a new **Search & Browse** (`sb`) shows everything a search finds in a sortable table of Rems or cards, Anki-Browser style, with bulk card priority, saved searches and a practice document per saved search, floating over the editor and collapsing to a bar while you work, and a **✨ AI** button that turns a request in your own words, in any language, into the search; the PDF tools find a source's IncRems and the Suppressed Cards tab reads each card's cause through the same index instead of checking Rem by Rem; and, on every device and without the helper, words split by a Rem reference ("[sea margin] becomes useless") now find their note too.
+
+!!! warning "Desktop only, Mac only"
+    The Search Engine, Search & Browse and ✨ AI need RemNote's desktop app on a Mac with the [AI helper](Desktop-Helpers.md#search) running and paired. Not on Windows, Linux, the web app, the iPhone or Android, where Find Rem keeps RemNote's own search.
+
+Try Search & Browse (example data; the demo knows a subset of the keys):
+
+<iframe src="../demos/search-browse.html" title="Search & Browse demo" loading="lazy" style="width:100%;height:560px;border:0;display:block"></iframe>
+
+![✨ AI turning a request into a search in Search & Browse](assets/search-natural-language-AI.png)
+
+📖 [Search Engine](Search-Engine.md)
+
+## v1.0.230 - November 14th, 2026
+
+### 🐛 Fixed
+
+**Read Aloud**: a reference to one of a Rem's aliases is read again (it was left out of the script), in Read aloud and Add pronunciation alike.
+
+📖 [Read Aloud → Reading rules](Read-Aloud.md#reading-rules)
+
+**Find Rem**: a Rem picked through one of its aliases is inserted showing that alias again, not the Rem's main name, and **text + pin** copies the alias text.
+
+📖 [Find Rem → Find by alias](Utilities-Finding-and-Navigating.md#find-by-alias)
+
+## v1.0.229 - November 13th, 2026
+
+### ✨ New
+
+**Bridge for Other Plugins**: other plugins can now store audio in RemNote through Incremental RemNote and the Local Media Bridge helper, so it plays on the iPhone too, and the helper's new `restore-audio` command repairs audio that was stored as an image, which played only on the desktop.
+
+📖 [Priority Bridge for Other Plugins → Storing audio](Priority-Bridge-for-Other-Plugins.md#store-media)
+
+**Local Media Bridge**: a new helper command, `notice`, lets an outside tool (an AI assistant that just wrote into RemNote, say) show you a notice in RemNote with an **Open Rem** button that takes you to the result.
+
+📖 [Local Media Bridge → Notices from outside tools](Local-Media-Bridge.md#notice)
+
+### ✨ Improved
+
+**Read Aloud**: **Generate** now makes the audio in the background, so the popup closes at once and you can keep working; a notice at the top right says when the audio is in, with an **Open Rem** button that takes you to it, and never closes the popup you are working in.
+
+📖 [Read Aloud → Using it](Read-Aloud.md#use)
+
+## v1.0.228 - November 13th, 2026
+
+### ✨ New
+
+**Read Aloud**: a new command, **Read aloud** (`ra`), turns a document or any Rem tree into a spoken audio file, stored in RemNote as the first child of the Rem. Read the notes as written (**Literal**), made listenable by AI (**Adapted**: formulas and units in words), or as an AI **Summary** of the length you choose, with your own instructions, its text inserted under the audio. Speech by Gemini TTS (Gemini API or Google Cloud), Azure or ElevenLabs with your own key; the popup shows the editable script, every engine with its estimated duration and cost, and keeps your drafts. Runs through the Local Media Bridge helper (version 12).
+
+📖 [Read Aloud](Read-Aloud.md)
+
+**Add pronunciation**: a companion command, **Add pronunciation (Extra Card Detail)** (`pron`), reads a card aloud, front and back (in the queue, the card on screen), plays it at once, and keeps the audio as the card's first child with the Extra Card Detail powerup. Pronunciations are marked with their own **Pronunciation** powerup, shown as a speaking-head icon on the pill and the bullet, apart from Read aloud's audios.
+
+📖 [Read Aloud → Add pronunciation](Read-Aloud.md#pronunciation)
+
+### ✨ Improved
+
+**True or False Cards**: a True/False statement shown under a card's **Extra details** in the queue now gets its ✓/✗ bullet there too, as in the editor.
+
+📖 [True or False Cards](Utilities-True-or-False-Cards.md)
+
+### ♻️ Changed
+
+**Local Media Bridge**: **Upscale image with ChatGPT**, **Read aloud** and **Add pronunciation** now appear only while the Local Media Bridge setting is on, since both need its helper.
+
+📖 [Local Media Bridge](Local-Media-Bridge.md)
+
+## v1.0.227 - November 13th, 2026
+
+### ✨ Improved
+
+**Read Points**: an IncRem opened as a page now shows its read point in the counter bar below the title, with the path to it and a **Go to Read Point** button.
+
+<iframe src="../demos/increm-counter.html?view=read-point" title="Read Point row demo" loading="lazy" style="width:100%;height:430px;border:0;display:block"></iframe>
+
+📖 [Jumping to the Read Point](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point)
+
+## v1.0.226 - November 12th, 2026
+
+### ✨ Improved
+
+**Source Pins**: Pin Source Quote now works from the queue, Learn New included, pinning the card on screen (or the Rems selected in the previewer).
+
+📖 [Using Pin Source Quote](Source-Pins.md#pin-source-quote)
+
+### 🐛 Fixed
+
+**Flashcard Priorities**: `Opt+P` and `Ctrl+Opt+P` now open for the card on screen in the Learn New queue instead of reporting that no Rem was found.
+
+📖 [In the queue, and in a Card Cluster](Priorities-for-Flashcards.md#priority-in-card-clusters)
+
+## v1.0.225 - November 12th, 2026
+
+### ✨ New
+
+**Mastery Drill**: added **Edit Later → Previous** (tags the card you just rated, keeping its rating) and brought Edit Later to the regular-queue drill; added a **Priority Cap** setting that keeps low-priority cards out of the drill; cards rated *Again* now wait for their scheduler's relearning step when it is longer than the Minimum Delay; and the drill bar was redesigned into captioned groups with a new icon, with an **Old** filter in the Card List. The drill now has [its own page](Mastery-Drill.md) in the manual.
+
+<iframe src="../demos/mastery-drill-bar.html" title="Mastery Drill bar demo" loading="lazy" style="width:100%;height:190px;border:0;display:block"></iframe>
+
+📖 [Mastery Drill](Mastery-Drill.md)
+
+### 📚 Docs - one page for the desktop helpers
+
+A new **Desktop Helpers** page lists every helper the plugin works with (AI helper, Local Media Bridge, Logos bridge, your source finder), with the AI helper's setup and how to look up the reviews of a card you deleted.
+
+📖 [Desktop Helpers](Desktop-Helpers.md)
+
+## v1.0.224 - November 12th, 2026
+
+### ✨ Improved
+
+**Batch Priority Change**: now also gathers the flashcards a document shows through portals and filtered table views. Their inherited or default priorities can be changed too, and become manual after a confirmation. Rows now show front → back, their location, and the parent row of table cells.
+
+📖 [Portals and table views](Prioritization-&-Sorting.md#batch-priority-portals)
+
+## v1.0.223 - November 12th, 2026
+
+### 🐛 Fixed
+
+**Flashcard Priorities**: priority changes made by editing a Rem reach the priority cache again, and the console no longer fills with `ChunkLoadError` for `9304.js` (broken since v1.0.220).
+
+📖 [Startup: how the priority cache is built](Priorities-for-Flashcards.md#startup-cache)
+
+## v1.0.222 - November 11th, 2026
+
+### ✨ Improved
+
+**Visited Rem History**: Incremental Rems and Rems with their own card priority now show a priority badge you can click to edit, as in the Flashcard and IncRem histories.
+
+📖 [Visited Rem History](History-Queue-Dashboard-and-Mastery-Drill.md#visited-rem-history)
+
+## v1.0.221 - November 11th, 2026
+
+### ✨ New
+
+**Flashcard Repetition History**: added **⟲ Reset SRS** beside ➕ Repetition, to reset a single card without touching the other clozes of the bullet. They and never-practised cards now show a NEW badge.
+
+📖 [Reset one card](Plugin-Widgets-Reference.md#reset-srs)
+
+## v1.0.220 - November 11th, 2026
+
+### 🐛 Fixed
+
+**Freezes during bulk edits**: editing many flashcard Rems at once, for example through the RemNote MCP, no longer freezes the plugin's widgets for a minute or more.
+
+📖 [Plugin widgets freeze or vanish for a while](Troubleshooting.md#stall-diagnostics)
+
+## v1.0.219 - November 11th, 2026
+
+### ✨ Improved
+
+**Document and Queue menus**: the plugin's entries are now one **Incremental RemNote…** item that opens the Menu Hub just below the menu, with every action grouped and keyboard-driven, plus the Study Dashboard opened on the document or the queue's scope.
+
+Try it: click ⋯ (or ⋮ in the queue), then **Incremental RemNote…**. *(A mock: nothing runs.)*
+
+<iframe src="../demos/menu-hub.html" title="Menu Hub demo" loading="lazy" style="width:100%;height:620px;border:0;display:block"></iframe>
+
+📖 [Menu Hub](Plugin-Widgets-Reference.md#menu-hub)
+
+### 🐛 Fixed
+
+**Priority Shield History, Batch Card Priority**: titles no longer pull in the text and image links of Rems pinned in them, and re-running the study log import no longer duplicates a chapter you pinned something to.
+
+📖 [Priority Shield History](Prioritization-&-Sorting.md#priority-shield-history)
+
+## v1.0.218 - November 11th, 2026
+
+### ✨ Improved
+
+**Copy Rem ID**: copies the PDF or web page open in the pane, even when RemNote still reports an earlier Rem as focused; on a Rem with sources, a picker lets you choose which ID to copy.
+
+📖 [Picking among sources](Utilities-Finding-and-Navigating.md#copy-rem-id-picker)
+
+## v1.0.217 - November 10th, 2026
+
+### ✨ New
+
+**Study Dashboard**: Reviews of Rems you deleted now still count in the Study Dashboard and the Practiced Queues summary. They show with 🗑 under the nearest surviving ancestor. RemNote drops them two weeks after deletion; the desktop helper now keeps them.
+
+To turn it on, download `history_archive.py` next to the helper and restart the helper. Older losses can be recovered from your backups with `history_backfill.py`.
+
+📖 [Deleted Rems](Study-Dashboard.md#deleted-rems)
+
+## v1.0.216 - November 10th, 2026
+
+### ✨ New
+
+**Pin Source Quote with no source open**: when no PDF or article is open, the command can ask a **source finder**, a program of yours that knows your books (for example a search index of your library), which book the quote comes from and which of your PDF Rems to try. The quote is pinned from the first that holds the passage, and a confirmation dialog shows, for each quote, the PDF and page it was pinned from and how its book was found. The Local Media Bridge's `pin-quote` does the same when no `--source` is given.
+
+Set it up in `~/.incremental-remnote/ai-ocr/source-finder.json`; the AI helper (route `/find-source`) runs it, so restart the helper after updating.
+
+📖 [With no source open](Source-Pins.md#no-source-open)
+
+### ⚡ Improved
+
+**Stall diagnostics**: a "main thread blocked" report now names the calls the plugin made while frozen, and any large value sent or received, with its storage key.
+
+📖 [What the plugin records](Troubleshooting.md#stall-diagnostics)
+
+## v1.0.215 - November 10th, 2026
+
+### ✨ New
+
+**Local Media Bridge**: `tag` adds a tag to rems, PDF rems included, which the RemNote MCP cannot tag. For example, to mark which of a book's PDFs is the one in use with `#preferthispdf`.
+
+Needs helper version 6: restart `media_bridge.py` after updating.
+
+📖 [Rem operations](Local-Media-Bridge.md#operations)
+
+## v1.0.214 - November 10th, 2026
+
+### ✨ New
+
+**Local Media Bridge**: Three more operations for tools writing through the RemNote MCP, which can only write plain references and cannot set a card's type or direction:
+
+- `pin` shows references to PDF and web highlights as pins (📌), instead of spelling out the whole highlighted text.
+- `pin-quote` runs [Pin Source Quote](Source-Pins.md#pin-source-quote) on rems against a PDF or web article you name: it reuses or creates the highlight and pins it, without the source being open.
+- `card` makes rems Concepts or Descriptors and sets which way they are practiced, without touching their text. For example, it can make a bidirectional Descriptor, which RemNote's markdown cannot write.
+
+Needs helper version 5: restart `media_bridge.py` after updating.
+
+📖 [Rem operations](Local-Media-Bridge.md#operations)
+
 ## v1.0.213 - November 10th, 2026
 
 ### ⚡ Improved
@@ -170,7 +529,7 @@ These need the Companion's new version, which is waiting for Google's approval i
 
 **Mastery Drill**: The regular-queue drill now opens the Queue Dashboard when **Auto-focus Queue Dashboard** is on; the popup drill still never does.
 
-📖 [Auto-focus Queue Dashboard](Plugin-Settings-Reference.md#queue-display) · [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill)
+📖 [Auto-focus Queue Dashboard](Plugin-Settings-Reference.md#queue-display) · [The regular-queue drill](Mastery-Drill.md#regular-queue-drill)
 
 ### 🐛 Fixed
 
@@ -224,7 +583,7 @@ These need the Companion's new version, which is waiting for Google's approval i
 
 **Mastery Drill Card List**: Added **Due now**, **Cooling** and **Unplayable** filters (keys `1`–`3`), so a due card that never came up in the drill is easy to spot; due cards now sort above cooling ones.
 
-📖 [Filtering the Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list-filters)
+📖 [Filtering the Card List](Mastery-Drill.md#card-list-filters)
 
 ## v1.0.191 - November 3rd, 2026
 
@@ -366,7 +725,7 @@ These need the Companion's new version, which is waiting for Google's approval i
 
 **Mastery Drill**: Fixed a rating going to another card of the same Rem when that card came up next, which could add a never-reviewed cloze to the drill. An entry already added this way stays until you press **Remove from Drill**.
 
-📖 [How the Mastery Drill works](History-Queue-Dashboard-and-Mastery-Drill.md#how-it-works)
+📖 [How the Mastery Drill works](Mastery-Drill.md#how-it-works)
 
 ## v1.0.178 - October 30th, 2026
 
@@ -440,7 +799,7 @@ These need the Companion's new version, which is waiting for Google's approval i
 
 **Mastery Drill**: A card rated *Hard* now waits a share of its new interval before returning to the drill (default 5%, between the Minimum Delay and a 7-day maximum), so a card sent a year out is checked from long-term memory days later instead of three hours later.
 
-📖 [Why Hard cards wait longer](History-Queue-Dashboard-and-Mastery-Drill.md#hard-card-delay)
+📖 [Why Hard cards wait longer](Mastery-Drill.md#hard-card-delay)
 
 ### ⚡ Improved
 
@@ -450,11 +809,11 @@ These need the Companion's new version, which is waiting for Google's approval i
 
 **Mastery Drill**: The drill bar in the regular queue now has the popup's queue tools — the Remaining and cooling counts, List Cards, Clear Queue, Clear Low Priority and Clear Old — next to Remove from Drill.
 
-📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill)
+📖 [The regular-queue drill](Mastery-Drill.md#regular-queue-drill)
 
 **Mastery Drill**: The Old Items warning now counts a card's age from when it became ready to drill, so a card that was still cooling is never flagged as old.
 
-📖 [Queue Management](History-Queue-Dashboard-and-Mastery-Drill.md#queue-management)
+📖 [Queue Management](Mastery-Drill.md#queue-management)
 
 **Beautiful Queue**: The priority badge's area in the card's top-right corner now fits the badge, widening only while the No Inc Rem countdown shows, so clicks across the rest of the card's top edge reach the card.
 
@@ -763,7 +1122,7 @@ These need the Companion's new version, which is waiting for Google's approval i
 
 **Mastery Drill**: Fixed Card Cluster cards staying in the regular-queue drill after being rated *Good* or *Easy*; cluster cards already stuck in the list are removed the next time the drill starts.
 
-📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill)
+📖 [The regular-queue drill](Mastery-Drill.md#regular-queue-drill)
 
 ## v1.0.146 - October 3rd, 2026
 
@@ -905,7 +1264,7 @@ These need the Companion's new version, which is waiting for Google's approval i
 
 **Mastery Drill**: When RemNote hides drill cards because the drill skipped another card of the same Rem, the drill now presses **Keep Practicing** itself and carries on with them, instead of ending at "Time to Take a Break".
 
-📖 [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#the-regular-queue-drill)
+📖 [The regular-queue drill](Mastery-Drill.md#regular-queue-drill)
 
 ### 🐛 Fixed
 
@@ -1029,7 +1388,7 @@ RemNote practises whole Rems, so the drill skips the other cards of a drill Rem 
 
 ![The Mastery Drill running in the regular queue: the queue titled "Mastery Drill" with 12 cards left, the drill bar above the card with Remove from Drill, Card List and the note that RemNote hid some drill cards, the card info bar with priority and FSRS figures under the cloze, and the Queue Dashboard on the right recording a Mastery Drill session with the card's forgetting curve](assets/native-drill.png){ width="900" }
 
-📖 [Where the Drill Runs](History-Queue-Dashboard-and-Mastery-Drill.md#where-the-drill-runs)
+📖 [Where the Drill Runs](Mastery-Drill.md#where-the-drill-runs)
 
 ## v1.0.116 - September 22nd, 2026
 
@@ -1091,7 +1450,7 @@ Card Clusters are recognised again since RemNote turned them into a built-in pow
 
 **List Cards** in the Mastery Drill toolbar shows every card in the drill and whether RemNote can still show it, so a card that was deleted or switched off — counted as *Remaining* but never served — can be found and removed.
 
-📖 [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list)
+📖 [Card List](Mastery-Drill.md#card-list)
 
 ### ⚡ Improved - `#cloze-extract` and `#ignore` styling reaches descendants
 
@@ -1297,7 +1656,7 @@ Leaving the queue now drains what you reviewed from the Priority Queue document 
 
 Rating a card *Again* or *Hard* again — in the drill or in a regular queue — now restarts its minimum delay, instead of leaving it ready to come straight back.
 
-📖 [Minimum Delay](History-Queue-Dashboard-and-Mastery-Drill.md#minimum-delay)
+📖 [Minimum Delay](Mastery-Drill.md#minimum-delay)
 
 ## v1.0.92 - September 13th, 2026
 
@@ -1464,7 +1823,7 @@ It was `cprd`.
 
 *Remove from Drill* took the card out of the drill list, and the card still reappeared later in the same session — as did cards taken out by *Edit Later* or by rating them *Good* — because RemNote's embedded queue keeps the card list it was handed when the drill opened: each time it runs out of cards it clears its own bookkeeping and reloads that original list, undoing every removal since. The drill now notices a card that has left the list, skips it the moment it is presented again, and rebuilds the embedded queue from the current list when a whole reloaded batch is stale. Cards inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters) are a documented exception, now written up on the drill's page: RemNote reports only the cluster anchor to plugins, so sibling ratings mostly never reach the drill and the per-card toolbar actions act on the anchor.
 
-📖 [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill) · [Card Cluster limitation](History-Queue-Dashboard-and-Mastery-Drill.md#how-it-works)
+📖 [Mastery Drill](Mastery-Drill.md) · [Card Cluster limitation](Mastery-Drill.md#how-it-works)
 
 ## v1.0.77 - September 4th, 2026
 
@@ -2391,7 +2750,7 @@ Four additions to the debug widget, all under **Raw Slot Diagnostics**:
 
 Everything you practised was still being scheduled and counted correctly, but the **Flashcard History** sidebar had quietly stopped adding new cards. Nothing on screen said so — the list simply stayed as it was.
 
-The list is stored as a single item in the plugin's synced storage, which RemNote caps at **900 KB**. It held every knowledge base's cards in one array, up to 1000 of them, each with a text preview of up to 1000 characters. That array had reached the ceiling, so every attempt to add a card to it was refused — including the ones written from the [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill) popup and from card clusters, which record through the same list.
+The list is stored as a single item in the plugin's synced storage, which RemNote caps at **900 KB**. It held every knowledge base's cards in one array, up to 1000 of them, each with a text preview of up to 1000 characters. That array had reached the ceiling, so every attempt to add a card to it was refused — including the ones written from the [Mastery Drill](Mastery-Drill.md) popup and from card clusters, which record through the same list.
 
 A detail worth recording, because it also affects how full other keys really are: the ceiling is counted in **UTF-16 bytes**, which is *twice* the size the plugin's own diagnostics reported. A list measuring 512 KB was in fact 1009 KB against the limit.
 
@@ -2530,7 +2889,7 @@ While the drill is active the plugin watches every flashcard rating and maintain
 
 The old switch was a double negative that shipped on. If you had turned *Skip Mastery Drill* on, the drill stays off — the value is inverted and carried over for you. **If you use the Mastery Drill and never touched that setting, switch the new one on after upgrading.**
 
-📖 [History, Queue Dashboard & Mastery Drill → Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
+📖 [Mastery Drill](Mastery-Drill.md)
 
 ### ⚡ Improved: far fewer full card-database reads, as RemNote asked
 

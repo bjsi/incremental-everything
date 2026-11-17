@@ -160,6 +160,12 @@ function FinalDrill() {
     []
   );
 
+  // The drill card shown before the current one — usually the one just rated. Tracked here
+  // rather than read from `finalDrillPreviousCardId`, which also moves on to the stale cards
+  // this guard skips (a card rated Again comes back in the embed and is skipped at once).
+  const lastShownRef = useRef<string | null>(null);
+  const [previousDrillCardId, setPreviousDrillCardId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!currentDrillCardId || !queueCardIds) {
       if (DRILL_GUARD_DEBUG && currentDrillCardId) {
@@ -175,6 +181,10 @@ function FinalDrill() {
     }
 
     if (!staleQueueIdsRef.current.has(currentDrillCardId)) {
+      if (lastShownRef.current && lastShownRef.current !== currentDrillCardId) {
+        setPreviousDrillCardId(lastShownRef.current);
+      }
+      lastShownRef.current = currentDrillCardId;
       consecutiveSkipsRef.current = 0;
       lastSkippedIdRef.current = null;
       return;
@@ -234,8 +244,10 @@ function FinalDrill() {
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
 
   const startEditing = async (which: 'current' | 'previous') => {
-    const key = which === 'current' ? "finalDrillCurrentCardId" : "finalDrillPreviousCardId";
-    const cardId = await plugin.storage.getSession<string>(key);
+    const cardId =
+      which === 'previous'
+        ? previousDrillCardId ?? (await plugin.storage.getSession<string>("finalDrillPreviousCardId"))
+        : await plugin.storage.getSession<string>("finalDrillCurrentCardId");
     if (!cardId) {
       await plugin.app.toast(`No ${which} card found to edit.`);
       return;
@@ -254,6 +266,17 @@ function FinalDrill() {
     await plugin.app.toast("Card marked for Edit Later and removed from drill.");
     setEditingRemId(null);
     setEditingCardId(null);
+  };
+
+  // The card stays rated: only its Rem is tagged, and it leaves the drill.
+  const editLaterPrevious = async (message: string) => {
+    const cardId = previousDrillCardId ?? (await plugin.storage.getSession<string>("finalDrillPreviousCardId"));
+    if (!cardId) { await plugin.app.toast("No previous card yet."); return; }
+    if (!(await markDrillCardEditLater(plugin, cardId, message))) {
+      await plugin.app.toast("Could not find the previous card.");
+      return;
+    }
+    await plugin.app.toast("Previous card marked for Edit Later and removed from drill.");
   };
 
   const editLaterCurrent = async (message: string) => {
@@ -340,6 +363,7 @@ function FinalDrill() {
     <MasteryDrillCardList
       items={kbItems}
       cooling={cooling}
+      oldThresholdDays={oldItemThreshold}
       onRemove={removeCardsFromDrill}
       onGoToRem={goToRem}
       onClose={closeCardList}
@@ -530,6 +554,7 @@ function FinalDrill() {
         onClearLowPriority={() => setShowClearLowPriorityView(true)}
         onClearOld={() => setShowClearOldConfirm(true)}
         onRemoveCurrent={removeCurrentFromDrill}
+        onEditLaterPrevious={editLaterPrevious}
         cardActions={{
           priority: currentCardData?.priority
             ? {

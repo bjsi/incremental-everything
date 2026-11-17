@@ -1,10 +1,11 @@
 import { AppEvents, PluginRem, QueueInteractionScore, QueueItemType, RemId, RNPlugin } from '@remnote/plugin-sdk';
-import { masteryDrillRevealDelayId } from './consts';
+import { enableMasteryDrillId, masteryDrillRevealDelayId } from './consts';
 import { forgetCardSkip, noteCardSkipped } from './queue_skipped_cards';
 import { getIESetting } from './settings';
 import {
   DrillCooling,
   FinalDrillEntry,
+  backfillDrillRelearnSteps,
   buildDrillEntry,
   drillReadyAt,
   finalDrillIdsKey,
@@ -140,6 +141,8 @@ interface Session {
   tripped: boolean;
   /** The drill card on screen, for the bar (NativeDrillState). */
   currentCardId?: string;
+  /** The drill card shown before it (usually the one just rated), for Edit Later on it. */
+  previousCardId?: string;
 }
 
 /** True when `subQueueId` is the regular-queue drill's document. Synchronous. */
@@ -273,11 +276,17 @@ const publishState = (plugin: RNPlugin, state: NativeDrillState) =>
   plugin.storage.setSession(nativeDrillStateKey, state);
 
 const publishSession = (plugin: RNPlugin, s: Session) =>
-  publishState(plugin, { active: true, buried: s.buried, currentCardId: s.currentCardId });
+  publishState(plugin, {
+    active: true,
+    buried: s.buried,
+    currentCardId: s.currentCardId,
+    previousCardId: s.previousCardId,
+  });
 
 /** A drill card came on screen. Published only for drill cards, so it never races a skip. */
 function showCard(plugin: RNPlugin, s: Session, cardId: string) {
   if (s.currentCardId === cardId) return;
+  if (s.currentCardId) s.previousCardId = s.currentCardId;
   s.currentCardId = cardId;
   void publishSession(plugin, s);
 }
@@ -303,7 +312,8 @@ async function reconcileRatings(plugin: RNPlugin, s: Session): Promise<void> {
     for (const { cardId, rep } of rated) {
       const restartsCooling = isAgainOrHard(rep.score);
       items = items.filter((item) => entryCardId(item) !== cardId);
-      if (restartsCooling) items.push(await buildDrillEntry(plugin, cardId, s.kbId ?? undefined, rep.score, rep.date));
+      const entry = restartsCooling ? await buildDrillEntry(plugin, cardId, s.kbId ?? undefined, rep.score, rep.date) : null;
+      if (entry) items.push(entry);
       if (!(restartsCooling && ratingReturnsAtOnce(rep.score, s.cooling))) {
         s.allowed.delete(cardId);
         s.watch.delete(cardId);
@@ -503,6 +513,12 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
     const cardId: string | undefined = data?.cardId;
     if (!s || !cardId || !build) return;
     s.rated++;
+    // The card just rated becomes "previous" at once, before the next drill card is up.
+    if (s.allowed.has(cardId) && s.previousCardId !== cardId) {
+      s.previousCardId = cardId;
+      if (s.currentCardId === cardId) s.currentCardId = undefined;
+      void publishSession(plugin, s);
+    }
     // The QueueCompleteCard handler in register/events.ts updates the list for this one.
     s.settled.set(cardId, Date.now());
     // A rated card leaves the session: Good/Easy took it out of the drill, Again/Hard restarted
@@ -550,4 +566,13 @@ export function registerNativeDrillListeners(plugin: RNPlugin) {
       console.warn(`${LOG} stale document cleanup failed:`, e);
     }
   }, 15_000);
+
+  // Again entries from before the relearning step was stored: read it once per knowledge base.
+  setTimeout(async () => {
+    try {
+      if (await getIESetting(plugin, enableMasteryDrillId)) await backfillDrillRelearnSteps(plugin);
+    } catch (e) {
+      console.warn(`${LOG} relearning-step backfill failed:`, e);
+    }
+  }, 20_000);
 }

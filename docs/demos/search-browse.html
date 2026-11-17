@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search &amp; Browse</title>
+<!--
+  Interactive demo for docs/Search-Engine.md#browse, embedded there and in the Changelog
+  in an iframe. A mock of the Search & Browse panel (src/components/SearchBrowseView.tsx):
+  the search box with ✨ AI, Rems / Cards, sortable columns, row selection, and the
+  collapse to a bar. The data is invented, and the queries run through a small
+  evaluator here that knows a subset of the keys (words, -, in:, tag:, card:, is:,
+  prop: with comparisons, scheduler:); ✨ AI knows only the example requests. In the
+  plugin, the AI helper searches the knowledge base and Claude writes the query.
+
+  Theme: follows the manual's light/dark toggle (Material's data-md-color-scheme on
+  the parent page, same origin), else the OS setting.
+-->
+<style>
+:root {
+  --bg: #ffffff; --panel: #ffffff; --text: #1f2937; --sub: #6b7280; --faint: #9ca3af;
+  --line: #e5e7eb; --head: #f5f6f8; --btn: #f5f6f8; --btn-border: #d1d5db;
+  --accent: #3b82f6; --sel: #e8f0fe; --err: #c0392b; --chip: #eef2ff; --chip-ink: #3730a3;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+:root.dark {
+  --bg: #1b1c22; --panel: #1f2027; --text: #e5e7eb; --sub: #9ca3af; --faint: #6b7280;
+  --line: #2f313a; --head: #262830; --btn: #2a2c34; --btn-border: #3f424d;
+  --accent: #60a5fa; --sel: #233046; --err: #f87171; --chip: #2a2f45; --chip-ink: #c7d2fe;
+  color-scheme: dark;
+}
+html, body { margin: 0; background: transparent; color: var(--text); }
+body { padding: 6px 4px 10px; font-size: 13px; -webkit-font-smoothing: antialiased; }
+.stage { position: relative; height: 540px; border-radius: 12px; background:
+  repeating-linear-gradient(0deg, transparent 0 27px, var(--line) 27px 28px); }
+.stage .doc { position: absolute; inset: 14px 18px auto; color: var(--faint); font-size: 12px; }
+.panel { position: absolute; inset: 10px 10px 10px 10px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--panel); border: 3px solid var(--accent); border-radius: 12px; padding: 12px 14px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 18px 48px rgba(0,0,0,.35); transition: opacity .18s ease; }
+.panel.hidden { opacity: 0; pointer-events: none; }
+.bar { position: absolute; right: 12px; bottom: 12px; display: none; align-items: center; gap: 8px; width: 250px;
+  padding: 8px 10px 8px 12px; background: var(--panel); border: 3px solid var(--accent); border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.35); font-size: 12px; }
+.bar.open { display: flex; }
+.bar button { background: none; border: 0; color: inherit; cursor: pointer; font: inherit; }
+.bar .expand { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row1, .row2, .foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.title { font-weight: 700; font-size: 14px; }
+button.b, select.b, input.b { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--btn-border);
+  background: var(--btn); color: var(--text); cursor: pointer; }
+button.b.on { font-weight: 700; border-color: var(--accent); }
+button.b:disabled { opacity: .5; cursor: default; }
+.spacer { flex: 1; }
+.box { flex: 1; min-width: 200px; font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--btn-border);
+  background: var(--head); color: var(--text); outline: 2px solid var(--accent); outline-offset: 1px; }
+.msg { font-size: 11.5px; color: var(--sub); min-height: 15px; }
+.msg.err { color: var(--err); }
+.try { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; color: var(--sub); align-items: center; }
+.try button { font: inherit; font-size: 11.5px; border: 0; border-radius: 999px; padding: 2px 9px; background: var(--chip); color: var(--chip-ink); cursor: pointer; }
+.table { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 8px; outline: none; }
+.grid { display: grid; gap: 8px; align-items: center; padding: 5px 10px; }
+.thead { position: sticky; top: 0; z-index: 1; background: var(--head); font-size: 10.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--sub); }
+.thead span.sortable { cursor: pointer; }
+.tr { border-top: 1px solid var(--line); cursor: default; }
+.tr.sel { background: var(--sel); box-shadow: inset 3px 0 0 var(--accent); }
+.tr.focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tr div { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.tr .rem { white-space: normal; font-size: 12.5px; }
+.rem .front { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+.rem .back { color: var(--sub); }
+.rem .path { font-size: 10.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.empty { padding: 14px; color: var(--faint); font-size: 12px; }
+.foot { font-size: 12px; color: var(--sub); }
+.legend { font-size: 10.5px; color: var(--faint); }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="doc">The editor, under the panel. Open a row: the panel collapses to a bar at the bottom right, and comes back as you left it.</div>
+
+  <div class="panel" id="panel">
+    <div class="row1">
+      <span class="title">Search &amp; Browse</span>
+      <button class="b on" id="mRems">Rems</button><button class="b" id="mCards">Cards</button>
+      <span class="spacer"></span>
+      <select class="b" id="saved" title="Saved searches">
+        <option value="">Saved searches…</option>
+        <option value="is:due prop:r&lt;0.7">At risk (R &lt; 70%)</option>
+        <option value="is:suppressed">Hidden cards</option>
+      </select>
+      <button class="b" id="collapse" title="Collapse to a bar (Esc)">–</button>
+    </div>
+    <div class="row2">
+      <input class="box" id="q" autocomplete="off" spellcheck="false" value="is:due">
+      <button class="b" id="search">Search</button>
+      <button class="b" id="ai" title="Plain language, in any language → a search (Ctrl/Cmd+Enter)">✨ AI</button>
+      <button class="b" disabled title="In the plugin: name the search, then ▶ Practise fills a document with its Rems">Save…</button>
+      <button class="b" disabled>▶ Practise</button>
+    </div>
+    <div class="try" id="try"><span>Try:</span></div>
+    <div class="msg" id="msg"></div>
+    <div class="table" id="table" tabindex="-1"></div>
+    <div class="foot">
+      <span id="count"></span><span class="spacer"></span>
+      <span id="target">Select rows to act on them</span>
+      <input class="b" id="pri" placeholder="0–100" style="width:52px;cursor:text">
+      <button class="b" id="setpri">Set card priority</button>
+      <button class="b" id="copy">Copy ids</button>
+    </div>
+    <div class="legend">In the box: Enter search · Ctrl/Cmd+Enter ✨ AI · Tab to the table — In the table: ↑↓ move · Space select · Enter open — Esc collapse</div>
+  </div>
+
+  <div class="bar" id="bar">
+    <button class="expand" id="expand">⤢ <strong>Browse</strong> <span id="barCount"></span></button>
+    <button id="barClose" title="Close">✕</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+// ---- Example data (invented): one row per card ----
+const D = (n) => n; // days from today
+const CARDS = [
+  { id: "c1", rem: "fray", back: "the threads in cloth start to come apart", path: "English / English Words", kind: "forward", tags: ["English Words"], pri: 50, due: -361, ivl: 1, reps: 4, lapses: 4, ml: "Acquiring", s: 1.1, d: 8.2, r: 0.49, sched: "Global Default" },
+  { id: "c2", rem: "imbibe", back: "to drink something, especially alcohol", path: "English / English Words", kind: "backward", tags: ["English Words"], pri: 50, due: -191, ivl: 1, reps: 6, lapses: 3, ml: "Acquiring", s: 6.8, d: 7.2, r: 0.64, sched: "Global Default" },
+  { id: "c3", rem: "grok", back: "to understand something completely", path: "English / English Words", kind: "forward", tags: ["English Words"], pri: 20, due: -420, ivl: 1, reps: 5, lapses: 3, ml: "Acquiring", s: 1.1, d: 7.4, r: 0.47, sched: "Global Default" },
+  { id: "c4", rem: "peek", back: "glance; to look at for a short time", path: "English / Anki Card - Vocabulary", kind: "forward", tags: ["Anki Card - Vocabulary"], pri: 50, due: -27, ivl: 7, reps: 24, lapses: 4, ml: "Growing", s: 20, d: 7.6, r: 0.6, sched: "Vocabulary" },
+  { id: "c5", rem: "Squat", back: "the bodily sinkage and trim of a ship moving in shallow water", path: "Shiphandling / Squat", kind: "forward", tags: ["Concept"], pri: 5, due: -12, ivl: 468, reps: 9, lapses: 1, ml: "Retaining", s: 412, d: 5.1, r: 0.88, sched: "Global Default" },
+  { id: "c6", rem: "Squat increases roughly with the {square} of the speed", back: "", path: "Shiphandling / Squat", kind: "cloze", tags: ["Cloze"], pri: 5, due: -3, ivl: 390, reps: 7, lapses: 2, ml: "Retaining", s: 360, d: 6.3, r: 0.93, sched: "Global Default" },
+  { id: "c7", rem: "Tug pushing at the bow: the {propulsion units} must not touch the hull", back: "", path: "Shiphandling / Tug Use", kind: "cloze", tags: ["Cloze"], pri: 15, due: -40, ivl: 30, reps: 5, lapses: 3, ml: "Growing", s: 24, d: 8.8, r: 0.66, sched: "Global Default" },
+  { id: "c8", rem: "Bow flare", back: "the spreading out of the forebody form above the waterline", path: "Ship Technology / B", kind: "forward", tags: ["Concept"], pri: 50, due: 186, ivl: 189, reps: 8, lapses: 2, ml: "Retaining", s: 199, d: 6.5, r: 0.99, sched: "Global Default" },
+  { id: "c9", rem: "Under-keel clearance", back: "the depth of water below the keel", path: "Navigation / Channels", kind: "backward", tags: ["Concept"], pri: 10, due: -2, ivl: 380, reps: 11, lapses: 1, ml: "Retaining", s: 371, d: 4.9, r: 0.9, sched: "Global Default" },
+  { id: "c10", rem: "What is a pivot point?", back: "the point about which a ship turns", path: "Shiphandling / Turning", kind: "forward", tags: ["Question"], pri: 25, due: -70, ivl: 410, reps: 6, lapses: 1, ml: "Retaining", s: null, d: null, r: null, sched: "Questions" },
+  { id: "c11", rem: "Mooring line loads", back: "", path: "Shiphandling / Mooring", kind: "forward", tags: ["Table"], pri: 50, due: null, ivl: null, reps: 0, lapses: 0, ml: "New", s: null, d: null, r: null, sched: "Global Default", hidden: "table" },
+  { id: "c12", rem: "Old exam notes", back: "", path: "Archive / 2019", kind: "forward", tags: [], pri: 80, due: -500, ivl: 120, reps: 3, lapses: 0, ml: "Growing", s: 140, d: 5.0, r: 0.55, sched: "Global Default", hidden: "paused" },
+];
+const AI = [
+  { re: /english.*(twice|two).*(80|retriev)/i, ask: "english cards forgotten more than twice, late (retrievability less than 80%)", q: "in:english prop:lapses>2 prop:r<0.8", mode: "cards" },
+  { re: /overdue.*year/i, ask: "overdue cards with interval greater than 1 year, rated again at least once", q: "is:due prop:ivl>365 prop:lapses>=1", mode: "cards" },
+  { re: /(rebocador|tug).*(cloze|lacuna)/i, ask: "cartões de lacuna sobre rebocadores que estão vencidos", q: "tug card:cloze is:due", mode: "cards" },
+  { re: /(hidden|switched off|escondid)/i, ask: "cards RemNote hides from me", q: "is:suppressed", mode: "cards" },
+];
+
+// ---- A small evaluator for the demo (the plugin's engine knows every key) ----
+function tokens(q) { return (q.match(/-?[\w.:*<>=!]+:"[^"]*"|-?"[^"]*"|-?\S+/g) || []).filter((t) => !/^(and|or)$/i.test(t)); }
+const word = (txt, w) => txt.toLowerCase().split(/[^\p{L}\p{N}]+/u).some((x) => x.startsWith(w.toLowerCase()));
+const like = (val, pat) => new RegExp("^" + pat.toLowerCase().replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$").test(val.toLowerCase());
+function test(c, t) {
+  let neg = t.startsWith("-"); if (neg) t = t.slice(1);
+  let ok;
+  const m = t.match(/^([a-z]+):(.*)$/i);
+  const cmp = t.match(/^prop:(\w+)(<=|>=|!=|<|>|=)(-?[\d.]+)$/i);
+  const v = (s) => s.replace(/^"|"$/g, "");
+  if (cmp) {
+    const key = { due: "due", ivl: "ivl", reps: "reps", lapses: "lapses", s: "s", d: "d", r: "r", priority: "pri" }[cmp[1].toLowerCase()];
+    const x = key ? c[key] : null, n = parseFloat(cmp[3]);
+    ok = x !== null && x !== undefined && { "<": x < n, "<=": x <= n, ">": x > n, ">=": x >= n, "=": x === n, "!=": x !== n }[cmp[2]];
+  } else if (m) {
+    const k = m[1].toLowerCase(), val = v(m[2]);
+    if (k === "in") ok = c.path.split(" / ").some((p) => like(p, val.includes("*") ? val : val + "*"));
+    else if (k === "tag") ok = val === "none" ? !c.tags.length : c.tags.some((g) => like(g, val));
+    else if (k === "card") ok = c.kind === val.toLowerCase();
+    else if (k === "scheduler") ok = like(c.sched, val.toLowerCase() === "global" ? "global default" : val + "*");
+    else if (k === "is") ok = ({ due: c.due !== null && c.due <= 0 && c.hidden !== "paused", new: c.reps === 0, review: c.reps > 0,
+      suppressed: !!c.hidden, paused: c.hidden === "paused", fsrs: c.sched !== "Questions", sm2: c.sched === "Questions" })[val.toLowerCase()];
+    else ok = word(c.rem + " " + c.back, t);
+    if (ok === undefined) throw new Error(`"${t}" isn't in this demo; the plugin knows it.`);
+  } else ok = word(c.rem + " " + c.back + " " + c.path, v(t));
+  return neg ? !ok : ok;
+}
+
+// ---- State and rendering ----
+let mode = "rems", sort = null, desc = false, rows = [], focus = -1, selected = new Set(), lastQuery = "";
+const COLS = () => [
+  { k: "rem", l: "Rem", w: "minmax(220px,1fr)" },
+  ...(mode === "cards" ? [{ k: "kind", l: "Card", w: "62px" }] : []),
+  { k: "tags", l: "Tags", w: "110px" },
+  { k: "pri", l: "Card pri.", w: "62px", sort: true },
+  { k: "due", l: "Due", w: "70px", sort: true },
+  { k: "ivl", l: "Ivl", w: "46px", sort: true },
+  { k: "lapses", l: "Lapses", w: "50px", sort: true },
+  { k: "s", l: "S", w: "50px", sort: true },
+  { k: "d", l: "D", w: "36px", sort: true },
+  { k: "r", l: "R", w: "40px", sort: true },
+  { k: "sched", l: "Scheduler", w: "88px" },
+  { k: "hidden", l: "Hidden", w: "70px" },
+];
+const fmt = { due: (x) => x === null ? "" : x === 0 ? "today" : x > 0 ? `in ${x} d` : `${-x} d ago`,
+  ivl: (x) => x === null ? "" : `${x} d`, s: (x) => x === null ? "" : `${x < 10 ? x.toFixed(1) : Math.round(x)} d`,
+  d: (x) => x === null ? "" : x.toFixed(1), r: (x) => x === null ? "" : `${Math.round(x * 100)}%`,
+  tags: (x) => x.join(", "), hidden: (x) => ({ table: "table", paused: "paused deck" })[x] || "" };
+const key = (r) => mode === "cards" ? r.id : r.rem;
+
+function run(q) {
+  q = (q ?? $("q").value).trim(); lastQuery = q; focus = -1; selected = new Set();
+  try {
+    const ts = tokens(q);
+    let hits = CARDS.filter((c) => ts.every((t) => test(c, t)));
+    if (mode === "rems") { // one row per Rem: its card with the lowest R
+      const by = new Map();
+      for (const c of hits) { const p = by.get(c.rem); if (!p || (c.r ?? 2) < (p.r ?? 2)) by.set(c.rem, c); }
+      hits = [...by.values()];
+    }
+    if (sort) hits.sort((a, b) => (a[sort] === null) - (b[sort] === null) || (desc ? b[sort] - a[sort] : a[sort] - b[sort]));
+    rows = hits; say("");
+  } catch (e) { say(e.message, true); }
+  draw();
+}
+function draw() {
+  const cols = COLS(), grid = `22px ${cols.map((c) => c.w).join(" ")}`;
+  const all = rows.length && rows.every((r) => selected.has(key(r)));
+  let h = `<div class="grid thead" style="grid-template-columns:${grid}"><span><input type="checkbox" id="all" ${all ? "checked" : ""}></span>` +
+    cols.map((c) => `<span class="${c.sort ? "sortable" : ""}" data-sort="${c.sort ? c.k : ""}">${c.l}${sort === c.k ? (desc ? " ▼" : " ▲") : ""}</span>`).join("") + `</div>`;
+  if (!rows.length) h += `<div class="empty">No matches.</div>`;
+  rows.forEach((r, i) => {
+    h += `<div class="grid tr ${selected.has(key(r)) ? "sel" : ""} ${focus === i ? "focus" : ""}" data-i="${i}" style="grid-template-columns:${grid}">` +
+      `<span><input type="checkbox" data-i="${i}" ${selected.has(key(r)) ? "checked" : ""}></span>` +
+      cols.map((c) => c.k === "rem"
+        ? `<div class="rem"><div class="front">${r.rem}${r.back ? ` <span class="back">→ ${r.back}</span>` : ""}</div><div class="path">${r.path}</div></div>`
+        : `<div>${fmt[c.k] ? fmt[c.k](r[c.k]) : r[c.k] ?? ""}</div>`).join("") + `</div>`;
+  });
+  $("table").innerHTML = h;
+  $("count").textContent = `${rows.length} ${mode === "rems" ? "Rems" : "cards"}${selected.size ? ` · ${selected.size} selected` : ""}`;
+  $("target").textContent = selected.size ? `${selected.size} selected:` : "Select rows to act on them";
+  $("barCount").textContent = `· ${rows.length} ${mode === "rems" ? "Rems" : "cards"}`;
+  fit();
+}
+function say(t, err) { $("msg").textContent = t; $("msg").className = "msg" + (err ? " err" : ""); }
+function setMode(m) { mode = m; $("mRems").classList.toggle("on", m === "rems"); $("mCards").classList.toggle("on", m === "cards"); run(lastQuery); }
+function collapse(text) { $("panel").classList.add("hidden"); $("bar").classList.add("open"); if (text) $("stage").querySelector(".doc").textContent = text; }
+function expand() { $("panel").classList.remove("hidden"); $("bar").classList.remove("open"); $("q").focus(); }
+function ai() {
+  const ask = $("q").value.trim(); if (!ask) return;
+  const hit = AI.find((a) => a.re.test(ask));
+  if (!hit) { say("✨ This demo knows only the example requests below; in RemNote, Claude writes the search for any request, in any language.", true); return; }
+  say("✨ Asking Claude to write the search…");
+  setTimeout(() => { $("q").value = hit.q; mode = hit.mode; setMode(hit.mode); say(`✨ “${ask}” → ${hit.q}  (edit it freely; ↑ brings your words back)`); }, 700);
+}
+
+// ---- Events ----
+$("search").onclick = () => run();
+$("ai").onclick = ai;
+$("mRems").onclick = () => setMode("rems");
+$("mCards").onclick = () => setMode("cards");
+$("saved").onchange = (e) => { if (e.target.value) { $("q").value = e.target.value; run(); } };
+$("collapse").onclick = () => collapse();
+$("expand").onclick = expand;
+$("barClose").onclick = () => { $("bar").classList.remove("open"); $("stage").querySelector(".doc").textContent = "Closed. (Reload the page to bring the demo back.)"; };
+$("copy").onclick = () => say(selected.size ? `📋 Copied ${selected.size} ids` : "Select rows first.");
+$("setpri").onclick = () => say(selected.size && $("pri").value ? `Card priority ${$("pri").value} set on ${selected.size} Rem(s), inheritance included.` : "Select rows and type a priority (0–100).");
+$("table").addEventListener("click", (e) => {
+  const s = e.target.closest("[data-sort]"); if (s && s.dataset.sort) { desc = sort === s.dataset.sort ? !desc : false; sort = s.dataset.sort; return run(lastQuery); }
+  if (e.target.id === "all") { const all = rows.every((r) => selected.has(key(r))); selected = all ? new Set() : new Set(rows.map(key)); return draw(); }
+  const cb = e.target.closest("input[data-i]"); if (cb) { const k = key(rows[+cb.dataset.i]); selected.has(k) ? selected.delete(k) : selected.add(k); return draw(); }
+  const tr = e.target.closest(".tr"); if (tr) { focus = +tr.dataset.i; $("table").focus(); draw(); }
+});
+$("table").addEventListener("dblclick", (e) => { const tr = e.target.closest(".tr"); if (tr) open(+tr.dataset.i); });
+function open(i) { const r = rows[i]; if (r) collapse(`Opened “${r.rem}” in the editor. The panel waits at the bottom right with the same search, rows and scroll: press ⤢ Browse.`); }
+$("q").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ai(); }
+  else if (e.key === "Enter") { e.preventDefault(); run(); }
+  else if (e.key === "Tab" && !e.shiftKey && rows.length) { e.preventDefault(); focus = 0; $("table").focus(); draw(); }
+  else if (e.key === "Escape") collapse();
+});
+$("table").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") { e.preventDefault(); focus = Math.min(rows.length - 1, focus + 1); draw(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); focus = Math.max(0, focus - 1); draw(); }
+  else if (e.key === " ") { e.preventDefault(); const k = key(rows[focus]); if (k) { selected.has(k) ? selected.delete(k) : selected.add(k); draw(); } }
+  else if (e.key === "Enter") { e.preventDefault(); open(focus); }
+  else if (e.key === "Escape") collapse();
+  else if (e.key === "/" || (e.key === "Tab" && e.shiftKey)) { e.preventDefault(); focus = -1; $("q").focus(); draw(); }
+});
+for (const [label, value] of [["english cards forgotten more than twice, late (retrievability less than 80%)", null],
+  ["cartões de lacuna sobre rebocadores que estão vencidos", null], ["is:due prop:r<0.7", "q"], ["squat -card:cloze", "q"], ["scheduler:vocabulary", "q"]]) {
+  const b = document.createElement("button");
+  b.textContent = value ? label : `✨ ${label}`;
+  b.onclick = () => { $("q").value = label; value ? run() : ai(); };
+  $("try").appendChild(b);
+}
+
+// ---- Theme: follow the manual's toggle, else the OS ----
+function applyTheme() {
+  let dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+  try {
+    const scheme = window.parent !== window && parent.document.body.getAttribute("data-md-color-scheme");
+    if (scheme) dark = scheme === "slate";
+  } catch (e) { /* not same-origin: keep the OS setting */ }
+  document.documentElement.classList.toggle("dark", dark);
+}
+applyTheme();
+try {
+  if (window.parent !== window) new parent.MutationObserver(applyTheme).observe(parent.document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
+} catch (e) {}
+if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+
+// ---- Size the iframe to the content ----
+function fit() {
+  try { if (window.frameElement) window.frameElement.style.height = document.documentElement.scrollHeight + "px"; } catch (e) {}
+}
+window.addEventListener("load", fit);
+window.addEventListener("resize", fit);
+run();
+</script>
+</body>
+</html>

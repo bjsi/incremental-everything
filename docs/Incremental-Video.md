@@ -198,9 +198,9 @@ Other plugins can link card videos too, for example an importer that has a video
 
 ## Setting up the helper for video { #setup }
 
-Screenshots, transcripts, titles and local videos run through the **local helper** that also does [AI Transcription of PDF Highlights](AI-Transcription-of-PDF-Highlights.md). The players themselves, extracts and resuming need nothing.
+Screenshots, transcripts, titles and local videos run through the **[AI helper](Desktop-Helpers.md#ai-helper)**, the same one that does AI Transcription of PDF Highlights. The players themselves, extracts and resuming need nothing.
 
-1. **Set up the helper** as described in [Setup](AI-Transcription-of-PDF-Highlights.md#setup), with [start at login](AI-Transcription-of-PDF-Highlights.md#run-at-login) on macOS. Claude Code is needed for 📸✨, tidying and titles.
+1. **Set up the helper** as described in [Setting up the AI helper](Desktop-Helpers.md#setup), with [start at login](Desktop-Helpers.md#run-at-login) on macOS. Claude Code is needed for 📸✨, tidying and titles.
 2. **For YouTube screenshots and transcripts**, and for local videos:
 
     ```bash

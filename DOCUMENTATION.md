@@ -33,7 +33,7 @@ incremental-everything/              ← repo root
 
 The published site is built from `docs/` only; nothing outside that folder is included, which is why `DOCUMENTATION.md` lives at the root and never appears on the site.
 
-Maintainer-only material has two homes outside `docs/`. **`findings/`** holds what has been established about RemNote itself, by measurement or by reading the app bundle: reference notes and support reports ([`findings/README.md`](findings/README.md) indexes them and describes how to find things out). **`plans/`** holds working plans for efforts spanning several releases ([`plans/README.md`](plans/README.md)). Neither is published, and both use `UPPER_SNAKE_CASE.md` names, which keeps them apart from the published pages at a glance.
+Maintainer-only material has two homes outside `docs/`. **`findings/`** holds what has been established about RemNote itself, by measurement or by reading the app bundle: reference notes and support reports ([`findings/README.md`](findings/README.md) indexes them and describes how to find things out). **`plans/`** holds working plans for efforts spanning several releases, and `plans/implemented/` the finished ones kept for their decisions ([`plans/README.md`](plans/README.md)). Neither is published, and both use `UPPER_SNAKE_CASE.md` names, which keeps them apart from the published pages at a glance.
 
 ## History
 

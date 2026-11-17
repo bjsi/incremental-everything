@@ -14,6 +14,7 @@ interface ButtonProps {
 export function Button({ children, onClick, variant = 'secondary', style, disabled, className, title }: ButtonProps) {
   const styles = getButtonStyles();
   const variantStyles = variant === 'primary' ? styles.primary : variant === 'danger' ? styles.danger : styles.secondary;
+  const filled = variant === 'primary' || !!style?.backgroundColor;
 
   return (
     <button
@@ -27,24 +28,17 @@ export function Button({ children, onClick, variant = 'secondary', style, disabl
         opacity: disabled ? 0.5 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',
       }}
+      aria-label={title ? title.split(/[:(]/)[0].trim() : undefined}
       onMouseEnter={(e) => {
-        if (!disabled) {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = styles.hoverShadow;
-          e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-        }
+        if (disabled) return;
+        // A filled button (the primary, or one the caller coloured, like the yellow
+        // Scroll to Highlight) keeps its colour and brightens; the rest get a tint.
+        if (filled) e.currentTarget.style.filter = styles.hoverFilter;
+        else e.currentTarget.style.backgroundColor = styles.hoverBackground;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = styles.defaultShadow;
-        if (style?.backgroundColor) {
-          // A caller-coloured button (e.g. the yellow Scroll to Highlight) keeps its colour.
-          e.currentTarget.style.backgroundColor = String(style.backgroundColor);
-        } else if (variant === 'primary') {
-          e.currentTarget.style.backgroundColor = 'var(--rn-clr-button-primary-bg, #3b82f6)';
-        } else {
-          e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)';
-        }
+        e.currentTarget.style.filter = 'none';
+        if (!filled) e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)';
       }}
       className={className}
     >

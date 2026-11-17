@@ -11,9 +11,10 @@
  * present sort to the top, since those are the reason anyone opens this list —
  * a drill that says "1 Remaining" above "You've finished practicing all your
  * cards!". Next come the cards that are due now (not cooling): those should be
- * in the drill's queue, so one the drill never showed stands out there. The
- * three filter chips (keys 1–3) hide whole groups, to leave just the ones
- * being checked.
+ * in the drill's queue, so one the drill never showed stands out there. Cards
+ * ready for longer than the Old Items Threshold (what Clear Old removes) form
+ * their own group, "Old", with a badge on each row. The four filter chips
+ * (keys 1–4) hide whole groups, to leave just the ones being checked.
  */
 
 import { usePlugin } from '@remnote/plugin-sdk';
@@ -31,6 +32,7 @@ import {
   drillItemCardId,
 } from '../lib/mastery_drill_audit';
 import { DrillCooling, drillReadyAt, formatDrillWait } from '../lib/mastery_drill_status';
+import { isOldDrillEntry } from '../lib/mastery_drill_cooling';
 import { scoreColor, scoreLabel } from '../lib/rating_labels';
 import { openRemInBrowserTab } from '../lib/remHelpers';
 import { formatTimeAgo } from '../lib/utils';
@@ -48,10 +50,15 @@ function statusColor(status: DrillCardStatus): string {
   return '#ef4444';
 }
 
-/** Which filter chip a row falls under. Unplayable wins: cooling ends, unplayable does not. */
-type Group = 'unplayable' | 'ready' | 'cooling';
+/**
+ * Which filter chip a row falls under. Unplayable wins: cooling ends, unplayable does not.
+ * Old is a ready card past the Old Items Threshold — the ones Clear Old removes.
+ */
+type Group = 'unplayable' | 'old' | 'ready' | 'cooling';
 
-const GROUPS: { id: Group; label: string; key: string; color: string; hint: string }[] = [
+const OLD_COLOR = '#d97706';
+
+const groupChips = (oldThresholdDays: number): { id: Group; label: string; key: string; color: string; hint: string }[] => [
   {
     id: 'ready',
     label: 'Due now',
@@ -73,9 +80,16 @@ const GROUPS: { id: Group; label: string; key: string; color: string; hint: stri
     color: '#ef4444',
     hint: 'Cards RemNote will never show, whatever the drill does (key 3)',
   },
+  {
+    id: 'old',
+    label: 'Old',
+    key: '4',
+    color: OLD_COLOR,
+    hint: `Cards ready to drill for more than ${oldThresholdDays} day${oldThresholdDays === 1 ? '' : 's'} — the ones Clear Old removes (key 4)`,
+  },
 ];
 
-const GROUP_RANK: Record<Group, number> = { unplayable: 0, ready: 1, cooling: 2 };
+const GROUP_RANK: Record<Group, number> = { unplayable: 0, old: 1, ready: 2, cooling: 3 };
 
 /** Within a group: the ones that should have left the drill, then the rest. */
 function statusRank(status: DrillCardStatus): number {
@@ -100,6 +114,7 @@ const smallButton: React.CSSProperties = {
 export function MasteryDrillCardList({
   items,
   cooling,
+  oldThresholdDays,
   onRemove,
   onGoToRem,
   onClose,
@@ -107,6 +122,8 @@ export function MasteryDrillCardList({
   /** The drill items of the current knowledge base. */
   items: FinalDrillItem[];
   cooling: DrillCooling;
+  /** The Old Items Threshold setting, in days. */
+  oldThresholdDays: number;
   onRemove: (cardIds: string[]) => Promise<void>;
   onGoToRem: (remId: string) => Promise<void>;
   onClose: () => void;
@@ -117,7 +134,8 @@ export function MasteryDrillCardList({
   const [audits, setAudits] = React.useState<Map<string, Row>>(new Map());
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const [busy, setBusy] = React.useState(false);
-  const [shown, setShown] = React.useState<Record<Group, boolean>>({ ready: true, cooling: true, unplayable: true });
+  const [shown, setShown] = React.useState<Record<Group, boolean>>({ ready: true, old: true, cooling: true, unplayable: true });
+  const GROUPS = groupChips(oldThresholdDays);
   // Shared for the life of the list, so re-auditing after a sync only walks new ancestors.
   const chainsRef = React.useRef(new AncestorChainCache(plugin));
 
@@ -167,9 +185,15 @@ export function MasteryDrillCardList({
     () => new Map(items.map((item) => [drillItemCardId(item), drillReadyAt(item, cooling)])),
     [items, cooling],
   );
+  const itemById = React.useMemo(() => new Map(items.map((item) => [drillItemCardId(item), item])), [items]);
+  const isOld = (cardId: string) => {
+    const item = itemById.get(cardId);
+    return !!item && isOldDrillEntry(item, cooling, oldThresholdDays, now);
+  };
   const groupOf = (row: Row): Group => {
     if (UNPLAYABLE_STATUSES.has(row.status)) return 'unplayable';
-    return (readyAtById.get(row.cardId) ?? 0) > now ? 'cooling' : 'ready';
+    if ((readyAtById.get(row.cardId) ?? 0) > now) return 'cooling';
+    return isOld(row.cardId) ? 'old' : 'ready';
   };
   const allRows = Array.from(audits.values()).sort(
     (a, b) =>
@@ -177,7 +201,7 @@ export function MasteryDrillCardList({
       statusRank(a.status) - statusRank(b.status) ||
       (a.addedAt ?? 0) - (b.addedAt ?? 0),
   );
-  const groupCounts: Record<Group, number> = { ready: 0, cooling: 0, unplayable: 0 };
+  const groupCounts: Record<Group, number> = { ready: 0, old: 0, cooling: 0, unplayable: 0 };
   for (const row of allRows) groupCounts[groupOf(row)]++;
   const rows = allRows.filter((row) => shown[groupOf(row)]);
   const hiddenCount = allRows.length - rows.length;
@@ -376,12 +400,14 @@ export function MasteryDrillCardList({
               {loading && allRows.length === 0
                 ? 'Loading…'
                 : allRows.length > 0
-                  ? 'No cards in the groups shown. Turn a filter back on above (keys 1–3).'
+                  ? 'No cards in the groups shown. Turn a filter back on above (keys 1–4).'
                   : 'No cards are in the Mastery Drill for this knowledge base.'}
             </div>
           )}
           {rows.map((row, index) => {
-            const coolingLeftMs = (readyAtById.get(row.cardId) ?? 0) - now;
+            const readyAt = readyAtById.get(row.cardId) ?? 0;
+            const coolingLeftMs = readyAt - now;
+            const old = isOld(row.cardId);
             const color = statusColor(row.status);
             return (
               <div
@@ -439,6 +465,24 @@ export function MasteryDrillCardList({
                     </div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '10.5px', color: 'var(--rn-clr-content-tertiary)' }}>
+                    {old && (
+                      <span
+                        title={`Ready to drill for more than ${oldThresholdDays} day${oldThresholdDays === 1 ? '' : 's'}: Clear Old would remove it`}
+                        style={{
+                          padding: '0 6px',
+                          borderRadius: '3px',
+                          border: `1px solid ${OLD_COLOR}`,
+                          background: `${OLD_COLOR}1a`,
+                          color: OLD_COLOR,
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                          cursor: 'help',
+                        }}
+                      >
+                        Old · ready {formatDrillWait(now - readyAt)}
+                      </span>
+                    )}
                     {row.priority && (
                       <PriorityBadge
                         priority={row.priority.priority}
@@ -509,7 +553,7 @@ export function MasteryDrillCardList({
             color: 'var(--rn-clr-content-tertiary)',
           }}
         >
-          ↑↓ choose · Enter go to Rem · 1–3 filter · Delete remove · Shift+Delete remove unplayable · Esc back to the drill
+          ↑↓ choose · Enter go to Rem · 1–4 filter · Delete remove · Shift+Delete remove unplayable · Esc back to the drill
         </div>
       </div>
   );

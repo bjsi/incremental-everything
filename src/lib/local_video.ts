@@ -34,8 +34,8 @@ export interface VideoLibrary {
   available: boolean;
 }
 
-export async function listVideoLibraries(): Promise<VideoLibrary[]> {
-  return (await callVideoHelper<{ libraries: VideoLibrary[] }>('/video-libraries', {})).libraries;
+export async function listVideoLibraries(plugin: RNPlugin, ): Promise<VideoLibrary[]> {
+  return (await callVideoHelper<{ libraries: VideoLibrary[] }>(plugin, '/video-libraries', {})).libraries;
 }
 
 /**
@@ -43,8 +43,7 @@ export async function listVideoLibraries(): Promise<VideoLibrary[]> {
  * placed in a library (a new one at its folder when none holds it). Null when
  * the user cancels.
  */
-export async function chooseLocalVideo(
-  kind: 'folder' | 'file',
+export async function chooseLocalVideo(plugin: RNPlugin, kind: 'folder' | 'file',
   prompt?: string
 ): Promise<(LocalVideoFile & { root: string }) | null> {
   const result = await callVideoHelper<{
@@ -52,15 +51,15 @@ export async function chooseLocalVideo(
     library: string;
     path: string;
     root: string;
-  }>('/video-choose', { kind, prompt });
+  }>(plugin, '/video-choose', { kind, prompt });
   return result.cancelled
     ? null
     : { library: result.library, path: result.path, root: result.root };
 }
 
 /** Points a library at another folder, picked in the dialog. False when cancelled. */
-export async function relinkVideoLibrary(library: string): Promise<boolean> {
-  return !(await callVideoHelper<{ cancelled: boolean }>('/video-library-relink', { library }))
+export async function relinkVideoLibrary(plugin: RNPlugin, library: string): Promise<boolean> {
+  return !(await callVideoHelper<{ cancelled: boolean }>(plugin, '/video-library-relink', { library }))
     .cancelled;
 }
 
@@ -72,13 +71,13 @@ export interface VideoFolder {
 }
 
 /** The videos under a library folder, in natural order, nested by subfolder. */
-export async function scanVideoFolder(library: string, path: string): Promise<VideoFolder> {
-  return (await callVideoHelper<{ tree: VideoFolder }>('/video-scan', { library, path })).tree;
+export async function scanVideoFolder(plugin: RNPlugin, library: string, path: string): Promise<VideoFolder> {
+  return (await callVideoHelper<{ tree: VideoFolder }>(plugin, '/video-scan', { library, path })).tree;
 }
 
 /** Throws with the helper's reason when the file can't be served (library or file missing). */
-export async function checkLocalVideo(file: LocalVideoFile): Promise<void> {
-  await callVideoHelper('/video-file', { file });
+export async function checkLocalVideo(plugin: RNPlugin, file: LocalVideoFile): Promise<void> {
+  await callVideoHelper(plugin, '/video-file', { file });
 }
 
 // --- the Rem ------------------------------------------------------------------

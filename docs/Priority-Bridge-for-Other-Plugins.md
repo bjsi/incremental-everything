@@ -5,6 +5,7 @@ Other RemNote plugins can work with **flashcard priorities** through a small mes
 - **Ask** what priority a new flashcard would get at a given place in your knowledge base, so they can show it to you before creating anything.
 - **Set** a flashcard's priority. Incremental RemNote applies it as a **manual** priority, exactly as if you had set it in the Priority popup.
 - **Link a video** on your computer to a flashcard, shown under its answer: a [card video](Incremental-Video.md#card-video). The other plugin asks Incremental RemNote to open its folder dialog and matches the videos to its cards. Since v1.0.195.
+- **Store audio** in RemNote so that it plays everywhere, the iPhone included. The other plugin hands the file to the [Local Media Bridge](Local-Media-Bridge.md) helper, and Incremental RemNote has RemNote store it. Since v1.0.229.
 
 The typical client is an **importer**: before it creates the cards, it shows you the priority each one would inherit and lets you type a different one, and it can link each question to the video that explains it.
 
@@ -88,6 +89,24 @@ A [card video](Incremental-Video.md#card-video) is a video file on the user's co
 
 Queue unconfirmed `set-card-video` items and resend them on `ready`, as for priorities.
 
+### Storing audio (version 3) { #store-media }
+
+The plugin SDK has no upload call. The only way a plugin can upload on its own, a `![](data:image/…;base64,…)` image in `richText.parseFromMarkdown`, accepts image types only. Audio relabelled `data:image/mp3` to get through is stored with that type and no file extension: the desktop app plays it, but the iOS app refuses it (*"The operation is not supported"*). Store audio this way instead:
+
+1. Post the file's bytes to the [Local Media Bridge](Local-Media-Bridge.md) helper: `POST http://127.0.0.1:3460/files?name=<file name>`, the raw bytes as the body. It answers `{ url, type }`: the file, served under the type read from its bytes (an MP3 as `audio/mpeg`). Check that `type` starts with `audio/`.
+2. Send those URLs to Incremental RemNote:
+
+| Request key (client writes) | Payload | Answer key (Incremental RemNote writes) | Answer |
+|---|---|---|---|
+| `ie-bridge.v1.store-media` | `{ requestId, urls: string[] }` | `ie-bridge.v1.store-media-answer` | `{ requestId, results: { [url]: storedUrl \| null } }` |
+
+- `storedUrl` is RemNote's own copy, to put in an audio element: `{ i: 'a', url: storedUrl, onlyAudio: true }`. `null` means RemNote did not store that file.
+- Only the helper's own `http://127.0.0.1:3460/files/…` addresses are accepted.
+- RemNote fetches and uploads the files one after another: about 2 seconds for a small file, as long as its upload for a large one. Send about 10 URLs per request and wait minutes, not seconds.
+- It needs the helper running and RemNote's desktop app. Check `GET http://127.0.0.1:3460/health` (version 13 or later) and the bridge version in `pong` (3 or later) before you start, and say so when either is missing.
+
+Audio stored the old way can be repaired with the helper's [`restore-audio`](Local-Media-Bridge.md#operations) command.
+
 ### Delivery { #delivery }
 
 Events only reach running listeners, and nothing is queued for a plugin that is off:
@@ -135,4 +154,4 @@ await ask(plugin, 'ie-bridge.v1.set-priority', 'ie-bridge.v1.set-priority-ack', 
 });
 ```
 
-The implementation is in [`src/lib/external_priority_bridge.ts`](https://github.com/hugomarins/incremental-remnote/blob/main/src/lib/external_priority_bridge.ts) and, for card videos, [`src/lib/external_card_video_bridge.ts`](https://github.com/hugomarins/incremental-remnote/blob/main/src/lib/external_card_video_bridge.ts).
+The implementation is in [`src/lib/external_priority_bridge.ts`](https://github.com/hugomarins/incremental-remnote/blob/main/src/lib/external_priority_bridge.ts) for card videos, [`src/lib/external_card_video_bridge.ts`](https://github.com/hugomarins/incremental-remnote/blob/main/src/lib/external_card_video_bridge.ts), and for audio, [`src/lib/external_media_bridge.ts`](https://github.com/hugomarins/incremental-remnote/blob/main/src/lib/external_media_bridge.ts).

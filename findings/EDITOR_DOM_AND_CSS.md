@@ -29,6 +29,31 @@ The slug in `data-rem-tags` and `data-queue-rem-container-tags` is the powerup's
 
 Write selectors against the slugified name. To fix a mismatch, change the CSS, never the code: tagged Rems are keyed on the code.
 
+## Plugin powerup pills have no name attribute { #plugin-powerup-pills }
+
+A row tagged with a built-in powerup and a plugin powerup draws them differently (saved DOM, 2026-11-13, a Rem with Extra Card Detail + the plugin's Pronunciation):
+
+- **Built-in** (Extra Card Detail): `span.hierarchy-editor__tag-bar__tag[data-test="Applied Powerup Pill Extra Card Detail"]` > `span` (name) + remove button, in a flex wrapper **before** the Tag Bar.
+- **Plugin powerup** (Pronunciation): inside `[data-test="Tag Bar"]`, `span.hierarchy-editor__tag-bar__tag` > `div` (`span.rem-powerup-icon` ⚡ + `.RichTextViewer` name) + `[data-test="Tag Close Button"]`. **No `data-test` with its name**, so `data-test^="Applied Powerup Pill <name>"` misses it.
+
+Match a plugin powerup's pill as `.rn-editor__rem__body[data-rem-tags~="slug"] .hierarchy-editor__tag-bar__tag:has(.rem-powerup-icon)` (its label: `> div:has(> .rem-powerup-icon)`); another plugin powerup on the same Rem would match too. `src/lib/pronunciation_css.ts` does this.
+
+## Extra details in the queue { #extra-details }
+
+The queue lists a card's Extra Card Detail Rems under **Extra details**, each in a `.extra-card-detail__item` with its own bullet. The item itself carries no tags or Rem id, but it nests an editor for the Rem's children whose container names the Rem's tags (saved DOM of the Beautiful queue, 2026-11-13):
+
+```
+.extra-card-detail__item (.queue-beautiful-extra-card-detail__item)
+  > .rem-bullet__container (absolute, left -24px) > .rem-bullet.perfect-circle > .perfect-circle__inner > svg (.rem-bullet__ring, .rem-bullet__core)
+  > div > … .RichTextViewer                         ← the Rem's text
+  > #hierarchy-editor.rn-editor > #hierarchy-editor-inner
+      > .container-node[data-rem-container-tags="pronunciation extra-card-detail"][data-rem-container-id=<remId>]
+```
+
+So `.extra-card-detail__item:has(> #hierarchy-editor > #hierarchy-editor-inner > [data-rem-container-tags~="slug"]) > .rem-bullet__container` reaches a tagged Rem's bullet there; the child combinators keep it off tagged children of that Rem. `src/lib/extra_details_css.ts` builds it; the pronunciation and True/False bullet rules use it (and the sierra-remnote and Context for Cloze plugins copy it). The Compact queue's markup was not saved.
+
+**A single Extra Card Detail Rem is drawn bare** (saved DOM, 2026-11-13): `.extra-card-detail__item` holds only the `.RichTextViewer`, with **no bullet and no nested editor**, so nothing names the Rem or its tags. Tag-keyed CSS cannot find it. The pronunciation rule recognises it by content instead: its 🔊 caption is written in a text colour (invisible on an emoji), which RemNote renders as a class (`text-color--<colour>`, on the item's inner span; renderer read from the bundle), followed by an audio item. Remember that `:has()` may not be nested inside another `:has()` (the browser drops the rule): combine two `:has()` side by side instead.
+
 ## The tag bar collapses past one tag
 
 Individual `.hierarchy-editor__tag-bar__tag` pills render only while a Rem has a **single** tag. With a second one, the bar collapses into a "2 tags" chip, taking any icon painted on a pill with it. A marker that must always show belongs on the row border or the bullet, not a pill. `SHOW_LEFT_BORDER_CSS` in `src/register/settings.ts` is an example.

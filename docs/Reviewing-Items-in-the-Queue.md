@@ -65,9 +65,15 @@ This hold is within a session. Its counterpart across days is **cooling** in the
 
 ## The Answer Buttons
 
-![The answer buttons bar: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, followed by the review-note, P Edit and help icons](assets/answer-buttons-bar.png){ width="900" }
+![The answer buttons bar on a computer: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, then the review-note and help icons; below it the info bar with the priority, the Priority Shield, the Weighted Shield and the repetitions](assets/answer-bar-desktop.png#only-light){ width="900" }
+![The answer buttons bar on a computer: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, then the review-note and help icons; below it the info bar with the priority, the Priority Shield, the Weighted Shield and the repetitions](assets/answer-bar-desktop-dark.png#only-dark){ width="900" }
 
 Here is a breakdown of each button and its function, from left to right. Every button after **Next** is a compact icon button — icon above, one-word label below — so the whole row fits on one line; hover over any button for its full name and shortcut.
+
+**On a phone** (or in any pane narrower than 520 px) the bar shrinks to about a third of its height: one row with **Next**, the same actions as square icon buttons without labels after it, and one line of figures under it (priority, repetitions, minutes). **New Tab** and the help icon are left out there. On **Next** the scheduler chip (`×1.5`) and the interval sit in two small lines beside the word, so the interval reads in full; months and years are shortened there to `m` and `y` (`in 1.3 m`, `in 2.5 y`). The ↕ drag hint is left out, but dragging Next up or down still works.
+
+![The answer buttons bar on a phone: Next with the scheduler chip over its interval, then Reschedule, Dismiss, Priority, In Editor, To Highlight and the review note as icon buttons; below it one line with the priority and the repetitions](assets/answer-bar-phone.png#only-light){ width="420" }
+![The answer buttons bar on a phone: Next with the scheduler chip over its interval, then Reschedule, Dismiss, Priority, In Editor, To Highlight and the review note as icon buttons; below it one line with the priority and the repetitions](assets/answer-bar-phone-dark.png#only-dark){ width="420" }
 
 * **[Next](#next):** (Shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Windows/Linux)
 This is your primary action. Clicking "Next" marks the item as reviewed, calculates the next time you should see it based on the scheduling algorithm, and advances to the next item in your queue. The subtitle (e.g., "×1.5 in 3 days") shows the interval that will be set, preceded by a chip naming the [scheduler](IncRem-Scheduler.md#scheduler-indicator) that produced it.
@@ -123,10 +129,10 @@ Toggles an inline text field to attach a short **observation to this repetition'
 * **Document Notes (Sidebar):**
 When reviewing PDF or HTML Incremental Rems (including **PDF Highlights** and **HTML Highlights**), a **📝 Document Notes** icon appears in the top bar. Clicking this opens the current document in a right-sidebar widget, allowing you to view and make notes and capture thoughts side-by-side with your reading material without leaving the queue. The sidebar syncs with the active queue item automatically. For highlight IncRems, the sidebar discovers all Incremental Rems sharing the same source document and lets you pick which one's notes to view (auto-selects if there is only one).
 
-  The same sidebar is also the **editing surface for plain Rem-type Incremental Rems** (text/note extracts). For these, the in-queue card is a **read-only preview** (see *Editing a Rem-type IncRem* below) and the Document Notes sidebar **opens automatically** when the item loads, so you can edit it there immediately — selecting text, formatting, and typing all behave normally in the sidebar pane.
+  The same sidebar can also show a **plain Rem-type Incremental Rem** (a text/note extract): press **Sidebar →** on its card. It no longer opens by itself; those Rems are edited over the card with **✎ Edit** (see *Editing a Rem-type IncRem* below), and the right sidebar stays on whatever it was showing.
 
-* **Editing a Rem-type IncRem (read-only card + "✎ Edit in sidebar"):**
-When the current Incremental Rem is a plain **Rem** (a text/note extract, not a PDF/HTML/video source), the queue card is a **read-only preview** of the Rem and its descendants, with an **"✎ Edit in sidebar →"** button; editing is done in the auto-opened **Document Notes sidebar**. See **[Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem)** below for why the card is read-only and how the editing flow works.
+* **Editing a Rem-type IncRem (✎ Edit):**
+When the current Incremental Rem is a plain **Rem** (a text/note extract, not a PDF/HTML/video source), the queue card is a **read-only preview** of the Rem and its descendants, with an **✎ Edit** button that opens RemNote's own editor for it right over the card. See **[Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem)** below.
 
 * **PDF Switcher (multi-PDF Inc Rems):**
 When the current Inc Rem has **more than one PDF source**, a small PDF dropdown appears in the top bar next to the 📝 Document Notes icon. Selecting a different PDF:
@@ -137,13 +143,8 @@ When the current Inc Rem has **more than one PDF source**, a small PDF dropdown 
 
   *See the [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) section for the full resolution chain (pin → `#preferthispdf` → first PDF) and how it applies across every surface.*
 
-* **Press 'P' to Edit:**
-This is a non-clickable hint that appears **only for certain card types** (like regular Rem or PDFs). It reminds you that you can press the "P" key to open the Rem in the pop-up "previewer" for quick edits — a fast alternative when you don't want to use the sidebar. (For Rem-type IncRems the primary editing path is the auto-opened **Document Notes sidebar**, since typing directly in the queue card is unreliable — which is exactly why that card is read-only; see [Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem) below.)
-
 ![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
-
-![A PDF highlight in the queue: the reader on top, then the answer buttons bar and the priority info bar below it](assets/answer-buttons-new-design.png){ width="1000" }
 
 ### Saved in the background { #saved-in-the-background }
 
@@ -155,22 +156,37 @@ ___
 
 ## Editing a Rem-type Incremental Rem
 
-When the current Incremental Rem is a plain **Rem** (a text/note extract, not a PDF, HTML, or video source), the queue card shows a **read-only preview** of the Rem and its descendant subtree, with an **"✎ Edit in sidebar →"** button. All actual editing is done in the **Document Notes sidebar**, which opens automatically when the item loads.
+When the current Incremental Rem is a plain **Rem** (a text/note extract, not a PDF, HTML, or video source), the queue card shows a **read-only preview** of the Rem and its descendant subtree. Press **✎ Edit** at the bottom of the card to edit it in place.
 
-### Why the card is read-only (the keyboard-conflict problem)
+### ✎ Edit: the editor over the card { #extract-editor }
 
-Earlier versions embedded RemNote's **editable** editor for the Rem directly in the queue card. That turned out to be unreliable: the plugin runs in a sandboxed frame while the editor is a "fake embed" rendered in RemNote's *main* window, and the queue (Flashcard) pane keeps reclaiming the keyboard. In practice this meant:
+**✎ Edit** opens RemNote's own document editor for the Rem in a panel laid over the card, where the preview was. It is a normal editor: the Rem's text as the title, its children below, with everything you have in a document.
+
+- **Formatting and clozes:** select text for the formatting bar (bold, highlight, native cloze), or use the usual shortcuts.
+- **Commands:** `/` commands and the command palette work, and so do the plugin's own commands on the focused Rem, such as [Create Cloze Deletion](Plugin-Commands-Reference.md#core-incremental-commands) (`Opt+Z` / `Alt+Z`), Extract and the priority commands.
+- **Click the text to start typing.** While the editor has the cursor, the queue's own keys (Space, the number keys, arrows) are off, so nothing you type can rate or advance the card.
+- **Done** closes the editor and shows the card again; the preview already has your changes. While the editor is open, **✎ Edit** on the card reads **✓ Done** and closes it too. Drag the bar with Done to move the panel.
+- **It follows the card.** The editor closes by itself when the queue moves on (**Next**, **Dismiss**, **Reschedule**, to a flashcard or to another Incremental Rem), when you leave the queue, and when you navigate away.
+- **On a phone** the editor starts at the card's top edge and is kept short, so it stays above the keyboard; its bar with **Done** is at the bottom of the panel, under RemNote's own page. This is the way to edit an extract there, since a phone has no right sidebar.
+
+Only one editor is open on a Rem at a time. **Sidebar →** (beside ✎ Edit, on a computer) closes the editor over the card and opens the Rem in the [Document Notes sidebar](Plugin-Widgets-Reference.md#14-document-notes-sidebar) instead. The sidebar never opens by itself for these Rems, so it stays on your [Practiced Queues dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) while you review.
+
+### Why the card itself is read-only
+
+Earlier versions embedded RemNote's **editable** editor directly in the queue card. That was unreliable:
 
 - the **text-selection toolbar flickered shut** as soon as you selected text;
-- **typed characters were dropped** (the editor couldn't hold focus); and
+- **typed characters were dropped** (the editor couldn't hold the cursor); and
 - **stray keys** (arrows, space, digits) fell through to the queue and could **rate or advance the card by accident**.
 
-A plugin cannot fully capture keyboard input inside the queue pane, so this could not be fixed there. The solution is to keep the in-queue card **read-only** (it never captures the keyboard — no collapsed selections, no accidental ratings) and route editing to a **separate pane** that holds focus correctly.
+The cause is in how RemNote's queue works: a moment after any click inside the queue's own area, the queue takes the keyboard back unless the click was on something of its own. An editor a plugin places inside the card is inside that area but is not the queue's, so every click into it was answered by the queue taking the cursor away.
+
+A floating panel is outside the queue's area. The editor behind **✎ Edit** lives in one, so it keeps the cursor the way an editor in the sidebar does, while looking as if it were in the card.
 
 ### The editing flow
 
-- **Read-only preview.** The card renders the Rem and its descendants (reactively — it updates live as you edit them elsewhere). Descendants are shown indented under a guide line, separated from the Rem by a horizontal divider.
-- **Edit in the sidebar.** The **Document Notes sidebar** auto-opens on the Rem when the item loads (or click **"✎ Edit in sidebar →"**). It is a normal editor pane — selecting text, formatting, typing, and editing children/descendants all work as usual, and the changes flow back into the read-only preview.
+- **Read-only preview.** The card renders the Rem and its descendants (reactively: it updates live as you edit them). Descendants are shown indented under a guide line, separated from the Rem by a horizontal divider. Where the preview stops (very deep or very long outlines), a line offers to open the editor.
+- **✎ Edit**, type, **Done.** See [above](#extract-editor).
 - **Back to the dashboard on Next/Dismiss.** When you press **Next** or **Dismiss** (leaving the rem), the [History-Queue-Dashboard-and-Mastery-Drill#practiced-queues-history--live-dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) is restored in the Right Sidebar (if the **Auto focus Queue Dashboard** setting is on), so you return to your live session metrics for the next item.
 - **Heavier-duty alternatives.** For more space or a full editor you can also use **[Review in Editor](#review-in-editor)** or **[Open Editor in New Tab](#open-editor-in-new-tab)**, or press **`P`** for the pop-up previewer.
 
@@ -337,7 +353,7 @@ This button is a direct response to a recent RemNote UI change and serves as an 
 
 RemNote recently removed the ability to open an editor pane on the left side of the screen when reviewing a PDF highlight in the queue (PDFWebViewer). This made it impossible to take notes and paste extracts without exiting the queue entirely, breaking the review flow (not always the *Previewer* - pressing "P" - is sufficient to this flow, nor does it allow having the PDF and editor side by side).
 
-> ℹ️ This is the same family of limitation that makes the in-queue card for Rem-type Incremental Rems **read-only** — a plugin can't reliably hold the keyboard inside the queue pane. For plain Rems the editing surface is the Document Notes sidebar; see [Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem).
+> ℹ️ This is the same family of limitation that makes the in-queue card for Rem-type Incremental Rems **read-only**: an editor placed inside the queue's card can't keep the keyboard. Plain Rems are edited in a panel over the card instead; see [Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem).
 
 ####  How It Works & When to Use It
 

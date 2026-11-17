@@ -203,13 +203,14 @@ const storeImageViaDataUri = async (plugin: RNPlugin, url: string): Promise<stri
 const storeViaImportedRem = async (
   plugin: RNPlugin,
   urls: string[],
-  onStored: (url: string, hosted: string) => void
+  onStored: (url: string, hosted: string) => void,
+  stallMs = REUPLOAD_TIMEOUT_MS
 ): Promise<void> => {
   const temp = await plugin.rem.createSingleRemWithMarkdown(urls.map(markdownImageFor).join(' '));
   if (!temp) return;
   try {
     const harvested = new Set<number>();
-    let deadline = Date.now() + REUPLOAD_TIMEOUT_MS;
+    let deadline = Date.now() + stallMs;
     while (harvested.size < urls.length && Date.now() < deadline) {
       await sleep(REUPLOAD_POLL_MS);
       const current = await plugin.rem.findOne(temp._id);
@@ -221,13 +222,43 @@ const storeViaImportedRem = async (
       now.forEach((url, index) => {
         if (harvested.has(index) || !isRemNoteHostedUrl(url)) return;
         harvested.add(index);
-        deadline = Date.now() + REUPLOAD_TIMEOUT_MS;
+        deadline = Date.now() + stallMs;
         onStored(urls[index], url);
       });
     }
   } finally {
     await temp.remove();
   }
+};
+
+/**
+ * Store the files served at `urls` through the import door only, in batches,
+ * and return url → stored URL for those RemNote took. RemNote keeps the type
+ * each file is served with, which is what makes it the door for audio (the
+ * data-URI door takes only `image/` types, and an audio pushed through it as
+ * `image/…` is stored with that type: iOS refuses to play it).
+ * `stallMs`: how long a batch may go without a file landing (large files upload slowly).
+ */
+export const storeUrlsViaImport = async (
+  plugin: RNPlugin,
+  urls: string[],
+  stallMs = REUPLOAD_TIMEOUT_MS
+): Promise<Map<string, string>> => {
+  const stored = new Map<string, string>();
+  const unique = [...new Set(urls)];
+  for (let start = 0; start < unique.length; start += IMPORT_BATCH_SIZE) {
+    try {
+      await storeViaImportedRem(
+        plugin,
+        unique.slice(start, start + IMPORT_BATCH_SIZE),
+        (url, hosted) => stored.set(url, hosted),
+        stallMs
+      );
+    } catch (error) {
+      console.warn(`${LOG} import-job upload failed`, error);
+    }
+  }
+  return stored;
 };
 
 /**

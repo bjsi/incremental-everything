@@ -8,7 +8,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect, useMemo } from 'react';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { getCardPriority, setCardPriority } from '../lib/card_priority';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
@@ -82,10 +82,11 @@ async function getBreadcrumb(plugin: RNPlugin, rem: PluginRem): Promise<string> 
     : undefined;
 
   for (let i = 0; i < MAX_BREADCRUMB_DEPTH && current; i++) {
-    // safeRemTextToString, not a truthiness ternary around richText.toString(): an
-    // empty rich-text array `[]` is truthy but toString() rejects it ("Invalid input"),
-    // which threw out of getBreadcrumb and dropped the whole rem from the list.
-    const label = await safeRemTextToString(plugin, current.text);
+    // Never a bare richText.toString(): an empty rich-text array `[]` is truthy but
+    // toString() rejects it ("Invalid input"), which threw out of getBreadcrumb and
+    // dropped the whole rem from the list. resolveRemTextForBreadcrumb walks the
+    // elements itself, and shows a pin as 📌 instead of the Rem it points at.
+    const label = await resolveRemTextForBreadcrumb(plugin, current.text);
     parts.unshift(label.substring(0, 40)); // cap label length
     current = current.parent ? await plugin.rem.findOne(current.parent) : undefined;
   }
@@ -179,13 +180,14 @@ function BatchCardPriority() {
           return;
         }
 
-        // Always go through safeRemTextToString: the old `text ? toString(text) : safe(...)`
-        // ternary routed AROUND the safe helper for every non-null value, so an empty
-        // array (truthy) or corrupt richText hit toString() raw and threw "Invalid input".
-        const frontText = await safeRemTextToString(plugin, anchorRem.text);
-        const backText = anchorRem.backText?.length
-          ? await plugin.richText.toString(anchorRem.backText)
+        // Never a bare richText.toString(): an empty array (truthy) or corrupt
+        // richText threw "Invalid input" there. Breadcrumb style, as in the rows:
+        // references show their text, a pin is a 📌. "Untitled" means no back.
+        const frontText = await resolveRemTextForBreadcrumb(plugin, anchorRem.text);
+        const backLabel = anchorRem.backText?.length
+          ? await resolveRemTextForBreadcrumb(plugin, anchorRem.backText)
           : '';
+        const backText = backLabel === 'Untitled' ? '' : backLabel;
         const anchorText = backText
           ? `${frontText} → ${backText}`
           : frontText;
@@ -234,10 +236,14 @@ function BatchCardPriority() {
 
         for (const rem of scopedRems) {
           try {
-            const remFront = await safeRemTextToString(plugin, rem.text);
-            const remBack = rem.backText?.length
-              ? await plugin.richText.toString(rem.backText)
+            // Breadcrumb style on both sides: references show their text, a pin
+            // is a 📌 rather than the whole Rem it points at. "Untitled" (no
+            // text at all) stays as the front's label, and means no back.
+            const remFront = await resolveRemTextForBreadcrumb(plugin, rem.text);
+            const backLabel = rem.backText?.length
+              ? await resolveRemTextForBreadcrumb(plugin, rem.backText)
               : '';
+            const remBack = backLabel === 'Untitled' ? '' : backLabel;
             const remText = remBack ? `${remFront} → ${remBack}` : remFront;
 
             const hasCardPriorityTag = await rem.hasPowerup(CARD_PRIORITY_CODE);

@@ -1,4 +1,5 @@
 import { BuiltInPowerupCodes, PluginRem, ReactRNPlugin, RichTextInterface } from '@remnote/plugin-sdk';
+import { PAIRING_MESSAGE, helperHeaders, isPairingRefusal } from './helper_client';
 import {
   isAreaHighlight,
   MergeSide,
@@ -62,11 +63,15 @@ async function requestTranscription(
   try {
     const res = await fetch(`${AI_OCR_HELPER_URL}/ocr`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await helperHeaders(plugin),
       // kbId: the helper looks for the PDF's local copy only in this knowledge base's folder.
       body: JSON.stringify({ ...req, kbId: (await plugin.kb.getCurrentKnowledgeBaseData())?._id }),
     });
     body = await res.json();
+    if (isPairingRefusal(res.status, body)) {
+      await plugin.app.toast(PAIRING_MESSAGE);
+      return undefined;
+    }
   } catch (e) {
     console.error('[AI-OCR] Helper unreachable:', e);
     await plugin.app.toast(`AI helper is not running (${AI_OCR_HELPER_URL}). Start scripts/ai_ocr_helper.py.`);

@@ -243,7 +243,8 @@ Happy learning! 📚✨
         * **[IncRem-List-and-Main-View](IncRem-List-and-Main-View.md)**: Browse, filter, and manage your Incremental Rems outside the queue. Includes the Review in Editor flow and the KB Priority Distribution Graph.
         * Tips for **Incremental Writing**.
         * How to use document/folder-specific queues for **Subset Review**.
-        * **[History-Queue-Dashboard-and-Mastery-Drill](History-Queue-Dashboard-and-Mastery-Drill.md)**: Track session history, monitor real-time study metrics, find recently reviewed cards, and deliberately re-practice difficult material with the Mastery Drill.
+        * **[History & Queue Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md)**: Track session history, monitor real-time study metrics and find recently reviewed cards.
+        * **[Mastery Drill](Mastery-Drill.md)**: Deliberately re-practice the cards you rated *Again* or *Hard*, until they stick.
 
 * **6. Integrations**
     * **Purpose:** Connect the incremental workflow to other applications.

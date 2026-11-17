@@ -469,8 +469,19 @@ export function getRetrievabilityColor(r: number): string {
  * Read once, when widgets are registered. Moving the window to another display
  * will not resize a popup until the plugin reloads.
  */
-export function screenFittedHeight(min: number, max = 1500): number {
+export function screenFittedHeight(min: number, max = 1500, share = 0.9): number {
   const available = typeof window !== 'undefined' ? window.screen?.availHeight : undefined;
+  if (typeof available !== 'number' || !Number.isFinite(available)) return min;
+  return Math.min(Math.max(Math.round(available * share), min), max);
+}
+
+/**
+ * The width counterpart of {@link screenFittedHeight}: 90% of the display's
+ * available width, kept between `min` and `max`. Same limits: it reads the
+ * display, not the RemNote window, once, when widgets are registered.
+ */
+export function screenFittedWidth(min: number, max = 2400): number {
+  const available = typeof window !== 'undefined' ? window.screen?.availWidth : undefined;
   if (typeof available !== 'number' || !Number.isFinite(available)) return min;
   return Math.min(Math.max(Math.round(available * 0.9), min), max);
 }

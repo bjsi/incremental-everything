@@ -17,6 +17,12 @@ describe('drill cooling', () => {
     assert.equal(drillReadyAt('legacy', defaults), 0);
   });
 
+  it('holds an Again card until its relearning step is over when that is longer than the floor', () => {
+    assert.equal(drillCoolingMs({ cardId: 'a', addedAt: 1, relearnMs: DAY }, defaults), DAY);
+    assert.equal(drillCoolingMs({ cardId: 'a', addedAt: 1, relearnMs: 10 * MIN }, defaults), 180 * MIN);
+    assert.equal(drillReadyAt({ cardId: 'a', addedAt: 1000, relearnMs: DAY }, defaults), 1000 + DAY);
+  });
+
   it('cools a Hard card for a share of its interval, between the floor and the cap', () => {
     assert.equal(drillCoolingMs({ cardId: 'h', addedAt: 1, intervalMs: 60 * DAY }, defaults), 3 * DAY);
     assert.equal(drillCoolingMs({ cardId: 'h', addedAt: 1, intervalMs: 365 * DAY }, defaults), 7 * DAY);
@@ -34,7 +40,8 @@ describe('drill cooling', () => {
 
   it('returns a rated card at once only when its rating has no wait at all', () => {
     const noFloor = { ...defaults, minDelayMs: 0 };
-    assert.equal(returnsAtOnce(false, noFloor), true);
+    // Again waits for its relearning step even with no floor.
+    assert.equal(returnsAtOnce(false, noFloor), false);
     assert.equal(returnsAtOnce(true, noFloor), false);
     assert.equal(returnsAtOnce(true, { ...noFloor, hardShare: 0 }), true);
     assert.equal(returnsAtOnce(false, defaults), false);
@@ -60,11 +67,12 @@ describe('drill cooling', () => {
       { cardId: 'again-old', kbId: 'kb', addedAt: now - 10 * DAY },
       { cardId: 'hard-cooling', kbId: 'kb', addedAt: now - 5 * DAY, intervalMs: 365 * DAY },
       { cardId: 'other-kb', kbId: 'other', addedAt: now - 10 * DAY },
+      { cardId: 'again-relearning', kbId: 'kb', addedAt: now - 5 * 60 * MIN, relearnMs: DAY },
     ];
     const s = summarizeDrill(items, (i) => typeof i === 'string' || i.kbId === 'kb', defaults, 7, now);
-    assert.equal(s.kbItems.length, 4);
+    assert.equal(s.kbItems.length, 5);
     assert.deepEqual(s.readyIds, ['legacy', 'again-old']);
-    assert.equal(s.coolingCount, 2);
+    assert.equal(s.coolingCount, 3);
     assert.equal(s.firstReadyAt, now - 60 * MIN + 180 * MIN);
     // again-old became ready 10 days minus 3 h ago; hard-cooling is not old however long it waited.
     assert.equal(s.oldCount, 1);

@@ -51,6 +51,9 @@ import {
 import { IncrementalRem, getIncrementalRemFromRem, isKnownIncRemId } from '../lib/incremental_rem';
 import { markIncRemDirty } from '../lib/incremental_rem/persistence';
 import { flushCacheUpdatesNow, flushRatedCardsNow, updateCardPriorityCache, updateCardPriorityCacheAfterRating } from '../lib/card_priority/cache';
+// Static, never `await import()`: a lazily loaded chunk fails in the index
+// sandbox (classic-script eval of `import.meta`), see the note in tracker.ts.
+import { readCardPriorityByRem } from '../lib/card_priority/shared_read';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { transferToDismissed } from '../lib/dismissed';
 import { IncrementalRep } from '../lib/incremental_rem/types';
@@ -998,18 +1001,19 @@ async function applyCardRating(
         const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
         const currentKbId = kbData?._id;
         type FinalDrillItem = FinalDrillEntry;
-        let finalDrillIds =
+        const finalDrillIds =
           ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
         const getCardId = (item: FinalDrillItem) =>
           typeof item === 'string' ? item : item.cardId;
 
         if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
-          // Re-adding restarts the cooling of a card that was already in the drill.
-          finalDrillIds = [
-            ...finalDrillIds.filter((item) => getCardId(item) !== cardId),
-            await buildDrillEntry(plugin, cardId, currentKbId, score, ratedAt),
-          ];
-          await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
+          // Re-adding restarts the cooling of a card that was already in the drill. A card
+          // the Priority Cap keeps out (null entry) leaves the drill instead.
+          const entry = await buildDrillEntry(plugin, cardId, currentKbId, score, ratedAt);
+          const others = finalDrillIds.filter((item) => getCardId(item) !== cardId);
+          if (entry || others.length !== finalDrillIds.length) {
+            await plugin.storage.setSynced('finalDrillIds', entry ? [...others, entry] : others);
+          }
         } else if (score >= QueueInteractionScore.GOOD) {
           const filtered = finalDrillIds.filter((item) => getCardId(item) !== cardId);
           if (filtered.length !== finalDrillIds.length) {
@@ -1373,8 +1377,9 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           return;
         }
 
-        const allInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
-        const cachedEntry = allInfos.find((info) => info.remId === data.remId);
+        // A shared copy, not a read per event: each full read costs ~0.3 s of
+        // main-thread time, and a bulk edit fires this for hundreds of Rems.
+        const cachedEntry = (await readCardPriorityByRem(plugin)).get(data.remId);
 
         if (
           !cachedEntry ||
@@ -1497,7 +1502,7 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
     const currentKbId = kbData?._id;
 
     type FinalDrillItem = FinalDrillEntry;
-    let finalDrillIds =
+    const finalDrillIds =
       ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
     const getCardId = (item: FinalDrillItem) =>
       typeof item === 'string' ? item : item.cardId;
@@ -1505,11 +1510,12 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
     if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
       // A card already in the drill restarts its cooling: its answer was just revealed, so the
       // delay must run again from now rather than from when it first entered the drill.
-      finalDrillIds = [
-        ...finalDrillIds.filter((item) => getCardId(item) !== cardId),
-        await buildDrillEntry(plugin, cardId, currentKbId, score),
-      ];
-      await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
+      // A card the Priority Cap keeps out (null entry) leaves the drill instead.
+      const entry = await buildDrillEntry(plugin, cardId, currentKbId, score);
+      const others = finalDrillIds.filter((item) => getCardId(item) !== cardId);
+      if (entry || others.length !== finalDrillIds.length) {
+        await plugin.storage.setSynced('finalDrillIds', entry ? [...others, entry] : others);
+      }
     } else if (score >= QueueInteractionScore.GOOD) {
       const filtered = finalDrillIds.filter((item) => getCardId(item) !== cardId);
       if (filtered.length !== finalDrillIds.length) {

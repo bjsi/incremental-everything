@@ -203,7 +203,7 @@ An IncRem with no cards is therefore never tagged `CardPriority` just because it
 ---
 
 ### Batch Priority Change (IncRems & Flashcards)
-**Access:** Document Menu (top right 3 dots) → "Batch Priority Change"
+**Access:** [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) (document ⋯ → **Incremental RemNote…**) → "Batch Priority Change"
 
 A powerful table view for unified priority management across an entire document tree.
 
@@ -211,7 +211,7 @@ A powerful table view for unified priority management across an entire document 
 *   **Bulk Operations:**
     *   **Increase/Decrease:** Adjust all selected priorities by a percentage.
     *   **Spread:** Distribute priorities evenly across a range (e.g., set selected items from 10 to 50).
-    *   **Set Fixed:** Set all selected items to a specific value.
+    *   **Adjust Proportionally:** Rescale the selected priorities into a new range, keeping their order and relative spacing.
 *   **Sorting/Filtering:** Sort by name, priority, next repetition date, etc. Filter by search text, type, or priority range.
 *   **Multi-Select Type Filter:** Hold `Cmd/Ctrl` while clicking in the "All Types" dropdown to instantly filter by multiple categories at once (e.g. showing only "Extracts" and items that "Has Cards").
 *   **Filter-Aware Bulk Actions:** When any filter is active (search, type, or priority range), bulk action buttons automatically adapt:
@@ -219,13 +219,23 @@ A powerful table view for unified priority management across an entire document 
     *   **Preview Filtered** — calculates new priorities only for the filtered subset, preserving existing calculations for items outside the filter.
     *   **Apply to Filtered** — applies changes exclusively to the filtered items.
     *   When no filters are active, buttons revert to their standard labels and affect all items as before.
+*   **Card sources:** each card priority shows where it comes from: **(man.)** manual, **(inc.)** from the Rem's Incremental priority, **(inh.)** inherited from an ancestor, **(def.)** the default setting.
+*   **Identifying cards:** each row shows the card as front → back, with its location (up to 5 ancestors) underneath. A table cell such as `[True/False]` is prefixed with its row. Hover a name for the full text.
+
+#### Portals and table views { #batch-priority-portals }
+
+**Include portals & table views** (on by default) also gathers the Rems a document shows through portals and table views, for example table flashcards brought into a study document. A filtered table view contributes only the rows its filters let through, plus their cells. These rows are marked **⧉**; hover the mark to see where the Rem actually lives.
+
+*   **Inherited and default priorities are included for these rows**, since the parent they follow usually lives outside the document. Changing one makes it **manual**, so it stops following its parent.
+*   **You confirm before that happens:** on apply, a dialog lists every card whose inherited or default priority would become manual, with where it lives and its current and new value. Use ←→ to choose and Enter to confirm, or Esc to cancel.
+*   Inside the document's own tree, inherited priorities are still left out: change the parent they inherit from instead.
 
 ![batch priority change widget](assets/batch-priority-change-widget-new.png){ width="900" }
 
 ---
 
 ### Batch Card Priority (Flashcards)
-**Access:** Focus on a Tag Rem → Document Menu → "Batch Assign Card Priority for tagged Rems"
+**Access:** Open the Tag Rem → [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) (document ⋯ → **Incremental RemNote…**) → "Batch Card Priority (tagged / referencing)"
 
 Designed specifically for **Flashcards**. You can now assign `CardPriority` to hundreds of rems at once, based on a tag.
 
@@ -342,7 +352,7 @@ The second phase works in reverse deliberately. Pushing from each Rem outward ma
 
 ## Sorting Criteria
 
-Accessed via the *three-dot menu in the top-right of the queue*, the **"Sorting Criteria"** popup lets you control the mix and order of cards in your review session.
+Accessed via the queue's ⋮ menu → **Incremental RemNote…** ([Menu Hub](Plugin-Widgets-Reference.md#menu-hub)), the **"Sorting Criteria"** popup lets you control the mix and order of cards in your review session.
 
 > [!NOTE]
 > **Knowledge Base Scope:** Your Sorting Criteria configurations are scoped to your active Knowledge Base. If you use multiple Knowledge Bases, you can maintain completely different sorting priorities and ratios for each one without interference. The name of the currently active Knowledge Base is displayed at the top of the popup as a reminder.
@@ -668,7 +678,9 @@ Hovering any cause — in the list above the table or in its column header — s
 
 Anything you have looked at can be marked **✓ checked**, which is remembered across devices, shown as a count next to each bucket's off-rem number, and can be filtered out of the list — so working through a few hundred Rems over several sittings picks up where you left off.
 
-**Paused decks must be scanned before they can be counted.** Pausing a deck does not clear its cards' `nextRepetitionTime`, so without the scan those cards read as *due* everywhere. Press **⏸ Scan paused decks** in the analytics tab (one pass over the knowledge base, then cached) and the `Paused` column fills in; until then the status bar says so in as many words rather than showing a confident zero.
+**With the [AI helper](Desktop-Helpers.md#search)** running and paired, **Compute** asks it for every card's cause instead of working them out Rem by Rem. The helper reads the switches RemNote keeps but never shows a plugin (a Rem's *Enable Cards* toggle, its directions, its switched-off clozes, whether it sits in a table), so causes are read as stored rather than inferred, paused decks need no scan, and the status bar adds *causes read by the AI helper*. The same causes can be searched in Find Rem with [`suppressed:`](Search-Engine.md#suppressed).
+
+**Without the helper, paused decks must be scanned before they can be counted.** Pausing a deck does not clear its cards' `nextRepetitionTime`, so without the scan those cards read as *due* everywhere. Press **⏸ Scan paused decks** in the analytics tab (one pass over the knowledge base, then cached) and the `Paused` column fills in; until then the status bar says so in as many words rather than showing a confident zero.
 
 #### FSRS Calibration { #fsrs-calibration }
 
@@ -767,7 +779,7 @@ W_A / W_B = e^(k × (p_B − p_A)/100)
 
 ###  Priority Shield History
 
-You can track your performance over time by accessing the **"Priority Shield History"** graph from the queue menu (the three-dot icon). This graph plots your daily shield values, helping you identify trends and adjust your workload or priorities accordingly.
+You can track your performance over time by accessing the **"Priority Shield History"** graph from the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub): the queue's ⋮ menu or a document's ⋯ menu → **Incremental RemNote…** → *Priority Shield History*. This graph plots your daily shield values, helping you identify trends and adjust your workload or priorities accordingly.
 
 Try it below with example data: hover a chart for its tooltip, drag across one to zoom, and switch between the two tabs.
 

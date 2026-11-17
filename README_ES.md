@@ -29,7 +29,7 @@ Un conjunto completo de herramientas de historial y práctica, ahora integrado e
 - **Historial de Rems Visitados**: vuelve de un salto a cualquier documento que hayas consultado recientemente.
 - **Historial de Tarjetas**: encuentra y abre cualquier tarjeta que hayas repasado, con búsqueda por el texto del anverso y del reverso.
 - **Panel de Colas Practicadas**: métricas de la sesión en tiempo real (velocidad, retención, antigüedad de las tarjetas) y un historial completo de cada sesión de práctica, con copia de seguridad mediante Exportar/Importar.
-- **Mastery Drill**: una cola de repráctica enfocada en las tarjetas que calificaste como *Forgot* u *Hard* — inspirada en el Final Drill de SuperMemo. Ábrela con el comando `Mastery Drill` o desde la notificación de la Barra Lateral Izquierda.
+- **[Mastery Drill](https://hugomarins.github.io/incremental-remnote/Mastery-Drill/)**: una cola de repráctica enfocada en las tarjetas que calificaste como *Forgot* u *Hard* — inspirada en el Final Drill de SuperMemo. Ábrela con el comando `Mastery Drill` o desde la notificación de la Barra Lateral Izquierda.
 
 👉 [Documentación completa](https://hugomarins.github.io/incremental-remnote/History-Queue-Dashboard-and-Mastery-Drill/)
 
@@ -51,6 +51,7 @@ Más allá del ciclo principal de aprendizaje, Incremental RemNote incluye **doc
 
 ### 🔌 Integraciones
 
+- **Chrome Companion**: Lee páginas web de forma incremental en Chrome. Selecciona texto para convertirlo en un Rem Incremental, ve tus extractos resaltados en la página y retoma donde dejaste de leer. [Instálalo desde la Chrome Web Store](https://chromewebstore.google.com/detail/incremental-remnote-compa/jdmbkbchgkfmipijdolpkhehjmehaagf) · [Más información](https://hugomarins.github.io/incremental-remnote/Chrome-Companion-Extension/)
 - **Logos Bible Software** *(macOS)*: Lee tus libros de Logos de forma incremental — importa libros, extrae pasajes y guarda marcadores con atajos pulsados en Logos. [Más información](https://hugomarins.github.io/incremental-remnote/Logos-Bible-Software-Integration/)
 
 ## Instalación
@@ -129,6 +130,18 @@ El complemento ahora cuenta con **Modo Ligero Automático**.
 ![Barra de herramientas de resaltado de PDF](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/pdfhighlight-toolbar.png)
 
 ![Resaltar](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
+
+#### 🌐 Páginas web en Chrome: el Companion
+
+Lee cualquier página web de forma incremental con **Incremental RemNote Companion**, una extensión de Chrome que abre RemNote en el panel lateral, junto a la página.
+
+- Selecciona texto en la página para convertirlo en un Rem Incremental, con una prioridad que escribes allí mismo. Las imágenes y el LaTeX se importan también.
+- Tus extractos quedan resaltados en la página, y un punto de lectura recuerda dónde te detuviste.
+- Importa los encabezados de la página como Rems anidados y registra el tiempo de lectura con el reloj del panel.
+
+**[Instálalo desde la Chrome Web Store](https://chromewebstore.google.com/detail/incremental-remnote-compa/jdmbkbchgkfmipijdolpkhehjmehaagf)** · 📖 [Chrome Companion en el Manual del Usuario](https://hugomarins.github.io/incremental-remnote/Chrome-Companion-Extension/)
+
+![Extractos marcados en azul en una página de Wikipedia, y el mismo texto en el panel del Companion con su imagen y LaTeX importados](https://hugomarins.github.io/incremental-remnote/assets/companion-assets/extracted-image-latex.png)
 
 ### Escritura Incremental
 

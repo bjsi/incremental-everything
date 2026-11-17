@@ -354,3 +354,63 @@ card does not un-practise it.
   greyed cloze and choose "Enable this card". Every surface that can report this state must say
   so rather than offering a button.
 - Note that re-enabling in bulk makes every affected card due immediately.
+
+## Deleted cards and their repetition history
+
+Established 2026-11-10 (desktop 1.28.6x) by deleting a Rem in a test KB and reading `remnote.db`
+before and after, plus the app bundle.
+
+- **Repetitions have no table of their own.** A card's whole history is the `h` array inside its
+  record in the `cards` table (`rId` → its Rem). No other table mentions the card id.
+- **Deleting the Rem moves the card, it doesn't orphan it.** The Rem goes to `deleted_quanta` and
+  each card to `deleted_cards`, as full records with `h` unchanged plus a `deletedAt` stamp. No
+  card stays in `cards` pointing at a missing Rem. Restoring from trash brings both back.
+- **The local trash empties itself after two weeks.** `runLazyOnBlurJobs` (runs when the app
+  loses focus) calls the `emptyTrashAfterTwoWeeks` step, which bulk-deletes every
+  `deleted_quanta`/`deleted_cards` row whose `deletedAt` is more than two weeks old. Confirmed
+  in data: the main KB's trash never reaches back further than ~14–17 days (Oct 26 backup:
+  oldest Oct 9; Nov 10: oldest Oct 27, the Oct 9–26 rows gone). The manual "Clear Trash"
+  (optionally "older than N days") does the same now. In a synced KB it calls the server's
+  `/trash/clear`; what the server keeps on its own is unknown and unreachable for a plugin.
+- **Consequence for statistics:** the plugin API sees only live cards, so a deleted card's reps
+  are invisible to it at once, and gone from the local DB two weeks later. Long-span counts
+  (reps, time spent per day/week) that must survive deletion have to be recorded by the
+  plugin itself as the reps happen.
+- **No plugin route into the trash.** The SDK has no trash or deleted-record call. In the host,
+  the deleted stores are read only by the Trash screen (`getDeletedDatabaseStore`) and the
+  purge jobs, and the bridge's lookups use the live store. Verified: an MCP
+  `read_docs_raw` of the deleted Rem's id returned nothing, just its parent. Reading
+  `remnote.db` read-only from outside the app is the only way in.
+- **A deleted IncRem goes the same way.** Its slots (`repHist`, priority, dates; inline `bpc`
+  or `ps`, slot child Rems with it) stay in its `deleted_quanta` row for the same two weeks. The
+  plugin's own IncRem cache drops the Rem on deletion. Dismissing keeps the history
+  (`dismissedHistory`); deleting doesn't.
+- **A card that is no longer generated is never trashed if it has history.** Measured 2026-11-10:
+  removing both spans of a cloze (card `s8JJop1pcbCYj0zYj`, 9 reps) left the card in `cards` with
+  `h` byte-identical. RemNote only cleared `a` (ACTIVE_NEXT_TIME) and `d`
+  (DOESNT_REQUIRE_INTERNET_ACTIVE_NEXT_TIME) and set **`b` = `NO_LONGER_NEEDED`** (field map in
+  the bundle: `CARD_TYPE:"c", NEXT_TIME:"n", ACTIVE_NEXT_TIME:"a", HISTORY:"h", NO_LONGER_NEEDED:"b",
+  NOT_YET_LEARNED:"ny"`…). The bundle's card regeneration does
+  `history.length > 0 || stillPossibleType ? set b=true : card.remove()`, so only a card that was
+  **never practiced** goes to `deleted_cards` and the two-week purge. Only the same cloze id
+  brings the old card back (the code clears `b` for a type the Rem generates again, which is
+  what an undo would do; not tested). **Re-clozing the same text by hand does not:** measured
+  2026-11-10, it got a new cloze id (`36035210260199513`) and a new card (`qkppjHCkWLoj5OCQx`,
+  0 reps, due now), while the old card kept its 9 reps under `b`. So the scheduler restarts the
+  cloze from scratch, and the Rem keeps two cloze records for the same text. Along the way,
+  clozing the second span on its own made a third card (`ZQcm8eJepXu5SF3iL`). Once that span
+  joined the first cloze, the card was no longer needed and had no history, so RemNote removed
+  it to `deleted_cards` 2.6 s after creating it. That's the other branch of the rule. These
+  cards are still in `card.getAll()` (see "per-card cloze states" above), so the dashboard
+  already counts their reps. They leave `cards` only when their Rem is deleted.
+- A disabled direction is different: its record stays in `cards` with its history, just not
+  returned by `getCards()` (see above).
+
+## Resetting a card: card level vs bullet level
+
+RemNote has two reset methods, and only one of them is per card (checked in 1.30.2-beta):
+
+- **`Card.resetRepetitionHistory()`** adds one entry `{score: 3 /* RESET */, responseTime: 0, revealTime: 0, isCram: false, metadata: {}}` to that card's history. It skips the write if the last entry is already a RESET. Past repetitions stay. The scheduler restarts from the entry after the last RESET, so the card is New again.
+- **`Rem.resetRepetitionHistory()`** calls the card method on **every** card of the Rem (`getCards({ignorePausing: true, includeDisabled: true})`). The `/srs` dialog's **Reset SRS Data**, the "Reset Flashcards for Bullet" command and its "…and All Descendants" variant all go through this one. So the dialog resets every cloze even when only one card is ticked: [support report](support-reports/REMNOTE_SUPPORT_REPORT_edit_srs_reset_ignores_card_selection.md).
+
+**From a plugin:** `card.updateCardRepetitionStatus(QueueInteractionScore.RESET)` gives the per-card behaviour. The bridge handler validates the score with `z.nativeEnum(QueueInteractionScore)`, looks up that one card, and calls `card.updateCardRepetitionStatus({q: rem}, 3, 0, 0, false, undefined, {}, false)`, which appends to that card's history only. Unlike the native method it has no guard against a second RESET in a row, so check the last entry first. The flashcard history widget's **⟲ Reset SRS** button does this.

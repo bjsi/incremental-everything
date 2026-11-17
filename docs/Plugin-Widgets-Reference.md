@@ -54,19 +54,24 @@ Unlike the *Card Info Bar*, which in the Compact queue lives at the bottom of fl
 
 #### In the Beautiful queue variant { #beautiful-queue-variant }
 
-In RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) the badge sits in the **top-right corner of the card**, in the blank space above the breadcrumbs, rather than in the top bar — the card layout itself is unchanged. The *No Inc Rem* countdown moves there with it. Switching back to *Compact* returns both to the toolbar.
+In RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) the badge sits in the **top-right corner of the window**, among the queue's own buttons, with the *No Inc Rem* countdown beside it while a timer runs. It is the same widget as in the *Compact* top bar.
 
-The corner area is only as wide as what it shows: the badge, or the badge and the countdown while a *No Inc Rem* timer runs. Clicks beside it reach the card, and the [regular-queue Mastery Drill's bar](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill) keeps its buttons clear of it.
+**On a phone** RemNote's Beautiful queue has no room for toolbar widgets and shows none, so the badge is not there; the [Card Info Bar](#11-card-info-bar) shows a flashcard's priority, and the answer bar an Incremental Rem's. In the Compact queue on a phone the badge stays in the top bar for flashcards and is left out for Incremental Rems.
 
 
 ### 1.3. Answer Buttons Info Bar
 *(Incremental Rems only)*
-An info bar shown below the answer buttons when reviewing an Incremental Rem in the queue. It displays review stats, the [Priority Shield](Prioritization-&-Sorting.md#priority-shield) counter, and a **📊** button to open the [IncRem Repetition History](Repetition-History-and-Statistics.md).
+An info bar shown below the answer buttons when reviewing an Incremental Rem in the queue. It displays the priority, the [Priority Shield](Prioritization-&-Sorting.md#priority-shield) and Weighted Shield, and the repetitions and time spent; click those (or the bars icon beside them) to open the [IncRem Repetition History](Repetition-History-and-Statistics.md).
 
-![Answer Buttons Info Bar](assets/reps-info-bar.png){ width="600" }
+![The answer buttons and, below them, the info bar: priority, Priority Shield, Weighted Shield, repetitions](assets/answer-bar-desktop.png#only-light){ width="900" }
+![The answer buttons and, below them, the info bar: priority, Priority Shield, Weighted Shield, repetitions](assets/answer-bar-desktop-dark.png#only-dark){ width="900" }
+
+On a phone, or in a pane narrower than 520 px, the bar and the answer buttons above it take a [compact form](Reviewing-Items-in-the-Queue.md#the-answer-buttons): one row of icon buttons and one line of figures.
 
 ### 1.4. Document Notes Sidebar
 *(PDF and HTML Incremental Rems, including PDF/HTML Highlights)*
+
+> A plain Rem-type Incremental Rem (a text extract) is edited over its queue card with **✎ Edit**, not here: see [the editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor). **Sidebar →** on that card opens it in this sidebar when you prefer; while the editor over the card is open on a Rem, this sidebar shows a note instead of a second copy of the same page.
 
 When reviewing a PDF or HTML Incremental Rem, you can click the **📝 Document Notes** icon in the document's top bar (next to the breadcrumbs) to open the current document's Rem in the Right Sidebar. 
 
@@ -113,7 +118,8 @@ Each card's section also carries its [Forgetting Curve](Reviewing-Items-in-the-Q
 - **Card identifiers** — `Forward Card (…)` and `Backward Card (…)` show the side the card asks; `Cloze (…)` shows the clozed words themselves. Rem references inside the text resolve to `[the referenced Rem]` and reference pins to 📌, so a cloze over a reference reads `Cloze (a [Carena])` rather than losing the word that identifies it.
 - **Collapsed** — the four tiles from RemNote's panel: **Next Practice**, **Last Practiced**, **Repetitions** (lapses in red, retention underneath) and **Time Spent**.
 - **Expanded** — the full analytics below.
-- Sections start **collapsed** when the Rem has more than one card, except the card you were reviewing (badged `IN QUEUE`); a single-card Rem opens straight into its table. **Expand all / Collapse all** is in the header, and `↑`/`↓` walk the sections with `Enter` to open the selected one.
+- Sections start **collapsed** when the Rem has more than one card, except the card you were reviewing (badged `IN QUEUE`); a single-card Rem opens straight into its table.
+- **Badges** — `NEW` on a card never practised, or with nothing graded since its last reset; `STALE` on a card overdue by more than twice its last interval. **Expand all / Collapse all** is in the header, and `↑`/`↓` walk the sections with `Enter` to open the selected one.
 
 **Per-card analytics** *(expanded)*:
 
@@ -135,6 +141,12 @@ Three things to know about the figures:
 - **It cannot be backdated.** Unlike the IncRem popup's [➕ Session](#recording-and-correcting-records), the SDK takes a grade and nothing else, so the repetition is dated *now*. The panel says so.
 - **The intervals are a projection, not a promise.** They come from this plugin's FSRS model and your configured weights; RemNote's own scheduler decides the date it writes, and the two can differ for the same reasons the *Optimum Next repetition date* line above already lists — a non-FSRS scheduler, different weights, fuzz, load balancing.
 - **Again † is where FSRS *resumes*, not what you will see next.** If your scheduler has **Relearning Phase Steps** set (Settings → Schedulers → Relearning Phase, e.g. `1h`), RemNote walks those steps first. They are extra repetitions that confirm you have relearnt the card, and the scheduler does not count them — so a card whose Again projection reads `6w` is shown by RemNote's own **Forgot** button as `1 hour`. Both are right, a relearning step apart.
+
+##### Reset one card { #reset-srs }
+
+**⟲ Reset SRS** *(beside ➕ Repetition)*: restarts **this card only** as a new card. Click once to arm it, then click again to confirm (Esc or clicking elsewhere cancels). Past repetitions stay in the table; the schedule restarts from the reset, and the card shows the `NEW` badge.
+
+Use it when only one cloze of a bullet needs relearning. RemNote's own reset (`/srs` → **Reset SRS Data**, or **Reset Flashcards for Bullet**) always resets **every** card of the bullet, even if you tick a single cloze in the `/srs` dialog.
 
 **🎚 Card Priority History** *(footer)* — every priority this Rem has held, newest first, with the change (`60 → 45`), the gesture behind it and the source recorded alongside. Rem-level rather than per-card, because the `cardPriority` powerup tags the Rem and all its cards share the value. See [Priority history](Priorities-for-Flashcards.md#priority-history) for what is recorded and how bursts are collapsed.
 
@@ -235,6 +247,7 @@ A chronological log of the Rems you have navigated to in the Editor. Helps you q
 - Searchable by text content with multi-word query support.
 - Each entry can be expanded and edited inline in the sidebar.
 - Click an entry to open the Rem; **Shift+click** opens it in a new pane beside your current document.
+- An Incremental Rem, or a Rem with its own card priority, shows a **priority badge**. Click it to edit the priority with an inline slider.
 
 📖 **Full documentation:** [Visited Rem History](History-Queue-Dashboard-and-Mastery-Drill.md#visited-rem-history)
 
@@ -291,7 +304,7 @@ A zero-lag alternative that opens instantly by skipping expensive KB-wide calcul
 ![Light Priority Widget](assets/light-priority-widget.png){ width="400" }
 
 ### 3.3. Priority & Interval Popup
-**Triggered by:** Extract with Priority (`Opt+Shift+X`), Create Incremental Rem (PDF/web highlight menu), Toggle Incremental Rem (document menu)
+**Triggered by:** Extract with Priority (`Opt+Shift+X`), Create Incremental Rem (PDF/web highlight menu), Make Incremental Rem ([Menu Hub](#menu-hub))
 
 A combined popup that appears automatically when a new Incremental Rem is created, letting you set both its **priority** and its **first review interval** in a single step.
 
@@ -314,7 +327,7 @@ A combined popup that appears automatically when a new Incremental Rem is create
 
 ### 3.4. Sorting Criteria Menu
 
-**Access:** Three-dot menu in the top-right corner of the queue (or using the `Sorting Criteria` command)
+**Access:** [Menu Hub](#menu-hub) from the queue's ⋮ menu → **Incremental RemNote…** (or the `Sorting Criteria` command)
 
 Controls three aspects of your queue algorithm: **IncRem Randomness** (how strictly the queue follows priority order), **Flashcard Randomness** (used when the [Priority Queue](Priority-Review-Document.md) is refilled), and **Flashcard Ratio** (the balance between flashcards and IncRems per session).
 
@@ -403,7 +416,7 @@ The same graph sits at the top of every [Priority Queue](Priority-Review-Documen
 📖 **Full documentation:** [IncRem List & Main View — Priority Distribution Graphs](IncRem-List-and-Main-View.md#priority-distribution-graphs)
 
 ### 4.4. Priority Shield Graph
-**Access:** Three-dot menu in the queue → "Priority Shield History", or the `Open Priority Shield Graph` command
+**Access:** [Menu Hub](#menu-hub) (the queue's ⋮ menu or a document's ⋯ menu → **Incremental RemNote…**) → "Priority Shield History", or the `Open Priority Shield Graph` command
 
 Plots your daily [Priority Shield](Prioritization-&-Sorting.md#priority-shield) values over time, helping you identify trends in your capacity to process high-priority material.
 
@@ -475,7 +488,7 @@ Lets you manually override the next review date, adjust priority and choose the 
 ### 6.2. Parent Selector
 **Access:** Highlight text in a PDF or web page → click the puzzle piece icon → "Create Incremental Rem"
 
-A hierarchical tree selector that lets you choose where to place a new extract. Supports keyboard navigation (arrow keys, Enter to select), inline child creation via the `+` button, and automatic priority inheritance from the chosen parent. Expanded branches show **H1–H6 badges** and can list headings first or filter down to headings only; `L` reselects the last/suggested destination. `E` (**📍 Pick in editor**) closes the list and opens a small floating card instead, so you can [pick the parent in the editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) and confirm with `Opt+Shift+Enter`. The popup's height follows your screen size.
+A hierarchical tree selector that lets you choose where to place a new extract. Supports keyboard navigation (arrow keys, Enter to select), inline child creation via the `+` button, and automatic priority inheritance from the chosen parent. Expanded branches show **H1–H6 badges** and can list headings first or filter down to headings only; `L` reselects the last/suggested destination, and with a [corpus provider](Corpus-Provider.md) the section of your notes the highlight comes from is suggested (📚, `S` to go to it). `E` (**📍 Pick in editor**) closes the list and opens a small floating card instead, so you can [pick the parent in the editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) and confirm with `Opt+Shift+Enter`. The popup's height follows your screen size.
 
 ![Creat Inc Rem parent selection](assets/uploaded/9cbcdd80-b782-4dcc-b033-cda82fc91be8.gif)
 
@@ -652,7 +665,7 @@ Two stages, like the Empty Extra Card Detail popup and for the same reason: the 
 ---
 
 ### 6.13. Card Enablement Audit Popup
-**Trigger:** `Audit Card Enablement (tagged / referencing / descendants)` command, or the **Document Menu** (⋯) of any Rem
+**Trigger:** `Audit Card Enablement (tagged / referencing / descendants)` command, or the [Menu Hub](#menu-hub) of any document
 
 Finds the Rems in an anchor's orbit that generate no flashcards, and fixes the two states a flag can fix.
 
@@ -667,7 +680,7 @@ Finds the Rems in an anchor's orbit that generate no flashcards, and fixes the t
 📖 **Full documentation:** [Card Enablement Audit](Utilities-Cleaning-Up.md#card-enablement-audit)
 
 ### 6.14. Priority Queue Popup
-**Trigger:** `Priority Queue` command (quick code `prq`, `Opt+Shift+L` / `Alt+Shift+L`), the **Document Menu** (⋯) of any document, the queue's ⋮ menu, or the **Priority Queue** button of the panel
+**Trigger:** `Priority Queue` command (quick code `prq`, `Opt+Shift+L` / `Alt+Shift+L`), the [Menu Hub](#menu-hub) of a document or of the queue, or the **Priority Queue** button of the panel
 
 The front door to the persistent review document, one per scope.
 
@@ -703,6 +716,42 @@ Lists websites with their Incremental and Dismissed counts, then the Rems of the
 
 📖 **Full documentation:** [Incremental Rems by Website](Utilities-Finding-and-Navigating.md#incremental-rems-by-website)
 
+### 6.18. Menu Hub { #menu-hub }
+**Trigger:** **Incremental RemNote…** in a document's ⋯ menu (top right of the document), or in the queue's ⋮ menu.
+
+RemNote can't group a plugin's entries under one submenu, so the plugin puts a single **Incremental RemNote…** entry in each menu. It opens this panel just below the menu's button, listing all the plugin's actions for that menu.
+
+Try it below: switch between the two menus, open one, and pick **Incremental RemNote…**; then use the mouse or the keys. *(A mock: a line under it says what each action would open.)*
+
+<iframe src="../demos/menu-hub.html" title="Menu Hub demo" loading="lazy" style="width:100%;height:620px;border:0;display:block"></iframe>
+
+**From a document's ⋯ menu**, the header names the document, and the actions act on it:
+
+| Group | Actions |
+|---|---|
+| Incremental Rem | Make Incremental Rem / Remove Incremental Rem tag |
+| Priority | Set Priority, [Batch Priority Change](Prioritization-&-Sorting.md#batch-priority-change-increms-flashcards), [Batch Card Priority (tagged / referencing)](Prioritization-&-Sorting.md#batch-card-priority-flashcards) |
+| Queue | [Priority Queue](#614-priority-queue-popup) |
+| PDF | [PDF Control Panel](PDF-Incremental-Reading-Workflow.md#3-pdf-control-panel) |
+| Statistics | [Priority Shield History](#44-priority-shield-graph), [Study Dashboard](Study-Dashboard.md#opening-it) (opens in Document mode on this document) |
+| Flashcards | [Audit Card Enablement](#613-card-enablement-audit-popup) |
+| Audio | [Audio Playlist (this document)](Audio-Playlist.md), [Audio Playlist (rems tagged with this)](Audio-Playlist.md#start) |
+
+**From the queue's ⋮ menu**, the header names the queue's scope, and the actions act on that queue:
+
+| Group | Actions |
+|---|---|
+| This queue | [Priority Queue](#614-priority-queue-popup), [Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria) |
+| Statistics | [Priority Shield History](#44-priority-shield-graph), [Study Dashboard](Study-Dashboard.md#opening-it) (opens in Document mode on the queue's document or folder) |
+| Incremental Rems | [No Inc Rems for 15 min](Plugin-Commands-Reference.md#queue-menu-actions), [Disable / Enable Inc Rems on this device](Plugin-Commands-Reference.md#queue-menu-actions) |
+
+**Using it:**
+
+- `↑`/`↓` move, `Enter` runs the selected action, a number key runs that action directly (the first nine), `Esc` closes. A click works too.
+- The panel closes once the action has run.
+- While open, it follows you: it switches to the queue actions when you enter the queue, and to the document actions for the focused pane's document when you leave it.
+- Drag it by its header to move it.
+
 ## 7. Mastery Drill
 
 ### 7.1. Mastery Drill Popup
@@ -715,10 +764,10 @@ A focused sub-queue of flashcards rated *Forgot* or *Hard*, designed for deliber
 - Includes a built-in editor UI: **Edit Later** (defers editing via the Edit Later powerup), **Go to Rem**, and **Edit Previous** buttons.
 - **Old Items Warning**: cards lingering past the configured threshold (default 7 days) are flagged; clear them with a single click.
 - **Clear Queue**: empty the entire drill at any time.
-- **List Cards**: lists every card in the drill with a status saying whether RemNote can still show it, and removes the ones it cannot. See [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list).
-- **In the regular queue**, the drill bar under the queue's top bar carries the same queue tools (counts, List Cards, Clear Queue, Clear Low Priority, Clear Old, Remove from Drill), without the per-card editing buttons. See [The regular-queue drill](History-Queue-Dashboard-and-Mastery-Drill.md#regular-queue-drill).
+- **List Cards**: lists every card in the drill with a status saying whether RemNote can still show it, and removes the ones it cannot. See [Card List](Mastery-Drill.md#card-list).
+- **In the regular queue**, the drill bar under the queue's top bar carries the same queue tools (counts, List Cards, Clear Queue, Clear Low Priority, Clear Old, Remove from Drill), without the per-card editing buttons. See [The regular-queue drill](Mastery-Drill.md#regular-queue-drill).
 
-📖 **Full documentation:** [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
+📖 **Full documentation:** [Mastery Drill](Mastery-Drill.md)
 
 ![Mastery Drill](assets/uploaded/f69a4d_final-drill.png){ width="900" }
 
@@ -730,12 +779,12 @@ A focused sub-queue of flashcards rated *Forgot* or *Hard*, designed for deliber
 A periodic notification widget that appears in the Left Sidebar End when ≥ 10 cards are pending in the Mastery Drill queue.
 
 - Shows the count of pending cards with a rotating motivational phrase.
-- **Start Drill** button opens the Mastery Drill, in the popup or the regular queue per [Where the Drill Runs](History-Queue-Dashboard-and-Mastery-Drill.md#where-the-drill-runs).
+- **Start Drill** button opens the Mastery Drill, in the popup or the regular queue per [Where the Drill Runs](Mastery-Drill.md#where-the-drill-runs).
 - Dismiss button hides the notification; it reappears automatically every 2 hours.
 - Can be disabled entirely via the `Disable Mastery Drill Notification` setting.
 - Not rendered while the [Incremental RemNote Panel](Getting-Started.md#collapsed-panel) is collapsed — the panel's 🎯 icon carries the drill and its count instead.
 
-📖 **Full documentation:** [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
+📖 **Full documentation:** [Mastery Drill](Mastery-Drill.md)
 
 ![Mastery Drill Notification](assets/drill-notification.png){ width="350" }
 
@@ -746,7 +795,7 @@ A periodic notification widget that appears in the Left Sidebar End when ≥ 10 
 
 Shown only while the Mastery Drill runs in the regular queue. **Remove from Drill** takes the card on screen out of the drill; **Card List** opens the card list below. When RemNote hides drill cards ("Time to Take a Break"), the drill presses **Keep Practicing** itself; if that fails, the bar says to press it (or **Esc**).
 
-📖 **Full documentation:** [Where the Drill Runs](History-Queue-Dashboard-and-Mastery-Drill.md#where-the-drill-runs)
+📖 **Full documentation:** [Where the Drill Runs](Mastery-Drill.md#where-the-drill-runs)
 
 ![The Mastery Drill running in the regular queue: the queue titled "Mastery Drill" with 12 cards left, the drill bar above the card with Remove from Drill, Card List and the note that RemNote hid some drill cards, the card info bar with priority and FSRS figures under the cloze, and the Queue Dashboard on the right recording a Mastery Drill session with the card's forgetting curve](assets/native-drill.png){ width="900" }
 
@@ -755,5 +804,5 @@ Shown only while the Mastery Drill runs in the regular queue. **Remove from Dril
 ### 7.4. Mastery Drill Card List
 *(Popup)*
 
-The [Card List](History-Queue-Dashboard-and-Mastery-Drill.md#card-list) of the popup drill, in a popup of its own, for the regular-queue drill.
+The [Card List](Mastery-Drill.md#card-list) of the popup drill, in a popup of its own, for the regular-queue drill.
 

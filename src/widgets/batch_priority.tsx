@@ -5,6 +5,7 @@ import {
   useTrackerPlugin,
   PluginRem,
   RNPlugin,
+  RemType,
 } from '@remnote/plugin-sdk';
 import { withHoverTips } from '../components/HoverTipLayer';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -23,6 +24,8 @@ import { updateIncrementalRemCache, writeIncRemCaches } from '../lib/incremental
 import { calculateRelativePercentile } from '../lib/utils';
 import { remToActionItemType } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
+import { gatherPortalIncludedRems, PortalIncludedRem } from '../lib/scope_helpers';
 import dayjs from 'dayjs';
 import { priorityColor, usePriorityColorScale } from '../components/priorityColor';
 
@@ -53,7 +56,44 @@ interface PrioritizedItemData {
   incPercentile: number | null;
   cardPercentile: number | null;
   originalIndex: number;
+  /** Shown in the document through a portal or table view; it lives elsewhere. */
+  viaPortal: boolean;
+  /** Name of the rem's real parent — where a portal row actually lives. */
+  homeName: string | null;
+  /** Up to 5 ancestors above the rem, "A › B › C" — as in Batch Card Priority Assignment. */
+  breadcrumb: string;
+  /**
+   * Full text of the parent for a descriptor/slot rem (a table cell such as
+   * "[True/False]"), whose own text says nothing about what the card asks.
+   */
+  descriptorParent: string | null;
 }
+
+/** Ancestors shown in a row's breadcrumb, as in Batch Card Priority Assignment. */
+const MAX_BREADCRUMB_DEPTH = 5;
+/** Per-level cap in the breadcrumb, so one long ancestor does not hide the rest. */
+const BREADCRUMB_LABEL_MAX = 40;
+
+/** Everything needed to recognise the card on hover: parent (for slots), front → back, location. */
+function rowTooltip(r: PrioritizedItemData): string {
+  const lines: string[] = [];
+  if (r.descriptorParent) lines.push(`Parent: ${r.descriptorParent}`);
+  lines.push(r.name);
+  if (r.breadcrumb) lines.push(`In: ${r.breadcrumb}`);
+  if (r.viaPortal) lines.push('Shown here through a portal or table view');
+  return lines.join('\n');
+}
+
+/** Card priority sources that are derived, not owned: they follow an ancestor or the default setting. */
+const isDerivedCardSource = (source: string | null) => source === 'inherited' || source === 'default';
+
+/** Every card source is labelled, so a manual priority is never mistaken for a default one. */
+const CARD_SOURCE_LABELS: Record<string, { short: string; tip: string }> = {
+  manual: { short: 'man.', tip: 'Manual priority — set on this rem' },
+  incremental: { short: 'inc.', tip: 'Incremental priority — follows this rem\'s Incremental Rem priority' },
+  inherited: { short: 'inh.', tip: 'Inherited priority — follows an ancestor; becomes manual if changed' },
+  default: { short: 'def.', tip: 'Default priority — from the default setting; becomes manual if changed' },
+};
 
 function BatchPriority() {
   const colorScale = usePriorityColorScale();
@@ -85,6 +125,7 @@ function BatchPriority() {
   const [incrementalRems, setIncrementalRems] = useState<PrioritizedItemData[]>([]);
   const [filteredRems, setFilteredRems] = useState<PrioritizedItemData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState('Loading Incremental Rems and flashcards…');
   const [operation, setOperation] = useState<OperationType>('increase');
   const [changePercent, setChangePercent] = useState(50);
   const [decreasePercent, setDecreasePercent] = useState(150); // Separate state for decrease
@@ -107,6 +148,18 @@ function BatchPriority() {
   const [totalToApply, setTotalToApply] = useState(0);
   const [previousStates, setPreviousStates] = useState<PrioritizedItemData[][]>([]);
   const isApplyingRef = useRef(false);
+  // Each load bumps this; an older load still in flight sees the mismatch and
+  // stops. The load re-runs on every IncRem/card cache update, and without this
+  // several full walks ran side by side.
+  const loadGenRef = useRef(0);
+  // Portals and table views show rems that live elsewhere (imported table
+  // flashcards, for example), so a descendants walk never reaches them.
+  const [includePortals, setIncludePortals] = useState(true);
+  // Derived (inherited/default) card priorities about to become manual — the
+  // confirmation step shown before applying.
+  const [pendingConversions, setPendingConversions] = useState<PrioritizedItemData[] | null>(null);
+  const [confirmFocus, setConfirmFocus] = useState<'cancel' | 'confirm'>('cancel');
+  const confirmRef = useRef<HTMLDivElement>(null);
 
   // Cached refs for freezing reactive hooks during batch apply
   const cachedIncRemsRef = useRef<IncrementalRem[] | null>(null);
@@ -151,6 +204,8 @@ function BatchPriority() {
 
   // Load incremental rems in the focused rem's hierarchy
   useEffect(() => {
+    const gen = ++loadGenRef.current;
+    const isStale = () => gen !== loadGenRef.current;
     const loadIncrementalRems = async () => {
       // Skip reload if we are mid-apply — the cache update triggers this effect
       // but we want to keep showing the progress bar, not reset to loading.
@@ -187,6 +242,7 @@ function BatchPriority() {
         console.log('   - Rem text:', focusedRemText);
 
         // Get all descendants of the focused rem first
+        setLoadingStatus('Gathering the rem and its descendants…');
         console.log('🌳 BatchPriority: Getting all descendants...');
         const allDescendants = await focusedRem.getDescendants();
         console.log('   - Found', allDescendants.length, 'descendants');
@@ -201,11 +257,79 @@ function BatchPriority() {
         const remIndexMap = new Map<string, number>();
         allRemsToCheck.forEach((r, i) => remIndexMap.set(r._id, i));
 
+        const cardInfoById = new Map<string, CardPriorityInfo>();
+        if (Array.isArray(allCardInfos)) {
+          for (const ci of allCardInfos) cardInfoById.set(ci.remId, ci);
+        }
+
+        // Rems the document shows through portals and table views (filtered
+        // table rows included, with their cells). They sort right after the
+        // portal that shows them.
+        let portalItems: PortalIncludedRem[] = [];
+        if (includePortals) {
+          setLoadingStatus('Gathering rems shown through portals and table views…');
+          console.log('🪟 BatchPriority: Gathering portal and table-view rems...');
+          portalItems = await gatherPortalIncludedRems(focusedRem, allRemsToCheck, isStale);
+          if (isStale()) return;
+          console.log('   - Found', portalItems.length, 'rems through portals');
+
+          // Only an IncRem or a rem the card-priority cache knows (it holds every
+          // rem with cards or a Card Priority tag) can qualify, so skip the
+          // per-rem lookups for the rest — portal rows can number in thousands.
+          if (Array.isArray(allIncrementalRems) && Array.isArray(allCardInfos)) {
+            const incRemIds = new Set(allIncrementalRems.map(r => r.remId));
+            const before = portalItems.length;
+            portalItems = portalItems.filter(p => incRemIds.has(p.rem._id) || cardInfoById.has(p.rem._id));
+            console.log(`   - ${portalItems.length} of ${before} portal rems are IncRems or have card priorities`);
+          }
+        }
+        const candidates: { rem: PluginRem; portal: PortalIncludedRem | null; index: number }[] =
+          allRemsToCheck.map((rem, i) => ({ rem, portal: null, index: i }));
+        portalItems.forEach((item, seq) => {
+          const anchor = (item.anchorId !== null ? remIndexMap.get(item.anchorId) : undefined) ?? allRemsToCheck.length;
+          candidates.push({ rem: item.rem, portal: item, index: anchor + (seq + 1) / (portalItems.length + 1) });
+        });
+        // Ancestors are shared by many rows (every cell of a row, every row of a
+        // table), so each is fetched and resolved once per load.
+        const ancestorCache = new Map<string, Promise<{ label: string; parent: string | null } | null>>();
+        const ancestor = (id: string) => {
+          if (!ancestorCache.has(id)) {
+            ancestorCache.set(id, (async () => {
+              const r = await plugin.rem.findOne(id);
+              if (!r) return null;
+              return { label: await resolveRemTextForBreadcrumb(plugin, r.text), parent: r.parent ?? null };
+            })());
+          }
+          return ancestorCache.get(id)!;
+        };
+        const parentName = async (parentId: string | null | undefined) =>
+          parentId ? (await ancestor(parentId))?.label ?? null : null;
+        const breadcrumbOf = async (rem: PluginRem) => {
+          const parts: string[] = [];
+          let id = rem.parent ?? null;
+          for (let i = 0; i < MAX_BREADCRUMB_DEPTH && id; i++) {
+            const a = await ancestor(id);
+            if (!a) break;
+            parts.unshift(a.label.length > BREADCRUMB_LABEL_MAX ? a.label.substring(0, BREADCRUMB_LABEL_MAX) + '…' : a.label);
+            id = a.parent;
+          }
+          return parts.join(' › ');
+        };
+
         // Check each rem for prioritized items - process ALL rems in the hierarchy
         console.log('🔎 BatchPriority: Checking each rem for prioritized items...');
+        const checkLabel = (done: number) =>
+          `Checking ${candidates.length.toLocaleString()} rems for Incremental Rems and flashcard priorities… ` +
+          `(${done.toLocaleString()}/${candidates.length.toLocaleString()})`;
+        setLoadingStatus(checkLabel(0));
+        const statusStep = Math.max(50, Math.floor(candidates.length / 20));
+        let checked = 0;
 
-        for (const rem of allRemsToCheck) {
+        for (const { rem, portal, index } of candidates) {
+          if (isStale()) return;
+          if (++checked % statusStep === 0) setLoadingStatus(checkLabel(checked));
           try {
+            const viaPortal = portal !== null;
             const hasIncremental = await rem.hasPowerup(powerupCode);
             const hasCardPriorityPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
 
@@ -213,19 +337,35 @@ function BatchPriority() {
             let cardPrioritySource: string | null = null;
             let currentCardPriority: number | null = null;
 
+            // Inside the document's own tree a derived (inherited/default) card
+            // priority follows an ancestor, so changing the ancestor is the way to
+            // move it. A portal row's ancestors usually are not in this document,
+            // so for rows WITH cards the derived value is offered too — it turns
+            // into a manual one if changed (confirmed before applying).
+            const derivedCardInfo = viaPortal ? cardInfoById.get(rem._id) : undefined;
+            const derivedHasCards = !!derivedCardInfo && derivedCardInfo.cardCount > 0;
+
             if (hasCardPriorityPowerup) {
               const sourceStr = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-              if (sourceStr === 'manual' || sourceStr === 'incremental') {
+              if (
+                sourceStr === 'manual' || sourceStr === 'incremental' ||
+                (derivedHasCards && isDerivedCardSource(sourceStr))
+              ) {
                 hasValidCardPriority = true;
                 cardPrioritySource = sourceStr;
                 const priorityStr = await getRawCardPriorityString(rem);
                 currentCardPriority = parseInt(priorityStr);
-                if (isNaN(currentCardPriority)) currentCardPriority = 50;
+                if (isNaN(currentCardPriority)) currentCardPriority = derivedCardInfo?.priority ?? 50;
               }
+            } else if (derivedHasCards && isDerivedCardSource(derivedCardInfo!.source)) {
+              // Untagged rem with cards: its priority is resolved on the fly
+              // (ancestor or default setting) and lives only in the cache.
+              hasValidCardPriority = true;
+              cardPrioritySource = derivedCardInfo!.source;
+              currentCardPriority = derivedCardInfo!.priority;
             }
 
             if (hasIncremental || hasValidCardPriority) {
-              console.log(`   ✓ Found prioritized rem:`, rem._id);
 
               let currentIncPriority = null;
               let nextRepDate = 0;
@@ -247,16 +387,33 @@ function BatchPriority() {
                 }
               }
 
-              const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled';
+              // Front → back, as in Batch Card Priority Assignment: a cell's front
+              // ("[True/False]") is only the column; the answer is in its back.
+              const front = await resolveRemTextForBreadcrumb(plugin, rem.text);
+              const backLabel = rem.backText?.length ? await resolveRemTextForBreadcrumb(plugin, rem.backText) : '';
+              const back = backLabel === 'Untitled' ? '' : backLabel;
+              const remText = back ? `${front} → ${back}` : front;
+              const isDescriptor = rem.type === RemType.DESCRIPTOR;
 
-              // Calculate depth and path for hierarchy display
-              const { path, pathIds } = await getRemPathWithIds(plugin, rem, focusedRemId);
-              const depth = rem._id === focusedRemId ? 0 : path.length - 1;
+              // Calculate depth and path for hierarchy display. A portal rem hangs
+              // off the focused rem at depth 1, with its own subtree nested below.
+              let path: string[];
+              let pathIds: string[];
+              let depth: number;
+              if (!portal) {
+                ({ path, pathIds } = await getRemPathWithIds(plugin, rem, focusedRemId));
+                depth = rem._id === focusedRemId ? 0 : path.length - 1;
+              } else {
+                const rel = await getRemPathWithIds(plugin, rem, portal.rootId);
+                path = [focusedRemText, ...rel.path];
+                pathIds = [focusedRemId, ...rel.pathIds];
+                depth = rel.pathIds.length;
+              }
 
               let cardStatus: 'Has Cards' | 'Inheritance only' | null = null;
               let cardKbPercentile: number | null = null;
-              if (hasValidCardPriority && Array.isArray(allCardInfos)) {
-                const cardInfo = allCardInfos.find((ci: CardPriorityInfo) => ci.remId === rem._id);
+              if (hasValidCardPriority) {
+                const cardInfo = cardInfoById.get(rem._id);
                 if (cardInfo) {
                   cardStatus = cardInfo.cardCount > 0 ? 'Has Cards' : 'Inheritance only';
                   // Use the pre-computed kbPercentile from the cache. It's the
@@ -289,7 +446,11 @@ function BatchPriority() {
                 incPercentile: Array.isArray(allIncrementalRems) ?
                   calculateRelativePercentile(allIncrementalRems, rem._id) : null,
                 cardPercentile: cardKbPercentile,
-                originalIndex: remIndexMap.get(rem._id) ?? 0
+                originalIndex: index,
+                viaPortal,
+                homeName: viaPortal ? await parentName(rem.parent) : null,
+                breadcrumb: await breadcrumbOf(rem),
+                descriptorParent: isDescriptor ? await parentName(rem.parent) : null,
               });
             }
           } catch (remError) {
@@ -297,6 +458,7 @@ function BatchPriority() {
           }
         }
 
+        if (isStale()) return;
         console.log('📈 BatchPriority: Found', prioritizedData.length, 'prioritized rems total');
 
         // Sort by hierarchy (document order)
@@ -319,13 +481,15 @@ function BatchPriority() {
         setErrorMessage(`Error: ${message}`);
         await plugin.app.toast('Error loading incremental rems');
       } finally {
-        setIsLoading(false);
-        console.log('🏁 BatchPriority: Finished loading');
+        if (!isStale()) {
+          setIsLoading(false);
+          console.log('🏁 BatchPriority: Finished loading');
+        }
       }
     };
 
     loadIncrementalRems();
-  }, [focusedRemId, plugin, allIncrementalRems, allCardInfos]);
+  }, [focusedRemId, plugin, allIncrementalRems, allCardInfos, includePortals]);
 
   // Apply filters and sorting
   useEffect(() => {
@@ -333,8 +497,11 @@ function BatchPriority() {
 
     // Apply search filter
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter(rem =>
-        rem.name.toLowerCase().includes(searchTerm.toLowerCase())
+        rem.name.toLowerCase().includes(term) ||
+        (rem.descriptorParent ?? '').toLowerCase().includes(term) ||
+        rem.breadcrumb.toLowerCase().includes(term)
       );
     }
 
@@ -358,7 +525,11 @@ function BatchPriority() {
 
     // Apply source filter
     if (sourceFilter !== 'all') {
-      filtered = filtered.filter(rem => rem.hasCardPriority && rem.cardPrioritySource === sourceFilter);
+      filtered = filtered.filter(rem => rem.hasCardPriority && (
+        sourceFilter === 'derived'
+          ? isDerivedCardSource(rem.cardPrioritySource)
+          : rem.cardPrioritySource === sourceFilter
+      ));
     }
 
     // Apply priority range filter
@@ -543,7 +714,7 @@ function BatchPriority() {
   };
 
   // Apply the new priorities with progress indicator — filter-aware
-  const applyChanges = async () => {
+  const applyChanges = async (conversionsConfirmed = false) => {
     console.log('💾 BatchPriority: Applying changes, hasActiveFilters:', hasActiveFilters);
     const scope = hasActiveFilters ? filteredRems : incrementalRems;
     const toUpdate = scope.filter(r => r.isChecked && (r.newIncPriority !== null || r.newCardPriority !== null));
@@ -554,6 +725,18 @@ function BatchPriority() {
       await plugin.app.toast('No changes to apply');
       return;
     }
+
+    // A derived card priority written here becomes manual: the rem stops
+    // following its ancestor (or the default setting). Ask first.
+    const conversions = toUpdate.filter(r =>
+      r.hasCardPriority && r.newCardPriority !== null && isDerivedCardSource(r.cardPrioritySource)
+    );
+    if (conversions.length > 0 && !conversionsConfirmed) {
+      setConfirmFocus('cancel');
+      setPendingConversions(conversions);
+      return;
+    }
+    setPendingConversions(null);
 
     setIsApplying(true);
     isApplyingRef.current = true;
@@ -619,10 +802,16 @@ function BatchPriority() {
       // Instead, write the rem ID to session storage — the tracker in tracker.ts
       // will pick it up and run recalculateTreeInheritance in the background.
       // The plugin_operation_active flag stays UP until the tracker finishes.
+      // Portal rems live outside the focused tree, so the focused rem's cascade
+      // never reaches their real descendants: each changed one is a root too.
       const capturedFocusedRemId = focusedRemId;
       if (capturedFocusedRemId) {
         console.log('📊 BatchPriority: Delegating inheritance cascade to background tracker...');
-        await plugin.storage.setSession('pendingInheritanceCascade', capturedFocusedRemId);
+        const portalRoots = toUpdate.filter(r => r.viaPortal).map(r => r.remId);
+        await plugin.storage.setSession(
+          'pendingInheritanceCascade',
+          portalRoots.length > 0 ? [capturedFocusedRemId, ...portalRoots] : capturedFocusedRemId
+        );
       } else {
         await plugin.storage.setSession('plugin_operation_active', false);
       }
@@ -744,6 +933,18 @@ function BatchPriority() {
     });
   };
 
+  // Lookup sets for the tree helpers below. Both used to scan the whole list
+  // per row — O(N²) per render, which froze the popup for 45 s at ~9k rows.
+  const { rowIds, parentIds } = useMemo(() => {
+    const rowIds = new Set<string>();
+    const parentIds = new Set<string>();
+    for (const r of incrementalRems) {
+      rowIds.add(r.remId);
+      for (let i = 0; i < r.pathIds.length - 1; i++) parentIds.add(r.pathIds[i]);
+    }
+    return { rowIds, parentIds };
+  }, [incrementalRems]);
+
   // Check if a node should be visible based on parent expansion
   const isNodeVisible = (remData: PrioritizedItemData) => {
     // Always show root level items
@@ -757,7 +958,7 @@ function BatchPriority() {
 
         // An ancestor's expansion state only matters if it's also an incremental rem
         // that is being displayed in the table. We ignore intermediate non-incremental rems.
-        const isParentInTable = incrementalRems.some(rem => rem.remId === parentId);
+        const isParentInTable = rowIds.has(parentId);
 
         if (isParentInTable && !expandedNodes.has(parentId)) {
           return false;
@@ -771,14 +972,7 @@ function BatchPriority() {
   };
 
   // Check if a node has children - need to check incremental rems only
-  const hasChildren = (remId: string) => {
-    return incrementalRems.some(r => {
-      // Check if this rem's path includes the given remId (but isn't the rem itself)
-      // This properly identifies parent-child relationships
-      const parentIndex = r.pathIds.indexOf(remId);
-      return parentIndex >= 0 && parentIndex < r.pathIds.length - 1;
-    });
-  };
+  const hasChildren = (remId: string) => parentIds.has(remId);
 
   // Handle sorting
   const handleSort = (field: SortField) => {
@@ -804,6 +998,43 @@ function BatchPriority() {
       }
     }
   }, [incrementalRems.map(r => r.isChecked).join(',')]);
+
+  // Focus the confirmation dialog when it opens, so ←→ / Enter / Esc work at
+  // once. Retried because RemNote may still be settling focus.
+  useEffect(() => {
+    if (!pendingConversions) return;
+    let cancelled = false;
+    const tryFocus = (attemptsLeft: number) => {
+      if (cancelled) return;
+      confirmRef.current?.focus();
+      if (document.activeElement !== confirmRef.current && attemptsLeft > 0) {
+        setTimeout(() => tryFocus(attemptsLeft - 1), 50);
+      }
+    };
+    tryFocus(8);
+    return () => { cancelled = true; };
+  }, [pendingConversions]);
+
+  const onConfirmKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingConversions(null);
+      return;
+    }
+    // A focused button handles its own Enter; handling it here too would run it twice.
+    if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      setConfirmFocus(f => (f === 'cancel' ? 'confirm' : 'cancel'));
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (confirmFocus === 'confirm') applyChanges(true);
+      else setPendingConversions(null);
+    }
+  };
 
   const uniqueIncTypes = useMemo(() => {
     const types = new Set(incrementalRems.filter(r => r.hasIncRem && r.type !== null).map(r => r.type));
@@ -906,7 +1137,7 @@ function BatchPriority() {
   console.log('🎨 BatchPriority: Rendering UI');
 
   if (isLoading) {
-    return <div style={{ padding: '16px' }}>Loading incremental rems...</div>;
+    return <div style={{ padding: '16px' }}>{loadingStatus}</div>;
   }
 
   if (errorMessage) {
@@ -929,7 +1160,7 @@ function BatchPriority() {
       <div style={{ padding: '16px' }}>
         <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>No Prioritized Items Found</div>
         <div style={{ fontSize: '14px', color: '#6b7280' }}>
-          The selected rem and its descendants contain no prioritized items (Incremental Rems or Flashcards with a Card Priority tag).
+          The selected rem and its descendants{includePortals ? ' (and the rems it shows through portals and table views)' : ''} contain no prioritized items (Incremental Rems or Flashcards with a Card Priority tag).
         </div>
         <button
           onClick={() => plugin.widget.closePopup()}
@@ -943,7 +1174,7 @@ function BatchPriority() {
 
   // Card info cache is still hydrating — keep showing the loading spinner
   if (incrementalRems.length === 0 && allCardInfos === undefined) {
-    return <div style={{ padding: '16px' }}>Loading incremental rems...</div>;
+    return <div style={{ padding: '16px' }}>Loading Incremental Rems and flashcards…</div>;
   }
 
   return (
@@ -1010,6 +1241,7 @@ function BatchPriority() {
             <option value="all">All Sources</option>
             <option value="manual">Manual CV</option>
             <option value="incremental">Incremental CV</option>
+            <option value="derived">Inherited / Default CV</option>
           </select>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1032,6 +1264,25 @@ function BatchPriority() {
               style={{ ...styles.input, width: '60px' }}
             />
           </div>
+
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer' }}
+            title="Also gather the rems this document shows through portals and table views. Their inherited or default card priorities are included too, and become manual when changed."
+          >
+            <input
+              type="checkbox"
+              checked={includePortals}
+              disabled={isApplying}
+              onChange={(e) => {
+                // The list is rebuilt, so any preview is stale.
+                setIsPreviewMode(false);
+                setHasCalculated(false);
+                setPreviousStates([]);
+                setIncludePortals(e.target.checked);
+              }}
+            />
+            Include portals &amp; table views
+          </label>
 
           <button
             onClick={exportToCSV}
@@ -1255,7 +1506,7 @@ function BatchPriority() {
                   Reset
                 </button>
                 <button
-                  onClick={applyChanges}
+                  onClick={() => applyChanges()}
                   style={{ ...styles.button, ...styles.successButton }}
                   disabled={isApplying}
                 >
@@ -1284,7 +1535,7 @@ function BatchPriority() {
         {/* Table */}
         <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', flex: 1 }}>
           {/* Table Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 80px 80px 80px 120px 120px 60px', ...styles.tableHeader }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 60px 80px 120px 120px 60px', ...styles.tableHeader }}>
             <div style={{ padding: '8px' }}>✓</div>
             <div style={{ padding: '8px', cursor: 'pointer' }} onClick={() => handleSort('hierarchy')}>
               Name {sortField === 'hierarchy' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1329,7 +1580,7 @@ function BatchPriority() {
                   key={remData.remId}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '40px 1fr 80px 80px 80px 120px 120px 60px',
+                    gridTemplateColumns: '40px 1fr 120px 60px 80px 120px 120px 60px',
                     ...styles.tableRow,
                     paddingLeft: sortField === 'hierarchy' ? `${remData.depth * 20 + 8}px` : '8px'
                   }}
@@ -1347,7 +1598,7 @@ function BatchPriority() {
                       onChange={() => toggleCheck(remData.remId)}
                     />
                   </div>
-                  <div style={{ padding: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ padding: '8px', display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
                     {sortField === 'hierarchy' && hasChildNodes && (
                       <button
                         onClick={() => toggleExpanded(remData.remId)}
@@ -1356,14 +1607,29 @@ function BatchPriority() {
                         {isExpanded ? '▼' : '▶'}
                       </button>
                     )}
-                    <span style={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      maxWidth: '300px',
-                      display: 'inline-block'
-                    }} title={remData.name}>
-                      {remData.name.length > 50 ? remData.name.substring(0, 50) + '...' : remData.name}
+                    {remData.viaPortal && (
+                      <span
+                        style={{ fontSize: '11px', color: '#6b7280', flexShrink: 0 }}
+                        title={`Shown here through a portal or table view${remData.homeName ? ` — lives under "${remData.homeName}"` : ''}`}
+                      >
+                        ⧉
+                      </span>
+                    )}
+                    <span
+                      style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}
+                      title={rowTooltip(remData)}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {remData.descriptorParent && (
+                          <span style={{ color: '#6b7280' }}>{remData.descriptorParent} › </span>
+                        )}
+                        {remData.name}
+                      </span>
+                      {remData.breadcrumb && (
+                        <span style={{ fontSize: '10px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {remData.breadcrumb}
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div style={{ padding: '8px', fontWeight: 600, display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1375,6 +1641,11 @@ function BatchPriority() {
                     {remData.hasCardPriority && remData.currentCardPriority !== null && (
                       <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#92400e', whiteSpace: 'nowrap' }}>
                         Card: {remData.currentCardPriority}
+                        {remData.cardPrioritySource && CARD_SOURCE_LABELS[remData.cardPrioritySource] && (
+                          <span style={{ fontWeight: 400 }} title={CARD_SOURCE_LABELS[remData.cardPrioritySource].tip}>
+                            {' '}({CARD_SOURCE_LABELS[remData.cardPrioritySource].short})
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>
@@ -1466,9 +1737,11 @@ function BatchPriority() {
         {/* Summary */}
         <div style={{ fontSize: '14px', color: '#6b7280', display: 'flex', justifyContent: 'space-between' }}>
           <span>
-            Total: {incrementalRems.length} incremental rem(s) |
+            Total: {incrementalRems.length} ({incrementalRems.filter(r => r.hasIncRem).length} Incremental Rems,{' '}
+            {incrementalRems.filter(r => r.hasCardPriority).length} flashcard Rems) |
             Filtered: {filteredRems.length} |
             Selected: {incrementalRems.filter(r => r.isChecked).length}
+            {includePortals && ` | Via portals & table views: ${incrementalRems.filter(r => r.viaPortal).length}`}
           </span>
           <span>
             {searchTerm && `Searching for: "${searchTerm}"`}
@@ -1477,13 +1750,91 @@ function BatchPriority() {
           </span>
         </div>
       </div>
+
+      {/* Confirmation: derived card priorities that will become manual */}
+      {pendingConversions && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px'
+          }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setPendingConversions(null); }}
+        >
+          <div
+            ref={confirmRef}
+            tabIndex={-1}
+            onKeyDown={onConfirmKeyDown}
+            style={{
+              outline: 'none', backgroundColor: 'white', color: '#111827', borderRadius: '8px',
+              width: 'min(720px, 100%)', maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+            }}
+          >
+            <div style={{ padding: '16px 16px 8px' }}>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '6px' }}>
+                Make {pendingConversions.length} card priorit{pendingConversions.length === 1 ? 'y' : 'ies'} manual?
+              </div>
+              <div style={{ fontSize: '13px', color: '#4b5563' }}>
+                These flashcards follow an ancestor or the default setting, often outside this document (portals and table views).
+                Changing them sets a <b>manual</b> priority, so they stop following their parents.
+              </div>
+            </div>
+            <div style={{ overflowY: 'auto', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 50px', ...styles.tableHeader, fontSize: '12px', position: 'sticky', top: 0 }}>
+                <div>Rem</div>
+                <div>Lives in</div>
+                <div>Current</div>
+                <div>New</div>
+              </div>
+              {pendingConversions.map(r => (
+                <div key={r.remId} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 50px', padding: '6px 8px', fontSize: '12px', borderTop: '1px solid #f3f4f6' }}>
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rowTooltip(r)}>
+                    {r.viaPortal && <span style={{ color: '#6b7280' }}>⧉ </span>}{r.name}
+                  </div>
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#6b7280' }} title={r.homeName ?? ''}>
+                    {r.homeName ?? '—'}
+                  </div>
+                  <div>{r.currentCardPriority} <span style={{ color: '#6b7280' }}>({r.cardPrioritySource})</span></div>
+                  <div style={{ fontWeight: 600 }}>{r.newCardPriority}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', color: '#6b7280' }}>←→ choose · Enter confirm · Esc cancel</span>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setConfirmFocus('cancel')}
+                  onClick={() => setPendingConversions(null)}
+                  style={{
+                    ...styles.button, ...styles.secondaryButton,
+                    ...(confirmFocus === 'cancel' ? { outline: '2px solid var(--rn-clr-border-accent, #3B82F6)', outlineOffset: '2px' } : {})
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setConfirmFocus('confirm')}
+                  onClick={() => applyChanges(true)}
+                  style={{
+                    ...styles.button, ...styles.successButton,
+                    ...(confirmFocus === 'confirm' ? { outline: '2px solid var(--rn-clr-border-accent, #3B82F6)', outlineOffset: '2px' } : {})
+                  }}
+                >
+                  Make manual and apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // Helper function with IDs for proper hierarchy tracking - including focused rem as root
 async function getRemPathWithIds(plugin: RNPlugin, rem: PluginRem, stopAtId: string): Promise<{ path: string[], pathIds: string[] }> {
-  console.log('🛤️ Getting path for rem:', rem._id, 'stopping at:', stopAtId);
   const path: string[] = [];
   const pathIds: string[] = [];
   let current: PluginRem | undefined = rem;
@@ -1515,8 +1866,6 @@ async function getRemPathWithIds(plugin: RNPlugin, rem: PluginRem, stopAtId: str
     current = await plugin.rem.findOne(current.parent);
   }
 
-  console.log('   - Path:', path);
-  console.log('   - Path IDs:', pathIds);
   return { path, pathIds };
 }
 

@@ -173,6 +173,27 @@ The main knowledge base has 845 `null` Rems, 152 of them with a back side. Rems 
 
 **A plugin cannot clear the `null`.** See PLUGIN_BRIDGE_AND_SDK.md: `rem.setType(DEFAULT_TYPE)` is rejected by the bridge. Reported in [support-reports/REMNOTE_SUPPORT_REPORT_beautiful_queue_null_rem_type.md](support-reports/REMNOTE_SUPPORT_REPORT_beautiful_queue_null_rem_type.md).
 
+## "View Full Table" is phone-only on individual-cell table cards
+
+Read from the 1.30.0-beta bundle (2026-11-10). The desktop app had no newer `build_overrides` build. Earlier builds and RemNote's own screenshots label the button "See Full Table".
+
+The Beautiful queue draws table cards through two renderers. Both use the same button, module 16197 export `D` (`data-test="Beautiful Queue View Full Table"`). The button returns `null` only while rendering to static markup (`O` from module 247).
+
+| Renderer | Used when | `data-test` prefix | Button |
+|---|---|---|---|
+| Table Preview | ordinary table cards | `Beautiful Queue Table Preview…` | always, in both the stacked and the two-column layout |
+| Individual Cell Card (module 91581, `L`) | an ancestor table has `ttic` (`TABLE_TEST_INDIVIDUAL_CELLS`) | `Beautiful Queue Individual Cell…` | **only if `Env.mobile.mode.isPhone`** |
+
+In the Individual Cell Card, `M = i.Env.mobile.mode.isPhone` and the stacked layout ends with `M ? <D onClick={() => k(true)}/> : null`. The two-column table layout has no button at all.
+
+On desktop the card still uses the stacked layout, the one that looks like the phone, when any of these holds:
+
+- the card has extra front or back columns,
+- the card is 520 px wide or narrower,
+- a cell would wrap past 3 lines in two columns.
+
+The full-table view is the component's own `useState` (`P`/`k`), and the button is the only thing that sets it. So **on desktop an individual-cell table card cannot show its full table**. A plugin cannot set that state either. Asked of RemNote in [support-reports/REMNOTE_SUPPORT_REPORT_view_full_table_desktop.md](support-reports/REMNOTE_SUPPORT_REPORT_view_full_table_desktop.md).
+
 ## Images in the queue are drawn by the drawing canvas
 
 Read from the 1.28.19 bundle and a real knowledge base (2026-09-30). The exact cause of the crop below was **not** proven; the data shapes are.
@@ -188,3 +209,25 @@ Read from the 1.28.19 bundle and a real knowledge base (2026-09-30). The exact c
 ## Cross-plugin side channel
 
 `messaging.broadcast` reaches only the caller's own widgets, but plugin events are keyed by event and key, not by plugin. So `storage.setSession(k, v)` fires `StorageSessionChange` for **any** plugin listening on `k`. This is undocumented and may be closed.
+
+## Why an editor inside the queue's card cannot keep the focus
+
+Read in the bundle (queue chunk `2276`, 1.30.4, November 17, 2026). The float editor was seen working in the desktop app the same day.
+
+The queue's shell has a click handler (`onShellClick`). About 20 ms after **any** click inside the shell it looks at the focus: an active element outside the queue's container is blurred, and unless the queue or one of its own children holds RemNote's focus (`isInFocusOrHasChildInFocus(queue.focusId)`), the queue takes it (`takeFocus()`). Interacting with the card does the same (`handleInteractWithCard`).
+
+A plugin's fake embeds are mounted beside its iframe, so in the `Flashcard` location they are inside the shell. But their focus paths are their own: `DocumentViewer` uses `[]`, `RemHierarchyEditorTree` `[{type: RemHierarchyEditorTree}]`, `RemRichTextEditor` `[{type: PluginRemRichTextEditor}]`. None is a child of the queue's path, so every click into such an editor is followed by the queue taking the focus back: the caret goes and the keys reach the queue's shortcuts. This is what made the editable Extract Viewer unusable.
+
+**A floating widget is outside the shell.** The floating layer is mounted in `RootAppContainer`, and each float's wrapper stops click propagation. An editor embedded in a float keeps the focus as one in the right sidebar does, and while it holds it the queue's commands are off (each is `enabled` only while the queue has the focus). `src/lib/extract_editor.ts` uses this: a `DocumentViewer` in a float laid over the Extract Viewer's card, placed from the queue frame's own rectangle (`plugin.widget.getDimensions`). Host popups (slash menu, reference search) open under a float; see "Host popups open below a floating widget" in [PLUGIN_BRIDGE_AND_SDK.md](PLUGIN_BRIDGE_AND_SDK.md).
+
+The embeds a plugin can use (`fake_embed_definitions`): `RemViewer` and `RichTextViewer` are read-only; `RichTextEditor` discards what is typed (`setText` is a no-op); `RemRichTextEditor` edits one Rem's front text only; `RemHierarchyEditorTree` is the outline under a root Rem, without the root's own text; `DocumentViewer` is the document page, title included, and is the only one that edits a Rem and its children together.
+
+**Two `DocumentViewer`s of one Rem steal the caret from each other** (seen in the app, November 17, 2026): both use the focus path `[]`. With the float editing a Rem, the notes sidebar must not show the same Rem's page (`src/widgets/increm_notes_sidebar.tsx` shows a placeholder instead).
+
+**A queue widget cannot clean up after itself** (seen in the app, November 17, 2026). When the queue advances or closes, the host destroys the `Flashcard` widget's frame, and the bridge calls its React cleanup had started never finish: the float opened from the Extract Viewer stayed on screen after Next and after leaving the queue. Anything that must happen when a card goes belongs in the index widget, on `QueueLoadCard`, `QueueExit` and `URLChange` (`registerExtractEditorHost`). `QueueLoadCard` carries `{cardId}` only, and no id for a plugin's own item; the Incremental Rem on screen is in the `current-inc-rem` session key by then.
+
+**On a phone, `DocumentViewer` draws RemNote's mobile page bar over the top of its float** (seen on an iPhone, November 17, 2026): a back arrow and the title, about 40 px, at the top of the float's wrapper rather than inside the embed's own box. A header the plugin puts there is covered. The Extract Editor keeps its bar (Done, drag) at the bottom on a narrow queue.
+
+**Where queue widgets appear on a phone** (read in the 1.30.4 bundle, November 17, 2026). The Beautiful queue's chrome has two branches: on a computer it renders the QueueToolbar widgets (`toolbarWidgets`) among its top-right actions; on a phone (`Env.mobile.mode.isPhone`) it renders none of them. The Compact queue's top bar renders them on both. QueueBelowTopBar is rendered in every layout, in the flow of the card box, so a widget there costs a row of the card on a phone. The Statistics plugin (1.6.0) registers its button at QueueBelowTopBar on a touch screen under 780 px wide for that reason. Hiding a widget: each wrapper carries the location's class (`rn-queue__widget-toolbar`, `rn-queue__widget-below-top-bar`) around `iframe[data-plugin-id][src*="widgetName=…"]`.
+
+**`currentIncRemKey` is written after `QueueLoadCard`.** `widgets/queue.tsx` sets it when it renders the item, so a listener on the event still reads the previous Incremental Rem. React to the key itself (a `plugin.track` on it), as `registerExtractEditorHost` does.

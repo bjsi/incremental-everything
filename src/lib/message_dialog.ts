@@ -9,7 +9,19 @@ export interface MessageDialog {
   quote?: string;
   /** Smaller explanation under everything else. */
   detail?: string;
-  tone?: 'error' | 'info';
+  /** One box per entry under the message, e.g. one per quote of a bulk run. */
+  items?: MessageItem[];
+  tone?: 'error' | 'info' | 'success';
+  /** Adds an "Open Rem" button (←→ to reach it) that opens this Rem and closes the dialog. */
+  openRemId?: string;
+}
+
+export interface MessageItem {
+  /** Shown in italics at the top of the box (a quote). */
+  title: string;
+  lines: string[];
+  /** ok = done (green edge), miss = not done (amber edge). */
+  tone?: 'ok' | 'miss';
 }
 
 /**

@@ -6,6 +6,8 @@ import '../App.css';
 import { MasteryDrillCardList } from '../components/MasteryDrillCardList';
 import { FinalDrillItem, drillItemCardId, isDrillItemInKb } from '../lib/mastery_drill_audit';
 import { finalDrillIdsKey, useDrillCooling } from '../lib/mastery_drill_status';
+import { oldItemThresholdId } from '../lib/consts';
+import { useIESetting } from '../lib/settings';
 
 /**
  * The Mastery Drill card list on its own, for the regular-queue drill (opened from
@@ -15,6 +17,7 @@ function MasteryDrillList() {
   const plugin = usePlugin();
   const [allItems, setAllItems] = useSyncedStorageState<FinalDrillItem[]>(finalDrillIdsKey, []);
   const cooling = useDrillCooling();
+  const oldThreshold = useIESetting(oldItemThresholdId);
 
   const kb = useTrackerPlugin(async (rp) => ({
     id: (await rp.kb.getCurrentKnowledgeBaseData())?._id as string | undefined,
@@ -46,6 +49,7 @@ function MasteryDrillList() {
       <MasteryDrillCardList
         items={items}
         cooling={cooling}
+        oldThresholdDays={oldThreshold}
         onRemove={removeCards}
         onGoToRem={goToRem}
         onClose={() => plugin.widget.closePopup()}

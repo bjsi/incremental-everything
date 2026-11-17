@@ -40,7 +40,7 @@ A persistent **Set priority** checkbox on the bar makes Add Extract ask for a pr
 - [x] One click before typing in the popup: not acceptable, replaced by the field.
 - [x] Priority field in Chrome on build 0.0.56.
 - [ ] Try images in extracts in Chrome on build 0.0.57. An image selected with no text around it still can't be extracted.
-- [ ] Check connection and extract times on a large KB.
+- [x] Check connection and extract times on a large KB.
 - [ ] A way to change the shortcut keys, for sites that use `Opt+X` themselves.
 - [x] Publish as Incremental RemNote Companion. The user chose to keep the name.
 - [ ] Two devices writing the same synced key can overwrite each other.

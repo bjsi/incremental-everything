@@ -33,6 +33,7 @@ import { PdfRemItem, EditingState } from '../components';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, initIncrementalRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { resolveRemTextAsTitle } from '../lib/richTextRemRefs';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
@@ -89,7 +90,7 @@ function PageRangeWidget() {
 
       // Optimistic patch: mark this rem as incremental and fetch its new priority,
       // rather than re-running the entire getAllIncrementsForPDF search.
-      const remName = rem.text ? await plugin.richText.toString(rem.text) : 'Rem';
+      const remName = rem.text ? await resolveRemTextAsTitle(plugin, rem.text) : 'Rem';
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
 
       setRelatedRems(prev => prev.map(r =>
