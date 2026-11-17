@@ -13,6 +13,8 @@ interface DraggableButtonProps {
   style?: React.CSSProperties;
   /** For the element around the button: how it sits in the caller's row (flex, width). */
   wrapperStyle?: React.CSSProperties;
+  /** Leave out the ↕ drag hint (the drag still works): for a button short of room. */
+  hideGrip?: boolean;
   title?: string;
 }
 
@@ -33,6 +35,7 @@ export function DraggableButton({
   onDragDown,
   style,
   wrapperStyle,
+  hideGrip = false,
   title,
 }: DraggableButtonProps) {
   const [dragMode, setDragMode] = React.useState<'up' | 'down' | null>(null);
@@ -180,7 +183,7 @@ export function DraggableButton({
         ) : (
           <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
             {children}
-            <span
+            {!hideGrip && (<span
               aria-hidden
               style={{
                 fontSize: '11px',
@@ -190,7 +193,7 @@ export function DraggableButton({
               }}
             >
               ↕
-            </span>
+            </span>)}
           </span>
         )}
       </button>

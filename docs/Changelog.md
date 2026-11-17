@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.240 - November 17th, 2026
+
+### 📝 Changed
+
+**Answer buttons on a phone**: **Next** no longer cuts its interval short. The scheduler chip (`×1.5`) and the interval sit in two small lines beside the word, at the button's usual height, and months and years are shortened to `m` and `y` (`in 1.3 m`, `in 2.5 y`). On the narrowest phones the icon buttons get a little smaller, and Next shrinks rather than pushing a button onto a second row.
+
+📖 [Reviewing Items in the Queue → The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
+
 ## v1.0.239 - November 17th, 2026
 
 ### 📝 Changed

@@ -352,8 +352,8 @@ export function AnswerButtons() {
   // the frame's own width, which is the queue's, so a narrow desktop pane gets it too.
   const [barWidth, setBarWidth] = useState(() => window.innerWidth);
   const narrow = barWidth > 0 && barWidth < NARROW_BAR_PX;
-  // On the smallest phones the scheduler's chip gives its place to the interval.
-  const tight = barWidth > 0 && barWidth < 360;
+  // Below this the icon buttons shrink a little, so Next keeps room for its interval.
+  const small = barWidth > 0 && barWidth < 400;
   useEffect(() => {
     const onResize = () => setBarWidth(window.innerWidth);
     onResize();
@@ -418,7 +418,7 @@ export function AnswerButtons() {
 
   const buttonRowStyle: React.CSSProperties = {
     display: 'flex',
-    gap: narrow ? '4px' : '6px',
+    gap: narrow ? (small ? '3px' : '4px') : '6px',
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
@@ -437,7 +437,7 @@ export function AnswerButtons() {
   // button row fits on one line beside the conditional buttons. On a narrow bar
   // they are squares with the icon alone; the label stays in the tooltip.
   const compactButtonStyle: React.CSSProperties = narrow
-    ? { minWidth: '36px', width: '36px', height: '36px', padding: 0, gap: 0 }
+    ? { minWidth: small ? '33px' : '36px', width: small ? '33px' : '36px', height: '36px', padding: 0, gap: 0 }
     : { minWidth: '56px', padding: '5px 8px', gap: '3px' };
   const iconSize = narrow ? 18 : 15;
   const label = (text: string, strong = false) =>
@@ -446,7 +446,7 @@ export function AnswerButtons() {
   // The quiet controls at the end of the row: note, help.
   const quietButtonStyle = (active: boolean): React.CSSProperties => ({
     cursor: 'pointer',
-    width: narrow ? '36px' : '30px',
+    width: narrow ? (small ? '33px' : '36px') : '30px',
     height: narrow ? '36px' : '30px',
     borderRadius: '8px',
     display: 'flex',
@@ -532,25 +532,39 @@ export function AnswerButtons() {
           overlayDownText="Repeat today"
           dragThreshold={12}
           title="Next (Cmd+Right on Mac; Ctrl+Right on Windows/Linux): Mark as reviewed, calculate next interval, and advance to next item"
-          // On a narrow bar Next takes the room the icon buttons leave.
-          wrapperStyle={narrow ? { flex: '1 1 96px', minWidth: 0 } : undefined}
-          style={narrow ? { width: '100%', minWidth: 0, height: '36px', padding: '0 8px', overflow: 'hidden' } : undefined}
+          // On a narrow bar Next takes the room the icon buttons leave. Its small basis
+          // makes it shrink, on the narrowest phones, rather than push a button onto a
+          // second row.
+          wrapperStyle={narrow ? { flex: '1 1 72px', minWidth: 0 } : undefined}
+          style={narrow ? { width: '100%', minWidth: 0, height: '36px', padding: small ? '0 6px' : '0 8px', overflow: 'hidden' } : undefined}
+          hideGrip={narrow}
         >
-          {/* DraggableButton lays its children out in a row (beside the ↕ grip):
-              the two lines are stacked here, or run on one line on a narrow bar. */}
+          {/* DraggableButton lays its children out in a row (beside the ↕ grip).
+              Wide: "Next" over its interval. Narrow: "Next" beside a small two-line
+              block, the scheduler chip over the interval, so the interval is read in
+              full at the button's height. */}
           <div
             style={{
               display: 'flex',
               flexDirection: narrow ? 'row' : 'column',
-              alignItems: narrow ? 'baseline' : 'center',
-              gap: narrow ? '6px' : '3px',
+              alignItems: 'center',
+              gap: narrow ? (small ? '5px' : '7px') : '3px',
               minWidth: 0,
               overflow: 'hidden',
             }}
           >
-            <div style={{ ...buttonStyles.label, flex: 'none' }}>Next</div>
-            <div style={{ ...buttonStyles.sublabel, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-              <NextRepTime rem={incRemInfo} showScheduler={!tight} />
+            <div style={{ ...buttonStyles.label, flex: 'none', fontSize: narrow ? (small ? '13px' : '14px') : buttonStyles.label.fontSize }}>Next</div>
+            <div
+              style={{
+                ...buttonStyles.sublabel,
+                ...(narrow ? { fontSize: '10px', lineHeight: 1.05 } : {}),
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                minWidth: 0,
+              }}
+            >
+              <NextRepTime rem={incRemInfo} showScheduler stacked={narrow} />
             </div>
           </div>
         </DraggableButton>
