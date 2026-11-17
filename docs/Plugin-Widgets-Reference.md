@@ -65,8 +65,12 @@ An info bar shown below the answer buttons when reviewing an Incremental Rem in 
 
 ![Answer Buttons Info Bar](assets/reps-info-bar.png){ width="600" }
 
+On a phone, or in a pane narrower than 520 px, the bar and the answer buttons above it take a [compact form](Reviewing-Items-in-the-Queue.md#the-answer-buttons): one row of icon buttons and one line of figures.
+
 ### 1.4. Document Notes Sidebar
 *(PDF and HTML Incremental Rems, including PDF/HTML Highlights)*
+
+> A plain Rem-type Incremental Rem (a text extract) is edited over its queue card with **✎ Edit**, not here: see [the editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor). **Sidebar →** on that card opens it in this sidebar when you prefer; while the editor over the card is open on a Rem, this sidebar shows a note instead of a second copy of the same page.
 
 When reviewing a PDF or HTML Incremental Rem, you can click the **📝 Document Notes** icon in the document's top bar (next to the breadcrumbs) to open the current document's Rem in the Right Sidebar. 
 

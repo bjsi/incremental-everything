@@ -10,6 +10,7 @@ import {
   getChildrenExcludingSlots,
   getDescendantsExcludingSlots
 } from '../lib/powerupSlotFilter';
+import { closeExtractEditor, openExtractEditor } from '../lib/extract_editor';
 import { CardPriorityInfo } from '../lib/card_priority';
 
 interface ExtractViewerProps {
@@ -37,7 +38,7 @@ const BATCH_DELAY_MS = 10;
 
 // Read-only preview caps. Each RemViewer is a (read-only) FakeEmbed overlay, so
 // we bound how many we spawn: children per node, and how deep we recurse. Beyond
-// either cap we show a "edit in sidebar" hint instead.
+// either cap we show an "open the editor" hint instead.
 const MAX_PREVIEW_CHILDREN = 100;
 const MAX_PREVIEW_DEPTH = 6;
 
@@ -232,7 +233,7 @@ function ReadOnlyRemTree({
           >
             {atMaxDepth ? (
               <button onClick={onEditInSidebar} style={hintButtonStyle}>
-                … deeper items — edit in sidebar →
+                … deeper items — open the editor →
               </button>
             ) : (
               <>
@@ -248,7 +249,7 @@ function ReadOnlyRemTree({
                 ))}
                 {hidden > 0 && (
                   <button onClick={onEditInSidebar} style={hintButtonStyle}>
-                    + {hidden} more — edit in sidebar →
+                    + {hidden} more — open the editor →
                   </button>
                 )}
               </>
@@ -484,10 +485,14 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   // matches the current IncRem id, so a stale value (if an unmount-clear is
   // skipped during sandbox teardown) is ignored rather than mis-shown.
   useEffect(() => {
+    // Tell the notes sidebar which Rem this is, for when the user opens it ("Sidebar →").
+    // It is not opened from here any more: editing is done over the card (✎ Edit), and
+    // the right sidebar stays on whatever it was showing (the practiced queues).
     plugin.storage.setSession(incremNotesSidebarRemIdKey, rem._id);
-    plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
     return () => {
       plugin.storage.setSession(incremNotesSidebarRemIdKey, undefined);
+      // The editor laid over this card goes with it (the queue moved on, or closed).
+      void closeExtractEditor(plugin, rem._id);
     };
   }, [rem._id, plugin]);
 
@@ -529,9 +534,29 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
     [plugin]
   );
 
-  const openNotesSidebar = useCallback(() => {
+  // One editor at a time: the sidebar's page and the one over the card are the same
+  // RemNote document view, and two of them fight for the caret.
+  const openNotesSidebar = useCallback(async () => {
+    await closeExtractEditor(plugin, rem._id);
     plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
-  }, [plugin]);
+  }, [plugin, rem._id]);
+
+  // The editable page, in a floating panel over this card (lib/extract_editor.ts).
+  const editHere = useCallback(async () => {
+    const title = await resolveRemTextForBreadcrumb(plugin, rem.text || []).catch(() => '');
+    await openExtractEditor(plugin, rem._id, title).catch((err) => {
+      console.error('[ExtractViewer] could not open the editor', err);
+      plugin.app.toast('Could not open the editor here. Use "Edit in sidebar" or Review in Editor.');
+    });
+  }, [plugin, rem]);
+
+  // A phone-sized queue: tighter frame, shorter footer.
+  const [narrow, setNarrow] = useState(() => window.innerWidth > 0 && window.innerWidth < 520);
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth > 0 && window.innerWidth < 520);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   return (
     <div
@@ -545,7 +570,8 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
         alignItems: 'center',
         // Top padding keeps the card below the queue's absolute "Back to isolated
         // view" button (top:12), so it can never sit under the breadcrumb.
-        padding: '48px 16px 16px',
+        // lib/extract_editor.ts lays the editor over this card: keep its CARD in step.
+        padding: narrow ? '48px 4px 4px' : '48px 16px 16px',
         overflow: 'hidden',
       }}
     >
@@ -647,30 +673,36 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
           <ReadOnlyRemTree
             remId={rem._id}
             depth={0}
-            onEditInSidebar={openNotesSidebar}
+            onEditInSidebar={() => void editHere()}
             readPointRemId={readPointRemId}
             scrollTrigger={scrollTrigger}
           />
         </div>
 
-        {/* Footer — status + statistics, and the Edit-in-sidebar action. */}
+        {/* Footer: status and statistics, Edit (the floating editor over this card)
+            and, where there is one, the notes sidebar. */}
         <div
           style={{
             flexShrink: 0,
             borderTop: '1px solid var(--rn-clr-border-primary, #e2e8f0)',
-            padding: '8px 16px',
+            padding: narrow ? '6px 8px' : '8px 16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 12,
+            gap: narrow ? 8 : 12,
             backgroundColor: 'var(--rn-clr-background-secondary, #f8fafc)',
-            opacity: isMetadataLoading ? 0.7 : 1,
           }}
         >
-          <div style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary, #64748b)', display: 'flex', flexWrap: 'wrap', gap: 12, minWidth: 0 }}>
-            <span>{isContextLoading ? 'Loading…' : (hasDocumentPowerup ? 'Document' : 'Extract')} • Incremental Rem</span>
+          <div style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary, #64748b)', display: 'flex', flexWrap: 'wrap', gap: narrow ? '0 8px' : 12, minWidth: 0, flex: 1, opacity: isMetadataLoading ? 0.7 : 1 }}>
+            {!narrow && <span>{isContextLoading ? 'Loading…' : (hasDocumentPowerup ? 'Document' : 'Extract')} • Incremental Rem</span>}
             {isMetadataLoading ? (
-              <span>Calculating statistics…</span>
+              <span>{narrow ? '…' : 'Calculating statistics…'}</span>
+            ) : narrow ? (
+              <>
+                <span>{childrenCount} children</span>
+                <span>{descendantsCount} desc.</span>
+                <span>{flashcardCount} cards</span>
+              </>
             ) : (
               <>
                 <span>{childrenCount} direct {childrenCount === 1 ? 'child' : 'children'} ({incrementalChildrenCount} incremental)</span>
@@ -680,8 +712,29 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
             )}
           </div>
           <button
-            onClick={openNotesSidebar}
-            title="Open this Rem in the notes sidebar to edit (the in-queue view is read-only)"
+            onClick={() => void editHere()}
+            title="Edit this Rem here: opens RemNote's editor over this card (formatting, clozes, / commands). Done or Esc brings the queue back."
+            style={{
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: narrow ? '8px 14px' : '6px 14px',
+              borderRadius: 6,
+              border: '1px solid var(--rn-clr-blue, #3b82f6)',
+              backgroundColor: 'var(--rn-clr-blue, #3b82f6)',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ✎ Edit
+          </button>
+          {!narrow && <button
+            onClick={() => void openNotesSidebar()}
+            title="Edit this Rem in the notes sidebar instead (closes the editor over the card)"
             style={{
               flexShrink: 0,
               display: 'inline-flex',
@@ -698,8 +751,8 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
               whiteSpace: 'nowrap',
             }}
           >
-            ✎ Edit in sidebar →
-          </button>
+            Sidebar →
+          </button>}
         </div>
       </div>
     </div>

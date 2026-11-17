@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT, EXTRACT_EDITOR_FLOAT } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
@@ -126,6 +126,26 @@ const SOURCE_FLOATING_POPUPS_CSS = `
       position: relative;
       z-index: 60;
     }
+  }
+`;
+
+// The Extract Editor is a float too, holding a real editor: its slash menu, reference
+// search and formatting bar are host popups, which would open under it for the same
+// reason. Same lift, same exclusion.
+//
+// The bar that appears over selected text (bold, highlight, cloze…) is not in that
+// portal: RemNote portals it straight into <body> as .rn-selected-text-menu, at z 30
+// (40 over a popup), so it too opened under the float (z 50). It goes between the
+// float and the lifted portal, where its own dropdowns open.
+const EXTRACT_EDITOR_POPUPS_CSS = `
+  @media (pointer: fine) {
+    body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) #controlled-popup-portal {
+      position: relative;
+      z-index: 60;
+    }
+  }
+  body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) .rn-selected-text-menu {
+    z-index: 55 !important;
   }
 `;
 
@@ -717,6 +737,13 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
   await plugin.app.registerCSS('source-floating-popups', SOURCE_FLOATING_POPUPS_CSS);
+
+  // The Extract Editor (lib/extract_editor.ts): an editable document page over the
+  // queue's read-only Extract Viewer. Sized by its content, which the opener sets.
+  plugin.app.registerWidget(EXTRACT_EDITOR_FLOAT, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+  await plugin.app.registerCSS('extract-editor-popups', EXTRACT_EDITOR_POPUPS_CSS);
 
   // Outline Restructure preview popup (Before | After + per-rem preserve toggles).
   plugin.app.registerWidget('outline_restructure_preview', WidgetLocation.Popup, {

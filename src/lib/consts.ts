@@ -922,3 +922,11 @@ export const audioPlaylistPlayingKey = 'audio-playlist-playing';
 // and each file's length in seconds, so a list is measured once.
 export const audioPlaylistStateKeyPrefix = 'audio-playlist-state';
 export const audioPlaylistDurationsKeyPrefix = 'audio-playlist-durations';
+
+// Extract Editor (lib/extract_editor.ts; widgets/extract_editor_float.tsx): an editable
+// DocumentViewer over the queue's read-only Extract Viewer. It is a floating widget
+// because an editor inside the queue's own frame cannot keep the focus.
+export const EXTRACT_EDITOR_FLOAT = 'extract_editor_float';
+// Session: what the editor shows and how big it is (ExtractEditorTarget), and its float id.
+export const extractEditorTargetKey = 'extract-editor-target';
+export const extractEditorFloatIdKey = 'extract-editor-float-id';

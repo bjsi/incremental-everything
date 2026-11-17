@@ -15,7 +15,7 @@ import { NextRepTime } from '../components/NextRepTime';
 import { DraggableButton } from '../components/buttons/DraggableButton';
 import { Button } from '../components/buttons/Button';
 import { getButtonStyles } from '../components/buttons/styles';
-import { RescheduleIcon, DismissIcon, PriorityIcon, ReviewInEditorIcon, NewTabIcon, LocateIcon, BookmarkIcon } from '../components/buttons/ActionIcons';
+import { RescheduleIcon, DismissIcon, PriorityIcon, ReviewInEditorIcon, NewTabIcon, LocateIcon, BookmarkIcon, NoteIcon, HelpIcon, HistoryIcon, LinkIcon } from '../components/buttons/ActionIcons';
 import {
   allIncrementalRemKey,
   activeHighlightIdKey,
@@ -59,6 +59,9 @@ import { setPendingReviewNote, getPendingReviewNote, MAX_NOTE_LENGTH } from '../
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
 import { getIESetting, useIESetting } from '../lib/settings';
+
+/** Below this width the bar takes its compact form. A phone in portrait is 320 to 430. */
+const NARROW_BAR_PX = 520;
 
 export function AnswerButtons() {
   const plugin = usePlugin();
@@ -344,6 +347,20 @@ export function AnswerButtons() {
     });
   }, [currentRemId]);
 
+  // A phone, or any pane this narrow: the bar shrinks to one row of icon buttons
+  // and one line of figures (about a third of the full bar's height). Decided by
+  // the frame's own width, which is the queue's, so a narrow desktop pane gets it too.
+  const [barWidth, setBarWidth] = useState(() => window.innerWidth);
+  const narrow = barWidth > 0 && barWidth < NARROW_BAR_PX;
+  // On the smallest phones the scheduler's chip gives its place to the interval.
+  const tight = barWidth > 0 && barWidth < 360;
+  useEffect(() => {
+    const onResize = () => setBarWidth(window.innerWidth);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   // ✅ NOW we can do early returns AFTER all hooks are called
   if (!coreData) {
     return (
@@ -393,15 +410,15 @@ export function AnswerButtons() {
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
-    padding: '8px 12px 12px 12px',
+    gap: narrow ? '5px' : '6px',
+    padding: narrow ? '4px 6px 6px' : '6px 12px 10px',
     backgroundColor: 'var(--rn-clr-background-primary)',
     borderRadius: '12px',
   };
 
   const buttonRowStyle: React.CSSProperties = {
     display: 'flex',
-    gap: '8px',
+    gap: narrow ? '4px' : '6px',
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
@@ -409,18 +426,38 @@ export function AnswerButtons() {
 
   const dividerStyle: React.CSSProperties = {
     width: '1px',
-    height: '40px',
+    height: '26px',
     backgroundColor: 'var(--rn-clr-border-primary)',
-    margin: '0 6px',
+    margin: '0 4px',
   };
+  // The groups are told apart by a rule on a wide bar, and by nothing on a narrow one.
+  const divider = narrow ? null : <div style={dividerStyle} />;
 
   // Icon + one-word label stacked: the secondary actions stay narrow so the
-  // button row fits on one line beside the conditional buttons.
-  const compactButtonStyle: React.CSSProperties = {
-    minWidth: '58px',
-    padding: '6px 8px',
-    gap: '4px',
-  };
+  // button row fits on one line beside the conditional buttons. On a narrow bar
+  // they are squares with the icon alone; the label stays in the tooltip.
+  const compactButtonStyle: React.CSSProperties = narrow
+    ? { minWidth: '36px', width: '36px', height: '36px', padding: 0, gap: 0 }
+    : { minWidth: '56px', padding: '5px 8px', gap: '3px' };
+  const iconSize = narrow ? 18 : 15;
+  const label = (text: string, strong = false) =>
+    narrow ? null : <div style={{ ...compactLabelStyle, fontWeight: strong ? 600 : 500 }}>{text}</div>;
+
+  // The quiet controls at the end of the row: note, help.
+  const quietButtonStyle = (active: boolean): React.CSSProperties => ({
+    cursor: 'pointer',
+    width: narrow ? '36px' : '30px',
+    height: narrow ? '36px' : '30px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 'none',
+    color: active ? 'var(--rn-clr-content-accent, #3b82f6)' : 'var(--rn-clr-content-tertiary)',
+    backgroundColor: active ? 'var(--rn-clr-background-tertiary)' : 'transparent',
+    border: narrow ? '1px solid var(--rn-clr-border-primary)' : '1px solid transparent',
+    transition: 'color 0.15s ease, background-color 0.15s ease',
+  });
 
   const compactLabelStyle: React.CSSProperties = {
     fontSize: '10.5px',
@@ -432,14 +469,15 @@ export function AnswerButtons() {
   const priorityBadgeStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '5px 12px',
-    borderRadius: '14px',
-    fontSize: '12px',
+    gap: '5px',
+    padding: narrow ? '1px 8px' : '2px 10px',
+    borderRadius: '999px',
+    fontSize: narrow ? '11px' : '12px',
     fontWeight: 600,
+    lineHeight: '1.5',
     color: 'white',
     backgroundColor: priorityColor,
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    whiteSpace: 'nowrap',
   };
 
   const infoBarStyle: React.CSSProperties = {
@@ -447,14 +485,16 @@ export function AnswerButtons() {
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    gap: '16px',
-    padding: '8px 16px',
+    gap: narrow ? '2px 10px' : '4px 14px',
+    padding: narrow ? '3px 8px' : '5px 14px',
     backgroundColor: 'var(--rn-clr-background-secondary)',
-    borderRadius: '10px',
-    fontSize: '12px',
+    borderRadius: '8px',
+    fontSize: narrow ? '11px' : '11.5px',
     color: 'var(--rn-clr-content-secondary)',
-    borderLeft: `4px solid ${priorityColor}`,
+    borderLeft: `3px solid ${priorityColor}`,
+    fontVariantNumeric: 'tabular-nums',
   };
+  const barSeparator = <span style={{ color: 'var(--rn-clr-border-primary)' }}>|</span>;
 
   return (
     <div
@@ -492,13 +532,25 @@ export function AnswerButtons() {
           overlayDownText="Repeat today"
           dragThreshold={12}
           title="Next (Cmd+Right on Mac; Ctrl+Right on Windows/Linux): Mark as reviewed, calculate next interval, and advance to next item"
+          // On a narrow bar Next takes the room the icon buttons leave.
+          wrapperStyle={narrow ? { flex: '1 1 96px', minWidth: 0 } : undefined}
+          style={narrow ? { width: '100%', minWidth: 0, height: '36px', padding: '0 8px', overflow: 'hidden' } : undefined}
         >
-          {/* DraggableButton lays its children out in a row (beside the ↕ grip),
-              so the two lines are stacked here. */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-            <div style={buttonStyles.label}>Next</div>
-            <div style={{ ...buttonStyles.sublabel, whiteSpace: 'nowrap' }}>
-              <NextRepTime rem={incRemInfo} showScheduler />
+          {/* DraggableButton lays its children out in a row (beside the ↕ grip):
+              the two lines are stacked here, or run on one line on a narrow bar. */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: narrow ? 'row' : 'column',
+              alignItems: narrow ? 'baseline' : 'center',
+              gap: narrow ? '6px' : '3px',
+              minWidth: 0,
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ ...buttonStyles.label, flex: 'none' }}>Next</div>
+            <div style={{ ...buttonStyles.sublabel, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+              <NextRepTime rem={incRemInfo} showScheduler={!tight} />
             </div>
           </div>
         </DraggableButton>
@@ -511,8 +563,8 @@ export function AnswerButtons() {
           style={compactButtonStyle}
           title="Reschedule (Ctrl+J): Manually set custom interval and adjust priority"
         >
-          <RescheduleIcon size={15} />
-          <div style={compactLabelStyle}>Reschedule</div>
+          <RescheduleIcon size={iconSize} />
+          {label('Reschedule')}
         </Button>
 
         <Button
@@ -539,12 +591,11 @@ export function AnswerButtons() {
           style={compactButtonStyle}
           title="Dismiss (Ctrl+D): Permanently finish item by removing its Incremental power-up"
         >
-          <DismissIcon size={15} />
-          <div style={{ ...compactLabelStyle, fontWeight: 600 }}>Dismiss</div>
+          <DismissIcon size={iconSize} />
+          {label('Dismiss', true)}
         </Button>
 
-        {/* Divider */}
-        <div style={dividerStyle} />
+        {divider}
 
         {/* Secondary Actions Group */}
         <Button
@@ -554,8 +605,8 @@ export function AnswerButtons() {
           style={compactButtonStyle}
           title="Change Priority (Ctrl+P / Ctrl+Alt+P): Adjust item's priority on the fly"
         >
-          <PriorityIcon size={15} />
-          <div style={compactLabelStyle}>Priority</div>
+          <PriorityIcon size={iconSize} />
+          {label('Priority')}
         </Button>
 
         <Button
@@ -563,18 +614,21 @@ export function AnswerButtons() {
           style={compactButtonStyle}
           title="Review in Editor (Ctrl+Shift+J): Reschedule item, open in editor, and start Editor Review Timer"
         >
-          <ReviewInEditorIcon size={15} />
-          <div style={compactLabelStyle}>In Editor</div>
+          <ReviewInEditorIcon size={iconSize} />
+          {label('In Editor')}
         </Button>
 
-        <Button
-          onClick={() => openRemInBrowserTab(plugin, rem._id)}
-          style={compactButtonStyle}
-          title="Open Editor in New Tab: Instantly open the full source document in a new browser tab"
-        >
-          <NewTabIcon size={15} />
-          <div style={compactLabelStyle}>New Tab</div>
-        </Button>
+        {/* A browser tab is a desktop notion: left out of the narrow bar. */}
+        {!narrow && (
+          <Button
+            onClick={() => openRemInBrowserTab(plugin, rem._id)}
+            style={compactButtonStyle}
+            title="Open Editor in New Tab: Instantly open the full source document in a new browser tab"
+          >
+            <NewTabIcon size={iconSize} />
+            {label('New Tab')}
+          </Button>
+        )}
 
         {/* Scroll to Highlight / Bookmark: compact, beside the other reader actions. */}
         {activeHighlightId && (
@@ -587,25 +641,19 @@ export function AnswerButtons() {
               style={{
                 ...compactButtonStyle,
                 backgroundColor: 'var(--rn-clr-yellow, #fbbf24)',
-                color: 'var(--rn-clr-content-primary)',
-                border: '2px solid var(--rn-clr-yellow, #f59e0b)',
+                color: '#422006',
+                border: '1px solid var(--rn-clr-yellow, #f59e0b)',
                 animation: 'highlightPulse 2s ease-in-out 3',
               }}
               title="Scroll to Highlight: Instantly snap view back to highlight's position"
             >
-              <LocateIcon size={15} />
-              <div style={{ ...compactLabelStyle, fontWeight: 600 }}>To Highlight</div>
+              <LocateIcon size={iconSize} />
+              {label('To Highlight', true)}
             </Button>
             <style>{`
               @keyframes highlightPulse {
-                0%, 100% {
-                  transform: translateY(0) scale(1);
-                  box-shadow: 0 2px 4px rgba(251, 191, 36, 0.3);
-                }
-                50% {
-                  transform: translateY(-2px) scale(1.05);
-                  box-shadow: 0 6px 12px rgba(251, 191, 36, 0.5);
-                }
+                0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+                50% { box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.45); }
               }
             `}</style>
           </>
@@ -622,15 +670,15 @@ export function AnswerButtons() {
               ...compactButtonStyle,
               position: 'relative',
               color: 'var(--rn-clr-blue, #3b82f6)',
-              border: '2px solid var(--rn-clr-blue, #3b82f6)',
+              border: '1px solid var(--rn-clr-blue, #3b82f6)',
             }}
             title={
               'Scroll to Bookmark: Jump to your last saved reading position in the document' +
               (readerBookmarkIsLatest ? ' (saved more recently than the read point)' : '')
             }
           >
-            <BookmarkIcon size={15} />
-            <div style={{ ...compactLabelStyle, fontWeight: 600 }}>To Bookmark</div>
+            <BookmarkIcon size={iconSize} />
+            {label('To Bookmark', true)}
             {/* "Latest" marker: saved more recently than the read point. */}
             {readerBookmarkIsLatest && (
               <span
@@ -652,30 +700,18 @@ export function AnswerButtons() {
             Tinted while the input is open or a note is pending. */}
         <span
           role="button"
+          aria-label="Review note"
           onClick={() => setNoteOpen((o) => !o)}
-          style={{
-            cursor: 'pointer',
-            fontSize: '18px',
-            opacity: noteOpen || noteText ? 1 : 0.7,
-            padding: '4px',
-            borderRadius: '6px',
-            transition: 'opacity 0.2s, background-color 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: noteOpen || noteText ? 'var(--rn-clr-background-tertiary)' : 'transparent',
-          }}
+          style={quietButtonStyle(noteOpen || !!noteText)}
           onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '1';
             e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = noteOpen || noteText ? '1' : '0.7';
             e.currentTarget.style.backgroundColor = noteOpen || noteText ? 'var(--rn-clr-background-tertiary)' : 'transparent';
           }}
           title="Review note: attach an observation to this repetition's history entry (saved when you press Next / Reschedule / Dismiss)"
         >
-          📝
+          <NoteIcon size={narrow ? 18 : 17} />
         </span>
 
         {/* Read point (hybrid cards): a read point is set on a descendant rem.
@@ -685,7 +721,7 @@ export function AnswerButtons() {
             navigating to the read-point descendant instead. */}
         {remReadPointInfo && (
           <>
-            <div style={dividerStyle} />
+            {divider}
             <Button
               onClick={async () => {
                 const ok = window.confirm(
@@ -699,15 +735,27 @@ export function AnswerButtons() {
                 });
               }}
               style={{
-                backgroundColor: 'var(--rn-clr-background-secondary)',
                 color: 'var(--rn-clr-green, #16a34a)',
-                border: '2px solid var(--rn-clr-green, #16a34a)',
+                border: '1px solid var(--rn-clr-green, #16a34a)',
                 fontWeight: 600,
+                position: 'relative',
+                ...(narrow ? compactButtonStyle : {}),
               }}
               title={`Read point set on a descendant rem: "${remReadPointInfo.text}". Click to open it in the Editor — this reviews the current IncRem (starts its timer) and jumps to the read point.`}
             >
-              <div style={buttonStyles.label}>🔖 Read point{remReadPointInfo.isLatest ? ' • latest' : ''}</div>
-              <div style={buttonStyles.sublabel}>Open in Editor →</div>
+              {narrow ? (
+                <>
+                  <BookmarkIcon size={iconSize} />
+                  {remReadPointInfo.isLatest && (
+                    <span style={{ position: 'absolute', top: '4px', right: '4px', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor' }} />
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={buttonStyles.label}>🔖 Read point{remReadPointInfo.isLatest ? ' • latest' : ''}</div>
+                  <div style={buttonStyles.sublabel}>Open in Editor →</div>
+                </>
+              )}
             </Button>
           </>
         )}
@@ -717,7 +765,7 @@ export function AnswerButtons() {
         {/* Open URL for the Companion - Only for HTML type rems */}
         {(remType === 'html' || remType === 'html-highlight') && htmlSourceUrl && (
           <>
-            <div style={dividerStyle} />
+            {divider}
             <Button
               onClick={async () => {
                 try {
@@ -755,29 +803,30 @@ export function AnswerButtons() {
               style={{
                 backgroundColor: 'var(--rn-clr-blue-light, #dbeafe)',
                 color: 'var(--rn-clr-blue-dark, #1e40af)',
-                border: '2px solid var(--rn-clr-blue, #3b82f6)',
+                border: '1px solid var(--rn-clr-blue, #3b82f6)',
                 animation: 'clipperPulse 2.5s ease-in-out infinite',
                 fontWeight: 600,
-                minWidth: '110px',
+                minWidth: '104px',
+                ...(narrow ? compactButtonStyle : {}),
               }}
               title="Open URL for the Companion 📎: Open the original page in a new tab, to read it with the Chrome Companion Extension"
             >
-              <div style={{ ...buttonStyles.label, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span>📎</span>
-                <span>Open URL</span>
-              </div>
-              <div style={buttonStyles.sublabel}>Use Companion</div>
+              {narrow ? (
+                <LinkIcon size={iconSize} />
+              ) : (
+                <>
+                  <div style={{ ...buttonStyles.label, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <LinkIcon size={14} />
+                    <span>Open URL</span>
+                  </div>
+                  <div style={buttonStyles.sublabel}>Use Companion</div>
+                </>
+              )}
             </Button>
             <style>{`
               @keyframes clipperPulse {
-                0%, 100% {
-                  transform: translateY(0) scale(1);
-                  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-                }
-                50% {
-                  transform: translateY(-2px) scale(1.02);
-                  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
-                }
+                0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+                50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.35); }
               }
               @keyframes clipperShine {
                 0% {
@@ -813,9 +862,9 @@ export function AnswerButtons() {
         )}
 
         {/* Desktop-only hint — compact informational badge */}
-        {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
+        {!narrow && ['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
           <>
-            <div style={dividerStyle} />
+            {divider}
             <div
               className="desktop-only-hint"
               title="Press 'P' to open the Rem in RemNote's pop-up previewer for quick edits"
@@ -823,9 +872,9 @@ export function AnswerButtons() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                padding: '4px 10px',
-                borderRadius: '20px',
-                border: '1px dashed var(--rn-clr-border-primary)',
+                padding: '3px 9px 3px 4px',
+                borderRadius: '999px',
+                border: '1px solid var(--rn-clr-border-primary)',
                 backgroundColor: 'transparent',
                 cursor: 'default',
                 pointerEvents: 'none',
@@ -847,7 +896,6 @@ export function AnswerButtons() {
                 fontWeight: 700,
                 color: 'var(--rn-clr-content-primary)',
                 fontFamily: 'monospace',
-                animation: 'keyHintPulse 2.5s ease-in-out infinite',
               }}>P</span>
               <span style={{
                 fontSize: '10.5px',
@@ -856,55 +904,39 @@ export function AnswerButtons() {
                 letterSpacing: '0.2px',
               }}>Edit</span>
             </div>
-            <style>{`
-              @keyframes keyHintPulse {
-                0%, 100% { opacity: 0.7; transform: scale(1); }
-                50% { opacity: 1; transform: scale(1.08); }
-              }
-            `}</style>
           </>
         )}
 
-        <div style={dividerStyle} />
-        <span
-          role="button"
-          style={{
-            cursor: 'pointer',
-            fontSize: '18px',
-            opacity: 0.7,
-            padding: '4px',
-            borderRadius: '6px',
-            transition: 'opacity 0.2s, background-color 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={() => window.open('https://github.com/bjsi/incremental-everything/wiki/Reviewing-Items-in-the-Queue', '_blank')}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '1';
-            e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '0.7';
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-          title="Help: Guide to Answer Buttons"
-        >
-          ℹ️
-        </span>
+        {!narrow && (
+          <span
+            role="button"
+            aria-label="Help"
+            style={quietButtonStyle(false)}
+            onClick={() => window.open('https://hugomarins.github.io/incremental-remnote/Reviewing-Items-in-the-Queue/', '_blank')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+            title="Help: Guide to Answer Buttons"
+          >
+            <HelpIcon size={17} />
+          </span>
+        )}
       </div>
 
       {/* Review-note input — parked in session storage on every keystroke and
           attached to this repetition's history entry by Next/Reschedule/Dismiss. */}
       {noteOpen && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '13px' }}>📝</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--rn-clr-content-tertiary)' }}>
+          <NoteIcon size={15} />
           <input
             type="text"
             autoFocus
             value={noteText}
             maxLength={MAX_NOTE_LENGTH}
-            placeholder="Observation for this repetition (saved with Next / Reschedule / Dismiss)…"
+            placeholder={narrow ? 'Note for this repetition…' : 'Observation for this repetition (saved with Next / Reschedule / Dismiss)…'}
             onChange={(e) => {
               setNoteText(e.target.value);
               setPendingReviewNote(plugin, rem._id, e.target.value).catch(console.error);
@@ -918,7 +950,9 @@ export function AnswerButtons() {
             }}
             style={{
               flex: 1,
-              fontSize: '12px',
+              minWidth: 0,
+              // 16px on a phone: a smaller field makes iOS zoom the page on focus.
+              fontSize: narrow ? '16px' : '12px',
               padding: '6px 10px',
               borderRadius: '8px',
               border: '1px solid var(--rn-clr-border-primary)',
@@ -934,23 +968,23 @@ export function AnswerButtons() {
       {(incRemInfo || (shouldDisplayShield && shieldStatusAsync)) && (
         <div style={infoBarStyle}>
           {/* Left side: Priority and Shield */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: narrow ? '10px' : '14px' }}>
             {/* Priority Display */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontWeight: 600 }}>Priority:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+              {!narrow && <span style={{ fontWeight: 600 }}>Priority</span>}
               <div style={priorityBadgeStyle}>
                 <span>{incRemInfo.priority}</span>
                 {/* Show KB percentile (always current). Doc percentile removed from cache after priority change. */}
                 {percentiles.kb !== null && (
                   <span
-                    style={{ opacity: 0.9, fontSize: '11px' }}
+                    style={{ opacity: 0.9, fontSize: '0.92em', fontWeight: 500 }}
                     title={percentiles.unified
                       ? 'Rank among all IncRems and cards, the Priority Shield’s scale'
                       : 'Rank among IncRems'}
                   >
-                    ({percentiles.kb}% KB
+                    {percentiles.kb}% KB
                     {/* 🔌 Conditionally show Doc percentile */}
-                    {!useLightMode && percentiles.doc !== null && `, ${percentiles.doc}% Doc`})
+                    {!useLightMode && percentiles.doc !== null && ` · ${percentiles.doc}% Doc`}
                   </span>
                 )}
               </div>
@@ -973,16 +1007,16 @@ export function AnswerButtons() {
             {/* 🔌 Conditionally show Shield */}
             {!useLightMode && shouldDisplayShield && shieldStatusAsync && (
               <>
-                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+                {barSeparator}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }} title="Priority Shield">
                     <span style={{
                       display: 'inline-flex',
                       animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
                     }}><ShieldIcon kind="priority" /></span>
-                    <span>Priority Shield:</span>
+                    {!narrow && <span>Shield</span>}
                   </span>
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: narrow ? '8px' : '12px' }}>
                     {shieldStatusAsync.unifiedKb?.absolute != null ? (
                       <PriorityShieldValue
                         label="KB"
@@ -1035,14 +1069,14 @@ export function AnswerButtons() {
           <span
             ref={statsSepRef}
             style={{
-              color: 'var(--rn-clr-content-tertiary)',
+              color: 'var(--rn-clr-border-primary)',
               opacity: statsSepVisible ? 1 : 0,
               pointerEvents: 'none',
             }}
           >|</span>
 
           {/* Right side: Weighted Shield + Reps — wraps together as a unit */}
-          <div ref={statsContainerRef} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div ref={statsContainerRef} style={{ display: 'flex', alignItems: 'center', gap: narrow ? '10px' : '14px' }}>
             {/* Weighted Shield Display */}
             {!useLightMode && shouldDisplayWeightedShield && shieldStatusAsync &&
               shieldStatusAsync.weightedKB !== null && shieldStatusAsync.weightedKB !== undefined && (
@@ -1061,38 +1095,29 @@ export function AnswerButtons() {
                       isDuePredicate: (r: any) => Date.now() >= r.nextRepDate && (!shieldStatusAsync.seenRemIds.includes(r.remId) || r.remId === coreData?.rem?._id),
                     }}
                   />
-                  <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+                  {barSeparator}
                 </>
               )
             }
 
             {/* Repetition History Stats and Icon */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>
-                <strong>{historyStats.reps}</strong> Reps, <strong>{historyStats.totalMinutes}</strong> min
+            <div
+              role="button"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '1px 6px', margin: '0 -6px', borderRadius: '6px', transition: 'background-color 0.15s ease' }}
+              onClick={() => plugin.widget.openPopup('repetition_history', { remId: ctx.remId })}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              title="Repetition History"
+            >
+              <span style={{ whiteSpace: 'nowrap' }}>
+                <strong>{historyStats.reps}</strong> {historyStats.reps === 1 ? 'rep' : 'reps'} · <strong>{historyStats.totalMinutes}</strong> min
               </span>
-              <span
-                role="button"
-                style={{
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  opacity: 0.7,
-                  padding: '4px',
-                  borderRadius: '6px',
-                  transition: 'opacity 0.2s, background-color 0.2s',
-                }}
-                onClick={() => plugin.widget.openPopup('repetition_history', { remId: ctx.remId })}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = '1';
-                  e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = '0.7';
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-                title="Repetition History"
-              >
-                📊
+              <span style={{ color: 'var(--rn-clr-content-tertiary)', display: 'flex' }}>
+                <HistoryIcon size={14} />
               </span>
             </div>
           </div>

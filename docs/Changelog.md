@@ -2,6 +2,22 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.235 - November 17th, 2026
+
+### ✨ New
+
+**Edit an extract in the queue**: a plain Rem-type Incremental Rem now has an **✎ Edit** button on its queue card. It opens RemNote's own editor for the Rem in a panel over the card, with the formatting bar, native clozes, `/` commands, the command palette and the plugin's commands on the focused Rem (Create Cloze Deletion, Extract, priorities). The queue's keys are off while you type, and **Done** brings the card back. It works on a phone, where there is no right sidebar: the editor takes the upper part of the screen, above the keyboard.
+
+📖 [Reviewing Items in the Queue → The editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor)
+
+### 📝 Changed
+
+**Answer buttons**: redrawn flat, at one height, with icons in place of the emoji for the review note, help and repetition history, and a slimmer figures bar. On a phone, or in any pane narrower than 520 px, the bar shrinks to about a third of its height: one row with **Next** and icon-only buttons, and one line of figures. **New Tab**, the **P Edit** hint and the help icon are left out there.
+
+📖 [Reviewing Items in the Queue → The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
+
+**Document Notes sidebar**: it no longer opens by itself when a Rem-type Incremental Rem comes up in the queue, so the right sidebar stays on the Practiced Queues dashboard. Open it by hand with **Sidebar →** on the card. While the editor over the card is open on a Rem, the sidebar shows a note instead of a second copy of the same page, since two editors on one Rem took the cursor from each other.
+
 ## v1.0.234 - November 17th, 2026
 
 ### ✨ New
