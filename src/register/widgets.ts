@@ -14,6 +14,15 @@ import { screenFittedHeight } from '../lib/utils';
    QueueToolbar widgets, so a second widget carried them at QueueBelowTopBar; RemNote
    now mounts them in the chrome's actions on a computer, and that workaround is gone.
    On a phone the Beautiful chrome still mounts none. */
+// The other half of the toolbar widget's see-through page (useTransparentFrame in
+// widgets/queue_toolbar_priority.tsx): its iframe element's colour scheme is pinned to
+// the page's, whatever the queue chrome around it inherits.
+const TOOLBAR_FRAME_CSS = `
+  iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_toolbar_priority&"] {
+    color-scheme: light !important;
+  }
+`;
+
 const QUEUE_BELOW_TOP_BAR_CSS = `
   .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=mastery_drill_queue_bar&"]) {
     min-height: 0.5rem;
@@ -113,6 +122,20 @@ const EXTRACT_EDITOR_POPUPS_CSS = `
   }
   body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) .rn-selected-text-menu {
     z-index: 55 !important;
+  }
+
+  /* On a phone the DocumentViewer is RemNote's mobile document page, which opens with
+     its own top bar (PageHeaderMobile: back arrow, breadcrumb, actions) and a spacer
+     the height of the screen's safe area (--safe-area-inset-top). In a floating panel
+     these covered the first lines of the Rem, and moved with the panel when dragged.
+     Inside the panel the safe area is zero, and the bar is the plugin's own (Done). */
+  div.absolute.z-50:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) {
+    --safe-area-inset-top: 0px !important;
+  }
+  div.absolute.z-50:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) .rn-page-header-mobile,
+  div.absolute.z-50:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) [data-covers-top-area="true"],
+  div.absolute.z-50:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) div[aria-hidden="true"][class*="-mt-safe"] {
+    display: none !important;
   }
 `;
 
@@ -275,6 +298,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   });
 
   await plugin.app.registerCSS('queue-below-top-bar', QUEUE_BELOW_TOP_BAR_CSS);
+  await plugin.app.registerCSS('queue-toolbar-frame', TOOLBAR_FRAME_CSS);
   await plugin.app.registerCSS('sidebar-end-padding', SIDEBAR_END_PADDING_CSS);
   await plugin.app.registerCSS('editor-review-timer-sticky', EDITOR_REVIEW_TIMER_STICKY_CSS);
 

@@ -2,6 +2,18 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.238 - November 17th, 2026
+
+### 🐛 Fixed
+
+**Editor over the card, on a phone**: the first lines of the Rem were hidden under a bar at the top of the panel, even after dragging it. That was RemNote's own phone page bar (back arrow, breadcrumb, actions) and a band the height of the screen's top safe area, which RemNote's document page brings along; inside the panel both are gone, and the Rem starts at the top.
+
+📖 [Reviewing Items in the Queue → The editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor)
+
+**Priority badge in the Beautiful queue**: in RemNote's light theme it showed in a white box on the queue's dark top bar. The box was the browser's backdrop for a frame whose colour scheme differs from its surroundings, not a background of the plugin's; the badge now sits straight on the bar.
+
+📖 [Queue Toolbar Priority](Plugin-Widgets-Reference.md#12-queue-toolbar-priority)
+
 ## v1.0.237 - November 17th, 2026
 
 ### 📝 Changed
