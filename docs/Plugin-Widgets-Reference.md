@@ -730,6 +730,7 @@ Try it below: switch between the two menus, open one, and pick **Incremental Rem
 | PDF | [PDF Control Panel](PDF-Incremental-Reading-Workflow.md#3-pdf-control-panel) |
 | Statistics | [Priority Shield History](#44-priority-shield-graph), [Study Dashboard](Study-Dashboard.md#opening-it) (opens in Document mode on this document) |
 | Flashcards | [Audit Card Enablement](#613-card-enablement-audit-popup) |
+| Audio | [Audio Playlist (this document)](Audio-Playlist.md), [Audio Playlist (rems tagged with this)](Audio-Playlist.md#start) |
 
 **From the queue's ⋮ menu**, the header names the queue's scope, and the actions act on that queue:
 
@@ -741,7 +742,7 @@ Try it below: switch between the two menus, open one, and pick **Incremental Rem
 
 **Using it:**
 
-- `↑`/`↓` move, `Enter` runs the selected action, a number key runs that action directly, `Esc` closes. A click works too.
+- `↑`/`↓` move, `Enter` runs the selected action, a number key runs that action directly (the first nine), `Esc` closes. A click works too.
 - The panel closes once the action has run.
 - While open, it follows you: it switches to the queue actions when you enter the queue, and to the document actions for the focused pane's document when you leave it.
 - Drag it by its header to move it.

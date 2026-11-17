@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
@@ -437,6 +437,12 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   // The timer's controls over RemNote's video page; opened by lib/video_review_bar.ts.
   plugin.app.registerWidget('video_review_bar', WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 'auto' },
+  });
+
+  // The Audio Playlist player (lib/audio_playlist.ts), opened and kept open by the index.
+  // 'auto' both ways: it sizes itself, to a panel or to a bar, and to a phone's width.
+  plugin.app.registerWidget(AUDIO_PLAYLIST_FLOAT, WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 'auto' },
   });
 

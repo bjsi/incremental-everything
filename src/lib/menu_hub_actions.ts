@@ -15,6 +15,7 @@ import { safeRemTextToString, getActivePdfForIncRem, getAllPDFsInRem } from './p
 import { initIncrementalRem } from './incremental_rem';
 import { confirmNoDuplicateSource } from './duplicate_source';
 import { markRemsAsFreshlyCreated } from './incRemHelpers';
+import { playBranch, playTagged } from './audio_playlist';
 
 // The actions of the Document menu ("…" at the top right of a document) and
 // the Queue menu. RemNote lists plugin menu items flat and can't nest them
@@ -77,6 +78,16 @@ export async function openBatchCardPriority(plugin: Plugin, remId: string) {
   }
   await plugin.storage.setSession('batchCardPriorityTagRem', rem._id);
   await plugin.widget.openPopup('batch_card_priority');
+}
+
+/** The document's audios as one playlist (lib/audio_playlist.ts). */
+export async function openAudioPlaylist(plugin: Plugin, remId: string) {
+  await playBranch(plugin, remId);
+}
+
+/** The audios of every rem tagged with this document, for a tag's own page. */
+export async function openTaggedAudioPlaylist(plugin: Plugin, remId: string) {
+  await playTagged(plugin, remId);
 }
 
 export async function openCardEnablementAudit(plugin: Plugin, remId: string) {

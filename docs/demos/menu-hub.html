@@ -131,6 +131,8 @@ const ACTIONS = {
     { id: "shield", group: "Statistics", label: "Priority Shield History", says: `opens Priority Shield History on the <b>${DOC}</b> tab.` },
     { id: "dashboard", group: "Statistics", label: "Study Dashboard", says: `opens the Study Dashboard in Document mode on <b>${DOC}</b>.` },
     { id: "audit", group: "Flashcards", label: "Audit Card Enablement", says: `opens Audit Card Enablement for <b>${DOC}</b>.` },
+    { id: "audio", group: "Audio", label: "Audio Playlist (this document)", says: `opens the audio player on every audio under <b>${DOC}</b>.` },
+    { id: "audio-tag", group: "Audio", label: "Audio Playlist (rems tagged with this)", says: `opens the audio player on the audios of every Rem tagged with <b>${DOC}</b>.` },
   ],
   queue: [
     { id: "q-priority-queue", group: "This queue", label: "Priority Queue", says: `opens the Priority Queue popup on this queue's scope, <b>${DOC}</b>.` },
@@ -273,9 +275,9 @@ function renderHub() {
     <div class="hub-sub">${sub}</div></div><button class="hub-x" id="hubX" title="Close (Esc)">✕</button></div><div class="hub-list">`;
   acts.forEach((a, i) => {
     if (i === 0 || acts[i - 1].group !== a.group) html += `<div class="group">${a.group}</div>`;
-    html += `<button class="act${i === state.selected ? " on" : ""}" data-i="${i}"><span class="n">${i + 1}</span><span>${label(a)}</span></button>`;
+    html += `<button class="act${i === state.selected ? " on" : ""}" data-i="${i}"><span class="n">${i < 9 ? i + 1 : ""}</span><span>${label(a)}</span></button>`;
   });
-  html += `</div><div class="hub-foot">↑↓ choose · Enter or 1–${acts.length} run · Esc close</div>`;
+  html += `</div><div class="hub-foot">↑↓ choose · Enter or 1–${Math.min(9, acts.length)} run · Esc close</div>`;
   const h = $("hub");
   h.innerHTML = html;
   $("hubX").addEventListener("click", () => closeHub());
@@ -298,7 +300,7 @@ function onKey(e) {
   }
   if (e.key === "Enter") { e.preventDefault(); run(state.selected); return; }
   const d = Number(e.key);
-  if (Number.isInteger(d) && d >= 1 && d <= n) { e.preventDefault(); run(d - 1); }
+  if (Number.isInteger(d) && d >= 1 && d <= Math.min(9, n)) { e.preventDefault(); run(d - 1); }
 }
 
 // The hub closes once its action has run.

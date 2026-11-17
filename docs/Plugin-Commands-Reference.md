@@ -242,6 +242,18 @@ In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) opened from the queue's 
 
   *Upscale image with ChatGPT*, *Read aloud* and *Add pronunciation* are registered only while the **Local Media Bridge** setting is on.
 
+- <a id="audio-playlist"></a>**Audio Playlist: Play This Branch** — `quick: apb`
+  Plays every audio under the selected Rems, the Rem with the cursor or the open document, one after the other, in a floating player that remembers where you stopped. With nothing to play under the cursor, the whole document plays.
+
+- **Audio Playlist: Play Rems Tagged With This Rem** — `quick: apt`
+  Plays every audio in the Rems tagged with the focused Rem or the open document (a tag's own page), across the knowledge base.
+
+- **Audio Playlist: Open Player** — `quick: apo`
+  Opens the player on the playlist heard last, paused where it stopped.
+
+  The first two are also in the document's [Menu Hub](Plugin-Widgets-Reference.md#menu-hub), which is how to start a playlist on a phone.
+  📖 See [Audio Playlist](Audio-Playlist.md).
+
 - <a id="cycle-image-size"></a>**Cycle Image Size (Fit / Large / Medium / Small / Original)** (`Opt+Shift+G` / `Alt+Shift+G`) — `quick: cis`
   Resizes the images of a card or Rem, including imported ones the queue can show zoomed in and cut off. Each press moves them one step along **Fit → Large → Medium → Small → Original**, and a small bar shows the size set.
   Acts on the current queue card (or the Rem selected in the previewer), or on the focused or selected Rems in the editor, and three levels below. It asks first before changing images you have sized, or more than 5 images. Image Occlusions and highlight images are left alone.

@@ -25,6 +25,7 @@ import { resolveRemTextAsTitle } from '../lib/richTextRemRefs';
 import { showMessageDialog } from '../lib/message_dialog';
 import {
   MenuHubTarget,
+  openAudioPlaylist,
   openBatchCardPriority,
   openBatchPriority,
   openCardEnablementAudit,
@@ -37,6 +38,7 @@ import {
   openQueueShieldHistory,
   openSetPriority,
   openSortingCriteria,
+  openTaggedAudioPlaylist,
   pauseIncRemsFor15Min,
   toggleIncrementalRem,
   toggleIncRemsOnThisDevice,
@@ -88,6 +90,8 @@ const DOCUMENT_ACTIONS: HubAction[] = [
   { id: 'shield', label: 'Priority Shield History', group: 'Statistics', run: doc(openPriorityShieldHistory), needsRem: true },
   { id: 'dashboard', label: 'Study Dashboard', group: 'Statistics', run: doc(openDocumentStudyDashboard), needsRem: true },
   { id: 'audit', label: 'Audit Card Enablement', group: 'Flashcards', run: doc(openCardEnablementAudit), needsRem: true },
+  { id: 'audio', label: 'Audio Playlist (this document)', group: 'Audio', run: doc(openAudioPlaylist), needsRem: true },
+  { id: 'audio-tag', label: 'Audio Playlist (rems tagged with this)', group: 'Audio', run: doc(openTaggedAudioPlaylist), needsRem: true },
 ];
 
 const QUEUE_ACTIONS: HubAction[] = [
@@ -305,7 +309,7 @@ function MenuHub() {
       return;
     }
     const digit = Number(e.key);
-    if (Number.isInteger(digit) && digit >= 1 && digit <= actions.length) {
+    if (Number.isInteger(digit) && digit >= 1 && digit <= Math.min(9, actions.length)) {
       e.preventDefault();
       run(digit - 1);
     }
@@ -449,7 +453,7 @@ function MenuHub() {
                     flexShrink: 0,
                   }}
                 >
-                  {i + 1}
+                  {i < 9 ? i + 1 : ''}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>{labelFor(action)}</span>
                 {busy === action.id && <span style={{ fontSize: 11 }}>…</span>}
@@ -467,7 +471,7 @@ function MenuHub() {
           borderTop: '1px solid var(--rn-clr-border-primary)',
         }}
       >
-        ↑↓ choose · Enter or 1–{actions.length} run · Esc close
+        ↑↓ choose · Enter or 1–{Math.min(9, actions.length)} run · Esc close
       </div>
     </div>
   );

@@ -43,6 +43,7 @@ import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerNoticeHost } from '../lib/notice';
+import { registerAudioPlaylist } from '../lib/audio_playlist';
 import { registerLogosBridge } from '../lib/logos_bridge';
 import { registerMediaBridge } from '../lib/media_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
@@ -170,6 +171,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerWidgets(plugin);
   // The review timer's floating bar over RemNote's video page.
   registerVideoReviewBar(plugin);
+  // Audio Playlist: its commands, and keeping its floating player open while wanted.
+  registerAudioPlaylist(plugin);
   // Runs Cycle Image Size's presses, and what its popup and floating widget ask for.
   registerImageSizeSession(plugin);
 

@@ -32,6 +32,18 @@ span.AudioVideoNode
 
 `audio[src]` is the only place the address reaches the DOM, and it is the *resolved* one: the outside address for a linked file; for a stored file the S3 address or a local/blob URL, never `%LOCAL_FILE%`. So `audio[src^="http"]:not([src*="remnote-user-data"])` selects linked audio, and `:has()` lifts that to the box. The "Mark Audio That Is Only Linked" setting is built on it (`src/register/settings.ts`).
 
+## Playing audio from a plugin
+
+Read in the running bundle (1.30.4, `build_overrides/`), with a stored file checked by `curl`, November 16, 2026. Used by the Audio Playlist (`src/lib/audio_playlist.ts`).
+
+- **RemNote has no audio library.** The inline player is `AudioVideoNode` (chunk 72624): a bare `<audio>` and a 28 px bar of its own. Position and speed are component state, and `onEnded` only releases an autoplay lock, so nothing plays the next audio and nothing is remembered. Phones run the same bundle in a Capacitor shell.
+- **A stored audio is a public file.** `https://remnote-user-data.s3.amazonaws.com/<name>.mpga` answers `audio/mpeg`, honours `Range`, and sends `Access-Control-Allow-Origin: *` even to `Origin: null` (a sandboxed plugin frame), with `range` allowed in the preflight. A plugin can use it as an `<audio src>` and can also `fetch` its first bytes, which is how the playlist reads a file's length without a media element.
+- **Files cannot be joined.** The main KB mixes 24 kHz mono (TTS), 44.1 kHz stereo (course audio) and 48 kHz clips under a second. One element with a timeline laid over the tracks is the way to play them as one.
+- **`getDescendants()` comes in document order.** The host builds it depth-first over each Rem's ordered children (`allDescendantIdsAsync`), so a branch needs one call and no `positionAmongstSiblings()`. This is how the code reads, not a promise of the SDK.
+- **A floating widget is the place for the element.** The floating layer is mounted in `RootAppContainer` with no phone exclusion, so it survives navigation and the queue. An Escape that reaches the host document closes every float, and there is no "closed" event: the index has to poll `isFloatingWidgetOpen` and reopen.
+- **Change track inside the `ended` handler.** Give the same element its next `src` and call `play()` there, not in a React effect. Reported by the user on an iPhone (November 16, 2026): RemNote's audio keeps playing with the screen locked and shows lock-screen controls.
+- **A source change fires `timeupdate` at 0 before anything loads.** A seek owed to the new track must survive it: apply it at `loadedmetadata`, and only consider it done once `readyState >= 1`.
+
 ## Uploading from a plugin
 
 The SDK (0.0.46) exposes nothing that uploads. Two calls reach RemNote's upload code as a side effect:

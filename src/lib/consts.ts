@@ -904,3 +904,21 @@ export const searchBrowseAckKey = 'search-browse-ack'; // session: the `at` the 
 export const savedSearchesKey = 'search-browse-saved'; // synced: SavedSearch[]
 export const searchHistoryKey = 'search-browse-history'; // local (per device): last searches, newest first
 export const searchQueuesParentName = 'Search Queues';
+
+// Audio Playlist (lib/audio_playlist.ts; widgets/audio_playlist_float.tsx): the audios
+// of a branch, or of the rems carrying a tag, played as one in a floating player.
+export const AUDIO_PLAYLIST_FLOAT = 'audio_playlist_float';
+export const audioPlaylistBranchCommandId = 'audio-playlist-branch';
+export const audioPlaylistTagCommandId = 'audio-playlist-tag';
+export const audioPlaylistOpenCommandId = 'audio-playlist-open';
+// Session: the playlist asked for (AudioPlaylistRequest), whether the player should be
+// on screen (the index opens it, and reopens it when the host closed it), its float id,
+// and whether it was playing, so a reopened player carries on.
+export const audioPlaylistRequestKey = 'audio-playlist-request';
+export const audioPlaylistWantedKey = 'audio-playlist-wanted';
+export const audioPlaylistFloatIdKey = 'audio-playlist-float-id';
+export const audioPlaylistPlayingKey = 'audio-playlist-playing';
+// Synced, per KB (`<prefix>_<kbId>`): positions, speed and recent tags (PlayerState),
+// and each file's length in seconds, so a list is measured once.
+export const audioPlaylistStateKeyPrefix = 'audio-playlist-state';
+export const audioPlaylistDurationsKeyPrefix = 'audio-playlist-durations';
