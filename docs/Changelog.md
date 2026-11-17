@@ -8,6 +8,10 @@ This page documents the major changes and improvements for each version of the I
 
 **Audio Playlist**: plays the audios in your notes one after the other, as if they were a single recording, in a floating player that stays on screen across documents and the flashcard queue. Make a playlist from a document or any Rem and everything under it, from the Rems carrying a tag across the knowledge base, or from a branch narrowed to a tag. One position bar and clock cover the whole playlist; −15 / +15 cross from one audio to the next; speed goes from 0.75× to 2×. The position in each playlist is remembered and synced, so one paused on the computer resumes on the phone. Each audio is named after the Rem it belongs to, with the levels above it. It works on the phone, with no helper and no setup: open a document's **⋯** menu → **Incremental RemNote…** → **Audio Playlist (this document)**.
 
+Try it (the plugin's own player, over an invented document):
+
+<iframe src="../demos/audio-playlist.html" title="Audio Playlist demo" loading="lazy" style="width:100%;height:560px;border:0;display:block"></iframe>
+
 📖 [Audio Playlist](Audio-Playlist.md)
 
 ## v1.0.233 - November 16th, 2026

@@ -6,6 +6,10 @@ RemNote's own inline player handles one audio at a time: nothing plays the next 
 
 **Works on the phone too.** It needs no helper and no settings.
 
+Try it: this is the plugin's own player, over an invented document with four short clips made for this page. Start a playlist, drag the bar from one audio into the next, close the player and open it again.
+
+<iframe src="../demos/audio-playlist.html" title="Audio Playlist demo" loading="lazy" style="width:100%;height:560px;border:0;display:block"></iframe>
+
 ## Starting a playlist { #start }
 
 A playlist is made from **a branch**, from **a tag**, or from both.
