@@ -166,8 +166,9 @@ When the current Incremental Rem is a plain **Rem** (a text/note extract, not a 
 - **Formatting and clozes:** select text for the formatting bar (bold, highlight, native cloze), or use the usual shortcuts.
 - **Commands:** `/` commands and the command palette work, and so do the plugin's own commands on the focused Rem, such as [Create Cloze Deletion](Plugin-Commands-Reference.md#core-incremental-commands) (`Opt+Z` / `Alt+Z`), Extract and the priority commands.
 - **Click the text to start typing.** While the editor has the cursor, the queue's own keys (Space, the number keys, arrows) are off, so nothing you type can rate or advance the card.
-- **Done** closes the editor and shows the card again; the preview already has your changes. The editor also closes when the queue moves to another item. Drag its header to move it.
-- **On a phone** the editor takes the upper part of the screen, so it stays above the keyboard. This is the way to edit an extract there, since a phone has no right sidebar.
+- **Done** closes the editor and shows the card again; the preview already has your changes. While the editor is open, **✎ Edit** on the card reads **✓ Done** and closes it too. Drag the bar with Done to move the panel.
+- **It follows the card.** The editor closes by itself when you press **Next** (or anything else that brings the next item), when you leave the queue, and when you navigate away.
+- **On a phone** the editor starts at the card's top edge and is kept short, so it stays above the keyboard; its bar with **Done** is at the bottom of the panel, under RemNote's own page. This is the way to edit an extract there, since a phone has no right sidebar.
 
 Only one editor is open on a Rem at a time. **Sidebar →** (beside ✎ Edit, on a computer) closes the editor over the card and opens the Rem in the [Document Notes sidebar](Plugin-Widgets-Reference.md#14-document-notes-sidebar) instead. The sidebar never opens by itself for these Rems, so it stays on your [Practiced Queues dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) while you review.
 

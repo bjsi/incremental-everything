@@ -14,8 +14,9 @@ import { FloatingPosition, useFloatingWidgetDrag } from '../lib/floating_widget_
  * it is a normal RemNote editor: formatting, clozes, `/`, references, and the plugin's
  * own commands on the focused Rem (Create Cloze Deletion, Extract, priorities).
  *
- * The header belongs to this frame; the page under it is drawn by the host. Done, or
- * Esc once the editor has let go of it, closes the panel. Drag the header to move it.
+ * The bar with Done belongs to this frame; the page is drawn by the host. Done, or Esc
+ * once the editor has let go of it, closes the panel. Drag the bar to move it. The
+ * index closes it too, when the queue leaves the card (lib/extract_editor.ts).
  */
 function ExtractEditorFloat() {
   const plugin = usePlugin();
@@ -40,7 +41,65 @@ function ExtractEditorFloat() {
 
   if (!target) return null;
   const { width, height, compact } = target;
-  const HEADER = compact ? 38 : 34;
+  const BAR = compact ? 44 : 34;
+
+  // The bar with Done, which is also the drag handle. On a computer it is the header.
+  // On a phone it is at the BOTTOM: RemNote's mobile document page draws its own top
+  // bar (back arrow and title) over the first 40 px of the panel, and a header there
+  // is covered, Done included.
+  const bar = (
+    <div
+      onPointerDown={startDrag}
+      style={{
+        flex: 'none',
+        height: BAR,
+        boxSizing: 'border-box',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: compact ? '0 6px 0 10px' : '0 6px 0 12px',
+        background: 'var(--rn-clr-background-secondary)',
+        [compact ? 'borderTop' : 'borderBottom']: '1px solid var(--rn-clr-border-primary)',
+        cursor: 'move',
+        touchAction: 'none',
+        userSelect: 'none',
+        fontSize: 12,
+      }}
+    >
+      <span style={{ fontWeight: 600, color: 'var(--rn-clr-content-accent, #3b82f6)', flex: 'none' }}>
+        {compact ? '⠿ ✎ Editing' : '✎ Editing'}
+      </span>
+      <span
+        title={target.title}
+        style={{ flex: 1, minWidth: 0, color: 'var(--rn-clr-content-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+      >
+        {target.title}
+      </span>
+      {!compact && (
+        <span style={{ flex: 'none', color: 'var(--rn-clr-content-tertiary)', fontSize: 11 }}>
+          click the text to type · the queue's keys are off while you edit
+        </span>
+      )}
+      <button
+        onClick={() => void closeExtractEditor(plugin)}
+        title="Close the editor and go back to the queue"
+        style={{
+          flex: 'none',
+          height: compact ? 34 : 24,
+          padding: compact ? '0 18px' : '0 12px',
+          borderRadius: 6,
+          border: 'none',
+          background: 'var(--rn-clr-content-accent, #3b82f6)',
+          color: 'white',
+          fontSize: compact ? 14 : 12,
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        Done
+      </button>
+    </div>
+  );
 
   return (
     <div
@@ -58,64 +117,17 @@ function ExtractEditorFloat() {
         overflow: 'hidden',
       }}
     >
-      <div
-        onPointerDown={startDrag}
-        style={{
-          flex: 'none',
-          height: HEADER,
-          boxSizing: 'border-box',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '0 6px 0 12px',
-          background: 'var(--rn-clr-background-secondary)',
-          borderBottom: '1px solid var(--rn-clr-border-primary)',
-          cursor: 'move',
-          touchAction: 'none',
-          userSelect: 'none',
-          fontSize: 12,
-        }}
-      >
-        <span style={{ fontWeight: 600, color: 'var(--rn-clr-content-accent, #3b82f6)', flex: 'none' }}>✎ Editing</span>
-        <span
-          title={target.title}
-          style={{ flex: 1, minWidth: 0, color: 'var(--rn-clr-content-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-        >
-          {target.title}
-        </span>
-        {!compact && (
-          <span style={{ flex: 'none', color: 'var(--rn-clr-content-tertiary)', fontSize: 11 }}>
-            click the text to type · the queue's keys are off while you edit
-          </span>
-        )}
-        <button
-          onClick={() => void closeExtractEditor(plugin)}
-          title="Close the editor and go back to the queue"
-          style={{
-            flex: 'none',
-            height: compact ? 30 : 24,
-            padding: '0 12px',
-            borderRadius: 6,
-            border: 'none',
-            background: 'var(--rn-clr-content-accent, #3b82f6)',
-            color: 'white',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Done
-        </button>
-      </div>
+      {!compact && bar}
       {/* The host draws the page over this box, at this size. */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         <DocumentViewer
           key={target.remId}
           documentId={target.remId as RemId}
           width="100%"
-          height={height - HEADER - 2}
+          height={height - BAR - 2}
         />
       </div>
+      {compact && bar}
     </div>
   );
 }

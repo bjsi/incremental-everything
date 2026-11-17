@@ -3,14 +3,14 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId, useTrackerPlugin } from '@remnote/plugin-sdk';
-import { powerupCode, dismissedPowerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
+import { powerupCode, dismissedPowerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey, extractEditorTargetKey } from '../lib/consts';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import {
   getChildrenExcludingSlots,
   getDescendantsExcludingSlots
 } from '../lib/powerupSlotFilter';
-import { closeExtractEditor, openExtractEditor } from '../lib/extract_editor';
+import { closeExtractEditor, ExtractEditorTarget, openExtractEditor } from '../lib/extract_editor';
 import { CardPriorityInfo } from '../lib/card_priority';
 
 interface ExtractViewerProps {
@@ -541,6 +541,14 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
     plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
   }, [plugin, rem._id]);
 
+  // Whether the editor is open on this Rem: the footer's button then closes it. On a
+  // phone that button is the one control never covered by the panel or the keyboard bar.
+  const editing =
+    useTrackerPlugin(
+      async (rp) => (await rp.storage.getSession<ExtractEditorTarget>(extractEditorTargetKey))?.remId === rem._id,
+      [rem._id]
+    ) ?? false;
+
   // The editable page, in a floating panel over this card (lib/extract_editor.ts).
   const editHere = useCallback(async () => {
     const title = await resolveRemTextForBreadcrumb(plugin, rem.text || []).catch(() => '');
@@ -712,8 +720,10 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
             )}
           </div>
           <button
-            onClick={() => void editHere()}
-            title="Edit this Rem here: opens RemNote's editor over this card (formatting, clozes, / commands). Done or Esc brings the queue back."
+            onClick={() => void (editing ? closeExtractEditor(plugin, rem._id) : editHere())}
+            title={editing
+              ? 'Close the editor and show this card again'
+              : "Edit this Rem here: opens RemNote's editor over this card (formatting, clozes, / commands). Done or Esc brings the queue back."}
             style={{
               flexShrink: 0,
               display: 'inline-flex',
@@ -730,7 +740,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
               whiteSpace: 'nowrap',
             }}
           >
-            ✎ Edit
+            {editing ? '✓ Done' : '✎ Edit'}
           </button>
           {!narrow && <button
             onClick={() => void openNotesSidebar()}

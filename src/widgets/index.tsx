@@ -44,6 +44,7 @@ import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerNoticeHost } from '../lib/notice';
 import { registerAudioPlaylist } from '../lib/audio_playlist';
+import { registerExtractEditorHost } from '../lib/extract_editor';
 import { registerLogosBridge } from '../lib/logos_bridge';
 import { registerMediaBridge } from '../lib/media_bridge';
 import { registerExternalPriorityBridge } from '../lib/external_priority_bridge';
@@ -173,6 +174,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerVideoReviewBar(plugin);
   // Audio Playlist: its commands, and keeping its floating player open while wanted.
   registerAudioPlaylist(plugin);
+  // The Extract Editor over a queue card closes when that card goes.
+  registerExtractEditorHost(plugin);
   // Runs Cycle Image Size's presses, and what its popup and floating widget ask for.
   registerImageSizeSession(plugin);
 

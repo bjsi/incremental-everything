@@ -20,8 +20,9 @@
  * its children below, with everything a normal editor has (formatting, clozes, `/`,
  * references, the plugin's own commands on the focused Rem).
  */
-import { RNPlugin } from '@remnote/plugin-sdk';
-import { EXTRACT_EDITOR_FLOAT, extractEditorFloatIdKey, extractEditorTargetKey } from './consts';
+import { AppEvents, ReactRNPlugin, RNPlugin } from '@remnote/plugin-sdk';
+import { currentIncRemKey, EXTRACT_EDITOR_FLOAT, extractEditorFloatIdKey, extractEditorTargetKey } from './consts';
+import { isQueueUrl } from './open_in_window';
 
 const LOG = '[ExtractEditor]';
 
@@ -37,8 +38,11 @@ export interface ExtractEditorTarget {
   at: number;
 }
 
-/** The Extract Viewer's card inside its frame: `padding: 48px 16px 16px`, at most 1000 wide. */
-const CARD = { top: 48, side: 16, bottom: 16, maxWidth: 1000 };
+/**
+ * The Extract Viewer's card inside its frame: `padding: 48px 16px 16px`, at most 1000
+ * wide; `48px 4px 4px` on a phone-sized queue.
+ */
+const CARD = { top: 48, side: 16, bottom: 16, maxWidth: 1000, sideCompact: 4 };
 /** Below this width the queue is a phone's. */
 const COMPACT_PX = 520;
 
@@ -56,10 +60,17 @@ export function editorPlacement(
     return { width, height, position: { top: 80, left: Math.max(8, Math.round((screen.width - width) / 2)) }, compact: screen.width < COMPACT_PX };
   }
   if (frame.width < COMPACT_PX) {
-    // The keyboard takes about 40% of a phone's screen: stay in the part above it.
-    const width = Math.round(frame.width - 8);
-    const height = Math.max(200, Math.min(Math.round(frame.height - 8), Math.round(screen.height * 0.44)));
-    return { width, height, position: { top: Math.round(frame.top + 4), left: Math.round(frame.left + 4) }, compact: true };
+    // From the card's top edge down. The keyboard takes about 40% of a phone's screen,
+    // so the panel is kept short rather than as tall as the card.
+    const width = Math.round(frame.width - 2 * CARD.sideCompact);
+    const cardHeight = frame.height - CARD.top - CARD.sideCompact;
+    const height = Math.round(Math.max(200, Math.min(cardHeight, screen.height * 0.4)));
+    return {
+      width,
+      height,
+      position: { top: Math.round(frame.top + CARD.top), left: Math.round(frame.left + CARD.sideCompact) },
+      compact: true,
+    };
   }
   const width = Math.round(Math.min(CARD.maxWidth, frame.width - 2 * CARD.side));
   const height = Math.round(Math.max(240, frame.height - CARD.top - CARD.bottom));
@@ -122,4 +133,41 @@ export async function closeExtractEditor(plugin: RNPlugin, remId?: string): Prom
   } catch (err) {
     console.warn(LOG, 'could not close the editor', err);
   }
+}
+
+/**
+ * The index's part: closing the editor when its card is gone.
+ *
+ * The Extract Viewer cannot be trusted to do it. When the queue advances or closes, the
+ * host destroys the viewer's frame, and whatever its cleanup had started (the session
+ * read, the close call) dies with it. The index lives all session and hears the queue's
+ * events, so it closes the editor when another card loads, when the queue exits, and
+ * when the window leaves the queue by any other road.
+ */
+export function registerExtractEditorHost(plugin: ReactRNPlugin) {
+  const target = () => plugin.storage.getSession<ExtractEditorTarget>(extractEditorTargetKey).catch(() => undefined);
+
+  // The event carries a card id, and none for the plugin's own items (read in the
+  // bundle: `{cardId}` only). The Incremental Rem on screen is in session storage,
+  // written when the queue asked for it, before this fires.
+  plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async (data: { cardId?: string } | undefined) => {
+    const open = await target();
+    if (!open) return;
+    if (!data?.cardId) {
+      // The same Rem again (a re-render, a hybrid card flipping views) keeps the editor.
+      const current = await plugin.storage.getSession<string>(currentIncRemKey).catch(() => undefined);
+      if (current === open.remId) return;
+    }
+    await closeExtractEditor(plugin);
+  });
+  plugin.event.addListener(AppEvents.QueueExit, undefined, async () => {
+    if (await target()) await closeExtractEditor(plugin);
+  });
+  plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
+    if (!(await target())) return;
+    const url = await plugin.window.getURL().catch(() => undefined);
+    if (typeof url === 'string' && !isQueueUrl(url)) await closeExtractEditor(plugin);
+  });
+  // One left from before a plugin reload has no viewer under it any more.
+  void closeExtractEditor(plugin);
 }

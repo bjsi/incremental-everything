@@ -23,12 +23,15 @@ describe('extract_editor', () => {
     assert.equal(p.position.left, 16);
   });
 
-  it('keeps to the top on a phone, above the keyboard', () => {
+  it('starts at the card on a phone and stays short, for the keyboard', () => {
     const p = editorPlacement({ top: 100, left: 0, width: 390, height: 600 }, { width: 390, height: 844 });
     assert.equal(p.compact, true);
     assert.equal(p.width, 382);
-    assert.equal(p.height, Math.round(844 * 0.44));
-    assert.deepEqual(p.position, { top: 104, left: 4 });
+    assert.equal(p.height, Math.round(844 * 0.4));
+    // The card's top edge, 48 below the frame's: never above the card.
+    assert.deepEqual(p.position, { top: 148, left: 4 });
+    // A short queue frame: no taller than the card itself.
+    assert.equal(editorPlacement({ top: 100, left: 0, width: 390, height: 300 }, { width: 390, height: 844 }).height, 248);
   });
 
   it('falls back to a centred panel when the frame is unknown', () => {
