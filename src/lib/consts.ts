@@ -673,6 +673,10 @@ export const editorReviewTimerRemIdKey = 'editor-review-timer-rem-id';
 export const editorReviewTimerStartKey = 'editor-review-timer-start';
 export const editorReviewTimerIntervalKey = 'editor-review-timer-interval';
 export const editorReviewTimerPriorityKey = 'editor-review-timer-priority';
+// The slot's priority when the review started. When the slot no longer holds it
+// at End Review, the priority was changed elsewhere during the review and that
+// newer value wins over the timer's copy.
+export const editorReviewTimerPriorityBaseKey = 'editor-review-timer-priority-base';
 export const editorReviewTimerRemNameKey = 'editor-review-timer-rem-name';
 // The timer's clock is a PAIR: elapsed = accumulated + (now − start), with
 // `paused-at` freezing the running segment. Anything adjusting the elapsed time
