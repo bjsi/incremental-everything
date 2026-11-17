@@ -7,7 +7,9 @@ import {
   showDismissedIndicatorSettingId,
   hideDismissedTagSettingId,
   showLinkedAudioIndicatorSettingId,
+  statisticsQueueButtonId,
 } from '../lib/consts';
+import { isMobileDevice } from '../lib/mobileUtils';
 import { PRIORITY_BAND_TAG_HIDE_CSS } from '../lib/priority_bands';
 import { PRONUNCIATION_CSS, PRONUNCIATION_CSS_ID } from '../lib/pronunciation_css';
 import {
@@ -97,6 +99,17 @@ const hideDismissedTagId = 'hide-dismissed-tag';
 const HIDE_DISMISSED_TAG_CSS = `
   [data-rem-tags~="dismissed"] .hierarchy-editor__tag-bar__tag {
     display: none;
+  }
+`;
+
+// The Statistics plugin's queue button (another plugin's widget, "queue-toolbar-button").
+// Read in its bundle (1.6.0): on a touch screen under 780 px wide it registers at
+// QueueBelowTopBar, because RemNote's Beautiful queue on a phone mounts no QueueToolbar
+// widgets; elsewhere at QueueToolbar. Each host wrapper carries the location's class,
+// so one rule covers the compact top bar, the Beautiful chrome and the phone row.
+const STATISTICS_QUEUE_BUTTON_CSS = `
+  :is(.rn-queue__widget-toolbar, .rn-queue__widget-below-top-bar):has(iframe[data-plugin-id="statistics"][src*="widgetName=queue-toolbar-button"]) {
+    display: none !important;
   }
 `;
 
@@ -275,6 +288,10 @@ export async function registerPluginSettings(plugin: ReactRNPlugin, opts: { ids:
   }
   if (await getIESetting(plugin, showLinkedAudioIndicatorSettingId)) {
     await plugin.app.registerCSS(showLinkedAudioIndicatorId, SHOW_LINKED_AUDIO_INDICATOR_CSS);
+  }
+  const statisticsButton = await getIESetting(plugin, statisticsQueueButtonId);
+  if (statisticsButton === 'hide' || (statisticsButton === 'hide-phone' && (await isMobileDevice(plugin)))) {
+    await plugin.app.registerCSS('statistics-queue-button', STATISTICS_QUEUE_BUTTON_CSS);
   }
 
   // Unconditional: the band tags are an implementation detail, so their tag-bar

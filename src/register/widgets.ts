@@ -3,54 +3,21 @@ import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupC
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
-/* Shows each queue badge/timer widget in one queue variant only. RemNote wraps
-   each location widget as
-     div.fade-in-first-load.<location class> > div > iframe
-   and a hidden iframe is how the widget learns to stop polling (useHostShown).
+/* The regular-queue Mastery Drill bar sits at QueueBelowTopBar. Registering anything
+   there drops RemNote's own h-2 spacer (it renders only when the location is empty), so
+   the bar's wrapper keeps that 0.5rem. The slot is a flex child of the queue box without
+   shrink-0: once a revealed answer overflows the box, flexbox would squeeze the wrapper
+   and its overflow:hidden clip the bar.
 
-   Compact: the toolbar widgets live in the top bar. queue_beautiful_bar sits in
-   .rn-queue (which carries .queue-beautiful-box only in Beautiful) and is hidden.
-   Registering anything at QueueBelowTopBar drops RemNote's own h-2 spacer there
-   (it renders only when the location is empty), so its wrapper keeps that 0.5rem.
-
-   Beautiful: RemNote now mounts QueueToolbar widgets in the chrome's action row
-   (.queue-beautiful-chrome-actions), where the badge looks out of place — so our
-   two are hidden there and queue_beautiful_bar carries them. Its wrapper leaves
-   the flow and overlays the card box's top-right corner: the box already opens
-   with 40px of blank space (that 0.5rem spacer + the card content's pt-8) above
-   the breadcrumbs, and the ~36px badge row fits inside it. The spacer moves to
-   the next sibling so the card sits exactly where RemNote puts it. The width cap
-   keeps the transparent iframe from swallowing clicks across the whole strip
-   when the card content scrolls under it; lib/queue_beautiful_bar_fit narrows
-   it further, to the widget's reported content width. */
-const QUEUE_VARIANT_CSS = `
-  .queue-beautiful-chrome-actions .rn-queue__widget-toolbar:has(> div > iframe[data-plugin-id="incremental-everything"]:is([src*="widgetName=queue_toolbar_priority&"], [src*="widgetName=no_inc_timer_indicator&"])) {
-    display: none;
-  }
-  .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) {
+   The queue's own badge and timer are one widget at QueueToolbar, in both variants
+   (queue_toolbar_priority). When the Beautiful queue first shipped its chrome showed no
+   QueueToolbar widgets, so a second widget carried them at QueueBelowTopBar; RemNote
+   now mounts them in the chrome's actions on a computer, and that workaround is gone.
+   On a phone the Beautiful chrome still mounts none. */
+const QUEUE_BELOW_TOP_BAR_CSS = `
+  .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=mastery_drill_queue_bar&"]) {
     min-height: 0.5rem;
     flex-shrink: 0;
-  }
-  /* The slot is a flex child of the queue box without shrink-0: once a revealed answer
-     overflows the box, flexbox squeezes the wrapper and its overflow:hidden clips the bar. */
-  .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=mastery_drill_queue_bar&"]) {
-    flex-shrink: 0;
-  }
-  /* In Beautiful the overlay below also covers the drill bar's right end. Both are sized to
-     the overlay's content by lib/queue_beautiful_bar_fit; the width below is the fallback. */
-  .rn-queue:not(.queue-beautiful-box) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"] {
-    display: none;
-  }
-  .queue-beautiful-box > .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: min(360px, 60%);
-    min-height: 0;
-    z-index: 5;
-  }
-  .queue-beautiful-box > .rn-queue__widget-below-top-bar:has(> div > iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue_beautiful_bar&"]) + * {
-    margin-top: 0.5rem;
   }
 `;
 
@@ -298,13 +265,8 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerWidget('no_inc_timer_indicator', WidgetLocation.QueueToolbar, {
-    dimensions: {
-      width: 'auto',
-      height: 'auto',
-    },
-  });
-
+  // The queue's toolbar: the No-Inc countdown and the priority badge, one iframe for
+  // both queue variants (widgets/queue_toolbar_priority.tsx).
   plugin.app.registerWidget('queue_toolbar_priority', WidgetLocation.QueueToolbar, {
     dimensions: {
       width: 'auto',
@@ -312,16 +274,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // Beautiful queue variant: carries the two widgets above at QueueBelowTopBar
-  // (top of the card box). QUEUE_VARIANT_CSS hides it in Compact, and hides the
-  // two above in the Beautiful chrome, so each variant shows one copy.
-  plugin.app.registerWidget('queue_beautiful_bar', WidgetLocation.QueueBelowTopBar, {
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
-  await plugin.app.registerCSS('queue-beautiful-bar', QUEUE_VARIANT_CSS);
+  await plugin.app.registerCSS('queue-below-top-bar', QUEUE_BELOW_TOP_BAR_CSS);
   await plugin.app.registerCSS('sidebar-end-padding', SIDEBAR_END_PADDING_CSS);
   await plugin.app.registerCSS('editor-review-timer-sticky', EDITOR_REVIEW_TIMER_STICKY_CSS);
 

@@ -258,6 +258,16 @@ export function QueueComponent() {
     setShowSpark(false);
   }, [viewMode, supportsIsolated]);
 
+  // A phone-sized queue. There a plain Rem's "Back to isolated view" goes into the
+  // Extract Viewer's header instead of floating above it, which kept 48 px free.
+  const [narrow, setNarrow] = useState(() => window.innerWidth > 0 && window.innerWidth < 520);
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth > 0 && window.innerWidth < 520);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const backInHeader = narrow && isRemType && viewMode === 'context';
+
   // AFTER ALL HOOKS, NOW you can return early
   if (!ctx?.remId) return null;
 
@@ -283,7 +293,7 @@ export function QueueComponent() {
   return (
     <div className="incremental-everything-element" style={{ height: '100%' }}>
       <div className="box-border p-2" style={{ height: `100vh`, position: 'relative' }}>
-        {viewMode === 'context' && supportsIsolated && (
+        {viewMode === 'context' && supportsIsolated && !backInHeader && (
           <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
             <style>{`
               .inc-back-btn {
@@ -418,7 +428,31 @@ export function QueueComponent() {
         ) : remAndType.type === 'video' ? (
           <NativeVideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' ? (
-          <ExtractViewer rem={remAndType.rem} plugin={plugin} />
+          <ExtractViewer
+            rem={remAndType.rem}
+            plugin={plugin}
+            headerAction={
+              backInHeader ? (
+                <button
+                  onClick={() => setViewMode('isolated')}
+                  title="Back to isolated view"
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    border: '1px solid var(--rn-clr-border-primary, #e2e8f0)',
+                    backgroundColor: 'var(--rn-clr-background-primary, #ffffff)',
+                    color: 'var(--rn-clr-content-secondary, #475569)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ← Isolated
+                </button>
+              ) : undefined
+            }
+          />
         ) : null}
       </div>
     </div>

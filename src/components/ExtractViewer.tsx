@@ -16,6 +16,12 @@ import { CardPriorityInfo } from '../lib/card_priority';
 interface ExtractViewerProps {
   rem: PluginRem;
   plugin: RNPlugin;
+  /**
+   * A control for the card's header (the queue's "Back to isolated view" on a phone).
+   * Given, the card starts at the top of its frame; otherwise 48 px stay free above
+   * it, where the queue floats that control on a wider screen.
+   */
+  headerAction?: React.ReactNode;
 }
 
 // Define the critical context structure
@@ -261,7 +267,7 @@ function ReadOnlyRemTree({
   );
 }
 
-export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
+export function ExtractViewer({ rem, plugin, headerAction }: ExtractViewerProps) {
   if (!rem) return null;
 
   // --- STATE 1: DEFERRED METADATA (Statistics) ---
@@ -552,11 +558,14 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   // The editable page, in a floating panel over this card (lib/extract_editor.ts).
   const editHere = useCallback(async () => {
     const title = await resolveRemTextForBreadcrumb(plugin, rem.text || []).catch(() => '');
-    await openExtractEditor(plugin, rem._id, title).catch((err) => {
+    await openExtractEditor(plugin, rem._id, title, cardRef.current).catch((err) => {
       console.error('[ExtractViewer] could not open the editor', err);
       plugin.app.toast('Could not open the editor here. Use "Edit in sidebar" or Review in Editor.');
     });
   }, [plugin, rem]);
+
+  // The card: the editor is laid over its rectangle.
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // A phone-sized queue: tighter frame, shorter footer.
   const [narrow, setNarrow] = useState(() => window.innerWidth > 0 && window.innerWidth < 520);
@@ -578,8 +587,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
         alignItems: 'center',
         // Top padding keeps the card below the queue's absolute "Back to isolated
         // view" button (top:12), so it can never sit under the breadcrumb.
-        // lib/extract_editor.ts lays the editor over this card: keep its CARD in step.
-        padding: narrow ? '48px 4px 4px' : '48px 16px 16px',
+        padding: `${headerAction ? (narrow ? 4 : 12) : 48}px ${narrow ? 4 : 16}px ${narrow ? 4 : 16}px`,
         overflow: 'hidden',
       }}
     >
@@ -587,6 +595,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
           breadcrumb), scrollable read-only content, and a footer with stats +
           the "Edit in sidebar" button. */}
       <div
+        ref={cardRef}
         style={{
           width: '100%',
           maxWidth: 1000,
@@ -605,13 +614,15 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
         <div
           style={{
             flexShrink: 0,
-            padding: '10px 16px',
+            padding: narrow ? '6px 8px' : '10px 16px',
             borderBottom: '1px solid var(--rn-clr-border-primary, #e2e8f0)',
-            opacity: isContextLoading ? 0 : 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
           }}
         >
           {!isContextLoading && ancestors.length > 0 && (
-            <div style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--rn-clr-content-tertiary, #64748b)', wordBreak: 'break-word' }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.4, color: 'var(--rn-clr-content-tertiary, #64748b)', wordBreak: 'break-word' }}>
               {ancestors.map((ancestor, index) => (
                 <span key={ancestor.id}>
                   <span
@@ -627,6 +638,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
               ))}
             </div>
           )}
+          {headerAction && <div style={{ flex: 'none', marginLeft: 'auto' }}>{headerAction}</div>}
         </div>
 
         {/* Read-point banner — shown when a read point is set. Surfaces the

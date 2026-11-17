@@ -2,6 +2,34 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.237 - November 17th, 2026
+
+### 📝 Changed
+
+**Queue toolbar**: the priority badge and the *No Inc Rem* countdown are one widget again, in RemNote's own toolbar, in both queue variants: in the Beautiful queue they now sit among the queue's buttons at the top right of the window, where RemNote shows toolbar widgets again, instead of in the card's corner. On a phone the badge is left out for Incremental Rems; RemNote's Beautiful queue on a phone shows no toolbar widgets at all.
+
+📖 [Queue Toolbar Priority](Plugin-Widgets-Reference.md#12-queue-toolbar-priority)
+
+**Statistics plugin button**: a new setting, **Statistics Plugin Button in the Queue**, hides that plugin's queue button on phones (where it takes a whole row of the card) or everywhere. Off by default.
+
+📖 [Settings → Queue Display](Plugin-Settings-Reference.md)
+
+**Queue on a phone**: a plain Rem's card starts at the top of the queue; its *Back to isolated view* button is in the card's header (**← Isolated**) instead of floating above it in a 48 px band.
+
+### 🐛 Fixed
+
+**Editor over the card**: it now also closes when the queue moves on to another Incremental Rem; it used to close only when a flashcard came next, and stayed open over the next Incremental Rem. On a phone it is laid exactly over the card, measured rather than assumed.
+
+📖 [Reviewing Items in the Queue → The editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor)
+
+## v1.0.236 - November 17th, 2026
+
+### 🐛 Fixed
+
+**Editor over the card**: it closes when a flashcard comes next and when you leave the queue; it used to stay on screen. On a phone its bar with **Done** is at the bottom of the panel, because RemNote's own page bar covered it at the top and left no way to close the panel; the card's **✎ Edit** button reads **✓ Done** while it is open.
+
+📖 [Reviewing Items in the Queue → The editor over the card](Reviewing-Items-in-the-Queue.md#extract-editor)
+
 ## v1.0.235 - November 17th, 2026
 
 ### ✨ New

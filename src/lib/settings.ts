@@ -44,6 +44,8 @@ import {
   initialIntervalForHighlightsId,
   initialIntervalForRemsId,
   collapseQueueTopBar,
+  statisticsQueueButtonId,
+  StatisticsQueueButton,
   defaultPriorityId,
   defaultCardPriorityId,
   priorityStepSizeId,
@@ -159,6 +161,7 @@ export interface IESettings {
 
   // Queue display
   [collapseQueueTopBar]: boolean;
+  [statisticsQueueButtonId]: StatisticsQueueButton;
   [displayPriorityShieldId]: boolean;
   [deferSpoilerIncRemsId]: boolean;
   [autoRefreshPriorityQueueId]: boolean;
@@ -265,6 +268,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [priorityEditorDisplayModeId]: 'all',
 
   [collapseQueueTopBar]: false,
+  [statisticsQueueButtonId]: 'hide-phone',
   [displayPriorityShieldId]: true,
   [deferSpoilerIncRemsId]: true,
   [autoRefreshPriorityQueueId]: true,
@@ -751,6 +755,21 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     description:
       'Frees vertical space during Incremental Rem review by collapsing the queue top bar to a ' +
       'thin strip; hover to reveal it. No effect on regular flashcard turns.',
+  },
+  [statisticsQueueButtonId]: {
+    kind: 'dropdown',
+    group: 'queue',
+    reloadRequired: true,
+    title: 'Statistics Plugin Button in the Queue',
+    description:
+      'The Statistics plugin (if installed) adds a button to the queue. On a phone it takes a whole ' +
+      'row at the top of the card, because RemNote has no toolbar there for it. Hide it on phones ' +
+      'only, or everywhere; the command "Open Statistics" still opens it.',
+    options: [
+      { value: 'show', label: 'Shown' },
+      { value: 'hide-phone', label: 'Hidden on phones' },
+      { value: 'hide', label: 'Hidden everywhere' },
+    ],
   },
   [displayPriorityShieldId]: {
     kind: 'boolean',

@@ -38,50 +38,41 @@ export interface ExtractEditorTarget {
   at: number;
 }
 
-/**
- * The Extract Viewer's card inside its frame: `padding: 48px 16px 16px`, at most 1000
- * wide; `48px 4px 4px` on a phone-sized queue.
- */
-const CARD = { top: 48, side: 16, bottom: 16, maxWidth: 1000, sideCompact: 4 };
 /** Below this width the queue is a phone's. */
 const COMPACT_PX = 520;
 
+type Rect = { top: number; left: number; width: number; height: number };
+
 /**
- * Where the editor goes: over the viewer's card when the frame's place in the window
- * is known, else a centred panel.
+ * Where the editor goes: exactly over the viewer's card, from the queue frame's place
+ * in the window and the card's place in the frame; a centred panel when either is
+ * unknown. On a phone the panel keeps the card's top and width but is kept short, so
+ * the on-screen keyboard (about 40% of the screen) does not cover it.
  */
 export function editorPlacement(
-  frame: { top: number; left: number; width: number; height: number } | null | undefined,
-  screen: { width: number; height: number }
+  frame: Rect | null | undefined,
+  screen: { width: number; height: number },
+  card?: Rect | null
 ): Pick<ExtractEditorTarget, 'width' | 'height' | 'position' | 'compact'> {
-  if (!frame || !(frame.width > 0) || !(frame.height > 0)) {
-    const width = Math.min(900, Math.max(280, screen.width - 48));
-    const height = Math.max(240, Math.round(screen.height * 0.6));
-    return { width, height, position: { top: 80, left: Math.max(8, Math.round((screen.width - width) / 2)) }, compact: screen.width < COMPACT_PX };
-  }
-  if (frame.width < COMPACT_PX) {
-    // From the card's top edge down. The keyboard takes about 40% of a phone's screen,
-    // so the panel is kept short rather than as tall as the card.
-    const width = Math.round(frame.width - 2 * CARD.sideCompact);
-    const cardHeight = frame.height - CARD.top - CARD.sideCompact;
-    const height = Math.round(Math.max(200, Math.min(cardHeight, screen.height * 0.4)));
+  const known = (r: Rect | null | undefined): r is Rect => !!r && r.width > 0 && r.height > 0;
+  if (!known(frame) || !known(card)) {
+    const compact = (known(frame) ? frame.width : screen.width) < COMPACT_PX;
+    const width = Math.min(900, Math.max(280, screen.width - (compact ? 8 : 48)));
+    const height = Math.max(240, Math.round(screen.height * (compact ? 0.4 : 0.6)));
     return {
       width,
       height,
-      position: { top: Math.round(frame.top + CARD.top), left: Math.round(frame.left + CARD.sideCompact) },
-      compact: true,
+      position: { top: compact ? 96 : 80, left: Math.max(4, Math.round((screen.width - width) / 2)) },
+      compact,
     };
   }
-  const width = Math.round(Math.min(CARD.maxWidth, frame.width - 2 * CARD.side));
-  const height = Math.round(Math.max(240, frame.height - CARD.top - CARD.bottom));
+  const compact = frame.width < COMPACT_PX;
+  const height = compact ? Math.max(200, Math.min(card.height, screen.height * 0.4)) : Math.max(240, card.height);
   return {
-    width,
-    height,
-    position: {
-      top: Math.round(frame.top + CARD.top),
-      left: Math.round(frame.left + (frame.width - width) / 2),
-    },
-    compact: false,
+    width: Math.round(card.width),
+    height: Math.round(height),
+    position: { top: Math.round(frame.top + card.top), left: Math.round(frame.left + card.left) },
+    compact,
   };
 }
 
@@ -99,12 +90,25 @@ async function ownFrame(plugin: RNPlugin) {
   }
 }
 
-/** Open the editor on a Rem, over the frame that asks (the queue's Extract Viewer). */
-export async function openExtractEditor(plugin: RNPlugin, remId: string, title: string): Promise<void> {
-  const placement = editorPlacement(await ownFrame(plugin), {
-    width: window.screen?.availWidth || window.innerWidth || 1024,
-    height: window.screen?.availHeight || window.innerHeight || 768,
-  });
+/**
+ * Open the editor on a Rem, over the frame that asks (the queue's Extract Viewer).
+ * `card` is the viewer's card element: the panel is laid over its rectangle.
+ */
+export async function openExtractEditor(
+  plugin: RNPlugin,
+  remId: string,
+  title: string,
+  card?: HTMLElement | null
+): Promise<void> {
+  const box = card?.getBoundingClientRect();
+  const placement = editorPlacement(
+    await ownFrame(plugin),
+    {
+      width: window.screen?.availWidth || window.innerWidth || 1024,
+      height: window.screen?.availHeight || window.innerHeight || 768,
+    },
+    box ? { top: box.top, left: box.left, width: box.width, height: box.height } : null
+  );
   const target: ExtractEditorTarget = { remId, title, ...placement, at: Date.now() };
   await plugin.storage.setSession(extractEditorTargetKey, target);
 
@@ -147,18 +151,18 @@ export async function closeExtractEditor(plugin: RNPlugin, remId?: string): Prom
 export function registerExtractEditorHost(plugin: ReactRNPlugin) {
   const target = () => plugin.storage.getSession<ExtractEditorTarget>(extractEditorTargetKey).catch(() => undefined);
 
-  // The event carries a card id, and none for the plugin's own items (read in the
-  // bundle: `{cardId}` only). The Incremental Rem on screen is in session storage,
-  // written when the queue asked for it, before this fires.
+  // A flashcard: its event carries a card id. The plugin's own items carry none, and
+  // the Incremental Rem now on screen is known only once the queue widget has rendered
+  // it, after this fires: that case is the tracker below.
   plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async (data: { cardId?: string } | undefined) => {
+    if (data?.cardId && (await target())) await closeExtractEditor(plugin);
+  });
+  // Another Incremental Rem on screen (queue.tsx writes its id when it renders it).
+  // The same Rem again, a re-render or a hybrid card flipping views, keeps the editor.
+  plugin.track(async (rp) => {
+    const current = await rp.storage.getSession<string>(currentIncRemKey);
     const open = await target();
-    if (!open) return;
-    if (!data?.cardId) {
-      // The same Rem again (a re-render, a hybrid card flipping views) keeps the editor.
-      const current = await plugin.storage.getSession<string>(currentIncRemKey).catch(() => undefined);
-      if (current === open.remId) return;
-    }
-    await closeExtractEditor(plugin);
+    if (open && current && current !== open.remId) await closeExtractEditor(plugin);
   });
   plugin.event.addListener(AppEvents.QueueExit, undefined, async () => {
     if (await target()) await closeExtractEditor(plugin);

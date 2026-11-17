@@ -54,9 +54,9 @@ Unlike the *Card Info Bar*, which in the Compact queue lives at the bottom of fl
 
 #### In the Beautiful queue variant { #beautiful-queue-variant }
 
-In RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) the badge sits in the **top-right corner of the card**, in the blank space above the breadcrumbs, rather than in the top bar — the card layout itself is unchanged. The *No Inc Rem* countdown moves there with it. Switching back to *Compact* returns both to the toolbar.
+In RemNote's **Beautiful** queue variant (Queue Menu → *Queue Variant*) the badge sits in the **top-right corner of the window**, among the queue's own buttons, with the *No Inc Rem* countdown beside it while a timer runs. It is the same widget as in the *Compact* top bar.
 
-The corner area is only as wide as what it shows: the badge, or the badge and the countdown while a *No Inc Rem* timer runs. Clicks beside it reach the card, and the [regular-queue Mastery Drill's bar](Mastery-Drill.md#regular-queue-drill) keeps its buttons clear of it.
+**On a phone** RemNote's Beautiful queue has no room for toolbar widgets and shows none, so the badge is not there; the [Card Info Bar](#11-card-info-bar) shows a flashcard's priority, and the answer bar an Incremental Rem's. In the Compact queue on a phone the badge stays in the top bar for flashcards and is left out for Incremental Rems.
 
 
 ### 1.3. Answer Buttons Info Bar
