@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.239 - November 17th, 2026
+
+### 📝 Changed
+
+**Answer buttons**: the **P Edit** hint is gone. An Incremental Rem is edited with **✎ Edit** on its card, **In Editor** or **New Tab**; RemNote's `P` key still opens the previewer.
+
+📖 [Reviewing Items in the Queue → The Answer Buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons)
+
 ## v1.0.238 - November 17th, 2026
 
 ### 🐛 Fixed

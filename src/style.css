@@ -86,12 +86,6 @@ body,
   border: 1px solid #ccc;
 }
 
-/* This rule applies only to screens with a max-width of 600px (typical for mobile phones) */
-@media (max-width: 600px) {
-  .desktop-only-hint {
-    display: none !important;
-  }
-}
 
 /* Calendar-icon-only date picker: hides the text portion and shows only the
    native browser calendar icon. Used alongside a text input for date entry. */

@@ -861,52 +861,6 @@ export function AnswerButtons() {
           </>
         )}
 
-        {/* Desktop-only hint — compact informational badge */}
-        {!narrow && ['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
-          <>
-            {divider}
-            <div
-              className="desktop-only-hint"
-              title="Press 'P' to open the Rem in RemNote's pop-up previewer for quick edits"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '3px 9px 3px 4px',
-                borderRadius: '999px',
-                border: '1px solid var(--rn-clr-border-primary)',
-                backgroundColor: 'transparent',
-                cursor: 'default',
-                pointerEvents: 'none',
-                userSelect: 'none',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '20px',
-                height: '20px',
-                borderRadius: '4px',
-                backgroundColor: 'var(--rn-clr-background-tertiary)',
-                border: '1px solid var(--rn-clr-border-primary)',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
-                fontSize: '11px',
-                fontWeight: 700,
-                color: 'var(--rn-clr-content-primary)',
-                fontFamily: 'monospace',
-              }}>P</span>
-              <span style={{
-                fontSize: '10.5px',
-                fontWeight: 500,
-                color: 'var(--rn-clr-content-tertiary)',
-                letterSpacing: '0.2px',
-              }}>Edit</span>
-            </div>
-          </>
-        )}
-
         {!narrow && (
           <span
             role="button"

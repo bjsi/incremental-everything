@@ -65,12 +65,12 @@ This hold is within a session. Its counterpart across days is **cooling** in the
 
 ## The Answer Buttons
 
-![The answer buttons bar on a computer: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, then the review-note, P Edit and help icons; below it the info bar with the priority, the Priority Shield, the Weighted Shield and the repetitions](assets/answer-bar-desktop.png#only-light){ width="900" }
-![The answer buttons bar on a computer: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, then the review-note, P Edit and help icons; below it the info bar with the priority, the Priority Shield, the Weighted Shield and the repetitions](assets/answer-bar-desktop-dark.png#only-dark){ width="900" }
+![The answer buttons bar on a computer: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, then the review-note and help icons; below it the info bar with the priority, the Priority Shield, the Weighted Shield and the repetitions](assets/answer-bar-desktop.png#only-light){ width="900" }
+![The answer buttons bar on a computer: Next, Reschedule, Dismiss, Priority, In Editor, New Tab and To Highlight, then the review-note and help icons; below it the info bar with the priority, the Priority Shield, the Weighted Shield and the repetitions](assets/answer-bar-desktop-dark.png#only-dark){ width="900" }
 
 Here is a breakdown of each button and its function, from left to right. Every button after **Next** is a compact icon button — icon above, one-word label below — so the whole row fits on one line; hover over any button for its full name and shortcut.
 
-**On a phone** (or in any pane narrower than 520 px) the bar shrinks to about a third of its height: one row with **Next** and its interval, then the same actions as square icon buttons without labels, and one line of figures under it (priority, repetitions, minutes). **New Tab**, the **P Edit** hint and the help icon are left out there.
+**On a phone** (or in any pane narrower than 520 px) the bar shrinks to about a third of its height: one row with **Next** and its interval, then the same actions as square icon buttons without labels, and one line of figures under it (priority, repetitions, minutes). **New Tab** and the help icon are left out there.
 
 ![The answer buttons bar on a phone: Next with its interval, then Reschedule, Dismiss, Priority, In Editor, To Highlight and the review note as icon buttons; below it one line with the priority and the repetitions](assets/answer-bar-phone.png#only-light){ width="420" }
 ![The answer buttons bar on a phone: Next with its interval, then Reschedule, Dismiss, Priority, In Editor, To Highlight and the review note as icon buttons; below it one line with the priority and the repetitions](assets/answer-bar-phone-dark.png#only-dark){ width="420" }
@@ -142,9 +142,6 @@ When the current Inc Rem has **more than one PDF source**, a small PDF dropdown 
   - The switcher is hidden for **PDF highlights and HTML hosts** (highlights are tied to a specific PDF; switching would orphan the queue card).
 
   *See the [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) section for the full resolution chain (pin → `#preferthispdf` → first PDF) and how it applies across every surface.*
-
-* **Press 'P' to Edit:**
-This is a non-clickable hint that appears **only for certain card types** (like regular Rem or PDFs). It reminds you that you can press the "P" key to open the Rem in the pop-up "previewer" for quick edits — a fast alternative when you don't want to use the sidebar. (For Rem-type IncRems the primary editing path is **✎ Edit** on the card; see [Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem) below.)
 
 ![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
