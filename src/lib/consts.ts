@@ -904,6 +904,7 @@ export const searchBrowseRequestKey = 'search-browse-request'; // session: {acti
 export const searchBrowseAckKey = 'search-browse-ack'; // session: the `at` the browser last acted on
 export const savedSearchesKey = 'search-browse-saved'; // synced: SavedSearch[]
 export const searchHistoryKey = 'search-browse-history'; // local (per device): last searches, newest first
+export const searchBrowseRecentsKeyPrefix = 'search-browse-recents-'; // local (per device) + 'move' | 'tag': picker targets, newest first
 export const searchQueuesParentName = 'Search Queues';
 
 // Audio Playlist (lib/audio_playlist.ts; widgets/audio_playlist_float.tsx): the audios

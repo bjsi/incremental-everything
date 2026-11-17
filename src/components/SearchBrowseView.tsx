@@ -24,18 +24,27 @@ import {
   translateQueryViaHelper,
 } from '../lib/rem_search_client';
 import {
+  MoveUndo,
   SavedSearch,
   SEARCH_QUEUE_LIMIT,
+  addTagToRems,
+  createNamedRem,
   deleteSavedSearch,
   loadSavedSearches,
+  moveRemsTo,
   practiceDocument,
-  reEnableCardsForRems,
+  pushPickerRecent,
   refreshSearchQueue,
+  removeTagFromRems,
   saveSearch,
   setCardPriorityForRems,
+  switchCards,
+  topmostOnly,
+  undoMove,
 } from '../lib/search_browse';
 import { openRemInNewPane } from '../lib/remHelpers';
-import { copyTextFromGesture } from '../lib/clipboard';
+import { RemRefForm, copyRemRefsFromGesture, copyTextFromGesture, remRefsRichText } from '../lib/clipboard';
+import { PickChoice, RemPicker } from './RemPicker';
 import {
   searchBrowseAckKey,
   searchBrowseFloatIdKey,
@@ -80,6 +89,35 @@ function num(n: number | null | undefined): string {
   return n === null || n === undefined ? '' : String(Math.round(n * 10) / 10);
 }
 
+/** A cloze card's text as RemNote's queue shows it: its own cloze underlined in blue on a
+ *  blue tint, the Rem's other clozes in grey. */
+function ClozeText({ parts }: { parts: [string, 0 | 1 | 2][] }) {
+  return (
+    <>
+      {parts.map(([t, mark], i) =>
+        mark === 1 ? (
+          <span
+            key={i}
+            style={{
+              background: 'color-mix(in srgb, var(--rn-clr-border-accent, #3B82F6) 18%, transparent)',
+              borderBottom: '2px solid var(--rn-clr-border-accent, #3B82F6)',
+              borderRadius: '2px',
+            }}
+          >
+            {t}
+          </span>
+        ) : mark === 2 ? (
+          <span key={i} style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            {t}
+          </span>
+        ) : (
+          <React.Fragment key={i}>{t}</React.Fragment>
+        )
+      )}
+    </>
+  );
+}
+
 interface Column {
   key: string;
   label: string;
@@ -101,7 +139,7 @@ const COLUMNS: Column[] = [
           style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
           title={r.back ? `${r.text} → ${r.back}` : r.text}
         >
-          {r.text || <em style={{ opacity: 0.6 }}>(no text)</em>}
+          {r.textParts?.length ? <ClozeText parts={r.textParts} /> : r.text || <em style={{ opacity: 0.6 }}>(no text)</em>}
           {r.back ? <span style={{ color: 'var(--rn-clr-content-secondary)' }}> → {r.back}</span> : null}
         </div>
         <div
@@ -119,6 +157,14 @@ const COLUMNS: Column[] = [
     width: '70px',
     modes: ['cards'],
     render: (r) => r.kind ?? '',
+  },
+  {
+    key: 'cards',
+    label: 'Cards',
+    width: '80px',
+    modes: ['rems'],
+    render: (r) => (r.ownCards || r.descCards ? `(${r.ownCards ?? 0} + ${(r.descCards ?? 0).toLocaleString()})` : ''),
+    title: 'Cards of the Rem itself + cards of all the Rems below it',
   },
   {
     key: 'type',
@@ -208,7 +254,12 @@ export function SearchBrowse() {
   const [total, setTotal] = React.useState(0);
   const [ran, setRan] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
-  const [message, setMessage] = React.useState<{ text: string; tone: 'info' | 'error' } | null>(null);
+  const [message, setMessage] = React.useState<{
+    text: string;
+    tone: 'info' | 'error';
+    action?: { label: string; run: () => void };
+  } | null>(null);
+  const [picker, setPicker] = React.useState<'move' | 'tag' | null>(null);
   const [focus, setFocus] = React.useState(-1); // -1 = the search box
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [saved, setSaved] = React.useState<SavedSearch[]>([]);
@@ -416,10 +467,25 @@ export function SearchBrowse() {
   };
 
   const selectedRows = React.useMemo(() => rows.filter((r) => selected.has(rowKey(r))), [rows, selected]);
-  const targetRemIds = React.useMemo(() => {
-    const pool = selectedRows.length ? selectedRows : focus >= 0 && rows[focus] ? [rows[focus]] : [];
-    return Array.from(new Set(pool.map((r) => r.remId)));
-  }, [selectedRows, rows, focus]);
+  /** The rows acted on: the selected ones, else the focused one. */
+  const targetRows = React.useMemo(
+    () => (selectedRows.length ? selectedRows : focus >= 0 && rows[focus] ? [rows[focus]] : []),
+    [selectedRows, rows, focus]
+  );
+  const targetRemIds = React.useMemo(() => Array.from(new Set(targetRows.map((r) => r.remId))), [targetRows]);
+
+  // The Rems' own rich text, fetched ahead for "text + pin": the copy must run inside
+  // the click or key press, before anything is awaited.
+  const richRef = React.useRef(new Map<string, any[]>());
+  React.useEffect(() => {
+    const missing = targetRemIds.filter((id) => !richRef.current.has(id)).slice(0, 300);
+    if (!missing.length) return;
+    const t = setTimeout(async () => {
+      const rems = (await plugin.rem.findMany(missing).catch(() => [])) ?? [];
+      for (const r of rems) richRef.current.set(r._id, (r.text as any[]) ?? []);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [plugin, targetRemIds]);
 
   const allBoxRef = React.useRef<HTMLInputElement>(null);
   const someSelected = rows.some((r) => selected.has(rowKey(r)));
@@ -501,14 +567,154 @@ export function SearchBrowse() {
     run();
   };
 
-  const doReEnable = async () => {
-    if (!targetRemIds.length) return;
-    setBusy(`Switching cards on… 0 / ${targetRemIds.length}`);
-    const res = await reEnableCardsForRems(plugin, targetRemIds, (d, t) => setBusy(`Switching cards on… ${d} / ${t}`));
+  /** Cards on/off, as RemNote's Browser: Rem rows switch the Rem's cards; card rows
+   *  their direction (single clozes can't be reached by plugins). */
+  const doSwitch = async (on: boolean) => {
+    if (!targetRows.length || busy) return;
+    const word = on ? 'on' : 'off';
+    setBusy(`Switching cards ${word}…`);
+    const res = await switchCards(
+      plugin,
+      targetRows.map((r) => ({ remId: r.remId, cardId: r.cardId, kind: r.kind, suppressed: r.suppressed })),
+      on,
+      (d, t) => setBusy(`Switching cards ${word}… ${d} / ${t}`)
+    );
     setBusy(null);
-    await plugin.app.toast(`Cards switched on for ${res.enabled} Rem(s)` + (res.failed.length ? `, ${res.failed.length} failed` : ''));
+    const parts = [
+      res.rems ? `${res.rems} Rem(s) switched ${word}` : '',
+      res.cards ? `${res.cards} card direction(s) switched ${word}` : '',
+    ].filter(Boolean);
+    const text =
+      (parts.join(', ') || `Nothing to switch ${word}`) +
+      (res.skippedClozes
+        ? `. ${res.skippedClozes} single cloze card(s) skipped: RemNote doesn't let plugins switch one cloze ${word} (select every card of the Rem, or use the Rem's own menu)`
+        : '') +
+      (res.failed.length ? `. ${res.failed.length} failed` : '') +
+      '.';
+    setMessage({ text, tone: res.failed.length || res.skippedClozes ? 'error' : 'info' });
     run();
   };
+
+  /** Move / Tag picker choices. */
+  const onPick = async (choice: PickChoice) => {
+    const kind = picker;
+    setPicker(null);
+    if (!kind || !targetRemIds.length) return;
+    try {
+      if (kind === 'move') {
+        if (choice.kind === 'remove') return;
+        const ids = topmostOnly(targetRows.map((r) => ({ remId: r.remId, ancestorIds: r.ancestorIds })));
+        const parentId =
+          choice.kind === 'rem' ? choice.row.remId : choice.kind === 'create' ? await createNamedRem(plugin, choice.name, choice.parentId) : null;
+        const where = choice.kind === 'rem' ? `“${choice.row.name}”` : choice.kind === 'create' ? `the new “${choice.name}”` : 'the top level';
+        setBusy(`Moving ${ids.length} Rem(s) to ${where}…`);
+        const res = await moveRemsTo(plugin, ids, parentId);
+        if (parentId) await pushPickerRecent(plugin, 'move', parentId);
+        setBusy(null);
+        const undo: MoveUndo[] = res.undo;
+        setMessage({
+          text:
+            `Moved ${res.moved} Rem(s) to ${where}` +
+            (ids.length < targetRemIds.length ? ` (${targetRemIds.length - ids.length} went along under a moved Rem)` : '') +
+            (res.failed.length ? `; RemNote refused ${res.failed.length} (a power-up, or into its own descendant)` : '') +
+            '.',
+          tone: res.failed.length ? 'error' : 'info',
+          action: undo.length
+            ? {
+                label: 'Undo',
+                run: async () => {
+                  setBusy('Putting them back…');
+                  const n = await undoMove(plugin, undo);
+                  setBusy(null);
+                  setMessage({ text: `${n} Rem(s) put back.`, tone: 'info' });
+                  run();
+                },
+              }
+            : undefined,
+        });
+        run();
+      } else {
+        if (choice.kind === 'top') return;
+        if (choice.kind === 'remove') {
+          const having = Array.from(new Set(targetRows.filter((r) => r.tagRefs?.some((t) => t.id === choice.id)).map((r) => r.remId)));
+          setBusy(`Removing “${choice.name}”…`);
+          const res = await removeTagFromRems(plugin, having, choice.id, (d, t) => setBusy(`Removing “${choice.name}”… ${d} / ${t}`));
+          setBusy(null);
+          setMessage({ text: `“${choice.name}” removed from ${res.done} Rem(s)` + (res.failed.length ? `, ${res.failed.length} failed` : '') + '.', tone: res.failed.length ? 'error' : 'info' });
+        } else {
+          const tagId = choice.kind === 'rem' ? choice.row.remId : await createNamedRem(plugin, choice.name, choice.parentId);
+          const name = choice.kind === 'rem' ? choice.row.name : choice.name;
+          setBusy(`Tagging with “${name}”…`);
+          const res = await addTagToRems(plugin, targetRemIds, tagId, (d, t) => setBusy(`Tagging with “${name}”… ${d} / ${t}`));
+          await pushPickerRecent(plugin, 'tag', tagId);
+          setBusy(null);
+          setMessage({ text: `Tagged ${res.done} Rem(s) with “${name}”` + (res.failed.length ? `, ${res.failed.length} failed` : '') + '.', tone: res.failed.length ? 'error' : 'info' });
+        }
+        run();
+      }
+    } catch (e: any) {
+      setBusy(null);
+      setMessage({ text: e?.message || String(e), tone: 'error' });
+    }
+    containerRef.current?.focus();
+  };
+
+  /** Tags on the target Rems that can be removed (power-ups left out: removing one
+   *  would drop its data, as Incremental or Card Priority hold theirs). */
+  const removableTags = React.useMemo(() => {
+    const byTag = new Map<string, { id: string; name: string; rems: Set<string> }>();
+    for (const r of targetRows)
+      for (const t of r.tagRefs ?? []) {
+        if (t.powerup) continue;
+        const e = byTag.get(t.id) ?? { id: t.id, name: t.name, rems: new Set<string>() };
+        e.rems.add(r.remId);
+        byTag.set(t.id, e);
+      }
+    return Array.from(byTag.values())
+      .map((e) => ({ id: e.id, name: e.name, count: e.rems.size }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [targetRows]);
+
+  const openPicker = (kind: 'move' | 'tag') => {
+    if (!targetRemIds.length || busy) return;
+    setPicker(kind);
+  };
+
+  /** Copy references to the target Rems: plain = references, Shift = pins, Opt = text +
+   *  pin. Runs inside the click / key press (the clipboard needs that gesture). */
+  const doCopyRefs = (form: RemRefForm) => {
+    const seen = new Set<string>();
+    const items = targetRows
+      .filter((r) => (seen.has(r.remId) ? false : (seen.add(r.remId), true)))
+      .map((r) => ({ remId: r.remId, name: r.text, rich: richRef.current.get(r.remId) }));
+    if (!items.length) return;
+    void copyRemRefsFromGesture(plugin, items, form);
+  };
+  const refFormOf = (e: { shiftKey: boolean; altKey: boolean }): RemRefForm => (e.altKey ? 'text-pin' : e.shiftKey ? 'pin' : 'reference');
+
+  // ⌘C can reach this frame as a native `copy` event without its keydown (the app's Edit
+  // menu takes the key first): copy references then too, while the table has the focus.
+  const copyStateRef = React.useRef({ focus, targetRows });
+  copyStateRef.current = { focus, targetRows };
+  React.useEffect(() => {
+    const onCopy = (e: ClipboardEvent) => {
+      const { focus: f, targetRows: rowsNow } = copyStateRef.current;
+      const el = document.activeElement as HTMLElement | null;
+      if (f < 0 || !e.clipboardData || (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'))) return;
+      const seen = new Set<string>();
+      const items = rowsNow
+        .filter((r) => (seen.has(r.remId) ? false : (seen.add(r.remId), true)))
+        .map((r) => ({ remId: r.remId, name: r.text }));
+      if (!items.length) return;
+      const { rich, plain } = remRefsRichText(items, 'reference');
+      e.preventDefault();
+      e.clipboardData.setData('text/plain', plain);
+      e.clipboardData.setData('linear-editor/json', JSON.stringify(rich));
+      void plugin.app.toast(`📋 Copied ${items.length === 1 ? 'reference' : `${items.length} references`}. Paste it into a Rem (⌘V).`);
+    };
+    document.addEventListener('copy', onCopy);
+    return () => document.removeEventListener('copy', onCopy);
+  }, [plugin]);
 
   /** Copy the selected ids. Plugin frames have no clipboard permission, so this goes
    *  through lib/clipboard.ts, called synchronously in the click so the click counts as
@@ -571,6 +777,16 @@ export function SearchBrowse() {
       e.preventDefault();
       setFocus(-1);
       inputRef.current?.focus();
+    } else if (e.code === 'KeyC' && (e.metaKey || e.ctrlKey)) {
+      // ⌘C references · ⇧⌘C pins · ⌥⌘C text + pin (Opt changes e.key, so by code).
+      e.preventDefault();
+      doCopyRefs(refFormOf(e));
+    } else if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'm') {
+      e.preventDefault();
+      openPicker('move');
+    } else if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key === 't') {
+      e.preventDefault();
+      openPicker('tag');
     }
   };
 
@@ -600,6 +816,7 @@ export function SearchBrowse() {
       tabIndex={-1}
       onKeyDown={onKeyDown}
       style={{
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         height: panelH ? `${panelH}px` : '100%',
@@ -784,8 +1001,21 @@ export function SearchBrowse() {
       </div>
 
       {(message || busy) && (
-        <div style={{ fontSize: '12px', color: message?.tone === 'error' && !busy ? 'var(--rn-clr-red, #c0392b)' : 'var(--rn-clr-content-secondary)' }}>
-          {busy ?? message?.text}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: message?.tone === 'error' && !busy ? 'var(--rn-clr-red, #c0392b)' : 'var(--rn-clr-content-secondary)' }}>
+          <span>{busy ?? message?.text}</span>
+          {!busy && message?.action && (
+            <button
+              onMouseDown={noSteal}
+              onClick={() => {
+                const act = message.action!;
+                setMessage(null);
+                act.run();
+              }}
+              style={{ ...btn, padding: '2px 8px' }}
+            >
+              {message.action.label}
+            </button>
+          )}
         </div>
       )}
 
@@ -907,15 +1137,73 @@ export function SearchBrowse() {
         <button onMouseDown={noSteal} onClick={doPriority} style={btn} disabled={!targetRemIds.length || !priority || !!busy}>
           Set card priority
         </button>
-        <button onMouseDown={noSteal} onClick={doReEnable} style={btn} disabled={!targetRemIds.length || !!busy} title="Switch the Rems' cards back on (their Enable Cards toggle)">
-          Switch cards on
+        <button
+          onMouseDown={noSteal}
+          onClick={() => doSwitch(true)}
+          style={btn}
+          disabled={!targetRemIds.length || !!busy}
+          title="Switch cards on. Rems: their Enable Cards toggle. Cards: that direction (a single cloze can't be switched by a plugin)."
+        >
+          Cards on
+        </button>
+        <button
+          onMouseDown={noSteal}
+          onClick={() => doSwitch(false)}
+          style={btn}
+          disabled={!targetRemIds.length || !!busy}
+          title="Switch cards off, as RemNote's Browser: Rems (or every card of a Rem) → the Rem's Enable Cards toggle; a forward or backward card → that direction. Not the Disable Descendant Cards power-up."
+        >
+          Cards off
+        </button>
+        <button onMouseDown={noSteal} onClick={() => openPicker('move')} style={btn} disabled={!targetRemIds.length || !!busy} title="Move the Rems under another Rem, at the end of its children (m)">
+          Move…
+        </button>
+        <button onMouseDown={noSteal} onClick={() => openPicker('tag')} style={btn} disabled={!targetRemIds.length || !!busy} title="Add a tag to the Rems, or remove one of theirs (t)">
+          Tag…
+        </button>
+        <button
+          onMouseDown={noSteal}
+          onClick={(e) => doCopyRefs(refFormOf(e))}
+          style={btn}
+          disabled={!targetRemIds.length}
+          title="Copy references to the Rems, to paste into one Rem with ⌘V. Shift+click: pins. Opt+click: each Rem's text followed by a pin. In the table: ⌘C, ⇧⌘C, ⌥⌘C."
+        >
+          Copy refs
         </button>
         <button onMouseDown={noSteal} onClick={doCopy} style={btn} disabled={!targetRemIds.length}>
           Copy ids
         </button>
       </div>
+      {picker && (
+        <RemPicker
+          plugin={plugin}
+          title={picker === 'move' ? `Move ${targetRemIds.length} Rem${targetRemIds.length === 1 ? '' : 's'}` : `Tag ${targetRemIds.length} Rem${targetRemIds.length === 1 ? '' : 's'}`}
+          chips={Array.from(new Map(targetRows.map((r) => [r.remId, r.text])).values())}
+          placeholder={picker === 'move' ? 'Type to search for a new parent…' : 'Type to search for a tag…'}
+          recentsKind={picker}
+          enterLabel={picker === 'move' ? 'Move' : 'Add tag'}
+          topLevelOption={picker === 'move'}
+          removable={picker === 'tag' ? removableTags : undefined}
+          createNoun={picker === 'move' ? 'Rem' : 'tag'}
+          disabledReason={
+            picker === 'move'
+              ? (row) =>
+                  targetRemIds.includes(row.remId)
+                    ? 'being moved'
+                    : row.ancestorIds.some((a) => targetRemIds.includes(a))
+                      ? 'under a moved Rem'
+                      : null
+              : (row) => (targetRemIds.length === 1 && targetRemIds[0] === row.remId ? 'the Rem itself' : null)
+          }
+          onPick={onPick}
+          onClose={() => {
+            setPicker(null);
+            containerRef.current?.focus();
+          }}
+        />
+      )}
       <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
-        In the box: Enter search · Ctrl/Cmd+Enter ✨ AI (plain language) · ↑↓ last searches · Tab to the table — In the table: ↑↓ move · Space select · Enter open · Shift+Enter open in new pane · / or Shift+Tab back to the box — Esc collapse (sb or the bar brings it back) · Ctrl/Cmd+click select
+        In the box: Enter search · Ctrl/Cmd+Enter ✨ AI (plain language) · ↑↓ last searches · Tab to the table — In the table: ↑↓ move · Space select · Enter open · Shift+Enter open in new pane · m move · t tag · ⌘C copy refs (⇧ pins, ⌥ text + pin) · / or Shift+Tab back to the box — Esc collapse (sb or the bar brings it back) · Ctrl/Cmd+click select
       </div>
     </div>
   );

@@ -21,7 +21,9 @@ import {
   HelperBrowseResult,
   HelperSearchResult,
   HelperSuppression,
+  HelperPickResult,
   parseBrowseResponse,
+  parsePickResponse,
   parseRemIdsResponse,
   parseSearchResponse,
   parseSuppressionResponse,
@@ -37,6 +39,8 @@ export type {
   HelperSearchResult,
   HelperSuppression,
   HelperSuppressionCause,
+  HelperPickResult,
+  PickRow,
 } from './rem_search_protocol';
 export { usesQuerySyntax } from './rem_search_protocol';
 
@@ -168,4 +172,19 @@ export async function translateQueryViaHelper(plugin: RNPlugin, request: string)
   if (parsed) return { status: 'ok', ...parsed };
   const message = typeof res.body?.error === 'string' ? res.body.error : 'Claude gave no query.';
   return { status: 'failed', message };
+}
+
+/**
+ * Rems for Search & Browse's Move / Tag picker (scripts/rem_browse.py pick): `ids` in
+ * that order (Recents), the children of `scope`, or a search (inside `scope` when
+ * set), documents and folders first. Never throws.
+ */
+export async function pickViaHelper(
+  plugin: RNPlugin,
+  req: { text?: string; scope?: string | null; ids?: string[]; limit?: number },
+  opts?: { signal?: AbortSignal }
+): Promise<HelperPickResult> {
+  const res = await postToHelper(plugin, '/search/pick', req, { signal: opts?.signal, timeoutMs: 8000 });
+  if (res.status === 'error') return /POST \/ocr/.test(res.message) ? { status: 'outdated' } : { status: 'unavailable' };
+  return res.status === 'ok' ? parsePickResponse(res.body) : res;
 }

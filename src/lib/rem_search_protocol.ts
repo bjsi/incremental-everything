@@ -99,6 +99,10 @@ export interface BrowseRow {
   created: number | null;
   edited: number | null;
   tags: string[];
+  /** The same tags with ids; `powerup` = a power-up shown as a tag. */
+  tagRefs?: { id: string; name: string; powerup: boolean }[];
+  /** Ancestor ids, top first. */
+  ancestorIds?: string[];
   incremental: boolean;
   dismissed: boolean;
   /** Card priority (0–100), when the Rem has one. */
@@ -108,6 +112,12 @@ export interface BrowseRow {
   incDue: number | null;
   /** Rem mode: how many cards. */
   cards?: number;
+  /** Rem mode: generated cards of the Rem itself, and of all Rems below it. */
+  ownCards?: number;
+  descCards?: number;
+  /** Rems with clozes: the text in runs, [text, 0 plain | 1 cloze | 2 another cloze].
+   *  Card mode marks the card's own cloze 1 and the others 2; Rem mode marks them all 1. */
+  textParts?: [string, 0 | 1 | 2][];
   /** Next review, in days from today (rem mode: its earliest card). */
   due: number | null;
   reps: number | null;
@@ -157,6 +167,9 @@ export function parseBrowseResponse(body: any): HelperBrowseResult {
     r.path = Array.isArray(r.path) ? r.path : [];
     r.tags = Array.isArray(r.tags) ? r.tags : [];
     r.suppressed = Array.isArray(r.suppressed) ? r.suppressed : [];
+    r.tagRefs = Array.isArray(r.tagRefs) ? r.tagRefs.filter((t: any) => t && typeof t.id === 'string') : [];
+    r.ancestorIds = Array.isArray(r.ancestorIds) ? r.ancestorIds : [];
+    if (r.textParts !== undefined && !Array.isArray(r.textParts)) delete r.textParts;
   }
   return { status: 'ok', rows, total: typeof body.total === 'number' ? body.total : rows.length,
     ms: typeof body.ms === 'number' ? body.ms : 0 };
@@ -194,4 +207,45 @@ const SYNTAX_RE = new RegExp(
 
 export function usesQuerySyntax(query: string): boolean {
   return SYNTAX_RE.test(query.trim() + ' ');
+}
+
+/** A Rem offered by the Move / Tag picker (scripts/rem_browse.py pick). */
+export interface PickRow {
+  remId: string;
+  name: string;
+  /** Ancestor names, top first. */
+  path: string[];
+  ancestorIds: string[];
+  isDocument: boolean;
+  isFolder: boolean;
+  hasChildren: boolean;
+}
+
+export type HelperPickResult =
+  | { status: 'ok'; rows: PickRow[] }
+  | { status: 'query-error'; error: HelperQueryError }
+  | { status: 'unpaired' }
+  | { status: 'unavailable' }
+  /** A helper from before /search/pick. */
+  | { status: 'outdated' };
+
+export function parsePickResponse(body: any): HelperPickResult {
+  if (!body || body.ok !== true) return { status: 'unavailable' };
+  if (body.queryError && typeof body.queryError === 'object') {
+    const e = body.queryError;
+    return { status: 'query-error', error: { kind: String(e.kind ?? 'query'), message: String(e.message ?? 'The search could not run.') } };
+  }
+  if (!Array.isArray(body.rows)) return { status: 'unavailable' };
+  const rows = body.rows
+    .filter((r: any) => r && typeof r.remId === 'string')
+    .map((r: any) => ({
+      remId: r.remId,
+      name: typeof r.name === 'string' ? r.name : '',
+      path: Array.isArray(r.path) ? r.path : [],
+      ancestorIds: Array.isArray(r.ancestorIds) ? r.ancestorIds : [],
+      isDocument: !!r.isDocument,
+      isFolder: !!r.isFolder,
+      hasChildren: !!r.hasChildren,
+    }));
+  return { status: 'ok', rows };
 }

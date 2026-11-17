@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.241 - November 17th, 2026
+
+### ✨ New
+
+**Search & Browse**: added **Move…**, **Tag…** (add or remove), **Cards on / off** and **Copy refs** (references, pins, or text + pin, pasted into one Rem) for the selected rows; a **Cards** column *(on the Rem + below it)*; and clozes in blue, as in the queue. The Move and Tag picker searches as RemNote's Move Bullet does (Tab into a Rem, Shift+Tab back up), with **+ Create** (⌘Enter). Needs the updated [AI helper](Desktop-Helpers.md#updating) (`ai_ocr_helper.py`, `rem_browse.py`).
+
+📖 [Search Engine → Acting on the rows](Search-Engine.md#actions)
+
 ## v1.0.240 - November 17th, 2026
 
 ### 📝 Changed

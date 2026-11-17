@@ -117,6 +117,50 @@ class Texts:
                     out.append(el['text'])
         return ' '.join(''.join(out).split())[:TEXT_CHARS]
 
+    def render_parts(self, rich, cloze=None):
+        """The text as [[text, mark]] runs: mark 1 = the cloze `cloze` (a card's own),
+        2 = another cloze of the Rem, 0 = plain. With `cloze` None (Rem mode) every cloze
+        is 1. Same whitespace folding and cut as render(), so the runs join into its text."""
+        runs = []
+        for el in rich if isinstance(rich, list) else [rich or '']:
+            if isinstance(el, str):
+                piece, cid = el, None
+            elif isinstance(el, dict):
+                if el.get('i') == 'q' and not el.get('pin'):
+                    piece = self.alias(el) or self.name(el.get('_id'), 1)
+                elif isinstance(el.get('text'), str):
+                    piece = el['text']
+                else:
+                    continue
+                cid = el.get('cId')
+            else:
+                continue
+            mark = 0 if not cid else 1 if cloze is None or str(cid) == str(cloze) else 2
+            if runs and runs[-1][1] == mark:
+                runs[-1][0] += piece
+            else:
+                runs.append([piece, mark])
+        out, used, prev_space = [], 0, True
+        for piece, mark in runs:
+            folded = ' '.join(piece.split())
+            if piece[:1].isspace() and not prev_space and folded:
+                folded = ' ' + folded
+            if piece[-1:].isspace() and folded:
+                folded += ' '
+            if not folded:
+                continue
+            if prev_space:
+                folded = folded.lstrip()
+            folded = folded[:max(0, TEXT_CHARS - used)]
+            if not folded:
+                break
+            out.append([folded, mark])
+            used += len(folded)
+            prev_space = folded.endswith(' ')
+        if out:
+            out[-1][0] = out[-1][0].rstrip()
+        return [r for r in out if r[0]]
+
 
 def _hits_table(db, hits):
     db.execute('CREATE TEMP TABLE IF NOT EXISTS hits (id TEXT PRIMARY KEY, ord INTEGER, alias TEXT)')
@@ -148,7 +192,7 @@ def browse(kb_id, query, mode='rems', sort='relevance', desc=False, offset=0, li
                               (limit, offset)).fetchall()
             texts = Texts(db)
             causes = card_causes_for(db, [rid for rid, _ in page])
-            rows = [rem_row(db, rid, alias, texts, causes) for rid, alias in page]
+            rows = [rem_row(db, rid, alias, texts, causes, kb_id) for rid, alias in page]
         else:
             comp = rs.Compiler(db)
             conds, args = [], []
@@ -201,20 +245,25 @@ def _common(db, rid, texts):
                          FROM remsSearchInfos s WHERE s.id = ? AND s.aliasId = s.id""", (rid,)).fetchone()
     ancestors = (info[0] or '').split() if info else []
     rem = db.execute('SELECT type, created, edited FROM rems WHERE id = ?', (rid,)).fetchone() or (None, None, None)
-    tags = [texts.name(t) for (t,) in db.execute('SELECT tag FROM rem_tags WHERE rem = ?', (rid,))]
+    tag_ids = [t for (t,) in db.execute('SELECT tag FROM rem_tags WHERE rem = ?', (rid,))]
+    powerup_rems = {r for (r,) in db.execute(
+        f"SELECT rem FROM powerups WHERE rem IN ({','.join('?' * len(tag_ids))})", tag_ids)} if tag_ids else set()
+    tag_refs = [{'id': t, 'name': n, 'powerup': t in powerup_rems} for t, n in ((t, texts.name(t)) for t in tag_ids) if n]
     powerups = {c for (c,) in db.execute('SELECT code FROM rem_powerups WHERE rem = ?', (rid,))}
     today = rs.today_day()
     inc_due = db.execute('SELECT ' + prop_expr('?', 'incremental', 'nextrepdate', 'day'), (rid,)).fetchone()[0]
-    return {
+    row = {
         'remId': rid,
         'text': texts.render(d.get('key')),
         'back': texts.render(d.get('value')),
         'path': [n for n in (texts.name(a) for a in ancestors) if n],
+        'ancestorIds': ancestors,
         'type': {1: 'concept', 2: 'descriptor', 6: 'portal'}.get(rem[0], ''),
         'isDocument': bool(info and (info[1] or info[2])),
         'created': rem[1],
         'edited': rem[2],
-        'tags': [t for t in tags if t],
+        'tags': [t['name'] for t in tag_refs],
+        'tagRefs': tag_refs,
         'incremental': 'incremental' in powerups,
         'dismissed': 'dismissed' in powerups,
         # The hidden priorityValue slot, the visible priority as fallback (slot_access.ts).
@@ -223,19 +272,54 @@ def _common(db, rid, texts):
         'incPriority': db.execute('SELECT ' + prop_expr('?', 'incremental', 'priority'), (rid,)).fetchone()[0],
         'incDue': (inc_due - today) if inc_due is not None else None,
     }
+    row['_anc'] = info[0] if info else ''
+    return row
 
 
-def rem_row(db, rid, alias, texts, causes):
+# Cards under a Rem (its descendants', not its own): one pass over every generated card
+# adds it to each of its ancestors (~0.2 s for 70k cards), kept until the index's cards
+# change (its card_watermark). Counting per Rem instead cost up to 0.6 s for a big root,
+# ~3 s for a page of top-level documents.
+_subtree_cards = {}
+
+
+def subtree_card_counts(db, kb_id=None):
+    stamp = db.execute("SELECT v FROM meta WHERE k = 'card_watermark'").fetchone()
+    key = (kb_id, stamp[0] if stamp else None)
+    hit = _subtree_cards.get(kb_id)
+    if hit and hit[0] == key and key[1] is not None:
+        return hit[1]
+    counts = {}
+    for (anc,) in db.execute("""SELECT s.ancestor_ids FROM cards c
+                               JOIN remsSearchInfos s ON s.id = c.rem AND s.aliasId = s.id
+                               WHERE IFNULL(c.nogen, 0) = 0"""):
+        for a in (anc or '').split():
+            counts[a] = counts.get(a, 0) + 1
+    _subtree_cards[kb_id] = (key, counts)
+    return counts
+
+
+def has_cloze(rich):
+    return isinstance(rich, list) and any(isinstance(el, dict) and el.get('cId') for el in rich)
+
+
+def rem_row(db, rid, alias, texts, causes, kb_id=None):
     row = _common(db, rid, texts)
+    row.pop('_anc')
+    key = (texts.doc(rid) or {}).get('key')
+    if has_cloze(key):
+        row['textParts'] = texts.render_parts(key)
     if alias:
         row['aliasId'] = alias
-    cards = db.execute('SELECT id, next_day, reps, lapses, ivl FROM cards WHERE rem = ?', (rid,)).fetchall()
+    cards = db.execute('SELECT id, next_day, reps, lapses, ivl, nogen FROM cards WHERE rem = ?', (rid,)).fetchall()
     row.update(memory(db, f'c.rem = ? ORDER BY {r_sql(time.time() * 1000)} IS NULL, {r_sql(time.time() * 1000)} ASC',
                       rid))
     today = rs.today_day()
     due_days = [c[1] - today for c in cards if c[1] is not None]
     row.update(
         cards=len(cards),
+        ownCards=sum(1 for c in cards if not c[5]),
+        descCards=subtree_card_counts(db, kb_id).get(rid, 0),
         due=min(due_days) if due_days else None,
         reps=sum(c[2] or 0 for c in cards) if cards else None,
         lapses=sum(c[3] or 0 for c in cards) if cards else None,
@@ -259,7 +343,10 @@ def memory(db, where, arg):
 
 def card_row(db, cid, rid, texts, causes):
     row = _common(db, rid, texts)
+    row.pop('_anc')
     c = db.execute('SELECT kind, cloze, next_day, reps, lapses, ivl, ml, ny FROM cards WHERE id = ?', (cid,)).fetchone()
+    if c[0] == 'cloze' and c[1]:
+        row['textParts'] = texts.render_parts((texts.doc(rid) or {}).get('key'), c[1])
     cause = causes.get(cid)
     row.update(memory(db, 'c.id = ?', cid))
     row.update(
@@ -270,6 +357,97 @@ def card_row(db, cid, rid, texts, causes):
         suppressed=[cause] if cause else [],
     )
     return row
+
+
+# ---------------------------------------------------------------------------
+# Pick: the Rem picker of Search & Browse's Move and Tag (RemNote's Move Bullet
+# popup, which plugins cannot open): light rows, documents and folders first.
+# ---------------------------------------------------------------------------
+
+PICK_LIMIT = 60
+PICK_POOL = 400       # hits ranked before documents and folders are moved up
+PICK_CHILDREN = 500
+
+
+def _visible(texts, rid):
+    """Not a hidden property/slot child (`ie`), and still there."""
+    d = texts.doc(rid)
+    return bool(d) and not d.get('ie')
+
+
+def pick_row(db, rid, texts):
+    info = db.execute("""SELECT s.ancestor_ids, json_extract(s.doc, '$.i'), json_extract(s.doc, '$.l')
+                         FROM remsSearchInfos s WHERE s.id = ? AND s.aliasId = s.id""", (rid,)).fetchone()
+    if info:
+        ancestors = (info[0] or '').split()
+    else:  # not in RemNote's search index (an empty Rem): walk the parents
+        ancestors, cur, seen = [], (texts.doc(rid) or {}).get('parent'), set()
+        while cur and cur not in seen and len(ancestors) < 64:
+            seen.add(cur)
+            ancestors.insert(0, cur)
+            cur = (texts.doc(cur) or {}).get('parent')
+    return {
+        'remId': rid,
+        'name': texts.name(rid),
+        'path': [n for n in (texts.name(a) for a in ancestors) if n],
+        'ancestorIds': ancestors,
+        'isDocument': bool(info and (info[1] or info[2])),
+        'isFolder': bool(info and info[2]),
+        'hasChildren': bool(db.execute('SELECT 1 FROM rems WHERE parent = ? LIMIT 1', (rid,)).fetchone()),
+    }
+
+
+def pick(kb_id, text='', scope=None, ids=None, limit=PICK_LIMIT, db_path=None, index_file=None, wait=True):
+    """{rows, ms}: Rems to move to or tag with.
+    - `ids`: these Rems, in this order (the picker's Recents);
+    - `scope` and no text: its children, in document order;
+    - text: a search (`in:<scope> (text)` inside a scope), documents and folders first.
+    Raises rs.SearchError."""
+    started = time.time()
+    text = (text or '').strip()
+    limit = max(1, min(int(limit or PICK_LIMIT), PICK_CHILDREN))
+    if scope is not None and not rs.REM_ID_RE.match(str(scope)):
+        raise rs.SearchError('unknown-value', 'scope is a Rem id.')
+    db = rs.open_index_for_search(kb_id, db_path, index_file, wait)
+    try:
+        texts = Texts(db)
+        if ids:
+            wanted = [i for i in ids if isinstance(i, str) and rs.REM_ID_RE.match(i)][:limit]
+            rows = [pick_row(db, rid, texts) for rid in wanted if _visible(texts, rid)]
+        elif not text:
+            if not scope:
+                return {'rows': [], 'ms': 0}
+            kids = [rid for (rid,) in db.execute('SELECT id FROM rems WHERE parent = ?', (scope,))]
+            kids = [k for k in kids if _visible(texts, k)]
+            kids.sort(key=lambda k: str((texts.doc(k) or {}).get('f') or ''))
+            rows = [pick_row(db, rid, texts) for rid in kids[:PICK_CHILDREN]]
+        else:
+            tree = rs.parse(f'in:{scope} ({text})' if scope else text)
+            hits, _ = rs.match(db, tree)
+            pool, seen = [], set()
+            for rid, _alias in hits:
+                if rid in seen or rid == scope:
+                    continue
+                seen.add(rid)
+                pool.append(rid)
+                if len(pool) >= PICK_POOL:
+                    break
+            docs = set()
+            if pool:
+                docs = {r for (r,) in db.execute(
+                    f"""SELECT id FROM remsSearchInfos WHERE aliasId = id AND id IN ({','.join('?' * len(pool))})
+                        AND (json_extract(doc, '$.i') = 1 OR json_extract(doc, '$.l') = 1)""", pool)}
+            # Stable: relevance kept inside each group.
+            pool.sort(key=lambda r: 0 if r in docs else 1)
+            rows = []
+            for rid in pool:
+                if _visible(texts, rid):
+                    rows.append(pick_row(db, rid, texts))
+                    if len(rows) >= limit:
+                        break
+        return {'rows': rows, 'ms': int((time.time() - started) * 1000)}
+    finally:
+        db.close()
 
 
 def main():

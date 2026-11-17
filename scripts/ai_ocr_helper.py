@@ -1440,6 +1440,23 @@ def handle_search_browse(req, entry):
     return out
 
 
+def handle_search_pick(req, entry):
+    """Rems for Search & Browse's Move and Tag picker (rem_browse.pick)."""
+    if rem_browse is None or rem_search is None:
+        raise RuntimeError('rem_browse.py, rem_search.py or rem_index.py is missing: download them next to ai_ocr_helper.py')
+    kb_id = history_archive.check_kb_id(req.get('kbId'))
+    ids = req.get('ids')
+    try:
+        out = rem_browse.pick(kb_id, req.get('text') or '', req.get('scope') or None,
+                              ids if isinstance(ids, list) else None, req.get('limit') or rem_browse.PICK_LIMIT,
+                              wait=False)
+    except rem_search.SearchError as e:
+        entry['queryError'] = e.kind
+        return {'queryError': e.to_json()}
+    entry.update(results=len(out['rows']))
+    return out
+
+
 def handle_search_ai(req, entry):
     """A plain-language request in, a Search Engine query out (rem_search_ai.py):
     one `claude -p` turn, checked with the search's parser, retried once if invalid."""
@@ -1464,7 +1481,8 @@ ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/find-source': handle_f
           '/history/scan': handle_history_scan, '/history/ghosts': handle_history_ghosts,
           '/history/status': handle_history_status, '/search': handle_search,
           '/search/source': handle_search_source, '/search/suppression': handle_search_suppression,
-          '/search/browse': handle_search_browse, '/search/ai': handle_search_ai}
+          '/search/browse': handle_search_browse, '/search/pick': handle_search_pick,
+          '/search/ai': handle_search_ai}
 
 
 class Handler(BaseHTTPRequestHandler):
