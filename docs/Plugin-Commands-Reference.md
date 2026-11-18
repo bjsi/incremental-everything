@@ -222,6 +222,9 @@ In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) opened from the queue's 
 - **[Find Sources (by meaning)](Source-Pins.md#find-sources)** — `quick: fsq`
   Finds, in the background, the passages of your library that say what the focused or selected Rems say (summaries, paraphrases, translations), then a notice opens the review: accept passages and they are pinned, optionally with their quotes and AI notes as child Rems. Needs a [corpus provider](Corpus-Provider.md) with semantic search.
 
+- **[Check Statement against Sources](Source-Pins.md#check-statement)** — `quick: cks`
+  Find Sources, then Claude's verdict on each focused or selected Rem (✅ correct, ⚠️ partly, ❌ contradicted, ❔ not covered), judged only from the passages found, with an observation citing book and page; after review, written under the Rem as a dated Check Rem with the passages it rests on. Needs a [corpus provider](Corpus-Provider.md) with semantic search and the Claude CLI.
+
 - <a id="store-linked-images-audio-in-remnote"></a>**Store linked images & audio in RemNote** — `quick: slm`
   An image or audio added through **Embed Link** (or **Audio Search**) is saved as the bare web address: nothing is copied, so the Rem breaks the day that server moves or removes the file, and it does not play offline. This command fetches each such file, stores it in RemNote the way an uploaded file is stored, and points the Rem at the stored copy.
   Run it on the focused Rem or on a selection of Rems; front and back are both handled. The Rem itself is edited in place — only the address inside the image or audio changes — so its flashcards and their history are untouched. Files RemNote already stores, and video embeds such as YouTube, are left alone, so it is safe to re-run.

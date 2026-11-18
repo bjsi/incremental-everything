@@ -10,6 +10,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Source Pins → Find Sources](Source-Pins.md#find-sources)
 
+**Check Statement**: added a command (`cks`) that runs Find Sources on a note and asks Claude whether it is right, judged only from the passages found (✅ ⚠️ ❌ ❔), with an observation citing book and page, written after review as a dated Check Rem under the note.
+
+📖 [Source Pins → Check Statement](Source-Pins.md#check-statement)
+
 ### ✨ Improved
 
 **Pin Source Quote**: a passage that is not in the open PDF or article is now looked up with your source finder in its book's other PDFs, and existing pages and highlights RemNote has not loaded yet are reused instead of duplicated (a second "Page 030"); the latter needs the AI helper, restarted.

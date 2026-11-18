@@ -4,7 +4,7 @@ A **source pin** is a pin reference to the highlight that holds a passage: click
 
 **Pin Source Quote** gives one to text you already have — a sentence you typed, pasted or wrote into your notes — without selecting it in the source again. It finds the passage in the open PDF or article, reuses the highlight that already covers it or creates one, and pins it.
 
-**Find Sources** does the same for text that only *means* what the source says — a summary, a paraphrase, a translation, course notes — by searching your library by meaning. See [Find Sources](#find-sources).
+**Find Sources** does the same for text that only *means* what the source says — a summary, a paraphrase, a translation, course notes — by searching your library by meaning. See [Find Sources](#find-sources). **Check Statement** goes one step further and tells you whether a note is right, from those passages. See [Check Statement](#check-statement).
 
 ## Requirements { #requirements }
 
@@ -129,6 +129,32 @@ Each row shows the book, the page in your RemNote PDF, the quote with the words 
 - **Quotes** keep only the words that bear on your note: the rest of the passage is cut with `[…]`, and each part gets its own pin, so the pin opens the whole context. The words the point turns on are in **bold**, the one word or figure it hinges on in ***bold italics***. The attribution reads `(book, §section, PDF p. N)`, with `; fora do edital` for a passage the exam does not ask for.
 - **Where the pins go:** at the end of the Rem (of its back, when it has one). When the Rem mixes what several passages say, each pin goes right after the sentence it supports, as long as that sentence can be found with certainty; any other goes at the end.
 - **Running it again** reuses the highlights, the headers and the quote Rems already there, and adds nothing twice.
+
+## Check Statement: is my note right? { #check-statement }
+
+**Check Statement against Sources** (`cks`) runs [Find Sources](#find-sources) on the focused or selected Rems, then asks Claude (Opus, through the [AI helper](Desktop-Helpers.md#ai-helper), on your Claude subscription) whether each note is right, judging **only from the passages found**, never from its own knowledge. Same requirements as Find Sources, plus the Claude CLI signed in.
+
+It runs in the background (about half a minute per Rem), and the notice shows the verdict:
+
+| Verdict | Meaning |
+|---|---|
+| ✅ Correta / Consistent | Every claim of the note is supported |
+| ⚠️ Em parte / Partly | Some claims are supported, others are missing, imprecise or wrong |
+| ❌ Incorreta / Contradicted | A central claim is contradicted |
+| ❔ Não coberta pelas fontes / Not covered | No passage settles the note |
+
+**Review** opens the same list as Find Sources, with the verdict and an **observation** at the top of each Rem: what is right, what is wrong and what the source says instead, citing book and page. The passages the verdict rests on are marked ◆ and selected from the start. Enter writes the verdict, even with no passage selected:
+
+```
+• Para canais de acesso expostos à ação de ondas, … 📌
+    • Verificação: ⚠️ Em parte (18/11/2026)        (Extra Card Detail)
+        • A primeira parte está correta: … A segunda parte está errada: …
+            • “…” (PIANC 121, PDF p. 30) 📌
+```
+
+- The **source pins** go on the Rem, as in Find Sources.
+- With quotes on (`Q`), the ◆ passages go under the observation; any other accepted passage goes under Fontes / Material relacionado.
+- Each check is **dated**: checking again adds a new one and leaves the old one.
 
 ## Pinning every quote in a subtree { #quote-rems-in-descendants }
 

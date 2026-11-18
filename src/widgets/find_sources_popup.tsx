@@ -12,6 +12,7 @@ import {
   queueFindSourcesWrite,
   ReviewPassage,
 } from '../lib/find_sources';
+import { Verdict, VERDICTS } from '../lib/find_sources/check';
 import { emphasisSegments } from '../lib/find_sources/quote_text';
 
 /** Remembered per device: what to write besides the pins (an old boolean meant quotes or not). */
@@ -43,6 +44,12 @@ interface Row {
 }
 
 const muted = { color: 'var(--rn-clr-content-secondary)' };
+const VERDICT_COLOR: Record<Verdict, string> = {
+  consistent: '#10B981',
+  partly: '#F59E0B',
+  contradicts: '#EF4444',
+  'not-covered': '#9CA3AF',
+};
 const keyStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, monospace',
   fontSize: 11,
@@ -77,7 +84,8 @@ function FindSourcesPopup() {
       const initial = new Set<string>();
       data?.rems.forEach((r, i) =>
         r.passages.forEach((p, j) => {
-          if (p.role === 'source' && p.score >= 8 && p.pdfRemId) initial.add(`${i}:${j}`);
+          // Sources scoring 8+, and the passages a Check Statement verdict rests on.
+          if (((p.role === 'source' && p.score >= 8) || p.basis) && (p.pdfRemId || p.basis)) initial.add(`${i}:${j}`);
         })
       );
       setSelected(initial);
@@ -109,6 +117,9 @@ function FindSourcesPopup() {
     });
     return out;
   }, [review]);
+
+  /** Check Statement: some Rem has a verdict (or the verdict failed). */
+  const isCheck = !!review?.rems.some((r) => r.check || r.checkError);
 
   useEffect(() => {
     rowRefs.current[cursor]?.scrollIntoView({ block: 'nearest' });
@@ -145,7 +156,7 @@ function FindSourcesPopup() {
   const write = async () => {
     if (!review || busy) return;
     const chosen = rows.filter((r) => selected.has(keyOf(r)) && selectable(r));
-    if (!chosen.length) {
+    if (!chosen.length && !isCheck) {
       await plugin.app.toast('Select at least one passage (Space), or press Esc to close.');
       return;
     }
@@ -155,8 +166,9 @@ function FindSourcesPopup() {
         remId: r.remId,
         lang: r.lang,
         passages: chosen.filter((c) => c.rem === i).map((c) => c.p),
+        check: r.check,
       }))
-      .filter((r) => r.passages.length);
+      .filter((r) => r.passages.length || r.check);
     // One hand-off write, awaited before closing (a popup's teardown cuts longer work short).
     await queueFindSourcesWrite(plugin, {
       id: `${review.jobId}-write-${Date.now()}`,
@@ -207,10 +219,12 @@ function FindSourcesPopup() {
       style={{ outline: 'none', color: 'var(--rn-clr-content-primary)', height: '100%', boxSizing: 'border-box' }}
     >
       <div className="flex items-center gap-2">
-        <span style={{ fontSize: 18 }}>🔎</span>
-        <span className="font-semibold text-base">Find Sources</span>
+        <span style={{ fontSize: 18 }}>{isCheck ? '⚖️' : '🔎'}</span>
+        <span className="font-semibold text-base">{isCheck ? 'Check Statement' : 'Find Sources'}</span>
         <span className="text-xs ml-auto" style={muted}>
-          Passages that say what your note says, found by meaning
+          {isCheck
+            ? 'Your note checked against the passages of your library'
+            : 'Passages that say what your note says, found by meaning'}
         </span>
       </div>
 
@@ -223,6 +237,31 @@ function FindSourcesPopup() {
             {rem.error && (
               <div className="text-xs" style={{ color: '#EF4444' }}>
                 {rem.error}
+              </div>
+            )}
+            {rem.check && (
+              <div
+                className="flex flex-col gap-1 p-2 rounded text-sm"
+                style={{
+                  background: 'var(--rn-clr-background-secondary)',
+                  borderLeft: `3px solid ${VERDICT_COLOR[rem.check.verdict]}`,
+                }}
+              >
+                <div className="font-semibold">
+                  {VERDICTS[rem.check.verdict].icon} {VERDICTS[rem.check.verdict][rem.lang]}
+                  <span className="text-xs font-normal ml-2" style={muted}>
+                    {rem.check.model ?? ''}
+                  </span>
+                </div>
+                {rem.check.observation && <div>{rem.check.observation}</div>}
+                <div className="text-xs" style={muted}>
+                  Written under the Rem as a Check Rem; the passages marked ◆ go under it.
+                </div>
+              </div>
+            )}
+            {rem.checkError && (
+              <div className="text-xs" style={{ color: '#EF4444' }}>
+                No verdict: {rem.checkError}
               </div>
             )}
             {!rem.error && !rem.passages.length && (
@@ -265,6 +304,7 @@ function FindSourcesPopup() {
                       <span>{p.pdfPage ? `PDF p. ${p.pdfPage}` : p.page ? `p. ${p.page}` : ''}</span>
                       {p.edital && p.edital !== 'sim' && <span>· fora do edital</span>}
                       {p.unpinnable && <span style={{ color: '#F59E0B' }}>· no pin: {p.unpinnable}</span>}
+                      {p.basis && <span style={{ color: 'var(--rn-clr-content-primary)' }}>· ◆ verdict</span>}
                     </div>
                     <div className="italic">
                       “
@@ -310,11 +350,17 @@ function FindSourcesPopup() {
         <button
           onClick={() => void write()}
           onMouseDown={(e) => e.preventDefault()}
-          disabled={busy || !count}
+          disabled={busy || (!count && !isCheck)}
           className="ml-auto py-1.5 px-4 text-sm font-medium rounded"
-          style={{ background: '#3B82F6', color: 'white', border: 'none', cursor: 'pointer', opacity: busy || !count ? 0.5 : 1 }}
+          style={{
+            background: '#3B82F6',
+            color: 'white',
+            border: 'none',
+            cursor: 'pointer',
+            opacity: busy || (!count && !isCheck) ? 0.5 : 1,
+          }}
         >
-          Pin {count || ''} (Enter)
+          {isCheck ? (count ? `Write verdict + pin ${count}` : 'Write verdict') : `Pin ${count || ''}`} (Enter)
         </button>
       </div>
     </div>

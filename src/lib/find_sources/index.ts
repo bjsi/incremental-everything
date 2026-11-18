@@ -37,6 +37,7 @@ import {
 import { guessLang } from '../read_aloud_script';
 import { placeInline, pinnedIds, RichElement } from './placement';
 import { attribution, emphasisSegments, segmentsToRichText } from './quote_text';
+import { checkHeader, checkStatement, StatementCheck, VERDICTS } from './check';
 
 export const SEMANTIC_SEARCH = 'semantic-search';
 /** The provider's answer for one Rem can take ~25 s (two Gemini calls); allow for a slow one. */
@@ -85,6 +86,8 @@ export interface FindSourcesJob {
   items: FindSourcesItem[];
   openSourceRemId: string | null;
   queuedAt: number;
+  /** Check Statement: also ask Claude for a verdict on each Rem's statement (./check). */
+  check?: boolean;
 }
 
 /** A passage as the review shows it: where it was found in RemNote, if it was. */
@@ -95,6 +98,8 @@ export interface ReviewPassage extends FoundPassage {
   pdfPage?: number;
   /** Why it cannot be pinned (no PDF in RemNote, not found in it, …). */
   unpinnable?: string;
+  /** Check Statement: the verdict rests on this passage (its quote goes under the Check Rem). */
+  basis?: boolean;
 }
 
 export interface ReviewRem {
@@ -105,6 +110,10 @@ export interface ReviewRem {
   passages: ReviewPassage[];
   /** Set when the search failed for this Rem. */
   error?: string;
+  /** Check Statement: the verdict on the Rem's statement. */
+  check?: StatementCheck;
+  /** Check Statement: why there is no verdict (the helper or Claude failed). */
+  checkError?: string;
 }
 
 export interface FindSourcesReview {
@@ -125,7 +134,7 @@ export interface FindSourcesWrite {
   id: string;
   noticeId: string;
   extras: FindSourcesExtras;
-  rems: { remId: string; lang: 'pt' | 'en'; passages: ReviewPassage[] }[];
+  rems: { remId: string; lang: 'pt' | 'en'; passages: ReviewPassage[]; check?: StatementCheck }[];
 }
 
 /** The verbatim parts of a passage's quote (one, from a provider without `excerpts`). */
@@ -179,7 +188,8 @@ export async function findSourcesUnavailable(plugin: RNPlugin): Promise<string |
 export async function enqueueFindSources(
   plugin: RNPlugin,
   remIds: string[],
-  openSource?: string | null
+  openSource?: string | null,
+  options: { check?: boolean } = {}
 ): Promise<number> {
   const items: FindSourcesItem[] = [];
   for (const remId of remIds) {
@@ -195,38 +205,50 @@ export async function enqueueFindSources(
     items,
     openSourceRemId: openSource ?? null,
     queuedAt: Date.now(),
+    check: !!options.check,
   };
   const queued = (await plugin.storage.getSession<FindSourcesJob[]>(pendingFindSourcesJobsKey)) || [];
   await plugin.storage.setSession(pendingFindSourcesJobsKey, [...queued, job]);
   return items.length;
 }
 
-const runningToast = (n: number) =>
-  `🔎 Finding the sources of ${n === 1 ? 'this Rem' : `${n} Rems`} by meaning, in the background ` +
-  `(about 25 s ${n === 1 ? '' : 'each'}). A notice will say when they are ready to review.`;
+const runningToast = (n: number, check = false) =>
+  `\ud83d\udd0e ${check ? 'Checking' : 'Finding the sources of'} ${n === 1 ? 'this Rem' : `${n} Rems`} ` +
+  `${check ? 'against your library' : 'by meaning'}, in the background (about ${check ? '45' : '25'} s` +
+  `${n === 1 ? '' : ' each'}). A notice will say when ${n === 1 ? 'it is' : 'they are'} ready to review.`;
 
-/** Command: Find Sources for the selected Rems, else the focused one (as Pin Source Quote resolves them). */
-export async function findSources(plugin: ReactRNPlugin) {
+/** The commands: Find Sources (or Check Statement) for the selected Rems, else the focused one. */
+async function startFromCommand(plugin: ReactRNPlugin, check: boolean) {
+  const what = check ? 'Check Statement' : 'Find Sources';
   const why = await findSourcesUnavailable(plugin);
   if (why) {
     await showMessageDialog(plugin, {
       tone: 'info',
-      title: 'Find Sources is not available',
+      title: `${what} is not available`,
       message: why,
       detail:
-        'Find Sources asks your corpus provider (through the AI helper) for the passages of your library ' +
+        `${what} asks your corpus provider (through the AI helper) for the passages of your library ` +
         'that say what a note says. See Corpus Provider in the docs.',
     });
     return;
   }
   const rems = await selectedOrFocusedRems(plugin);
   if (!rems.length) {
-    await plugin.app.toast('Focus or select the Rems whose sources you want to find.');
+    await plugin.app.toast(`Focus or select the Rems ${check ? 'to check' : 'whose sources you want to find'}.`);
     return;
   }
-  const n = await enqueueFindSources(plugin, rems.map((r) => r._id), await openSourceRemId(plugin));
-  await plugin.app.toast(n ? runningToast(n) : 'The selected Rems have no text to look for.');
+  const n = await enqueueFindSources(plugin, rems.map((r) => r._id), await openSourceRemId(plugin), { check });
+  await plugin.app.toast(n ? runningToast(n, check) : 'The selected Rems have no text to look for.');
 }
+
+/** Command: Find Sources for the selected Rems, else the focused one (as Pin Source Quote resolves them). */
+export const findSources = (plugin: ReactRNPlugin) => startFromCommand(plugin, false);
+
+/**
+ * Command: Check Statement — Find Sources, then Claude's verdict on each Rem's statement
+ * from the passages found (./check); written as a Check Rem under the Rem after review.
+ */
+export const checkStatementCommand = (plugin: ReactRNPlugin) => startFromCommand(plugin, true);
 
 /** For "Search by meaning" in Pin Source Quote's dialog: queue and say so. */
 export async function findSourcesFromDialog(plugin: RNPlugin, remIds: string[], openSource?: string | null) {
@@ -290,7 +312,9 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
       const passages: ReviewPassage[] = [];
       for (const p of found) passages.push(await locateInRemNote(plugin, p));
       console.log(`[FindSources] ${item.title}: ${passages.length} passage(s)`, passages);
-      rems.push({ remId: item.remId, title: item.title, lang, passages });
+      const rem: ReviewRem = { remId: item.remId, title: item.title, lang, passages };
+      if (job.check) await addCheck(plugin, rem, item.texts.join('\n'));
+      rems.push(rem);
     } catch (e) {
       console.error('[FindSources] search failed for', item.remId, e);
       const message =
@@ -312,12 +336,14 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
   const count = (role: PassageRole) => rems.reduce((n, r) => n + r.passages.filter((p) => p.role === role).length, 0);
   const total = rems.reduce((n, r) => n + r.passages.length, 0);
   const failed = rems.filter((r) => r.error);
-  const subject = rems.length === 1 ? `“${rems[0].title}”` : `${rems.length} Rems`;
-  if (!total) {
+  const subject = rems.length === 1 ? `\u201c${rems[0].title}\u201d` : `${rems.length} Rems`;
+  const what = job.check ? 'Check Statement' : 'Find Sources';
+  const checked = rems.filter((r) => r.check);
+  if (!total && !checked.length) {
     await showNotice(plugin, {
       id: noticeId,
       tone: failed.length ? 'error' : 'info',
-      title: 'Find Sources: nothing found',
+      title: `${what}: nothing found`,
       message: failed.length
         ? `${subject}: ${failed[0].error}`
         : `${subject}: no passage of your library says this.`,
@@ -332,13 +358,55 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
     failed.length ? `${failed.length} failed` : '',
   ].filter(Boolean);
   const review: FindSourcesReview = { jobId: job.id, noticeId, rems };
+  const verdicts = job.check
+    ? rems.length === 1 && rems[0].check
+      ? `${VERDICTS[rems[0].check.verdict].icon} ${VERDICTS[rems[0].check.verdict][rems[0].lang]}. `
+      : checked.length
+      ? `${(Object.keys(VERDICTS) as (keyof typeof VERDICTS)[])
+          .map((v) => [v, checked.filter((r) => r.check!.verdict === v).length] as const)
+          .filter(([, n]) => n)
+          .map(([v, n]) => `${VERDICTS[v].icon} ${n}`)
+          .join(' ')}. `
+      : ''
+    : '';
+  const worst = checked.some((r) => r.check!.verdict === 'contradicts')
+    ? 'error'
+    : checked.some((r) => r.check!.verdict !== 'consistent')
+    ? 'info'
+    : 'success';
   await showNotice(plugin, {
     id: noticeId,
-    tone: count('source') ? 'success' : 'info',
-    title: 'Find Sources: ready to review',
-    message: `${subject}: ${parts.join(' · ')}. Nothing is pinned until you accept it.`,
+    tone: job.check ? worst : count('source') ? 'success' : 'info',
+    title: `${what}: ready to review`,
+    message: `${subject}: ${verdicts}${parts.join(' \u00b7 ')}. Nothing is written until you accept it.`,
     action: { label: 'Review', popup: FIND_SOURCES_POPUP, data: review },
   });
+}
+
+/**
+ * Check Statement: Claude's verdict on the Rem's statement from the passages found
+ * (all of them, pinnable or not), and which of them it rests on.
+ */
+async function addCheck(plugin: ReactRNPlugin, rem: ReviewRem, statement: string) {
+  if (!rem.passages.length) {
+    rem.check = {
+      verdict: 'not-covered',
+      observation:
+        rem.lang === 'pt'
+          ? 'Nenhuma passagem da bibliografia trata desta afirmação.'
+          : 'No passage of the bibliography deals with this statement.',
+      basis: [],
+    };
+    return;
+  }
+  try {
+    rem.check = await checkStatement(plugin, statement, rem.lang, rem.passages);
+    rem.check.basis.forEach((k) => (rem.passages[k].basis = true));
+    console.log('[CheckStatement]', rem.title, rem.check);
+  } catch (e) {
+    console.error('[CheckStatement] verdict failed for', rem.remId, e);
+    rem.checkError = (e as Error).message;
+  }
 }
 
 // --- 3. write ---------------------------------------------------------------------------
@@ -415,6 +483,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
   let pinCount = 0;
   let quoteCount = 0;
   let noteCount = 0;
+  let checkCount = 0;
   const problems: string[] = [];
   for (const entry of write.rems) {
     const rem = await plugin.rem.findOne(entry.remId);
@@ -471,12 +540,43 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
     }
     pinCount += onRem.reduce((n, p) => n + p.pins.length, 0);
 
+    // Check Statement: the verdict first among the Rem's children, the observation under
+    // it, and (with quotes) the passages it rests on under the observation.
+    let underCheck = new Set<ReviewPassage>();
+    if (entry.check) {
+      const header = await plugin.rem.createRem();
+      if (header) {
+        await header.setText([checkHeader(entry.check.verdict, entry.lang)]);
+        await header.setParent(rem._id, 0);
+        await header.addPowerup(BuiltInPowerupCodes.ExtraCardDetail);
+        let parentOfQuotes: PluginRem = header;
+        if (entry.check.observation) {
+          const observation = await plugin.rem.createRem();
+          if (observation) {
+            await observation.setText([entry.check.observation]);
+            await observation.setParent(header._id);
+            parentOfQuotes = observation;
+          }
+        }
+        checkCount++;
+        if (write.extras !== 'pins') {
+          underCheck = new Set(entry.passages.filter((p) => p.basis));
+          for (const { passage, pins } of pinned.filter((p) => underCheck.has(p.passage))) {
+            const added = await addQuoteRem(plugin, parentOfQuotes, passage, pins, write.extras === 'notes');
+            if (added.quote) quoteCount++;
+            if (added.note) noteCount++;
+          }
+        }
+      }
+    }
+
     if (write.extras !== 'pins') {
       const names = HEADERS[entry.lang];
       const other = HEADERS[entry.lang === 'pt' ? 'en' : 'pt'];
+      const rest = pinned.filter((p) => !underCheck.has(p.passage));
       const groups: [string[], typeof pinned][] = [
-        [[names.sources, other.sources], pinned.filter((p) => p.passage.role === 'source')],
-        [[names.related, other.related], pinned.filter((p) => p.passage.role !== 'source')],
+        [[names.sources, other.sources], rest.filter((p) => p.passage.role === 'source')],
+        [[names.related, other.related], rest.filter((p) => p.passage.role !== 'source')],
       ];
       for (const [headerNames, items] of groups) {
         if (!items.length) continue;
@@ -499,14 +599,16 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
     }
   }
   await dismissNotices(plugin, write.noticeId);
-  const done = `📌 Find Sources: ${pinCount} pin${pinCount === 1 ? '' : 's'}` +
+  const done = `\ud83d\udccc ${checkCount ? 'Check Statement' : 'Find Sources'}: ` +
+    (checkCount ? `${checkCount} verdict${checkCount === 1 ? '' : 's'}, ` : '') +
+    `${pinCount} pin${pinCount === 1 ? '' : 's'}` +
     (write.extras !== 'pins' ? `, ${quoteCount} quote Rem${quoteCount === 1 ? '' : 's'}` : '') +
     (write.extras === 'notes' ? `, ${noteCount} AI note${noteCount === 1 ? '' : 's'}` : '') +
     ` on ${write.rems.length} Rem${write.rems.length === 1 ? '' : 's'}.`;
   if (problems.length) {
     await showNotice(plugin, {
       tone: 'info',
-      title: 'Find Sources: pinned, with problems',
+      title: `${checkCount ? 'Check Statement' : 'Find Sources'}: written, with problems`,
       message: done.replace(/^\S+ /, ''),
       detail: [...new Set(problems)].join(' · '),
       openRemId: write.rems[0]?.remId,

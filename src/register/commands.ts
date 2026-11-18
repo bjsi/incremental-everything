@@ -13,7 +13,7 @@ import { openMasteryDrill } from '../lib/mastery_drill_launch';
 import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote, pinSourceQuotesInTree } from '../lib/pdf_source_pins';
-import { findSources } from '../lib/find_sources';
+import { checkStatementCommand, findSources } from '../lib/find_sources';
 import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { sendFocusedPaneToAnotherWindow } from '../lib/send_to_window';
 import { localizeMediaInRems } from '../lib/localize_media';
@@ -51,6 +51,7 @@ import {
   pinSourceQuoteCommandId,
   pinSourceQuotesInTreeCommandId,
   findSourcesCommandId,
+  checkStatementCommandId,
   localizeMediaCommandId,
   localizeMediaTreeCommandId,
   currentIncrementalRemTypeKey,
@@ -412,6 +413,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'fsq',
     action: async () => {
       await findSources(plugin);
+    },
+  });
+
+  // Check the selected Rems' statements against the library: Find Sources, then Claude's
+  // verdict (✅ ⚠️ ❌ ❔) and observation from the passages found, written as a Check Rem.
+  await plugin.app.registerCommand({
+    id: checkStatementCommandId,
+    name: 'Check Statement against Sources',
+    quickCode: 'cks',
+    action: async () => {
+      await checkStatementCommand(plugin);
     },
   });
 

@@ -791,6 +791,7 @@ export const pinSourceQuotesInTreeCommandId = 'pin-source-quotes-in-tree';
 // (find-passages) and posts a notice whose Review button opens the popup; the popup hands
 // the accepted passages back to the tracker, which pins them.
 export const findSourcesCommandId = 'find-sources';
+export const checkStatementCommandId = 'check-statement';
 export const FIND_SOURCES_POPUP = 'find_sources_popup';
 export const pendingFindSourcesJobsKey = 'pendingFindSourcesJobs';
 export const pendingFindSourcesWritesKey = 'pendingFindSourcesWrites';

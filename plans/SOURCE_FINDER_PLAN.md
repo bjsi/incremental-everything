@@ -124,12 +124,12 @@ The answer has one list per Rem, best first:
 - **Diverging passages** go under *Related material*, prefixed ⚠️, until Check Statement exists.
 - **Re-running** reuses an existing *Sources* / *Related material* child rather than adding a second one, and skips quotes already pinned there.
 
-### Phase 3: Check Statement
+### Phase 3: Check Statement (shipped in v1.0.245)
 
-- [ ] **Command:** the same search in `mode: "check"`, which asks the reranker for `diverge` on every candidate. Then one `claude -p` call on the **retrieved passages only**: the Rem's text, the passages with their citations, and the instruction to answer in the Rem's language.
+- [x] **Command:** (`cks`, Check Statement against Sources) the same search in `mode: "check"`, which asks the reranker for `diverge` on every candidate. Then one `claude -p` call on the **retrieved passages only**: the Rem's text, the passages with their citations, and the instruction to answer in the Rem's language.
   - **The answer:** a verdict (✅ consistent / ⚠️ partly / ❌ contradicts / ❔ not covered), 2–4 sentences on what is wrong or missing and which source diverges, and the ids of the passages it rests on.
-- [ ] **Written** under the Rem as an Extra Card Detail **Check** Rem (*Verificação*): the verdict and observation, with the passages it rests on as quote + pin children. The supporting quotes are also pinned on the Rem when they are not already (user decision).
-- [ ] **Where `claude -p` runs:** the AI helper's `/run` from AI Study Tools phase 2 (see overlaps). Check Statement can be its thin slice.
+- [x] **Written** under the Rem as an Extra Card Detail **Check** Rem (*Verificação*): the verdict and observation, with the passages it rests on as quote + pin children. The supporting quotes are also pinned on the Rem when they are not already (user decision).
+- [x] **Where `claude -p` runs:** the AI helper's `/run` from AI Study Tools phase 2 (see overlaps). Check Statement can be its thin slice.
 
 ### Phase 4: a whole summary
 
@@ -160,6 +160,12 @@ The two plans go in **opposite directions**: AI Study Tools goes **source → no
 
 - Built: provider `find-passages` (~16 s per Rem through the helper), plugin job, notice, review popup, write, and Search by meaning in the not-found dialogs. Not yet run end to end in RemNote; docs (Corpus-Provider.md `find-passages`, Source-Pins.md or a Find Sources page, changelog) wait for approval.
 - **Learned:** the helper runs the provider under launchd, which has no permission to read the Google Drive library: `open()` blocks instead of failing. `consultar()` gained `args.conferir=False` for the provider path (the plugin checks every quote in the RemNote PDF anyway). `mesma_copia` (suggest-parent) still opens the library and could hang the same way.
+
+## Status of phase 3 (2026-11-18)
+
+- Built on Find Sources' pipeline: the job carries `check`; after the passages are located, `src/lib/find_sources/check.ts` sends the statement and the trimmed quotes to the AI helper's new `/run` (one `claude -p` turn, tools off, JSON validated with one retry; model `opus`, as Read aloud's script writer). Verdict `consistent` / `partly` / `contradicts` / `not-covered`, a 2–4 sentence observation in the Rem's language citing book and page, and the passages it rests on (marked ◆ and preselected in the review).
+- Written first among the Rem's children: a dated Extra Card Detail header (`Verificação: ⚠️ Em parte (18/11/2026)`; runs never overwrite each other), the observation under it and, with quotes on, the basis quotes under the observation; other accepted passages go to Fontes / Material relacionado as in Find Sources; source pins on the Rem.
+- Tested through the helper: a deliberately wrong statement came back `contradicts` in 4.5 s (Opus 5.5) with the right correction and sources. `/run` is the AI Study Tools phase 2 route; its JSON mode is what that plan's `/run` needs.
 
 ## Risks and open questions
 

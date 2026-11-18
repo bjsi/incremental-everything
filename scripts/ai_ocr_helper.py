@@ -29,6 +29,9 @@ It also archives review history (`/history/scan`, `/history/ghosts`,
 each knowledge base it has heard from out of remnote.db, read-only, so the
 Study Dashboard can keep counting the reps of Rems deleted since.
 
+It also runs one Claude turn for the plugin's AI features (`/run`: a system prompt
+and text in, a reply or a validated JSON object out), e.g. Check Statement's verdict.
+
 It also searches a knowledge base (`/search`, see rem_search.py): an Anki-style
 query (AND, OR, NOT, phrases, in:, tag:, is:, prop:…) run on remnote.db, read-only,
 because RemNote's own search only ever ORs the words. Keys beyond plain text use the
@@ -428,9 +431,10 @@ def transcribe(images, raw_text, extend=None):
     return bullets_to_markers(markup), model
 
 
-def run_claude(content, system_prompt):
+def run_claude(content, system_prompt, model=None):
     """One `claude -p` turn on `content` (message content blocks); returns the
-    reply text and the model that answered."""
+    reply text and the model that answered. `model`: an alias (sonnet, opus,
+    haiku), MODEL by default."""
     message = json.dumps({'type': 'user', 'message': {'role': 'user', 'content': content}})
 
     claude = find_claude()
@@ -441,7 +445,7 @@ def run_claude(content, system_prompt):
     # settings files (and so hooks) and session persistence.
     cmd = [claude, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
            '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence',
-           '--model', MODEL, '--system-prompt', system_prompt]
+           '--model', model or MODEL, '--system-prompt', system_prompt]
     proc = subprocess.run(cmd, input=message + '\n', capture_output=True, text=True, timeout=240, cwd=HOME)
     model = None  # the model the CLI actually resolved the alias to, reported in its init event
     for line in proc.stdout.splitlines():
@@ -1221,6 +1225,62 @@ def handle_extract_title(req, entry):
     return {'title': title}
 
 
+
+# ---------------------------------------------------------------------------
+# /run — one Claude turn for the plugin's AI features (Check Statement, …)
+# ---------------------------------------------------------------------------
+
+RUN_MODELS = {'sonnet', 'opus', 'haiku'}
+MAX_RUN_SYSTEM_CHARS = 20_000
+MAX_RUN_TEXT_CHARS = 80_000
+
+
+def _json_object(reply):
+    """The JSON object in a reply: as is, inside a ```json fence, or from its first
+    { to its last }. None when there is none."""
+    text = reply.strip()
+    fence = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+    for candidate in (text, fence.group(1) if fence else None,
+                      text[text.find('{'):text.rfind('}') + 1] if '{' in text else None):
+        if not candidate:
+            continue
+        try:
+            value = json.loads(candidate)
+        except ValueError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def handle_run(req, entry):
+    """POST /run {system, text, json?, model?, task?}: one `claude -p` turn on the
+    user's subscription, with tools, MCP servers and settings off (run_claude). The
+    plugin writes the prompt; `task` only names it in the log. With `json`, the reply
+    must be one JSON object: it comes back parsed as `data`, after one retry that
+    asks for valid JSON when the first reply is not."""
+    system, text = req.get('system'), req.get('text')
+    if not isinstance(system, str) or not system.strip() or len(system) > MAX_RUN_SYSTEM_CHARS:
+        raise RuntimeError(f'need a system prompt, {MAX_RUN_SYSTEM_CHARS} characters at most')
+    if not isinstance(text, str) or not text.strip() or len(text) > MAX_RUN_TEXT_CHARS:
+        raise RuntimeError(f'need the text, {MAX_RUN_TEXT_CHARS} characters at most')
+    model = req.get('model') if req.get('model') in RUN_MODELS else None
+    entry.update(task=str(req.get('task') or '')[:60], chars=len(text))
+    reply, used = run_claude([{'type': 'text', 'text': text}], system, model)
+    entry['model'] = used
+    if not req.get('json'):
+        return {'text': reply, 'model': used}
+    data = _json_object(reply)
+    if data is None:
+        retry = (text + '\n\nYour previous reply was not one valid JSON object:\n' + reply[:4000] +
+                 '\n\nReply again with ONLY the JSON object, no other text.')
+        reply, used = run_claude([{'type': 'text', 'text': retry}], system, model)
+        data = _json_object(reply)
+        entry['retried'] = True
+    if data is None:
+        raise RuntimeError('Claude did not return a JSON object: ' + reply[:300])
+    return {'data': data, 'text': reply, 'model': used}
+
 # ---------------------------------------------------------------------------
 # Local videos: libraries, the macOS file dialogs, scanning, serving
 # ---------------------------------------------------------------------------
@@ -1552,7 +1612,7 @@ MEDIA_CHUNK = 1 << 20
 ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/find-source': handle_find_source, '/corpus': handle_corpus, '/source': handle_source, '/source-highlights': handle_source_highlights, '/match': handle_match,
           '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
           '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy,
-          '/extract-title': handle_extract_title,
+          '/extract-title': handle_extract_title, '/run': handle_run,
           '/video-choose': handle_video_choose, '/video-libraries': handle_video_libraries,
           '/video-library-relink': handle_video_library_relink, '/video-scan': handle_video_scan,
           '/video-file': handle_video_file,
