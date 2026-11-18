@@ -35,7 +35,7 @@ import { MEDIA_BRIDGE_URL } from './media_bridge_url';
 export { MEDIA_BRIDGE_URL };
 const POLL_WAIT_S = 25;
 /** The bridge protocol this build speaks; see OPS_BY_PLUGIN_VERSION in media_bridge.py. */
-const PROTOCOL_VERSION = 10;
+const PROTOCOL_VERSION = 12;
 const RETRY_MS = 30_000;
 /**
  * A rem written through the MCP reaches this client by sync, a moment after the
@@ -123,7 +123,7 @@ async function pollLoop(plugin: ReactRNPlugin, generation: number) {
     // A job taken by a loop that was switched off is redelivered by the helper.
     if (generation !== loopGeneration) break;
     if (!job.op || job.op === 'localize') await handleJob(plugin, job);
-    else if (job.op === 'notice') await handleNoticeJob(plugin, job);
+    else if (job.op === 'notice' || job.op === 'ask') await handleNoticeJob(plugin, job);
     else await handleOpJob(plugin, job as MediaJob & { op: string });
   }
 }
@@ -154,19 +154,37 @@ async function waitForRemsToExist(plugin: ReactRNPlugin, remIds: string[]) {
  * RemNote) says it is done. Shown at once as a notice (lib/notice.ts), with Open Rem
  * for the rem it names; the rem may still be on its way by sync, which Open Rem
  * tolerates.
+ *
+ * `media_bridge.py ask`: the same card with one button per choice (Accept / Reject…).
+ * The job itself ends once the card is up; the answer comes later, from the card, as
+ * POST /answers {askId: job id, answer}, which the tool waits for.
  */
 async function handleNoticeJob(plugin: ReactRNPlugin, job: MediaJob) {
   const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined);
-  const tone = job.tone === 'error' || job.tone === 'info' ? job.tone : 'success';
+  const tone =
+    job.tone === 'error' || job.tone === 'info' || job.tone === 'success' ? job.tone : job.op === 'ask' ? 'info' : 'success';
+  const items = Array.isArray(job.items)
+    ? (job.items as unknown[]).flatMap((it) => {
+        const o = (it ?? {}) as { title?: unknown; lines?: unknown };
+        const title = str(o.title);
+        const lines = Array.isArray(o.lines) ? o.lines.filter((l): l is string => typeof l === 'string') : [];
+        return title || lines.length ? [{ title: title ?? '', lines }] : [];
+      })
+    : undefined;
+  const choices = Array.isArray(job.choices)
+    ? (job.choices as unknown[]).filter((c): c is string => typeof c === 'string' && !!c.trim())
+    : [];
   try {
     await showNotice(plugin, {
-      title: str(job.title) ?? 'Done',
+      title: str(job.title) ?? (job.op === 'ask' ? 'Confirm' : 'Done'),
       message: str(job.message) ?? '',
       detail: str(job.detail),
+      items: items?.length ? items : undefined,
       tone,
       openRemId: job.remIds[0],
+      ...(job.op === 'ask' ? { id: job.id, ask: { id: job.id, choices: choices.length ? choices : ['Accept', 'Reject'] } } : {}),
     });
-    await postJSON('/result', { jobId: job.id, op: job.op, ok: true, summary: 'notice shown' });
+    await postJSON('/result', { jobId: job.id, op: job.op, ok: true, summary: job.op === 'ask' ? 'question shown' : 'notice shown' });
   } catch (err) {
     console.error(`${LOG} job ${job.id}: notice not shown`, err);
     await postJSON('/result', { jobId: job.id, op: job.op, ok: false, message: String(err) }).catch(() => undefined);

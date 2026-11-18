@@ -3,7 +3,7 @@
  *
  * The RemNote MCP can write text, tags and documents, but cannot move a rem,
  * remove a tag, hand back an image, pin a source, set a card's type and direction,
- * set a heading level, make a portal,
+ * set a heading level, make a portal, build an outline,
  * add a playable audio file, rewrite rich text exactly, or make a rem Incremental the way this
  * plugin does (its slots, history, cache and inheritance cascade). Outside tools
  * queue these as jobs on the media-bridge helper (scripts/media_bridge/
@@ -823,6 +823,131 @@ export async function runHeading(plugin: ReactRNPlugin, job: BridgeOpJob): Promi
   };
 }
 
+// --- outline -----------------------------------------------------------------
+
+/**
+ * Build or fix an outline in one job (`media_bridge.py outline`, used by the
+ * /book-outline command). Three lists, run in this order:
+ *   - `create`: [{key, parent, text, tag?}] new plain-text rems, put at the end of
+ *     `parent` (an order step places them). `key` is the caller's name for the new
+ *     rem ("new:3.1.2"); later steps (and later jobs, through `keys`) refer to it.
+ *   - `order`: [{parent, children}] makes `children` the parent's first children, in
+ *     that order, moving each from wherever it is. The parent's other children keep
+ *     their relative order after them.
+ *   - `heading`: [{rem, level}] level 1–6, or 0 for a plain paragraph.
+ *   - `document`: [rem] made documents (a block moved out to stand on its own).
+ * `parent`, `children[]` and `rem` are rem ids or keys; `keys` maps keys made by an
+ * earlier job to their ids. Returns `keys` (every key → id) and each failure.
+ */
+export async function runOutline(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<BridgeOpResult> {
+  const keys: Record<string, string> = { ...((job.keys as Record<string, string>) ?? {}) };
+  const failures: { step: string; ref: string; error: string }[] = [];
+  const resolve = async (ref: string) => {
+    const id = ref.startsWith('new:') ? keys[ref] : ref;
+    return id ? await plugin.rem.findOne(id) : undefined;
+  };
+  type Create = { key: string; parent: string; text: string; tag?: string };
+  type Order = { parent: string; children: string[] };
+  type Head = { rem: string; level: number };
+  const creates = (Array.isArray(job.create) ? job.create : []) as Create[];
+  const orders = (Array.isArray(job.order) ? job.order : []) as Order[];
+  const heads = (Array.isArray(job.heading) ? job.heading : []) as Head[];
+
+  let created = 0;
+  for (const c of creates) {
+    try {
+      if (keys[c.key]) continue; // made by an earlier try of this job
+      const parent = await resolve(c.parent);
+      if (!parent) throw new Error(`parent not found: ${c.parent}`);
+      const rem = await plugin.rem.createRem();
+      if (!rem) throw new Error('RemNote did not create the rem');
+      await rem.setText([c.text]);
+      await rem.setParent(parent, ((await parent.getChildrenRem()) ?? []).length);
+      if (c.tag) await rem.addTag(c.tag);
+      keys[c.key] = rem._id;
+      created++;
+    } catch (err) {
+      failures.push({ step: 'create', ref: c.key, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  let placed = 0;
+  for (const o of orders) {
+    const parent = await resolve(o.parent);
+    if (!parent) {
+      failures.push({ step: 'order', ref: o.parent, error: 'parent not found' });
+      continue;
+    }
+    let slot = 0;
+    for (const ref of o.children) {
+      try {
+        const rem = await resolve(ref);
+        if (!rem) throw new Error('rem not found');
+        if (await isSelfOrAncestorOf(plugin, rem, parent)) throw new Error('cannot go under itself');
+        const current = (await parent.getChildrenRem()) ?? [];
+        if (current[slot]?._id !== rem._id) {
+          await rem.setParent(parent, slot);
+          placed++;
+        }
+        slot++;
+      } catch (err) {
+        failures.push({ step: 'order', ref, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    // Check what RemNote kept: the placed rems first, in this order.
+    const after = ((await parent.getChildrenRem()) ?? []).map((c) => c._id);
+    const want = (await Promise.all(o.children.map(async (ref) => (await resolve(ref))?._id))).filter(
+      (id): id is string => !!id
+    );
+    if (after.slice(0, want.length).join() !== want.join())
+      failures.push({ step: 'order', ref: o.parent, error: 'children not in the asked order after the moves' });
+  }
+
+  let headed = 0;
+  for (const h of heads) {
+    try {
+      const rem = await resolve(h.rem);
+      if (!rem) throw new Error('rem not found');
+      const level = Number(h.level);
+      const now = await getHeadingLevel(rem);
+      if ((now ?? 0) === level) continue;
+      if (level >= 1 && level <= 6) await applyHeadingLevel(rem, level as HeadingLevel);
+      else await clearHeading(rem);
+      headed++;
+    } catch (err) {
+      failures.push({ step: 'heading', ref: h.rem, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  let documents = 0;
+  for (const ref of (Array.isArray(job.document) ? job.document : []) as string[]) {
+    try {
+      const rem = await resolve(ref);
+      if (!rem) throw new Error('rem not found');
+      if (!(await rem.isDocument())) {
+        await rem.setIsDocument(true);
+        documents++;
+      }
+    } catch (err) {
+      failures.push({ step: 'document', ref, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  return {
+    ok: failures.length === 0,
+    summary:
+      `outline: ${plural(created, 'rem')} created, ${placed} moved, ${headed} heading(s) set` +
+      (documents ? `, ${plural(documents, 'document')} made` : '') +
+      (failures.length ? `, ${failures.length} failed` : ''),
+    keys,
+    created,
+    placed,
+    headed,
+    documents,
+    failures,
+  };
+}
+
 // --- audio -------------------------------------------------------------------
 
 /**
@@ -1026,6 +1151,7 @@ const OPS: Record<string, (plugin: ReactRNPlugin, job: BridgeOpJob) => Promise<B
   'restore-audio': runRestoreAudio,
   'set-text': runSetText,
   remove: runRemove,
+  outline: runOutline,
 };
 
 /** Runs a non-localize job. Errors come back as `{ok: false, message}`, never thrown. */

@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.243 - November 18th, 2026
 
+### ✨ New
+
+**Questions from outside tools**: the notice card can now ask, with a button per answer (**Accept** / **Reject**, or labels the tool chooses) and **Open Rem** to look before deciding; the answer goes back to the tool (`media_bridge.py ask` / `answer`). And the Local Media Bridge can build an outline in one go (`outline`): create headers, put a parent's children in a given order, set heading levels and make documents — for example to mirror a book's table of contents in its notes. Restart the helper to get them.
+
+📖 [Local Media Bridge → Questions with buttons](Local-Media-Bridge.md#ask) · [Rem operations](Local-Media-Bridge.md#operations)
+
 ### ✨ Improved
 
 **Find Rem**: added hierarchical search, as in Search & Browse's Move and Tag picker: Tab searches within the selected Rem (listing its children until you type), Shift+Tab goes back up, and Backspace in an empty box returns to the whole knowledge base.
