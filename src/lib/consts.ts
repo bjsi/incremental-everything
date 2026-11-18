@@ -939,3 +939,5 @@ export const EXTRACT_EDITOR_FLOAT = 'extract_editor_float';
 // Session: what the editor shows and how big it is (ExtractEditorTarget), and its float id.
 export const extractEditorTargetKey = 'extract-editor-target';
 export const extractEditorFloatIdKey = 'extract-editor-float-id';
+// Session key: a document the Menu Hub sent to another window, until it opens there (see lib/send_to_window.ts).
+export const sendToWindowPendingKey = 'send-to-window-pending';

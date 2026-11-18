@@ -34,6 +34,8 @@ interface OpenRequest {
   from: string;
   at: number;
   claimedBy?: string;
+  /** Set by the claiming window once the Rem is open there (or it follows the queue). */
+  openedAt?: number;
 }
 
 // Every widget iframe loads its own copy of this module, so this differs between
@@ -83,19 +85,38 @@ export async function isOpenRequestClaimed(plugin: ReactRNPlugin, id: string): P
   return request?.id === id && !!request.claimedBy;
 }
 
+/**
+ * Where a request stands: waiting for a window, claimed, open in the claiming window,
+ * or gone (withdrawn, or replaced by a newer request).
+ */
+export async function openRequestState(
+  plugin: ReactRNPlugin,
+  id: string
+): Promise<'waiting' | 'claimed' | 'opened' | 'gone'> {
+  const request = await readRequest(plugin);
+  if (request?.id !== id) return 'gone';
+  return request.openedAt ? 'opened' : request.claimedBy ? 'claimed' : 'waiting';
+}
+
 /** Withdraws the request, unless a newer one has replaced it. */
 export async function cancelOpenRequest(plugin: ReactRNPlugin, id: string): Promise<void> {
   const request = await readRequest(plugin);
   if (request?.id === id) await plugin.storage.setLocal(openInWindowRequestKey, undefined);
 }
 
-async function openRequested(plugin: ReactRNPlugin, request: OpenRequest) {
-  if (!request.remId) return;
+/** True once the Rem is open; the highlight scroll carries on in the background. */
+async function openRequested(plugin: ReactRNPlugin, request: OpenRequest): Promise<boolean> {
+  if (!request.remId) return false;
   const rem = await plugin.rem.findOne(request.remId);
-  if (!rem) return;
+  if (!rem) return false;
   await plugin.window.openRem(rem);
-  if (!request.highlightRemId) return;
-  const highlight = await plugin.rem.findOne(request.highlightRemId);
+  void scrollToHighlight(plugin, request.highlightRemId);
+  return true;
+}
+
+async function scrollToHighlight(plugin: ReactRNPlugin, highlightRemId: string | null) {
+  if (!highlightRemId) return;
+  const highlight = await plugin.rem.findOne(highlightRemId);
   if (!highlight) return;
   for (const delay of SCROLL_DELAYS_MS) {
     setTimeout(() => {
@@ -125,8 +146,14 @@ export async function registerOpenInWindowListener(
       const latest = await readRequest(plugin);
       if (latest?.id !== request.id || latest.claimedBy) return;
       await plugin.storage.setLocal(openInWindowRequestKey, { ...latest, claimedBy: WINDOW_ID });
+      let opened = true;
       if (latest.follow) await startFollowing(plugin);
-      else await openRequested(plugin, latest);
+      else opened = await openRequested(plugin, latest);
+      // Confirms the open to the sending window (lib/send_to_window.ts closes its pane on it).
+      const after = await readRequest(plugin);
+      if (opened && after?.id === latest.id) {
+        await plugin.storage.setLocal(openInWindowRequestKey, { ...after, openedAt: Date.now() });
+      }
     } catch (e) {
       console.warn('[OpenInWindow] poll failed', e);
     }

@@ -150,7 +150,7 @@ The first step is to convert a Rem, PDF, or website into an "Incremental Rem" so
 2. In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) that opens, select **"Make Incremental Rem"** (or press `1`)
 3. The priority popup will open automatically
 
-<iframe src="../demos/menu-hub.html?view=document" title="Document menu and Menu Hub demo" loading="lazy" style="width:100%;height:580px;border:0;display:block"></iframe>
+<iframe src="../demos/menu-hub.html?view=document" title="Document menu and Menu Hub demo" loading="lazy" style="width:100%;height:630px;border:0;display:block"></iframe>
 
 ### Duplicate web page warning
 

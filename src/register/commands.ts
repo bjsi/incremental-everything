@@ -14,6 +14,7 @@ import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote, pinSourceQuotesInTree } from '../lib/pdf_source_pins';
 import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
+import { sendFocusedPaneToAnotherWindow } from '../lib/send_to_window';
 import { localizeMediaInRems } from '../lib/localize_media';
 import { showMessageDialog } from '../lib/message_dialog';
 import {
@@ -1297,6 +1298,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         false
       );
       await plugin.storage.setSession(sourceFloatingActiveIdKey, id);
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'send-pane-to-another-window',
+    name: 'Send Pane to Another Window',
+    description: "Opens the focused pane's document in another RemNote window, then closes the pane here",
+    action: async () => {
+      await sendFocusedPaneToAnotherWindow(plugin);
     },
   });
 

@@ -217,6 +217,21 @@ While it's waiting, click the button again to cancel. The request also expires a
 - **The other window doesn't come to the front by itself;** switch to it yourself.
 - **The viewer stays open** in the first window, so you can keep peeking at it.
 
+### Send to another window { #send-to-another-window }
+
+Moves a document, PDF or not, from a pane of this window to another RemNote window: it opens there, and its pane here closes. Desktop app only.
+
+- **From the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub):** the document's ⋯ menu → **Incremental RemNote…** → **Send to Another Window**.
+- **From the Omnibar:** **Send Pane to Another Window** sends the focused pane's document: the page the pane shows, not the bullet the cursor is on. With the cursor on a bullet of *Section V*, it sends *Section V*.
+
+1. A notice says the document is on its way. If another window is open, it opens there within a few seconds. If none is open, press **`⌘⇧N` / `Ctrl+Shift+N`**, and the new window opens it.
+2. Once the other window confirms it is open, the pane it came from closes here, and a notice says so.
+
+Dismiss the waiting notice to cancel. If no window takes the document within a minute, a notice says so and nothing closes.
+
+- **Only the pane closes, never the tab.** When the document is the only pane of its tab, it stays open here.
+- **The other window's focused pane is replaced,** as with [Open in another window](#open-in-another-window).
+
 ### Follow the queue
 
 One RemNote window can show the sources of the cards you practice in another, so you can read them on a second screen, or beside the queue, without opening anything. Desktop app only.

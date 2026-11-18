@@ -51,6 +51,7 @@ import { registerExternalCardVideoBridge } from '../lib/external_card_video_brid
 import { registerExternalMediaBridge } from '../lib/external_media_bridge';
 import { registerWindowSourcesPresence } from '../lib/window_sources';
 import { registerOpenInWindowListener } from '../lib/open_in_window';
+import { registerSendToWindowWatcher } from '../lib/send_to_window';
 import { registerFollowQueueSources, startFollowingQueueSources } from '../lib/follow_queue_sources';
 import { registerVideoReviewBar } from '../lib/video_review_bar';
 import { registerImageSizeSession } from '../lib/image_size_session';
@@ -166,6 +167,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerWindowSourcesPresence(plugin);
   // Opens a source another window asks this one to show.
   void registerOpenInWindowListener(plugin, startFollowingQueueSources);
+  // Closes a document's pane here once the window it was sent to has it open.
+  registerSendToWindowWatcher(plugin);
   // Shows the sources of the queue's cards in the window that asks to follow it.
   void registerFollowQueueSources(plugin);
   await registerWidgets(plugin);

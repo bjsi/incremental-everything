@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.244 - November 18th, 2026
+
+### ✨ New
+
+**Send to another window**: added **Send to Another Window** to the document's Menu Hub, and the **Send Pane to Another Window** command, which open the document in another RemNote window (`⌘⇧N` if none is open) and close its pane here once it is open there. Desktop app only.
+
+📖 [Finding & Navigating → Send to another window](Utilities-Finding-and-Navigating.md#send-to-another-window)
+
 ## v1.0.243 - November 18th, 2026
 
 ### ✨ New
@@ -329,7 +337,7 @@ A new **Desktop Helpers** page lists every helper the plugin works with (AI help
 
 Try it: click ⋯ (or ⋮ in the queue), then **Incremental RemNote…**. *(A mock: nothing runs.)*
 
-<iframe src="../demos/menu-hub.html" title="Menu Hub demo" loading="lazy" style="width:100%;height:620px;border:0;display:block"></iframe>
+<iframe src="../demos/menu-hub.html" title="Menu Hub demo" loading="lazy" style="width:100%;height:670px;border:0;display:block"></iframe>
 
 📖 [Menu Hub](Plugin-Widgets-Reference.md#menu-hub)
 
