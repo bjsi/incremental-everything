@@ -13,6 +13,7 @@ import { openMasteryDrill } from '../lib/mastery_drill_launch';
 import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote, pinSourceQuotesInTree } from '../lib/pdf_source_pins';
+import { findSources } from '../lib/find_sources';
 import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { sendFocusedPaneToAnotherWindow } from '../lib/send_to_window';
 import { localizeMediaInRems } from '../lib/localize_media';
@@ -49,6 +50,7 @@ import {
   restoreHighlightBeforeAiCommandId,
   pinSourceQuoteCommandId,
   pinSourceQuotesInTreeCommandId,
+  findSourcesCommandId,
   localizeMediaCommandId,
   localizeMediaTreeCommandId,
   currentIncrementalRemTypeKey,
@@ -399,6 +401,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'ctrl+opt+shift+q',
     action: async () => {
       await pinSourceQuotesInTree(plugin);
+    },
+  });
+
+  // Find the passages of the user's library that say what the selected Rems say, by
+  // meaning (corpus provider, semantic-search); reviewed from a notice, then pinned.
+  await plugin.app.registerCommand({
+    id: findSourcesCommandId,
+    name: 'Find Sources (by meaning)',
+    quickCode: 'fsq',
+    action: async () => {
+      await findSources(plugin);
     },
   });
 

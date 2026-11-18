@@ -6,6 +6,7 @@ import '../App.css';
 import { MessageDialog } from '../lib/message_dialog';
 import { PinQuoteRequest, pinQuotesInViews, SourceView } from '../lib/pdf_source_pins';
 import { MessageBody } from '../components/MessageBody';
+import { FindSourcesButton, runDialogFindSources } from '../components/FindSourcesButton';
 
 const CHOICE_KEY = 'pin-source-views-choice';
 
@@ -34,6 +35,8 @@ export function PinSourceViewsPopup() {
   const [selected, setSelected] = useState(0);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MessageDialog | null>(null);
+  /** On the failure view: the Search by meaning button has the ring, not OK. */
+  const [onSearch, setOnSearch] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const openedAt = useRef(Date.now());
 
@@ -82,9 +85,13 @@ export function PinSourceViewsPopup() {
       e.preventDefault();
       close();
     } else if (failure) {
-      if (e.key === 'Enter') {
+      if (failure.findSources && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
-        close();
+        setOnSearch((v) => !v);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (onSearch && failure.findSources) void runDialogFindSources(plugin, failure, close);
+        else close();
       }
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
       e.preventDefault();
@@ -116,13 +123,21 @@ export function PinSourceViewsPopup() {
           <MessageBody dialog={failure} />
           <div className="flex items-center justify-between">
             <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-              Enter or Esc to close
+              {failure.findSources ? '←→ choose · Enter confirm · Esc close' : 'Enter or Esc to close'}
             </span>
+            {failure.findSources && (
+              <FindSourcesButton
+                onClick={() => void runDialogFindSources(plugin, failure, close)}
+                onHover={() => setOnSearch(true)}
+                selected={onSearch}
+              />
+            )}
             <button
               onClick={close}
+              onMouseEnter={() => setOnSearch(false)}
               onMouseDown={(e) => e.preventDefault()}
               className="py-1.5 px-4 text-sm font-medium rounded"
-              style={{ background: '#3B82F6', color: 'white', border: 'none', cursor: 'pointer', ...ring }}
+              style={{ background: '#3B82F6', color: 'white', border: 'none', cursor: 'pointer', ...(onSearch ? {} : ring) }}
             >
               OK
             </button>

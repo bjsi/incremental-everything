@@ -19,7 +19,7 @@ import {
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
-  preservedHistoryPowerupCode,
+  preservedHistoryPowerupCode, aiNotePowerupCode,
   videoExtractPowerupCode,
   videoExtractUrlSlotCode,
   videoExtractStartSlotCode,
@@ -333,6 +333,16 @@ export async function registerPluginPowerups(
     code: preservedHistoryPowerupCode,
     description:
       'Marks a rem whose content was removed but whose review history was preserved. Hidden from the editor and queue.',
+    options: { slots: [] },
+  });
+
+  // AI Note Powerup - an AI-written remark, such as Find Sources' reason for choosing a
+  // passage, under its quote. No slots: a CSS hook (data-rem-tags~="ai-note", from the
+  // NAME) that shows it small, italic and muted (registerAiNoteCSS in lib/ui_helpers.ts).
+  await plugin.app.registerPowerup({
+    name: 'AI Note',
+    code: aiNotePowerupCode,
+    description: 'A remark written by AI (e.g. why Find Sources chose a passage), shown small and muted.',
     options: { slots: [] },
   });
 

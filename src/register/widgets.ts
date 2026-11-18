@@ -679,6 +679,13 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
       height: screenFittedHeight(640, 1100),
     },
   });
+  // Find Sources: review the passages found by meaning, pin the accepted ones (lib/find_sources).
+  plugin.app.registerWidget('find_sources_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 820,
+      height: screenFittedHeight(560, 900),
+    },
+  });
   // Read aloud: editable script, the helper's estimate, Generate (lib/read_aloud.ts).
   plugin.app.registerWidget(READ_ALOUD_POPUP, WidgetLocation.Popup, {
     dimensions: {

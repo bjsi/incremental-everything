@@ -1,7 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache, writeIncRemCaches, applyIncRemCacheChanges } from '../lib/incremental_rem/cache';
 import { PriorityChangeEvent } from '../lib/priority_history';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, pendingIncRemTransferTailKey, pendingReadAloudJobsKey, pendingUpscaleJobsKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, pendingIncRemTransferTailKey, pendingReadAloudJobsKey, pendingUpscaleJobsKey, pendingFindSourcesJobsKey, pendingFindSourcesWritesKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -16,6 +16,7 @@ import { runIncRemTransferTail, IncRemTransferTailJob } from '../lib/incremental
 import { showNotice } from '../lib/notice';
 import { ReadAloudJob, runReadAloudJob } from '../lib/read_aloud';
 import { runUpscaleJob, UpscaleJob } from '../lib/upscale_image';
+import { FindSourcesJob, FindSourcesWrite, runFindSourcesJob, runFindSourcesWrite } from '../lib/find_sources';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
 // IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
@@ -804,6 +805,35 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       startedUpscaleJobs.add(job.id);
       console.log('[Tracker] upscale job picked up for remId:', job.remId);
       void runUpscaleJob(plugin, job);
+    }
+  });
+
+  // Find Sources (lib/find_sources): searches queued by the command run here, one job at a
+  // time (each Rem waits ~25 s on the corpus provider), and post a notice whose Review
+  // opens the popup; the popup's accepted passages come back here to be pinned.
+  const startedFindSources = new Set<string>();
+  let findSourcesChain = Promise.resolve();
+  plugin.track(async (rp) => {
+    const queued = await rp.storage.getSession<FindSourcesJob[]>(pendingFindSourcesJobsKey);
+    if (!queued || queued.length === 0) return;
+    await plugin.storage.setSession(pendingFindSourcesJobsKey, null);
+    for (const job of queued) {
+      if (startedFindSources.has(job.id)) continue;
+      startedFindSources.add(job.id);
+      console.log('[Tracker] Find Sources job picked up:', job.items.length, 'Rem(s)');
+      findSourcesChain = findSourcesChain
+        .then(() => runFindSourcesJob(plugin, job))
+        .catch((e) => console.error('[Tracker] Find Sources job failed', e));
+    }
+  });
+  plugin.track(async (rp) => {
+    const queued = await rp.storage.getSession<FindSourcesWrite[]>(pendingFindSourcesWritesKey);
+    if (!queued || queued.length === 0) return;
+    await plugin.storage.setSession(pendingFindSourcesWritesKey, null);
+    for (const write of queued) {
+      if (startedFindSources.has(write.id)) continue;
+      startedFindSources.add(write.id);
+      void runFindSourcesWrite(plugin, write).catch((e) => console.error('[Tracker] Find Sources write failed', e));
     }
   });
 

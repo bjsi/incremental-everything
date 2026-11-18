@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.245 - November 18th, 2026
 
+### ✨ New
+
+**Find Sources**: added a command (`fsq`, or **Search by meaning** when Pin Source Quote finds no match) that finds, by meaning, the passages of your library that say what a note says (a summary, paraphrase or translation), lets you review them, and pins the accepted ones, optionally with their trimmed, emphasised quotes and AI notes as child Rems; needs a corpus provider with semantic search.
+
+📖 [Source Pins → Find Sources](Source-Pins.md#find-sources)
+
 ### ✨ Improved
 
 **Pin Source Quote**: a passage that is not in the open PDF or article is now looked up with your source finder in its book's other PDFs, and existing pages and highlights RemNote has not loaded yet are reused instead of duplicated (a second "Page 030"); the latter needs the AI helper, restarted.

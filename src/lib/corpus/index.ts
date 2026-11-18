@@ -95,16 +95,19 @@ export class CorpusUnavailableError extends Error {}
 
 /**
  * Run one provider operation. Throws CorpusUnavailableError when the provider does
- * not offer `op` (callers gate on the capability first, so this is a mismatch).
+ * not offer the capability the operation belongs to: `options.capability`, or the
+ * operation's own name (`find-source`, `suggest-parent`). An operation can belong to a
+ * capability of another name (`find-passages` is `semantic-search`).
  */
 export async function corpusRequest<T>(
   plugin: ReactRNPlugin | RNPlugin,
-  op: CorpusCapability,
+  op: string,
   payload: object,
-  options: { timeoutMs?: number } = {}
+  options: { timeoutMs?: number; capability?: CorpusCapability } = {}
 ): Promise<T> {
-  if (!(await hasCorpusCapability(plugin, op))) {
-    throw new CorpusUnavailableError(`The corpus provider does not offer "${op}".`);
+  const capability = options.capability ?? op;
+  if (!(await hasCorpusCapability(plugin, capability))) {
+    throw new CorpusUnavailableError(`The corpus provider does not offer "${capability}".`);
   }
   const res = await helperPost<{ available: boolean; reason?: string } & T>(
     plugin,

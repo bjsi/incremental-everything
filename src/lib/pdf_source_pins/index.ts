@@ -635,11 +635,33 @@ export async function pinQuoteInViews(
   const { result, error } = await pinOneQuote(plugin, request, views);
   if (error) return { ok: false, dialog: errorDialog(error) };
   if (!result) {
-    const dialog = await finderFallback(plugin, [request], 0, onProgress);
-    return { ok: false, dialog: dialog ?? notFoundDialog(request.candidates) };
+    const dialog = (await finderFallback(plugin, [request], 0, onProgress)) ?? notFoundDialog(request.candidates);
+    const stillMissing = dialog.items ? (dialog.items[0]?.tone === 'miss' ? [request.remId] : []) : [request.remId];
+    return { ok: false, dialog: await offerSearchByMeaning(plugin, dialog, stillMissing, request.sourceRemId) };
   }
   await plugin.app.toast(`\ud83d\udccc ${await viewSummary(plugin, request.sourceRemId, result)}`);
   return { ok: true };
+}
+
+/**
+ * With a corpus provider that searches by meaning, a "not found" dialog offers Find
+ * Sources for the Rems that missed: a paraphrase, translation or summary is what the
+ * literal search cannot find.
+ */
+async function offerSearchByMeaning(
+  plugin: ReactRNPlugin,
+  dialog: MessageDialog,
+  remIds: string[],
+  openSourceRemId?: string
+): Promise<MessageDialog> {
+  if (!remIds.length || !(await hasCorpusCapability(plugin, 'semantic-search'))) return dialog;
+  return {
+    ...dialog,
+    findSources: { remIds, openSourceRemId: openSourceRemId ?? null },
+    detail:
+      `${dialog.detail ? `${dialog.detail} ` : ''}Search by meaning finds the passages that say the same thing in ` +
+      `other words or another language: about 25 s per Rem, in the background, then a notice to review them.`,
+  };
 }
 
 /**
@@ -712,17 +734,20 @@ export async function pinQuotesInViews(
   );
   if (!missed.length) return { ok: true };
   const fromFinder = await finderFallback(plugin, missed, pinned, onProgress);
-  if (fromFinder) return { ok: false, dialog: fromFinder };
+  if (fromFinder) {
+    const stillMissing = missed.filter((_, k) => fromFinder.items?.[k]?.tone === 'miss').map((r) => r.remId);
+    return { ok: false, dialog: await offerSearchByMeaning(plugin, fromFinder, stillMissing, missed[0].sourceRemId) };
+  }
   const list = missed.map((r) => excerpt(r.candidates[0] ?? '', 90));
   return {
     ok: false,
-    dialog: {
+    dialog: await offerSearchByMeaning(plugin, {
       tone: 'info',
       title: `Passage not found for ${missed.length} of ${requests.length} Rems`,
       message: 'The others were pinned. These were not found in the open source:',
       quote: list.slice(0, 8).map((m) => `\u2022 ${m}`).join('\n') + (list.length > 8 ? `\n\u2022 \u2026and ${list.length - 8} more` : ''),
       detail: 'Only text taken from the source matches \u2014 a paraphrase, translation or summary will not.',
-    },
+    }, missed.map((r) => r.remId), missed[0].sourceRemId),
   };
 }
 
@@ -795,13 +820,25 @@ export async function pinSourceQuotesInTree(plugin: ReactRNPlugin) {
  * multi-Rem or table-row selection, else the focused Rem. Same resolution as the
  * priority commands (lib/priority_targets).
  */
-async function selectedOrFocusedRems(plugin: ReactRNPlugin): Promise<PluginRem[]> {
+export async function selectedOrFocusedRems(plugin: ReactRNPlugin): Promise<PluginRem[]> {
   const { remIds } = await resolvePriorityTargets(plugin);
   if (!remIds.length) {
     console.warn(`[PinSourceQuote] No target Rem resolved on ${await plugin.window.getURL()}`);
     return [];
   }
   return (await plugin.rem.findMany(remIds)) || [];
+}
+
+/**
+ * The first PDF or saved article open in a pane, in this window first, then in the
+ * other RemNote windows (lib/window_sources.ts); undefined when none is.
+ */
+export async function openSourceRemId(plugin: ReactRNPlugin): Promise<string | undefined> {
+  for (const id of [...(await plugin.window.getOpenPaneRemIds()), ...(await sourcesInOtherWindows(plugin))]) {
+    const rem = await plugin.rem.findOne(id);
+    if (rem && (await sourceViews(rem)).length) return id;
+  }
+  return undefined;
 }
 
 async function pinSourcesOfRems(plugin: ReactRNPlugin, rems: PluginRem[]) {
@@ -845,7 +882,8 @@ async function pinSourcesOfRems(plugin: ReactRNPlugin, rems: PluginRem[]) {
     await plugin.app.toast('Open the source PDF or web article in a pane first (in any RemNote window).');
     return;
   }
-  await showMessageDialog(plugin, finderPinDialog(run));
+  const notPinned = run.rows.filter((r) => !r.pinned).map((r) => r.remId);
+  await showMessageDialog(plugin, await offerSearchByMeaning(plugin, finderPinDialog(run), notPinned));
 }
 
 // --- no source open: the source finder ---------------------------------------
@@ -901,7 +939,7 @@ export interface FinderPinRun {
   stopped?: string;
 }
 
-async function ancestorIds(rem: PluginRem, max = 40): Promise<string[]> {
+export async function ancestorIds(rem: PluginRem, max = 40): Promise<string[]> {
   const ids: string[] = [];
   let parent = await rem.getParentRem();
   while (parent && ids.length < max) {

@@ -219,6 +219,9 @@ In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) opened from the queue's 
 - **[Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants)** (`Ctrl+Opt+Shift+Q` / `Ctrl+Alt+Shift+Q`) — `quick: psqd`
   Runs Pin Source Quote on every Rem formatted as a Quote in the focused Rem and all its descendants, or in each selected Rem's subtree; other Rems are left alone.
 
+- **[Find Sources (by meaning)](Source-Pins.md#find-sources)** — `quick: fsq`
+  Finds, in the background, the passages of your library that say what the focused or selected Rems say (summaries, paraphrases, translations), then a notice opens the review: accept passages and they are pinned, optionally with their quotes and AI notes as child Rems. Needs a [corpus provider](Corpus-Provider.md) with semantic search.
+
 - <a id="store-linked-images-audio-in-remnote"></a>**Store linked images & audio in RemNote** — `quick: slm`
   An image or audio added through **Embed Link** (or **Audio Search**) is saved as the bare web address: nothing is copied, so the Rem breaks the day that server moves or removes the file, and it does not play offline. This command fetches each such file, stores it in RemNote the way an uploaded file is stored, and points the Rem at the stored copy.
   Run it on the focused Rem or on a selection of Rems; front and back are both handled. The Rem itself is edited in place — only the address inside the image or audio changes — so its flashcards and their history are untouched. Files RemNote already stores, and video embeds such as YouTube, are left alone, so it is safe to re-run.

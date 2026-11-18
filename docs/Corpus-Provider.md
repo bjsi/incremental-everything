@@ -15,6 +15,7 @@ Each feature checks for its own **capability**. A provider offers only the capab
 | `find-source` | [Pin Source Quote](Source-Pins.md#no-source-open) with no source open | Names the book a quote comes from and the PDF Rems to try |
 | `quote-literal` | Pin Source Quote, same path | Also gives, per book, the exact text to search for when the Rem's text was corrected and no longer matches the PDF letter for letter |
 | `suggest-parent` | The [parent selector](Create-Incremental-Rem-from-PDF-Highlights.md#corpus-suggestion) | Names the Rem in your notes for the section the highlight comes from, so the selector can suggest it |
+| `semantic-search` | [Find Sources](Source-Pins.md#find-sources) | Finds the passages that say what a Rem says, by meaning: operation `find-passages` |
 
 ## Setting one up { #setup }
 
@@ -80,6 +81,38 @@ Answer, best first:
 
 An empty `parents` list means "no suggestion". The plugin checks that the Rem still exists before showing it.
 
+### `find-passages` { #op-find-passages }
+
+Asked by Find Sources, one Rem per request. It may take a while (the plugin waits up to three minutes, the helper two).
+
+```json
+{ "op": "find-passages",
+  "items": [ { "remId": "R1", "texts": ["front", "back"], "ancestors": ["parent id", "…"],
+               "openSourceRemId": "PdfRem or null" } ] }
+```
+
+- `openSourceRemId`: the PDF or article open in a pane, if any. Search its book first, and the book whose notes `ancestors` belong to.
+
+Answer, sources first:
+
+```json
+{ "items": [ { "remId": "R1", "passages": [
+  { "book": { "id": "pianc-121", "title": "…", "cite": "PIANC 121", "pdfRemIds": ["PdfRem"] },
+    "page": 29, "section": "1.4.3 Probability Aspects…", "sectionNumber": "1.4.3",
+    "quote": "Probabilistic design methods are widely used […] significant savings …",
+    "excerpts": ["Probabilistic design methods are widely used", "significant savings …"],
+    "emphasis": ["widely used", "significant savings"], "key": "savings",
+    "covers": "", "score": 10, "why": "Métodos probabilísticos dão dimensões ótimas e economias.",
+    "role": "source", "diverges": false, "edital": "sim" } ] } ] }
+```
+
+- `excerpts` (optional): the parts of the passage that bear on the Rem, each copied **character for character** from the source; each is located and pinned on its own. `quote` is them joined with `[…]`; without `excerpts`, `quote` is used as one.
+- `emphasis` (optional): short phrases inside the excerpts, shown in bold; `key` (optional): one word or figure inside them, shown in bold italics.
+- `covers`: the part of the Rem's own text this passage supports, copied from it; empty when it supports all of it. Drives where the pin goes.
+- `role`: `source` (says what the Rem says), `related` (same point, adds or explains) or `diverges` (contradicts it). `score`: 0–10.
+- `why`: one line, in the Rem's language, on what the passage says. Written under the quote as an AI Note when the user asks for it.
+- `page`: a page in your copy of the book; the plugin searches its RemNote PDF from there. `sectionNumber` and `edital` (anything but `sim` reads *fora do edital*) go into the attribution.
+
 ### Unknown operations { #unknown-op }
 
 A provider that gets an `op` it does not implement should answer `{"error": "unsupported op"}` (exit 0) or exit with an error. The plugin only sends the operations listed under `capabilities`, so this happens only with a mismatch.
@@ -93,6 +126,7 @@ A provider that gets an `op` it does not implement should answer `{"error": "uns
   - **What it never does:** replace the remembered destination or the IncRem you are reviewing. It is selected only when the popup had nothing else to suggest and you have not moved the selection yet.
   - **Outside the tree:** when the suggested Rem is outside the tree the selector shows, it gets a row of its own at the top.
 - **Pin Source Quote:** when a book in the `find-source` answer carries `quote`, that text is searched first, then the Rem's own.
+- **Find Sources:** runs only when the provider lists `semantic-search`; its operation is `find-passages`.
 
 ## For developers { #developers }
 

@@ -4,6 +4,8 @@ A **source pin** is a pin reference to the highlight that holds a passage: click
 
 **Pin Source Quote** gives one to text you already have — a sentence you typed, pasted or wrote into your notes — without selecting it in the source again. It finds the passage in the open PDF or article, reuses the highlight that already covers it or creates one, and pins it.
 
+**Find Sources** does the same for text that only *means* what the source says — a summary, a paraphrase, a translation, course notes — by searching your library by meaning. See [Find Sources](#find-sources).
+
 ## Requirements { #requirements }
 
 - The [AI helper](Desktop-Helpers.md#ai-helper), running — see [Setting up the AI helper](Desktop-Helpers.md#setup). Pin Source Quote only needs Python and PyMuPDF; no AI and no Claude account are involved.
@@ -73,6 +75,60 @@ Answer, books in the order to try:
 - `page` (optional): a page to search first; the whole PDF is searched if the passage is not near it.
 - `id` and `detail` (optional): passed back by the Local Media Bridge, not shown.
 - `quote` (optional, [corpus providers](Corpus-Provider.md#op-find-source) with `quote-literal`): the text to look for instead of the Rem's own, when the Rem's text was corrected and no longer matches the PDF letter for letter.
+
+## Find Sources: by meaning { #find-sources }
+
+Pin Source Quote only finds text taken from the source. **Find Sources** finds the passages of your library that *say what a note says*, in other words or in another language: a summary you are studying from, course material, your own paraphrase. You review what it found, and the accepted passages are pinned to their highlights in your PDFs, as Pin Source Quote does.
+
+It needs a [corpus provider](Corpus-Provider.md) that searches by meaning (the `semantic-search` capability), run by the [AI helper](Desktop-Helpers.md#ai-helper). Without one, the command says so.
+
+### Running it { #find-sources-run }
+
+- **Find Sources (by meaning)** (`fsq`) on the focused Rem or a multi-Rem selection (in the queue, the card on screen). A PDF open in a pane, or the book whose notes the Rem sits in, is searched first; the rest of your library too.
+- Or **🔎 Search by meaning** in Pin Source Quote's *Passage not found* dialog (←→ to reach it), for the Rems that missed.
+
+It runs **in the background**, about 20 seconds per Rem. A notice says when the results are ready; nothing is written until you review them.
+
+### Reviewing { #find-sources-review }
+
+**Review** in the notice opens the list of passages, per Rem:
+
+| Group | What it means |
+|---|---|
+| **Source** | Says what your note says (score 8–10). Selected from the start. |
+| **Diverges** | Contradicts your note: a different number, definition, condition or recommendation. |
+| **Related** | Same point and context, adds to it or explains it (score 5–7). |
+
+Each row shows the book, the page in your RemNote PDF, the quote with the words it turns on in **bold**, and a short note on what the passage says. A passage whose book has no PDF in RemNote (or which is not found in it) cannot be pinned; it can still be written as a quote.
+
+| Key | Action |
+|---|---|
+| `↑` `↓` | Move |
+| `Space` | Select or unselect the row |
+| `A` | Select every passage scoring 9 or more |
+| `Q` | What to write besides the pins (below) |
+| `Enter` | Pin the selected passages |
+| `Esc` | Close; **Review** in the notice opens it again |
+
+### What gets written { #find-sources-written }
+
+`Q` chooses, and the choice is remembered on this device:
+
+- **Pins only**: the pins, on the Rem.
+- **Pins + quotes**: also each quote as a child Rem, in the Quote format, under **Fontes** / **Sources** (sources) and **Material relacionado** / **Related material** (related and diverging passages, the latter marked ⚠️). Both headers are Extra Card Detail, so they show on the back of the Rem's cards.
+- **Pins + quotes + AI notes**: also, under each quote, the note on what the passage says, as an **AI Note**: small, italic and muted, with a small 🤖 in place of its tag.
+
+```
+• Métodos de projeto probabilístico são muito utilizados … 📌
+    • Fontes
+        • “Probabilistic design methods are widely used to determine the optimum
+          dimensions […] and lead to significant savings …” (PIANC 121, PDF p. 29) 📌
+            • Métodos probabilísticos dão dimensões ótimas e economias…   (AI Note)
+```
+
+- **Quotes** keep only the words that bear on your note: the rest of the passage is cut with `[…]`, and each part gets its own pin, so the pin opens the whole context. The words the point turns on are in **bold**, the one word or figure it hinges on in ***bold italics***. The attribution reads `(book, §section, PDF p. N)`, with `; fora do edital` for a passage the exam does not ask for.
+- **Where the pins go:** at the end of the Rem (of its back, when it has one). When the Rem mixes what several passages say, each pin goes right after the sentence it supports, as long as that sentence can be found with certainty; any other goes at the end.
+- **Running it again** reuses the highlights, the headers and the quote Rems already there, and adds nothing twice.
 
 ## Pinning every quote in a subtree { #quote-rems-in-descendants }
 

@@ -589,6 +589,41 @@ export async function registerTagBadgeCSS(plugin: ReactRNPlugin) {
   await plugin.app.registerCSS('tag-badge-styling', css);
 }
 
+/**
+ * AI Note (Find Sources' reason for a passage, under its quote): small, italic and
+ * muted, so it never competes with the quote; full strength while it is being edited.
+ * Its powerup pill becomes a small 🤖, the way Incremental's becomes 🔍. Row-scoped:
+ * the editor is a flat list of rows, so nothing leaks to other Rems. The queue's Extra
+ * details render the same rows inside a hierarchy editor.
+ */
+export async function registerAiNoteCSS(plugin: ReactRNPlugin) {
+  const css = `
+    .rem-container[data-rem-tags~="ai-note" i] .rem-text,
+    [data-rem-container-tags~="ai-note" i] .rem-text,
+    [data-queue-rem-tags~="ai-note" i] .rem-text {
+      font-size: var(--rn-fontsize-small, 14px) !important;
+      font-style: italic;
+      color: var(--rn-clr-content-tertiary, #8a8f98);
+      opacity: 0.85;
+    }
+    .rem-container[data-rem-tags~="ai-note" i]:focus-within .rem-text {
+      opacity: 1;
+    }
+    [data-test="Applied Powerup Pill AI Note"].hierarchy-editor__tag-bar__tag {
+      font-size: 0px;
+      opacity: 0.55;
+    }
+    [data-test="Applied Powerup Pill AI Note"].hierarchy-editor__tag-bar__tag:before {
+      font-size: 11px;
+      content: '🤖';
+    }
+    [data-rem-tags~="ai-note" i] [data-test="Tag Bar"] .hierarchy-editor__tag-bar__tag:has(.rem-powerup-icon) {
+      display: none;
+    }
+  `;
+  await plugin.app.registerCSS('ai-note-styling', css);
+}
+
 export async function registerClozeExtractCSS(plugin: ReactRNPlugin) {
   const css = `
     /* Badge: violet ↑ pill before the bullet */

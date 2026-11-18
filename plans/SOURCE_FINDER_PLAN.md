@@ -35,17 +35,18 @@ Maintainer notes, not published (the docs site is built from `docs/` only). Last
 
 ## Phases
 
-### Phase 1: the open source misses, so ask the finder (done 2026-11-18, not yet released)
+### Phase 1: the open source misses, so ask the finder (shipped in v1.0.245)
 
 - [x] **`pinQuotesInViews` / `pinQuoteInViews`:** when the open source does not hold the passage, the Rems that missed go to `pinFromSourceFinder`, gated on `hasCorpusCapability('find-source')`. This works in both paths, the single-view one and the Text Reader views popup.
 - [x] **`pinFromSourceFinder(…, { searched })`:** skips the PDFs already searched with the Rem's own text, unless the book carries a literal `quote` (`quote-literal`: the Rem's text was corrected and only the literal text matches). They are listed as *“… (the open source)”* under *Not found in*.
 - [x] **`finderPinDialog(run, fallback)`:** the dialog says the open source was searched first and how many Rems were pinned there. It keeps *Wrong PDF?…* for pins and the paraphrase/translation hint for misses.
 - [x] **Without a finder** (no helper, or no provider), the dialogs are as before.
-- [ ] Test in RemNote:
+- [x] Test in RemNote:
   - the PIANC Rem (a translation, so still a miss, now listing the open PDF);
   - a quote from another book with a PDF open;
   - a multi-Rem selection mixing both.
-- [ ] Docs once approved: the Source-Pins.md *With no source open* section becomes *When the open source does not have it*; troubleshooting row; changelog.
+- [x] Docs: the Source-Pins.md section became *Sources that are not open*; troubleshooting row; changelog v1.0.245.
+- [x] Same release: pages and highlights RemNote has not loaded are read from remnote.db (helper `/source-highlights`), so no duplicate "Page NNN" (findings/PLUGIN_BRIDGE_AND_SDK.md).
 
 ### Phase 2: Find Sources (semantic search, background, review)
 
@@ -79,29 +80,29 @@ The answer has one list per Rem, best first:
 
 **Provider work** (`~/Busca-Semantica-PSCPP`; that repo commits itself):
 
-- [ ] `find_passages(pedido)` in `busca_provedor.py`: `consultar()` in `conceito` mode, the Rem's text as the question, the hinted book first, then the whole collection.
-- [ ] Reranker schema for this operation: add `trecho` (sentences copied from the passage) and `cobre` (the part of the query they support). Validate both as substrings after normalising spaces and quotes, with the anchor sentence or an empty `cobre` as the fallback.
-- [ ] `semantic-search` in `CAPACIDADES`; `pdfRemIds` through `bap._pdfs(sigla)`, as `find-source` does.
+- [x] `find_passages(pedido)` in `busca_provedor.py`: `consultar()` in `conceito` mode, the Rem's text as the question, the hinted book first, then the whole collection.
+- [x] Reranker schema for this operation (mode `fonte`): add `trecho` (sentences copied from the passage) and `cobre` (the part of the query they support). Validate both as substrings after normalising spaces and quotes, with the anchor sentence or an empty `cobre` as the fallback.
+- [x] `semantic-search` in `CAPACIDADES`; `pdfRemIds` through `bap._pdfs(sigla)`, as `find-source` does.
 
 **Plugin work:**
 
-- [ ] **`FindSourcesJob`** in the tracker (pattern: `UpscaleJob`, `src/lib/upscale_image.ts`, `register/tracker.ts`).
+- [x] **`FindSourcesJob`** in the tracker (pattern: `UpscaleJob`, `src/lib/upscale_image.ts`, `register/tracker.ts`).
   - At most 2 Rems in flight.
   - One `corpusRequest('find-passages')` per Rem, with a 90 s timeout.
   - Then a **dry-run** `ensureSourcePins` per passage on its RemNote PDF, to keep only pinnable ones and learn the real page.
   - Results stored per job until reviewed.
-- [ ] **Entry points:**
+- [x] **Entry points:**
   - **Find Sources** command: the focused Rem or a multi-Rem selection, with or without a source open. Hidden without the helper, like Read aloud.
   - **🔎 Search by meaning** button in the *Passage not found* dialog (`MessageDialog` gains an action button that runs a command or opens a popup). Shown only with `semantic-search`, with the cost: *about 20 s per Rem, runs in the background, uses Gemini*.
-- [ ] **Notice** when done: *🔎 3 sources · 2 related · 1 diverges*, with **Review** (notice `action`). Errors: `tone: error`.
-- [ ] **Review popup** (`find_sources_review_popup.tsx`), keyboard-driven (popups-must-be-keyboard-driven):
+- [x] **Notice** when done: *🔎 3 sources · 2 related · 1 diverges*, with **Review** (notice `action`). Errors: `tone: error`.
+- [x] **Review popup** (`find_sources_popup.tsx`), keyboard-driven (popups-must-be-keyboard-driven):
   - groups **Sources / Related / Diverges**, one row per passage: cite, page, quote in the source's language, `why`, score, and what it covers;
   - Space toggles a row, `A` accepts the rows scored 9 or more, Enter writes, Esc keeps the notice so the review can be reopened;
   - the **Pins only / Pins + quotes** choice;
   - a preview line of where each pin goes (end, or inline after *“…”*).
-- [ ] **Re-check on write:** if the Rem's text changed since the search, re-run the dry run and drop `covers` that no longer match, so those pins go to the end.
-- [ ] **Write** (`src/lib/find_sources/write.ts`): `ensureSourcePins` for real per accepted passage, pins per the placement rule, then the quote Rems if chosen.
-- [ ] **Books with no RemNote PDF:** offered with their citation as text and no pin, marked *no PDF in RemNote*.
+- [x] **Re-check on write:** if the Rem's text changed since the search, re-run the dry run and drop `covers` that no longer match, so those pins go to the end.
+- [x] **Write** (`runFindSourcesWrite` in `src/lib/find_sources/index.ts`, placement in `placement.ts` + test): `ensureSourcePins` for real per accepted passage, pins per the placement rule, then the quote Rems if chosen.
+- [x] **Books with no RemNote PDF:** offered with their citation as text and no pin, marked *no PDF in RemNote*.
 - [ ] **Media bridge op `find-sources`,** so the skills can use the same path (optional).
 
 **Inline placement rule:**
@@ -149,6 +150,16 @@ The two plans go in **opposite directions**: AI Study Tools goes **source → no
 | Pin on the back of a card | decided | `appendPins` does it | — |
 
 **Not shared:** recipes from *AI Tutor Commands* (a generation feature), page-range extraction, and vision mode.
+
+## Status of phase 2 (2026-11-18, shipped in v1.0.245)
+
+- Tested end to end in RemNote. Follow-ups from that test, all done: the corpus gate takes the operation's capability (`find-passages` is `semantic-search`); a third write option adds the passage notes as **AI Note** child Rems (plugin powerup, small/italic/muted CSS, 🤖 pill); quotes follow the skills' rules (excerpts joined with `[…]`, each pinned on its own; bold emphasis and a bold-italic key word; `(cite, §x.y, PDF p. N; fora do edital)`); notes say what a passage says, never what it leaves out (prompt rule plus a regex in the provider that cuts "…, mas não menciona X" tails).
+- Docs: Source-Pins.md *Find Sources*, Corpus-Provider.md `find-passages`, commands reference, changelog v1.0.245.
+
+## Status of phase 2 as first built
+
+- Built: provider `find-passages` (~16 s per Rem through the helper), plugin job, notice, review popup, write, and Search by meaning in the not-found dialogs. Not yet run end to end in RemNote; docs (Corpus-Provider.md `find-passages`, Source-Pins.md or a Find Sources page, changelog) wait for approval.
+- **Learned:** the helper runs the provider under launchd, which has no permission to read the Google Drive library: `open()` blocks instead of failing. `consultar()` gained `args.conferir=False` for the provider path (the plugin checks every quote in the RemNote PDF anyway). `mesma_copia` (suggest-parent) still opens the library and could hang the same way.
 
 ## Risks and open questions
 
