@@ -36,8 +36,9 @@ import {
 } from '../pdf_source_pins';
 import { guessLang } from '../read_aloud_script';
 import { placeInline, pinnedIds, RichElement } from './placement';
-import { attribution, emphasisSegments, segmentsToRichText } from './quote_text';
+import { attribution, ChosenQuote, emphasisSegments, mergedQuote, segmentsToRichText } from './quote_text';
 import { checkHeader, checkStatement, StatementCheck, VERDICTS } from './check';
+import { AnswerSection, answerHeader, askSources, boldToRichText, SourcesAnswer } from './ask';
 import { groupOf, OutlineNode, pinTarget, Statement, StatementMember, statementsInOutline } from './outline';
 
 export const SEMANTIC_SEARCH = 'semantic-search';
@@ -63,6 +64,11 @@ export interface FoundPassage {
   key?: string;
   /** The numbered section the passage sits in ("2.5.4"), for the attribution. */
   sectionNumber?: string | null;
+  /**
+   * The whole chunk the quote was cut from. Never quoted or written: it lets Check Statement
+   * and Ask Your Sources read a trimmed quote in context ("these two values" → which ones).
+   */
+  context?: string;
   /** The part of the Rem's text this passage supports; empty for all of it. */
   covers: string;
   score: number;
@@ -92,6 +98,8 @@ export interface FindSourcesJob {
   queuedAt: number;
   /** Check Statement: also ask Claude for a verdict on each Rem's statement (./check). */
   check?: boolean;
+  /** Ask Your Sources: the Rem is a question or topic; Claude answers it from the passages (./ask). */
+  ask?: boolean;
 }
 
 /** A passage as the review shows it: where it was found in RemNote, if it was. */
@@ -102,8 +110,10 @@ export interface ReviewPassage extends FoundPassage {
   pdfPage?: number;
   /** Why it cannot be pinned (no PDF in RemNote, not found in it, …). */
   unpinnable?: string;
-  /** Check Statement: the verdict rests on this passage (its quote goes under the Check Rem). */
+  /** Check Statement / Ask Your Sources: the verdict or answer rests on this passage. */
   basis?: boolean;
+  /** Its place in the Rem's passage list, which the answer's sections refer to. */
+  index?: number;
 }
 
 export interface ReviewRem {
@@ -118,6 +128,10 @@ export interface ReviewRem {
   check?: StatementCheck;
   /** A list group's items (see FindSourcesItem.members). */
   members?: StatementMember[];
+  /** Ask Your Sources: the answer to the Rem's question or topic. */
+  answer?: SourcesAnswer;
+  /** Ask Your Sources: why there is no answer (the helper or Claude failed). */
+  answerError?: string;
   /** Check Statement: why there is no verdict (the helper or Claude failed). */
   checkError?: string;
 }
@@ -146,6 +160,7 @@ export interface FindSourcesWrite {
     passages: ReviewPassage[];
     check?: StatementCheck;
     members?: StatementMember[];
+    answer?: SourcesAnswer;
   }[];
 }
 
@@ -158,7 +173,7 @@ export const excerptsOf = (p: FoundPassage): string[] => (p.excerpts?.length ? p
  */
 export function quoteRichText(p: ReviewPassage): RichElement[] {
   const text: RichElement[] = [
-    `${p.role === 'diverges' ? '\u26a0\ufe0f ' : ''}\u201c`,
+    `${p.role === 'diverges' || p.diverges ? '\u26a0\ufe0f ' : ''}\u201c`,
     ...segmentsToRichText(emphasisSegments(p.quote, p.emphasis, p.key)),
     `\u201d ${attribution({
       cite: p.book.cite || p.book.title,
@@ -291,7 +306,7 @@ async function enqueueStatements(
   plugin: RNPlugin,
   statements: Statement[],
   openSource: string | null | undefined,
-  check: boolean
+  mode: { check?: boolean; ask?: boolean }
 ): Promise<number> {
   const items: FindSourcesItem[] = [];
   for (const st of statements) {
@@ -311,7 +326,8 @@ async function enqueueStatements(
     items,
     openSourceRemId: openSource ?? null,
     queuedAt: Date.now(),
-    check,
+    check: !!mode.check,
+    ask: !!mode.ask,
   };
   const queued = (await plugin.storage.getSession<FindSourcesJob[]>(pendingFindSourcesJobsKey)) || [];
   await plugin.storage.setSession(pendingFindSourcesJobsKey, [...queued, job]);
@@ -323,20 +339,28 @@ export async function enqueueFindSources(
   plugin: RNPlugin,
   remIds: string[],
   openSource?: string | null,
-  options: { check?: boolean } = {}
+  options: { check?: boolean; ask?: boolean } = {}
 ): Promise<number> {
   const rems = (await plugin.rem.findMany(remIds)) || [];
-  return enqueueStatements(plugin, await statementsForRems(plugin, rems), openSource, !!options.check);
+  return enqueueStatements(plugin, await statementsForRems(plugin, rems), openSource, options);
 }
 
-const runningToast = (n: number, check = false) =>
-  `\ud83d\udd0e ${check ? 'Checking' : 'Finding the sources of'} ${n === 1 ? 'this Rem' : `${n} Rems`} ` +
-  `${check ? 'against your library' : 'by meaning'}, in the background (about ${check ? '45' : '25'} s` +
-  `${n === 1 ? '' : ' each'}). A notice will say when ${n === 1 ? 'it is' : 'they are'} ready to review.`;
+type Mode = 'find' | 'check' | 'ask';
+const MODE_NAMES: Record<Mode, string> = { find: 'Find Sources', check: 'Check Statement', ask: 'Ask Your Sources' };
 
-/** The commands: Find Sources (or Check Statement) for the selected Rems, else the focused one. */
-async function startFromCommand(plugin: ReactRNPlugin, check: boolean) {
-  const what = check ? 'Check Statement' : 'Find Sources';
+const runningToast = (n: number, mode: Mode = 'find') => {
+  const doing = { find: 'Finding the sources of', check: 'Checking', ask: 'Asking your sources about' }[mode];
+  const how = { find: 'by meaning', check: 'against your library', ask: 'in your library' }[mode];
+  const secs = { find: 25, check: 45, ask: 60 }[mode];
+  return (
+    `\ud83d\udd0e ${doing} ${n === 1 ? 'this Rem' : `${n} Rems`} ${how}, in the background (about ${secs} s` +
+    `${n === 1 ? '' : ' each'}). A notice will say when ${n === 1 ? 'it is' : 'they are'} ready to review.`
+  );
+};
+
+/** The commands: Find Sources, Check Statement or Ask Your Sources for the selected Rems, else the focused one. */
+async function startFromCommand(plugin: ReactRNPlugin, mode: Mode) {
+  const what = MODE_NAMES[mode];
   const why = await findSourcesUnavailable(plugin);
   if (why) {
     await showMessageDialog(plugin, {
@@ -345,17 +369,21 @@ async function startFromCommand(plugin: ReactRNPlugin, check: boolean) {
       message: why,
       detail:
         `${what} asks your corpus provider (through the AI helper) for the passages of your library ` +
-        'that say what a note says. See Corpus Provider in the docs.',
+        'that bear on a note. See Corpus Provider in the docs.',
     });
     return;
   }
   const rems = await selectedOrFocusedRems(plugin);
   if (!rems.length) {
-    await plugin.app.toast(`Focus or select the Rems ${check ? 'to check' : 'whose sources you want to find'}.`);
+    const target = { find: 'whose sources you want to find', check: 'to check', ask: 'holding your question or topic' }[mode];
+    await plugin.app.toast(`Focus or select the Rems ${target}.`);
     return;
   }
-  const n = await enqueueFindSources(plugin, rems.map((r) => r._id), await openSourceRemId(plugin), { check });
-  await plugin.app.toast(n ? runningToast(n, check) : 'The selected Rems have no text to look for.');
+  const n = await enqueueFindSources(plugin, rems.map((r) => r._id), await openSourceRemId(plugin), {
+    check: mode === 'check',
+    ask: mode === 'ask',
+  });
+  await plugin.app.toast(n ? runningToast(n, mode) : 'The selected Rems have no text to look for.');
 }
 
 /** Rems searched at once in a tree run: each waits ~20 s on the provider (two Gemini calls). */
@@ -423,7 +451,7 @@ async function startTreeFromCommand(plugin: ReactRNPlugin, check: boolean) {
     return;
   }
   const taken = statements.slice(0, MAX_TREE_REMS);
-  const n = await enqueueStatements(plugin, taken, await openSourceRemId(plugin), check);
+  const n = await enqueueStatements(plugin, taken, await openSourceRemId(plugin), { check });
   const minutes = Math.max(1, Math.round((n * (check ? 30 : 20)) / IN_FLIGHT / 60));
   await plugin.app.toast(
     `\ud83d\udd0e ${what}: ${n} Rem${n === 1 ? '' : 's'} in the background, about ${minutes} min` +
@@ -437,18 +465,25 @@ export const findSourcesInTree = (plugin: ReactRNPlugin) => startTreeFromCommand
 export const checkStatementsInTree = (plugin: ReactRNPlugin) => startTreeFromCommand(plugin, true);
 
 /** Command: Find Sources for the selected Rems, else the focused one (as Pin Source Quote resolves them). */
-export const findSources = (plugin: ReactRNPlugin) => startFromCommand(plugin, false);
+export const findSources = (plugin: ReactRNPlugin) => startFromCommand(plugin, 'find');
 
 /**
  * Command: Check Statement — Find Sources, then Claude's verdict on each Rem's statement
  * from the passages found (./check); written as a Check Rem under the Rem after review.
  */
-export const checkStatementCommand = (plugin: ReactRNPlugin) => startFromCommand(plugin, true);
+export const checkStatementCommand = (plugin: ReactRNPlugin) => startFromCommand(plugin, 'check');
+
+/**
+ * Command: Ask Your Sources — the Rem holds a question or a topic; Find Sources looks for
+ * the passages that answer it, then Claude answers from them (./ask), and the answer is
+ * written under the Rem with its quotes after review.
+ */
+export const askYourSourcesCommand = (plugin: ReactRNPlugin) => startFromCommand(plugin, 'ask');
 
 /** For "Search by meaning" in Pin Source Quote's dialog: queue and say so. */
 export async function findSourcesFromDialog(plugin: RNPlugin, remIds: string[], openSource?: string | null) {
   const n = await enqueueFindSources(plugin, remIds, openSource);
-  await plugin.app.toast(n ? runningToast(n) : 'Those Rems have no text to look for.');
+  await plugin.app.toast(n ? runningToast(n, 'find') : 'Those Rems have no text to look for.');
 }
 
 // --- 2. run -----------------------------------------------------------------------------
@@ -490,7 +525,7 @@ async function locateInRemNote(plugin: ReactRNPlugin, passage: FoundPassage): Pr
 
 export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJob): Promise<void> {
   const noticeId = `${job.id}-notice`;
-  const what = job.check ? 'Check Statement' : 'Find Sources';
+  const what = job.ask ? 'Ask Your Sources' : job.check ? 'Check Statement' : 'Find Sources';
   const slots: (ReviewRem | undefined)[] = new Array(job.items.length);
   let stopped: string | undefined;
   let done = 0;
@@ -504,7 +539,13 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
         'find-passages',
         {
           items: [
-            { remId: item.remId, texts: item.texts, ancestors: item.ancestors, openSourceRemId: job.openSourceRemId },
+            {
+              remId: item.remId,
+              texts: item.texts,
+              ancestors: item.ancestors,
+              openSourceRemId: job.openSourceRemId,
+              ...(job.ask ? { mode: 'answer' } : {}),
+            },
           ],
         },
         { timeoutMs: FIND_TIMEOUT_MS, capability: SEMANTIC_SEARCH }
@@ -514,7 +555,11 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
       for (const p of found) passages.push(await locateInRemNote(plugin, p));
       console.log(`[FindSources] ${item.title}: ${passages.length} passage(s)`, passages);
       const rem: ReviewRem = { remId: item.remId, title: item.title, lang, passages, members: item.members };
+      passages.forEach((p, k) => (p.index = k));
       if (job.check) await addCheck(plugin, rem, item.texts.join('\n'));
+      if (job.ask) await addAnswer(plugin, rem, item.texts.join('\n'));
+      // The full chunks served the verdict or answer; the review and the write do not need them.
+      passages.forEach((p) => delete p.context);
       return rem;
     } catch (e) {
       console.error('[FindSources] search failed for', item.remId, e);
@@ -553,7 +598,7 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
   const failed = rems.filter((r) => r.error);
   const subject = rems.length === 1 ? `\u201c${rems[0].title}\u201d` : `${rems.length} Rems`;
   const checked = rems.filter((r) => r.check);
-  if (!total && !checked.length) {
+  if (!total && !checked.length && !rems.some((r) => r.answer)) {
     await showNotice(plugin, {
       id: noticeId,
       tone: failed.length ? 'error' : 'info',
@@ -588,11 +633,13 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
     : checked.some((r) => r.check!.verdict !== 'consistent')
     ? 'info'
     : 'success';
+  // Ask Your Sources: one question's answer in the notice itself.
+  const answered = job.ask && rems.length === 1 && rems[0].answer ? `${rems[0].answer.answer} ` : '';
   await showNotice(plugin, {
     id: noticeId,
-    tone: job.check ? worst : count('source') ? 'success' : 'info',
+    tone: job.check ? worst : job.ask ? (rems.some((r) => r.answerError) ? 'error' : 'success') : count('source') ? 'success' : 'info',
     title: `${what}: ready to review`,
-    message: `${subject}: ${verdicts}${parts.join(' \u00b7 ')}. Nothing is written until you accept it.`,
+    message: `${subject}: ${verdicts}${answered}${parts.join(' \u00b7 ')}. Nothing is written until you accept it.`,
     action: { label: 'Review', popup: FIND_SOURCES_POPUP, data: review },
   });
 }
@@ -610,12 +657,14 @@ async function addCheck(plugin: ReactRNPlugin, rem: ReviewRem, statement: string
           ? 'Nenhuma passagem da bibliografia trata desta afirmação.'
           : 'No passage of the bibliography deals with this statement.',
       basis: [],
+      quotes: [],
     };
     return;
   }
   try {
     rem.check = await checkStatement(plugin, statement, rem.lang, rem.passages);
     rem.check.basis.forEach((k) => (rem.passages[k].basis = true));
+    takeChosenQuotes(rem, rem.check.quotes);
     console.log('[CheckStatement]', rem.title, rem.check);
   } catch (e) {
     console.error('[CheckStatement] verdict failed for', rem.remId, e);
@@ -623,7 +672,67 @@ async function addCheck(plugin: ReactRNPlugin, rem: ReviewRem, statement: string
   }
 }
 
+/** Ask Your Sources: Claude's answer from the passages found, and which of them it uses. */
+async function addAnswer(plugin: ReactRNPlugin, rem: ReviewRem, question: string) {
+  if (!rem.passages.length) {
+    rem.answer = {
+      answer: rem.lang === 'pt' ? 'Nenhuma passagem da bibliografia trata disto.' : 'No passage of the bibliography deals with this.',
+      covered: 'none',
+      sections: [],
+      divergences: [],
+      basis: [],
+    };
+    return;
+  }
+  try {
+    rem.answer = await askSources(plugin, question, rem.lang, rem.passages);
+    rem.answer.basis.forEach((k) => (rem.passages[k].basis = true));
+    takeChosenQuotes(rem, [...rem.answer.sections, ...rem.answer.divergences].flatMap((sec) => sec.quotes));
+    console.log('[AskSources]', rem.title, rem.answer);
+  } catch (e) {
+    console.error('[AskSources] answer failed for', rem.remId, e);
+    rem.answerError = (e as Error).message;
+  }
+}
+
+/**
+ * Claude's quotes become the passages' own: each passage Claude quoted shows Claude's
+ * excerpts and emphasis (merged across sections, in passage order) in the review, and its
+ * pins are made for exactly those words. A passage Claude did not quote keeps the provider's
+ * trim. Needs the full texts (`context`), so it runs before they are dropped.
+ */
+function takeChosenQuotes(rem: ReviewRem, quotes: ChosenQuote[]) {
+  const byPassage = new Map<number, ChosenQuote[]>();
+  for (const q of quotes) byPassage.set(q.index, [...(byPassage.get(q.index) ?? []), q]);
+  for (const [index, list] of byPassage) {
+    const p = rem.passages[index];
+    const merged = p ? mergedQuote(list, p.context || p.quote) : null;
+    if (!p || !merged) continue;
+    p.excerpts = merged.excerpts;
+    p.emphasis = merged.emphasis;
+    p.key = merged.key;
+    p.quote = merged.excerpts.join(' [\u2026] ');
+  }
+}
+
+/** An accepted passage after its highlights are made: its pins, and per excerpt (for a section's own quote). */
+interface Pinned {
+  passage: ReviewPassage;
+  pins: string[];
+  byExcerpt?: Map<string, string[]>;
+}
+
 // --- 3. write ---------------------------------------------------------------------------
+
+/**
+ * Make `rem` the LAST child of `parentId`: setParent without a position puts it first
+ * (findings/PLUGIN_BRIDGE_AND_SDK.md), which wrote quotes and sections in reverse order.
+ */
+async function appendAsLastChild(plugin: RNPlugin, rem: PluginRem, parentId: string) {
+  const parent = await plugin.rem.findOne(parentId);
+  const count = parent ? ((await parent.getChildrenRem()) ?? []).filter((c) => c._id !== rem._id).length : 0;
+  await rem.setParent(parentId, count);
+}
 
 const HEADERS = {
   pt: { sources: 'Fontes', related: 'Material relacionado' },
@@ -639,7 +748,7 @@ async function headerRem(plugin: ReactRNPlugin, parent: PluginRem, names: string
   const rem = await plugin.rem.createRem();
   if (!rem) return undefined;
   await rem.setText([names[0]]);
-  await rem.setParent(parent._id);
+  await appendAsLastChild(plugin, rem, parent._id);
   await rem.addPowerup(BuiltInPowerupCodes.ExtraCardDetail);
   return rem;
 }
@@ -670,7 +779,7 @@ async function addQuoteRem(
       ...quoteRichText(passage),
       ...pins.flatMap((id) => [' ', { i: 'q' as const, _id: id, pin: true }]),
     ] as RichTextInterface);
-    await quoteRem.setParent(header._id);
+    await appendAsLastChild(plugin, quoteRem, header._id);
     await quoteRem.setIsQuote(true);
     added.quote = true;
   }
@@ -681,7 +790,7 @@ async function addQuoteRem(
   const noteRem = await plugin.rem.createRem();
   if (!noteRem) return added;
   await noteRem.setText([passage.why.trim()]);
-  await noteRem.setParent(quoteRem._id);
+  await appendAsLastChild(plugin, noteRem, quoteRem._id);
   await noteRem.addPowerup(aiNotePowerupCode);
   added.note = true;
   return added;
@@ -698,6 +807,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
   let quoteCount = 0;
   let noteCount = 0;
   let checkCount = 0;
+  let answerCount = 0;
   const problems: string[] = [];
   for (const entry of write.rems) {
     const rem = await plugin.rem.findOne(entry.remId);
@@ -706,7 +816,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
       continue;
     }
     // Highlights first: reused or created in the PDF, per passage.
-    const pinned: { passage: ReviewPassage; pins: string[] }[] = [];
+    const pinned: Pinned[] = [];
     for (const passage of entry.passages) {
       if (!passage.pdfRemId) {
         pinned.push({ passage, pins: [] });
@@ -721,12 +831,23 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
           ['pdf']
         );
         const pins = [...new Set(results.filter((r) => r.found).flatMap((r) => r.pins))];
-        pinned.push({ passage, pins });
+        const byExcerpt = new Map(excerptsOf(passage).map((e, k) => [e, results[k]?.found ? results[k].pins : []]));
+        pinned.push({ passage, pins, byExcerpt });
         if (!pins.length) problems.push(`not found again in ${passage.pdfName ?? 'its PDF'}`);
       } catch (e) {
         problems.push((e as Error).message);
         pinned.push({ passage, pins: [] });
       }
+    }
+
+    // Ask Your Sources: the answer under the question; the question itself gets no pins.
+    if (entry.answer) {
+      const counts = await writeAnswer(plugin, rem, entry.answer, entry.lang, pinned, write.extras);
+      quoteCount += counts.quotes;
+      noteCount += counts.notes;
+      pinCount += counts.pins;
+      answerCount++;
+      continue;
     }
 
     // The Rem's own pins: sources only (related and diverging passages go under the Rem, as quotes).
@@ -777,7 +898,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
           const observation = await plugin.rem.createRem();
           if (observation) {
             await observation.setText([entry.check.observation]);
-            await observation.setParent(header._id);
+            await appendAsLastChild(plugin, observation, header._id);
             parentOfQuotes = observation;
           }
         }
@@ -823,7 +944,9 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
     }
   }
   await dismissNotices(plugin, write.noticeId);
-  const done = `\ud83d\udccc ${checkCount ? 'Check Statement' : 'Find Sources'}: ` +
+  const feature = answerCount ? 'Ask Your Sources' : checkCount ? 'Check Statement' : 'Find Sources';
+  const done = `\ud83d\udccc ${feature}: ` +
+    (answerCount ? `${answerCount} answer${answerCount === 1 ? '' : 's'}, ` : '') +
     (checkCount ? `${checkCount} verdict${checkCount === 1 ? '' : 's'}, ` : '') +
     `${pinCount} pin${pinCount === 1 ? '' : 's'}` +
     (write.extras !== 'pins' ? `, ${quoteCount} quote Rem${quoteCount === 1 ? '' : 's'}` : '') +
@@ -832,7 +955,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
   if (problems.length) {
     await showNotice(plugin, {
       tone: 'info',
-      title: `${checkCount ? 'Check Statement' : 'Find Sources'}: written, with problems`,
+      title: `${feature}: written, with problems`,
       message: done.replace(/^\S+ /, ''),
       detail: [...new Set(problems)].join(' · '),
       openRemId: write.rems[0]?.remId,
@@ -840,6 +963,102 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
   } else {
     await plugin.app.toast(done);
   }
+}
+
+const ANSWER_LABELS = {
+  pt: { divergences: 'Divergências', others: 'Outras passagens' },
+  en: { divergences: 'Divergences', others: 'Other passages' },
+};
+
+/**
+ * Ask Your Sources, written under the question (first among its children):
+ *
+ *   • Resposta (18/11/2026): <the direct answer>          Extra Card Detail
+ *       • <section, **bold** key terms>
+ *           • “quote” (cite, PDF p. N) 📌                  its passages (with quotes on)
+ *       • Divergências
+ *           • <where the sources disagree> → its quotes
+ *       • Outras passagens → accepted passages the answer did not use
+ *
+ * With Pins only, a section's pins go at the end of its own text instead of quote Rems.
+ * Only the passages accepted in the review are quoted or pinned.
+ */
+async function writeAnswer(
+  plugin: ReactRNPlugin,
+  rem: PluginRem,
+  answer: SourcesAnswer,
+  lang: 'pt' | 'en',
+  pinned: Pinned[],
+  extras: FindSourcesExtras
+): Promise<{ quotes: number; notes: number; pins: number }> {
+  const counts = { quotes: 0, notes: 0, pins: 0 };
+  const byIndex = new Map(pinned.filter((p) => p.passage.index !== undefined).map((p) => [p.passage.index!, p]));
+  const used = new Set<number>();
+
+  const child = async (parent: PluginRem, text: RichElement[], first = false): Promise<PluginRem | undefined> => {
+    const r = await plugin.rem.createRem();
+    if (!r) return undefined;
+    await r.setText(text as RichTextInterface);
+    if (first) await r.setParent(parent._id, 0);
+    else await appendAsLastChild(plugin, r, parent._id);
+    return r;
+  };
+
+  /** A section (or divergence) with its passages: quote Rems under it, or its pins at its end. */
+  const section = async (parent: PluginRem, s: AnswerSection) => {
+    // The section's own quotes (Claude's excerpts of each passage), for the passages accepted
+    // in the review; a section from an older answer without quotes falls back to its basis.
+    const quotes = (s.quotes?.length ? s.quotes : s.basis.map((index) => ({ index, excerpts: [], emphasis: [], key: '' })))
+      .map((q) => ({ q, p: byIndex.get(q.index) }))
+      .filter((x): x is { q: ChosenQuote; p: Pinned } => !!x.p);
+    const mine = quotes.map(({ q, p }) => {
+      used.add(p.passage.index!);
+      if (!q.excerpts.length) return { passage: p.passage, pins: p.pins };
+      const pins = [...new Set(q.excerpts.flatMap((e) => p.byExcerpt?.get(e) ?? []))];
+      return {
+        passage: { ...p.passage, quote: q.excerpts.join(' [\u2026] '), excerpts: q.excerpts, emphasis: q.emphasis, key: q.key },
+        pins: pins.length ? pins : p.pins,
+      };
+    });
+    const pins = extras === 'pins' ? [...new Set(mine.flatMap((p) => p.pins))] : [];
+    const r = await child(parent, [...boldToRichText(s.text), ...pins.flatMap((id) => [' ', { i: 'q', _id: id, pin: true }])]);
+    counts.pins += pins.length;
+    if (!r || extras === 'pins') return;
+    for (const p of mine) {
+      const added = await addQuoteRem(plugin, r, p.passage, p.pins, extras === 'notes');
+      if (added.quote) counts.quotes++;
+      if (added.note) counts.notes++;
+      counts.pins += p.pins.length;
+    }
+  };
+
+  const header = await child(rem, boldToRichText(answerHeader(answer, lang)), true);
+  if (!header) return counts;
+  await header.addPowerup(BuiltInPowerupCodes.ExtraCardDetail);
+  for (const s of answer.sections) await section(header, s);
+  if (answer.divergences.length) {
+    const div = await child(header, [ANSWER_LABELS[lang].divergences]);
+    if (div) for (const s of answer.divergences) await section(div, s);
+  }
+  const rest = pinned.filter((p) => p.passage.index === undefined || !used.has(p.passage.index));
+  if (rest.length) {
+    const others = await child(header, [ANSWER_LABELS[lang].others]);
+    if (others) {
+      for (const p of rest) {
+        if (extras === 'pins') {
+          const fresh = p.pins.length ? await plugin.rem.findOne(others._id) : undefined;
+          if (fresh) await appendPins(fresh, p.pins);
+          counts.pins += p.pins.length;
+          continue;
+        }
+        const added = await addQuoteRem(plugin, others, p.passage, p.pins, extras === 'notes');
+        if (added.quote) counts.quotes++;
+        if (added.note) counts.notes++;
+        counts.pins += p.pins.length;
+      }
+    }
+  }
+  return counts;
 }
 
 /** From the popup: hand the accepted passages to the tracker (one setSession survives the popup closing). */

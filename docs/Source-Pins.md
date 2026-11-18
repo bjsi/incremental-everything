@@ -4,7 +4,7 @@ A **source pin** is a pin reference to the highlight that holds a passage: click
 
 **Pin Source Quote** gives one to text you already have — a sentence you typed, pasted or wrote into your notes — without selecting it in the source again. It finds the passage in the open PDF or article, reuses the highlight that already covers it or creates one, and pins it.
 
-**Find Sources** does the same for text that only *means* what the source says — a summary, a paraphrase, a translation, course notes — by searching your library by meaning. See [Find Sources](#find-sources). **Check Statement** goes one step further and tells you whether a note is right, from those passages. See [Check Statement](#check-statement).
+**Find Sources** does the same for text that only *means* what the source says — a summary, a paraphrase, a translation, course notes — by searching your library by meaning. See [Find Sources](#find-sources). **Check Statement** goes one step further and tells you whether a note is right, from those passages. See [Check Statement](#check-statement). **Ask Your Sources** answers a question from them. See [Ask Your Sources](#ask-your-sources).
 
 ## Requirements { #requirements }
 
@@ -80,7 +80,7 @@ Answer, books in the order to try:
 
 Pin Source Quote only finds text taken from the source. **Find Sources** finds the passages of your library that *say what a note says*, in other words or in another language: a summary you are studying from, course material, your own paraphrase. You review what it found, and the accepted passages are pinned to their highlights in your PDFs, as Pin Source Quote does.
 
-It needs a [corpus provider](Corpus-Provider.md) that searches by meaning (the `semantic-search` capability), run by the [AI helper](Desktop-Helpers.md#ai-helper). Without one, the command says so.
+It needs a [corpus provider](Corpus-Provider.md) that searches by meaning (the `semantic-search` capability), run by the [AI helper](Desktop-Helpers.md#ai-helper). Find Sources, Check Statement, Ask Your Sources and their tree versions appear among the commands only once the provider reports that capability (looked at shortly after RemNote starts, then every few minutes until the helper answers).
 
 ### Running it { #find-sources-run }
 
@@ -158,7 +158,7 @@ Neither part is a statement alone, so Find Sources and Check Statement read them
 
 ## Check Statement: is my note right? { #check-statement }
 
-**Check Statement against Sources** (`cks`) runs [Find Sources](#find-sources) on the focused or selected Rems, then asks Claude (Opus, through the [AI helper](Desktop-Helpers.md#ai-helper), on your Claude subscription) whether each note is right, judging **only from the passages found**, never from its own knowledge. Same requirements as Find Sources, plus the Claude CLI signed in.
+**Check Statement against Sources** (`cks`) runs [Find Sources](#find-sources) on the focused or selected Rems, then asks Claude (Opus, through the [AI helper](Desktop-Helpers.md#ai-helper), on your Claude subscription) whether each note is right, judging **only from the passages found**, never from its own knowledge. Claude reads each passage in full and picks the words that show its verdict: those become the quotes, with their emphasis, and the pins. Same requirements as Find Sources, plus the Claude CLI signed in.
 
 It runs in the background (about half a minute per Rem), and the notice shows the verdict:
 
@@ -181,6 +181,31 @@ It runs in the background (about half a minute per Rem), and the notice shows th
 - The **source pins** go on the Rem, as in Find Sources.
 - With quotes on (`Q`), the ◆ passages go under the observation; any other accepted passage goes under Fontes / Material relacionado.
 - Each check is **dated**: checking again adds a new one and leaves the old one.
+
+## Ask Your Sources: a question to your library { #ask-your-sources }
+
+Write a question or a topic in a Rem, *qual deve ser o ângulo de presa das âncoras tipo patente?* or just *ângulo de presa das âncoras tipo patente*, and run **Ask Your Sources** (`ask`). It finds the passages of your library that answer it, then Claude (Opus) answers **only from them**, the way `/explain-with-quotes` does, and says so when they do not settle it. Same requirements as Check Statement.
+
+- **The answer:** one sentence, then a few short sections from the core idea to the details and conditions, then where the sources disagree. Key terms and figures in **bold**.
+- **The quotes:** Claude reads each passage in full and quotes, under each section, exactly the words that section rests on, trimmed with `[…]` and emphasised; the same passage can be quoted differently in two sections. Every quote is checked against the source before it is offered.
+- **Review:** the answer at the top, each section with its quotes and passage numbers, and the passages below with the same numbers; the ones the answer uses (◆) start selected, a passage that disagrees with another is marked ⚠ diverges.
+
+Written under the question, first among its children:
+
+```
+• qual deve ser o ângulo de presa das âncoras tipo patente?
+    • Resposta (18/11/2026): Segundo a Arte Naval, … aproximadamente 45°; Clark … entre 35° e 37°.   (Extra Card Detail)
+        • Nas âncoras tipo patente, o ângulo de presa é … aproximadamente 45°.
+            • “Nas âncoras tipo patente, é o ângulo máximo …” (Arte Naval II, PDF p. 61) 📌
+        • O valor do ângulo é um meio-termo: … 30° para areia … 50° para lama …
+            • “the optimum maximum angle for the flukes varies …” (Clark, PDF p. 200) 📌
+        • Divergências
+            • A Arte Naval dá cerca de 45°; Clark, 35° a 37° … → each side's quote
+        • Outras passagens → accepted passages the answer did not use
+```
+
+- With **Pins only** (`Q`), a section gets its pins at the end of its own text instead of quote Rems; with AI notes on, each quote gets its note.
+- The question itself gets no pin. Each answer is **dated**: asking again adds a new one.
 
 ## Pinning every quote in a subtree { #quote-rems-in-descendants }
 

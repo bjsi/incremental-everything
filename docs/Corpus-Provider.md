@@ -92,6 +92,7 @@ Asked by Find Sources, one Rem per request. It may take a while (the plugin wait
 ```
 
 - `openSourceRemId`: the PDF or article open in a pane, if any. Search its book first, and the book whose notes `ancestors` belong to.
+- `mode` (optional): `"answer"` when the Rem is a question or a topic ([Ask Your Sources](Source-Pins.md#ask-your-sources)). Rank passages by whether they answer it rather than say the same; `role` then comes from the score, and a passage that disagrees with another one in the list keeps its role with `"diverges": true`.
 
 Answer, sources first:
 
@@ -112,6 +113,8 @@ Answer, sources first:
 - `role`: `source` (says what the Rem says), `related` (same point, adds or explains) or `diverges` (contradicts it). `score`: 0–10.
 - `why`: one line, in the Rem's language, on what the passage says. Written under the quote as an AI Note when the user asks for it.
 - `page`: a page in your copy of the book; the plugin searches its RemNote PDF from there. `sectionNumber` and `edital` (anything but `sim` reads *fora do edital*) go into the attribution.
+- `context` (optional): the whole passage the quote was cut from, a few thousand characters at most. Never quoted as is: Check Statement and Ask Your Sources give it to Claude, which picks its own excerpts from it (checked against it before use).
+- Each excerpt should make sense on its own: when it says "these values" or "it", keep the words it points back to.
 
 ### Unknown operations { #unknown-op }
 

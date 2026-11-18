@@ -14,6 +14,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Source Pins → Check Statement](Source-Pins.md#check-statement)
 
+**Ask Your Sources**: added a command (`ask`) that answers the question or topic written in a Rem from the passages of your library, in sections with the quotes each one rests on and the sources' divergences, written after review under the Rem; Check Statement and Ask Your Sources now let Claude pick the quoted words from each passage, and these commands appear only when your corpus provider searches by meaning.
+
+📖 [Source Pins → Ask Your Sources](Source-Pins.md#ask-your-sources)
+
 ### ✨ Improved
 
 **Pin Source Quote**: a passage that is not in the open PDF or article is now looked up with your source finder in its book's other PDFs, and existing pages and highlights RemNote has not loaded yet are reused instead of duplicated (a second "Page 030"); the latter needs the AI helper, restarted.

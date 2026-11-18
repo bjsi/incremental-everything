@@ -77,3 +77,89 @@ export function attribution(p: {
   const outside = p.edital && p.edital !== 'sim' ? '; fora do edital' : '';
   return `(${parts.join(', ')}${outside})`;
 }
+
+/** **bold** in Claude's text as RemNote rich text (other markup stays as typed). */
+export function boldToRichText(text: string): RichElement[] {
+  const out: RichElement[] = [];
+  const re = /\*\*(.+?)\*\*/g;
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    if ((m.index ?? 0) > last) out.push(text.slice(last, m.index));
+    out.push({ i: 'm', text: m[1], b: true });
+    last = (m.index ?? 0) + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out.filter((el) => el !== '');
+}
+
+// --- Excerpts chosen by Claude (Check Statement, Ask Your Sources) ---------------------
+
+/** For comparing copies: letters and digits only, lower case (spacing, hyphens and quotes from the PDF don't count). */
+export const plain = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/** A quote Claude chose from one passage: its verbatim excerpts and what to emphasize. */
+export interface ChosenQuote {
+  /** Index of the passage in the Rem's passage list. */
+  index: number;
+  excerpts: string[];
+  emphasis: string[];
+  key: string;
+}
+
+/**
+ * Claude's quote, checked against the passage's full text: the excerpts that are really
+ * there (the AI never types a quote), in the order they appear, and the emphasis that falls
+ * inside them. Null when no excerpt survives: the caller keeps the provider's own trim.
+ */
+export function checkedQuote(quote: ChosenQuote, context: string): ChosenQuote | null {
+  const whole = plain(context);
+  if (!whole) return null;
+  const excerpts = [...new Set(quote.excerpts.map((e) => e.trim()).filter((e) => plain(e) && whole.includes(plain(e))))].sort(
+    (a, b) => whole.indexOf(plain(a)) - whole.indexOf(plain(b))
+  );
+  if (!excerpts.length) return null;
+  const inside = (t: string) => !!plain(t) && excerpts.some((e) => plain(e).includes(plain(t)));
+  const emphasis = quote.emphasis.map((e) => e.trim()).filter(inside).slice(0, 4);
+  const key = inside(quote.key) && emphasis.some((e) => plain(e).includes(plain(quote.key))) ? quote.key.trim() : '';
+  return { index: quote.index, excerpts, emphasis, key };
+}
+
+/** Several quotes of one passage merged into one, excerpts in passage order (what the review shows). */
+export function mergedQuote(quotes: ChosenQuote[], context: string): ChosenQuote | null {
+  if (!quotes.length) return null;
+  return checkedQuote(
+    {
+      index: quotes[0].index,
+      excerpts: quotes.flatMap((q) => q.excerpts),
+      emphasis: [...new Set(quotes.flatMap((q) => q.emphasis))],
+      key: quotes.find((q) => q.key)?.key ?? '',
+    },
+    context
+  );
+}
+
+/**
+ * The quotes in Claude's JSON ({passage, excerpts, emphasis, key}), checked against the
+ * passages' full texts (`contexts`, by passage number - 1). Malformed or unverifiable
+ * quotes are dropped.
+ */
+export function parseChosenQuotes(raw: unknown, contexts: string[]): ChosenQuote[] {
+  if (!Array.isArray(raw)) return [];
+  const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  const out: ChosenQuote[] = [];
+  for (const q of raw) {
+    const index = Number((q as { passage?: unknown })?.passage) - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= contexts.length) continue;
+    const checked = checkedQuote(
+      {
+        index,
+        excerpts: strings((q as { excerpts?: unknown }).excerpts),
+        emphasis: strings((q as { emphasis?: unknown }).emphasis),
+        key: typeof (q as { key?: unknown }).key === 'string' ? ((q as { key: string }).key) : '',
+      },
+      contexts[index]
+    );
+    if (checked) out.push(checked);
+  }
+  return out;
+}

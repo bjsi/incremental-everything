@@ -792,6 +792,7 @@ export const pinSourceQuotesInTreeCommandId = 'pin-source-quotes-in-tree';
 // the accepted passages back to the tracker, which pins them.
 export const findSourcesCommandId = 'find-sources';
 export const checkStatementCommandId = 'check-statement';
+export const askYourSourcesCommandId = 'ask-your-sources';
 export const findSourcesInTreeCommandId = 'find-sources-in-tree';
 export const checkStatementsInTreeCommandId = 'check-statements-in-tree';
 export const FIND_SOURCES_POPUP = 'find_sources_popup';

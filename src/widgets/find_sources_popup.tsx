@@ -44,6 +44,17 @@ interface Row {
 }
 
 const muted = { color: 'var(--rn-clr-content-secondary)' };
+
+/** Claude's **bold** shown as bold. */
+function Bold({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*\*.+?\*\*)/g).map((part, k) =>
+        part.startsWith('**') && part.endsWith('**') ? <b key={k}>{part.slice(2, -2)}</b> : <React.Fragment key={k}>{part}</React.Fragment>
+      )}
+    </>
+  );
+}
 const VERDICT_COLOR: Record<Verdict, string> = {
   consistent: '#10B981',
   partly: '#F59E0B',
@@ -122,7 +133,9 @@ function FindSourcesPopup() {
   const multi = (review?.rems.length ?? 0) > 1;
 
   /** Check Statement: some Rem has a verdict (or the verdict failed). */
-  const isCheck = !!review?.rems.some((r) => r.check || r.checkError);
+  const isAsk = !!review?.rems.some((r) => r.answer || r.answerError);
+  /** A verdict or an answer is written even with no passage selected. */
+  const isCheck = isAsk || !!review?.rems.some((r) => r.check || r.checkError);
 
   useEffect(() => {
     rowRefs.current[cursor]?.scrollIntoView({ block: 'nearest' });
@@ -183,6 +196,7 @@ function FindSourcesPopup() {
         passages: chosen.filter((c) => c.rem === i).map((c) => c.p),
         check: r.check,
         members: r.members,
+        answer: r.answer,
       }))
       .filter((r) => r.passages.length || r.check);
     // One hand-off write, awaited before closing (a popup's teardown cuts longer work short).
@@ -238,10 +252,12 @@ function FindSourcesPopup() {
       style={{ outline: 'none', color: 'var(--rn-clr-content-primary)', height: '100%', boxSizing: 'border-box' }}
     >
       <div className="flex items-center gap-2">
-        <span style={{ fontSize: 18 }}>{isCheck ? '⚖️' : '🔎'}</span>
-        <span className="font-semibold text-base">{isCheck ? 'Check Statement' : 'Find Sources'}</span>
+        <span style={{ fontSize: 18 }}>{isAsk ? '💬' : isCheck ? '⚖️' : '🔎'}</span>
+        <span className="font-semibold text-base">{isAsk ? 'Ask Your Sources' : isCheck ? 'Check Statement' : 'Find Sources'}</span>
         <span className="text-xs ml-auto" style={muted}>
-          {isCheck
+          {isAsk
+            ? 'Your question answered from the passages of your library'
+            : isCheck
             ? 'Your note checked against the passages of your library'
             : 'Passages that say what your note says, found by meaning'}
           {multi && ` \u00b7 ${review.rems.length} Rems, ${rows.length} passages`}
@@ -284,6 +300,56 @@ function FindSourcesPopup() {
                 No verdict: {rem.checkError}
               </div>
             )}
+            {rem.answer && (
+              <div
+                className="flex flex-col gap-1.5 p-2 rounded text-sm"
+                style={{ background: 'var(--rn-clr-background-secondary)', borderLeft: '3px solid #8B5CF6' }}
+              >
+                <div className="font-semibold">
+                  <Bold text={rem.answer.answer} />
+                  <span className="text-xs font-normal ml-2" style={muted}>
+                    {rem.answer.covered !== 'full' ? `(${rem.answer.covered === 'none' ? 'not covered' : 'partly covered'}) ` : ''}
+                    {rem.answer.model ?? ''}
+                  </span>
+                </div>
+                {rem.answer.sections.map((sec, k) => (
+                  <div key={k}>
+                    <Bold text={sec.text} />
+                    {sec.basis.length > 0 && <span className="text-xs ml-1" style={muted}>[{sec.basis.map((b) => b + 1).join(', ')}]</span>}
+                    {(sec.quotes ?? []).map((q, n) => (
+                      <div key={n} className="text-xs italic ml-3 mt-0.5" style={muted}>
+                        [{q.index + 1}] “
+                        {emphasisSegments(q.excerpts.join(' […] '), q.emphasis, q.key).map((seg, m) =>
+                          seg.bold ? <b key={m}>{seg.text}</b> : <React.Fragment key={m}>{seg.text}</React.Fragment>
+                        )}
+                        ”
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {rem.answer.divergences.length > 0 && (
+                  <div className="flex flex-col gap-1" style={{ borderTop: '1px solid var(--rn-clr-border-primary)', paddingTop: 4 }}>
+                    <div className="text-xs font-semibold" style={{ color: '#EF4444' }}>
+                      {rem.lang === 'pt' ? 'Divergências' : 'Divergences'}
+                    </div>
+                    {rem.answer.divergences.map((sec, k) => (
+                      <div key={k}>
+                        <Bold text={sec.text} />
+                        {sec.basis.length > 0 && <span className="text-xs ml-1" style={muted}>[{sec.basis.map((b) => b + 1).join(', ')}]</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="text-xs" style={muted}>
+                  Written under the Rem as a dated answer; each section gets the quotes of the passages selected below.
+                </div>
+              </div>
+            )}
+            {rem.answerError && (
+              <div className="text-xs" style={{ color: '#EF4444' }}>
+                No answer: {rem.answerError}
+              </div>
+            )}
             {!rem.error && !rem.passages.length && (
               <div className="text-xs" style={muted}>
                 No passage of your library says this.
@@ -316,6 +382,9 @@ function FindSourcesPopup() {
                   <div className="flex flex-col gap-0.5" style={{ minWidth: 0 }}>
                     <div className="flex items-center gap-2 text-xs" style={muted}>
                       <span style={{ color: role.color, fontWeight: 600 }}>{role.label}</span>
+                      {review.rems[row.rem].answer && p.index !== undefined && (
+                        <span style={{ color: 'var(--rn-clr-content-primary)', fontWeight: 600 }}>[{p.index + 1}]</span>
+                      )}
                       <span>{p.score}/10</span>
                       <span>·</span>
                       <span className="font-medium" style={{ color: 'var(--rn-clr-content-primary)' }}>
@@ -324,7 +393,12 @@ function FindSourcesPopup() {
                       <span>{p.pdfPage ? `PDF p. ${p.pdfPage}` : p.page ? `p. ${p.page}` : ''}</span>
                       {p.edital && p.edital !== 'sim' && <span>· fora do edital</span>}
                       {p.unpinnable && <span style={{ color: '#F59E0B' }}>· no pin: {p.unpinnable}</span>}
-                      {p.basis && <span style={{ color: 'var(--rn-clr-content-primary)' }}>· ◆ verdict</span>}
+                      {p.diverges && p.role !== 'diverges' && <span style={{ color: '#EF4444' }}>· ⚠ diverges</span>}
+                      {p.basis && (
+                        <span style={{ color: 'var(--rn-clr-content-primary)' }}>
+                          · ◆ {review.rems[row.rem].answer ? 'answer' : 'verdict'}
+                        </span>
+                      )}
                     </div>
                     <div className="italic">
                       “
@@ -385,7 +459,10 @@ function FindSourcesPopup() {
             opacity: busy || (!count && !isCheck) ? 0.5 : 1,
           }}
         >
-          {isCheck ? (count ? `Write verdict + pin ${count}` : 'Write verdict') : `Pin ${count || ''}`} (Enter)
+          {isCheck
+            ? `Write ${isAsk ? 'answer' : 'verdict'}${count ? ` + ${count} passage${count === 1 ? '' : 's'}` : ''}`
+            : `Pin ${count || ''}`}{' '}
+          (Enter)
         </button>
       </div>
     </div>

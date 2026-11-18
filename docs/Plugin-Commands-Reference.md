@@ -225,6 +225,9 @@ In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) opened from the queue's 
 - **[Check Statement against Sources](Source-Pins.md#check-statement)** — `quick: cks`
   Find Sources, then Claude's verdict on each focused or selected Rem (✅ correct, ⚠️ partly, ❌ contradicted, ❔ not covered), judged only from the passages found, with an observation citing book and page; after review, written under the Rem as a dated Check Rem with the passages it rests on. Needs a [corpus provider](Corpus-Provider.md) with semantic search and the Claude CLI.
 
+- **[Ask Your Sources](Source-Pins.md#ask-your-sources)** — `quick: ask`
+  The focused Rem holds a question or a topic: Find Sources looks for the passages that answer it, then Claude answers only from them, with sections, quotes chosen per section and the sources' divergences; after review, written under the Rem as a dated answer. Needs a corpus provider with semantic search and the Claude CLI.
+
 - **[Find Sources (by meaning) in descendants](Source-Pins.md#find-sources-in-descendants)** — `quick: fsqd`
   Find Sources on every statement under the focused or selected Rems (a summary or course document): lists read as one statement with their lead-in, headings and short labels left out, statements already pinned skipped; three at a time in the background, one review for the run.
 
