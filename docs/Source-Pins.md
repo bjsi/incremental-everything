@@ -130,6 +130,32 @@ Each row shows the book, the page in your RemNote PDF, the quote with the words 
 - **Where the pins go:** at the end of the Rem (of its back, when it has one). When the Rem mixes what several passages say, each pin goes right after the sentence it supports, as long as that sentence can be found with certainty; any other goes at the end.
 - **Running it again** reuses the highlights, the headers and the quote Rems already there, and adds nothing twice.
 
+### Lists in your notes { #find-sources-lists }
+
+Notes often split one sentence over several Rems: a lead-in ending with ":" and its list items as children.
+
+```
+• A profundidade segura de um canal é determinada por:
+    • fatores do nível d'água,
+    • fatores do navio e
+    • fatores do fundo.
+```
+
+Neither part is a statement alone, so Find Sources and Check Statement read them as **one**: *"…é determinada por: fatores do nível d'água, fatores do navio e fatores do fundo."*
+
+- **A list** is a Rem ending with ":" (or with a word that waits for its list, like *…composta por*) whose children are all short (up to 30 words) and not headings. An item can have its own list, which is folded in.
+- **Running a command on one item** judges its whole list.
+- **The pin** goes on the item a passage supports when it supports just that one, otherwise on the lead-in. Quotes and Check Rems go under the lead-in.
+- **Headings are titles, not statements:** they are skipped, and their children are judged one by one. So are labels of fewer than six words and the caption over an audio or image.
+
+### Whole summaries { #find-sources-in-descendants }
+
+**Find Sources (by meaning) in descendants** (`fsqd`) and **Check Statements against Sources in descendants** (`cksd`) run on every statement under the focused or selected Rems: a course or summary document, or a section of one.
+
+- **What is searched:** each statement once, lists read as above. Quotes, AI Notes and what Find Sources and Check Statement already wrote are left out. `fsqd` also skips statements that already have a pin; `cksd` checks them all. At most 120 per run.
+- **Speed:** three statements at a time, in the background. A notice follows the progress and turns into the review when all are done.
+- **Reviewing:** one list for the whole run, grouped by note. `A` selects every passage scoring 9 or more, `Shift+A` only in the current note, and `PageDown` / `PageUp` jump between notes.
+
 ## Check Statement: is my note right? { #check-statement }
 
 **Check Statement against Sources** (`cks`) runs [Find Sources](#find-sources) on the focused or selected Rems, then asks Claude (Opus, through the [AI helper](Desktop-Helpers.md#ai-helper), on your Claude subscription) whether each note is right, judging **only from the passages found**, never from its own knowledge. Same requirements as Find Sources, plus the Claude CLI signed in.

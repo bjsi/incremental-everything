@@ -6,11 +6,11 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ New
 
-**Find Sources**: added a command (`fsq`, or **Search by meaning** when Pin Source Quote finds no match) that finds, by meaning, the passages of your library that say what a note says (a summary, paraphrase or translation), lets you review them, and pins the accepted ones, optionally with their trimmed, emphasised quotes and AI notes as child Rems; needs a corpus provider with semantic search.
+**Find Sources**: added a command (`fsq`, or **Search by meaning** when Pin Source Quote finds no match) that finds, by meaning, the passages of your library that say what a note says (a summary, paraphrase or translation), lets you review them, and pins the accepted ones, optionally with their trimmed, emphasised quotes and AI notes as child Rems; reads a list and its lead-in as one statement, and runs on a whole summary with `fsqd`; needs a corpus provider with semantic search.
 
-📖 [Source Pins → Find Sources](Source-Pins.md#find-sources)
+📖 [Source Pins → Find Sources](Source-Pins.md#find-sources) · [Lists in your notes](Source-Pins.md#find-sources-lists) · [Whole summaries](Source-Pins.md#find-sources-in-descendants)
 
-**Check Statement**: added a command (`cks`) that runs Find Sources on a note and asks Claude whether it is right, judged only from the passages found (✅ ⚠️ ❌ ❔), with an observation citing book and page, written after review as a dated Check Rem under the note.
+**Check Statement**: added a command (`cks`) that runs Find Sources on a note and asks Claude whether it is right, judged only from the passages found (✅ ⚠️ ❌ ❔), with an observation citing book and page, written after review as a dated Check Rem under the note; `cksd` checks every statement of a summary.
 
 📖 [Source Pins → Check Statement](Source-Pins.md#check-statement)
 

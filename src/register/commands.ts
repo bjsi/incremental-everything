@@ -13,7 +13,7 @@ import { openMasteryDrill } from '../lib/mastery_drill_launch';
 import { convertRemTree } from '../lib/markup_to_richtext';
 import { aiTranscribeHighlight, restoreHighlightBeforeAi } from '../lib/ai_ocr';
 import { pinSourceQuote, pinSourceQuotesInTree } from '../lib/pdf_source_pins';
-import { checkStatementCommand, findSources } from '../lib/find_sources';
+import { checkStatementCommand, checkStatementsInTree, findSources, findSourcesInTree } from '../lib/find_sources';
 import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { sendFocusedPaneToAnotherWindow } from '../lib/send_to_window';
 import { localizeMediaInRems } from '../lib/localize_media';
@@ -52,6 +52,8 @@ import {
   pinSourceQuotesInTreeCommandId,
   findSourcesCommandId,
   checkStatementCommandId,
+  findSourcesInTreeCommandId,
+  checkStatementsInTreeCommandId,
   localizeMediaCommandId,
   localizeMediaTreeCommandId,
   currentIncrementalRemTypeKey,
@@ -424,6 +426,26 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'cks',
     action: async () => {
       await checkStatementCommand(plugin);
+    },
+  });
+
+  // The same over a whole summary or course document: every statement in the focused
+  // Rem's subtree (headings, labels, quotes and our own output left out), a few at a time,
+  // one notice and one review for the batch.
+  await plugin.app.registerCommand({
+    id: findSourcesInTreeCommandId,
+    name: 'Find Sources (by meaning) in descendants',
+    quickCode: 'fsqd',
+    action: async () => {
+      await findSourcesInTree(plugin);
+    },
+  });
+  await plugin.app.registerCommand({
+    id: checkStatementsInTreeCommandId,
+    name: 'Check Statements against Sources in descendants',
+    quickCode: 'cksd',
+    action: async () => {
+      await checkStatementsInTree(plugin);
     },
   });
 

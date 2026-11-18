@@ -1,5 +1,7 @@
 # Find Sources — plan and status
 
+**Implemented** in v1.0.245 (all four phases, 2026-11-18).
+
 Maintainer notes, not published (the docs site is built from `docs/` only). Last updated 2026-11-18.
 
 **Goal:** from a note (a summary, course material, a translation, a statement to judge), find *where the canonical sources say it*, by meaning when the words differ, and pin those passages. Where the Pin Source Quote of today needs text copied from the open source, this works from text that only means the same thing.
@@ -131,11 +133,11 @@ The answer has one list per Rem, best first:
 - [x] **Written** under the Rem as an Extra Card Detail **Check** Rem (*Verificação*): the verdict and observation, with the passages it rests on as quote + pin children. The supporting quotes are also pinned on the Rem when they are not already (user decision).
 - [x] **Where `claude -p` runs:** the AI helper's `/run` from AI Study Tools phase 2 (see overlaps). Check Statement can be its thin slice.
 
-### Phase 4: a whole summary
+### Phase 4: a whole summary (shipped in v1.0.245)
 
-- [ ] **Find Sources in Tree:** like Pin Source Quotes in Tree, over the text Rems of a course or summary document. One job per Rem, one notice for the batch, and a review popup grouped by Rem, with *accept all ≥ 9* per Rem and globally.
+- [x] **Find Sources in Tree:** (`fsqd`; and `cksd`, Check Statements in descendants) like Pin Source Quotes in Tree, over the text Rems of a course or summary document. One job per Rem, one notice for the batch, and a review popup grouped by Rem, with *accept all ≥ 9* per Rem and globally.
 
-## Overlaps with AI Study Tools (plans/AI_STUDY_TOOLS_PLAN.md)
+## Overlaps with AI Study Tools (../AI_STUDY_TOOLS_PLAN.md)
 
 The two plans go in **opposite directions**: AI Study Tools goes **source → notes** (generate summaries or Q&A from pages, with pins), while this one goes **notes → sources** (justify or check what a note says). They stay separate plans, but they share parts, which should be built once:
 
@@ -166,6 +168,14 @@ The two plans go in **opposite directions**: AI Study Tools goes **source → no
 - Built on Find Sources' pipeline: the job carries `check`; after the passages are located, `src/lib/find_sources/check.ts` sends the statement and the trimmed quotes to the AI helper's new `/run` (one `claude -p` turn, tools off, JSON validated with one retry; model `opus`, as Read aloud's script writer). Verdict `consistent` / `partly` / `contradicts` / `not-covered`, a 2–4 sentence observation in the Rem's language citing book and page, and the passages it rests on (marked ◆ and preselected in the review).
 - Written first among the Rem's children: a dated Extra Card Detail header (`Verificação: ⚠️ Em parte (18/11/2026)`; runs never overwrite each other), the observation under it and, with quotes on, the basis quotes under the observation; other accepted passages go to Fontes / Material relacionado as in Find Sources; source pins on the Rem.
 - Tested through the helper: a deliberately wrong statement came back `contradicts` in 4.5 s (Opus 5.5) with the right correction and sources. `/run` is the AI Study Tools phase 2 route; its JSON mode is what that plan's `/run` needs.
+
+## Status of phase 4 (2026-11-18)
+
+- `fsqd` / `cksd` collect the statements under the focused or selected Rems (`statementsInTree`): at least 6 words, not a heading (`getFontSize`), a quote, a slot or an AI Note, and not inside our own Fontes / Material relacionado / Verificação headers; `fsqd` also leaves out Rems that already carry a pin. At most 120 per run.
+- The job runs 3 Rems at a time; a progress notice ("12 of 50 Rems done") is replaced by the review notice (showNotice now replaces a notice with the same id).
+- Review: the same popup; `A` all ≥ 9, `Shift+A` the current Rem only, `PageDown` / `PageUp` between Rems, the header counts Rems and passages.
+- **Outline-aware statements** (`src/lib/find_sources/outline.ts` + test, built from the user's notes d8BsVi, tQeV99, s5ibbX, PTj8Nz): a lead-in (ends with ":" or a dangling "…composta por") whose children are all short fragments (≤ 30 words, no heading; a fragment may be a nested lead-in with its own list) is one statement, lead-in + items, joined with the author's own punctuation ("," / "e" run on, else ";"). Every command uses it: `fsq` / `cks` on a list item judge its whole group. A source passage whose `covers` falls inside exactly one item is pinned on that item (also related ones in Pins only), else on the lead-in; quotes and Check Rems go under the lead-in. Headings and media captions (a Rem whose children are all text-less media) are not statements. Provider test: the 6-factor Gross UKC list → PIANC p. 35 (whole list, lead-in) and p. 43 (Net UKC, onto that item).
+- Open: `getDescendants` shares `getChildrenRem`'s lazy-graph gap (findings/PLUGIN_BRIDGE_AND_SDK.md); a summary document is normally open, so its rows are loaded, but a closed one could come back short.
 
 ## Risks and open questions
 

@@ -1,5 +1,5 @@
 /**
- * Where Find Sources puts a pin in the Rem's own text (plans/SOURCE_FINDER_PLAN.md,
+ * Where Find Sources puts a pin in the Rem's own text (plans/implemented/SOURCE_FINDER_PLAN.md,
  * "Inline placement rule"): right after the sentence a passage supports, when the Rem
  * mixes what several passages say and that sentence can be found with certainty;
  * otherwise at the end. Pure functions over rich text, so they can be tested.

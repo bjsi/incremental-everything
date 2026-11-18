@@ -5,7 +5,6 @@ Working documents for multi-step efforts that span several releases. Maintainer 
 | File | Effort |
 |---|---|
 | [AI_STUDY_TOOLS_PLAN.md](AI_STUDY_TOOLS_PLAN.md) | AI study tools: transcription, source pins, summaries and Q&A from part of a source |
-| [SOURCE_FINDER_PLAN.md](SOURCE_FINDER_PLAN.md) | Find Sources: from a note (summary, translation, statement) to the canonical passages, by meaning, pinned and reviewed; Check Statement |
 | [COMPANION_EXTENSION_PLAN.md](COMPANION_EXTENSION_PLAN.md) | A Chrome extension for incremental reading of web pages, working with the plugin |
 | [INCREMENTAL_VIDEO_PLAN.md](INCREMENTAL_VIDEO_PLAN.md) | Plugin player ⇄ RemNote player for YouTube IncRems: rebuilding the plugin player on Embed Website, Review in Editor with PaneHeader controls, extracts from either player |
 | [STORAGE_PLAN.md](STORAGE_PLAN.md) | Reducing what the plugin keeps in RemNote's synced storage |
@@ -16,6 +15,7 @@ Finished plans, moved to [`implemented/`](implemented/). They are kept for their
 
 | File | Effort | Shipped |
 |---|---|---|
+| [SOURCE_FINDER_PLAN.md](implemented/SOURCE_FINDER_PLAN.md) | Find Sources, Check Statement and their tree versions: from a note (summary, translation, statement) to the canonical passages, by meaning, reviewed and pinned; verdicts by Claude; outline-aware lists | v1.0.245 |
 | [SEARCH_ENGINE_PLAN.md](implemented/SEARCH_ENGINE_PLAN.md) | An Anki-style query language run by the AI helper on remnote.db: AND/OR/NOT, scopes, tags, slots, cards, suppression causes, FSRS S/D/R per card's scheduler; Search & Browse with ✨ AI | v1.0.231 |
 | [HISTORY_ARCHIVE_PLAN.md](implemented/HISTORY_ARCHIVE_PLAN.md) | A desktop helper that archives the review history of deleted cards and IncRems (and where they lived in the tree), so the Study Dashboard keeps counting it | v1.0.217 |
 

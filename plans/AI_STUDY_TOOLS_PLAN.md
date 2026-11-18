@@ -4,7 +4,7 @@ Maintainer notes, not published (the docs site is built from `docs/` only).
 
 **Goal:** point the plugin at part of a source — pages, a chapter, the current IncRem's range, a web article — pick a prompt, and get summaries or Q&A written into RemNote with **source pins** to the exact passages, reviewed before anything is inserted.
 
-**Related:** [SOURCE_FINDER_PLAN.md](SOURCE_FINDER_PLAN.md) goes the other way (notes → sources) and shares the review list, the helper's `/run` and the tracker-job + notice pattern with phases 2–3 here; see its *Overlaps* table before building those.
+**Related:** [SOURCE_FINDER_PLAN.md](implemented/SOURCE_FINDER_PLAN.md) goes the other way (notes → sources) and shares the review list, the helper's `/run` and the tracker-job + notice pattern with phases 2–3 here; see its *Overlaps* table before building those.
 
 ## Done
 

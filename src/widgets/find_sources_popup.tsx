@@ -118,6 +118,9 @@ function FindSourcesPopup() {
     return out;
   }, [review]);
 
+  /** A batch (a tree run): per-Rem keys and the count in the header. */
+  const multi = (review?.rems.length ?? 0) > 1;
+
   /** Check Statement: some Rem has a verdict (or the verdict failed). */
   const isCheck = !!review?.rems.some((r) => r.check || r.checkError);
 
@@ -139,8 +142,20 @@ function FindSourcesPopup() {
     });
   };
 
-  const acceptHigh = () =>
-    setSelected(new Set(rows.filter((r) => r.p.score >= ACCEPT_SCORE && selectable(r)).map(keyOf)));
+  /** A: select the passages scoring 9+ (and only those); with `rem`, in that Rem only, the others untouched. */
+  const acceptHigh = (rem?: number) =>
+    setSelected((s) => {
+      const keep = rem === undefined ? [] : [...s].filter((k) => !k.startsWith(`${rem}:`));
+      const high = rows.filter((r) => (rem === undefined || r.rem === rem) && r.p.score >= ACCEPT_SCORE && selectable(r));
+      return new Set([...keep, ...high.map(keyOf)]);
+    });
+
+  /** PageDown / PageUp: the first row of the next or previous Rem that has passages. */
+  const jumpRem = (step: 1 | -1) => {
+    const current = rows[cursor]?.rem ?? 0;
+    const target = step === 1 ? rows.findIndex((r) => r.rem > current) : rows.findIndex((r) => r.rem === (rows.slice(0, cursor).reverse().find((x) => x.rem < current)?.rem ?? -1));
+    if (target !== -1) setCursor(target);
+  };
 
   /** Pins only → Pins + quotes → Pins + quotes + AI notes → Pins only. */
   const cycleExtras = () => {
@@ -167,6 +182,7 @@ function FindSourcesPopup() {
         lang: r.lang,
         passages: chosen.filter((c) => c.rem === i).map((c) => c.p),
         check: r.check,
+        members: r.members,
       }))
       .filter((r) => r.passages.length || r.check);
     // One hand-off write, awaited before closing (a popup's teardown cuts longer work short).
@@ -197,7 +213,10 @@ function FindSourcesPopup() {
       if (row) toggle(row);
     } else if (e.key === 'a' || e.key === 'A') {
       e.preventDefault();
-      acceptHigh();
+      acceptHigh(e.shiftKey ? row?.rem : undefined);
+    } else if (e.key === 'PageDown' || e.key === 'PageUp') {
+      e.preventDefault();
+      jumpRem(e.key === 'PageDown' ? 1 : -1);
     } else if (e.key === 'q' || e.key === 'Q') {
       e.preventDefault();
       cycleExtras();
@@ -225,6 +244,7 @@ function FindSourcesPopup() {
           {isCheck
             ? 'Your note checked against the passages of your library'
             : 'Passages that say what your note says, found by meaning'}
+          {multi && ` \u00b7 ${review.rems.length} Rems, ${rows.length} passages`}
         </span>
       </div>
 
@@ -345,6 +365,11 @@ function FindSourcesPopup() {
         </button>
         <span className="text-xs" style={muted}>
           <span style={keyStyle}>↑↓</span> move · <span style={keyStyle}>Space</span> select · <span style={keyStyle}>A</span> all ≥ {ACCEPT_SCORE} ·{' '}
+          {multi && (
+            <>
+              <span style={keyStyle}>⇧A</span> this Rem · <span style={keyStyle}>PgDn</span> next Rem ·{' '}
+            </>
+          )}
           <span style={keyStyle}>Q</span> what to add · <span style={keyStyle}>Esc</span> later
         </span>
         <button

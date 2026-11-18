@@ -1,7 +1,7 @@
 /**
  * Find Sources: the passages of the user's library that SAY what a note says (a
  * summary, a translation, a paraphrase), found by meaning, checked in the RemNote PDF,
- * reviewed, then pinned. Plan: plans/SOURCE_FINDER_PLAN.md (phase 2).
+ * reviewed, then pinned. Plan: plans/implemented/SOURCE_FINDER_PLAN.md (phase 2).
  *
  * The flow, all in the background so nothing waits on the ~25 s search per Rem:
  * 1. The command (or "Search by meaning" in Pin Source Quote's dialog) queues a
@@ -38,6 +38,7 @@ import { guessLang } from '../read_aloud_script';
 import { placeInline, pinnedIds, RichElement } from './placement';
 import { attribution, emphasisSegments, segmentsToRichText } from './quote_text';
 import { checkHeader, checkStatement, StatementCheck, VERDICTS } from './check';
+import { groupOf, OutlineNode, pinTarget, Statement, StatementMember, statementsInOutline } from './outline';
 
 export const SEMANTIC_SEARCH = 'semantic-search';
 /** The provider's answer for one Rem can take ~25 s (two Gemini calls); allow for a slow one. */
@@ -74,10 +75,13 @@ export interface FoundPassage {
 // --- what the job carries -------------------------------------------------------------
 
 export interface FindSourcesItem {
+  /** The Rem the statement belongs to: a list group's lead-in, or the Rem itself. */
   remId: string;
   title: string;
   texts: string[];
   ancestors: string[];
+  /** A list group's items (./outline), where a passage that supports one item is pinned. */
+  members?: StatementMember[];
 }
 
 export interface FindSourcesJob {
@@ -112,6 +116,8 @@ export interface ReviewRem {
   error?: string;
   /** Check Statement: the verdict on the Rem's statement. */
   check?: StatementCheck;
+  /** A list group's items (see FindSourcesItem.members). */
+  members?: StatementMember[];
   /** Check Statement: why there is no verdict (the helper or Claude failed). */
   checkError?: string;
 }
@@ -134,7 +140,13 @@ export interface FindSourcesWrite {
   id: string;
   noticeId: string;
   extras: FindSourcesExtras;
-  rems: { remId: string; lang: 'pt' | 'en'; passages: ReviewPassage[]; check?: StatementCheck }[];
+  rems: {
+    remId: string;
+    lang: 'pt' | 'en';
+    passages: ReviewPassage[];
+    check?: StatementCheck;
+    members?: StatementMember[];
+  }[];
 }
 
 /** The verbatim parts of a passage's quote (one, from a provider without `excerpts`). */
@@ -184,20 +196,88 @@ export async function findSourcesUnavailable(plugin: RNPlugin): Promise<string |
   return undefined;
 }
 
-/** Queue a Find Sources run for these Rems; the tracker picks it up. Returns how many were queued. */
-export async function enqueueFindSources(
+// --- outline: Rems → statements (./outline) ------------------------------------------
+
+/** Text of a Rem as a statement reads it: front, then back, without pins. */
+const statementText = async (plugin: RNPlugin, rem: PluginRem) =>
+  [await plainOf(plugin, rem.text), await plainOf(plugin, rem.backText)].map((t) => t.trim()).filter(Boolean).join(' ');
+
+/** Rems in their order among siblings (getChildrenRem and getDescendants promise none). */
+async function ordered(rems: PluginRem[]): Promise<PluginRem[]> {
+  const at = await Promise.all(rems.map((r) => r.positionAmongstSiblings().catch(() => 0)));
+  return rems.map((r, k) => ({ r, k: at[k] ?? 0 })).sort((x, y) => x.k - y.k).map((x) => x.r);
+}
+
+/**
+ * A Rem as an outline node, its children read by `childrenOf` down to `depth`. Null for
+ * what is never a statement and is skipped with its subtree: quotes, slots, AI Notes, and
+ * what Find Sources / Check Statement wrote (their Fontes, Material relacionado and
+ * Verificação headers).
+ */
+async function nodeOf(
   plugin: RNPlugin,
-  remIds: string[],
-  openSource?: string | null,
-  options: { check?: boolean } = {}
+  rem: PluginRem,
+  childrenOf: (rem: PluginRem) => Promise<PluginRem[]>,
+  depth: number
+): Promise<OutlineNode | null> {
+  const text = await statementText(plugin, rem);
+  const ours = Object.values(HEADERS).flatMap((h) => [h.sources, h.related]);
+  if (ours.includes(text) || /^(Verificação|Check):/.test(text)) return null;
+  if ((await rem.isQuote()) || (await rem.isSlot()) || (await rem.hasPowerup(aiNotePowerupCode))) return null;
+  const children: OutlineNode[] = [];
+  if (depth > 0) {
+    for (const child of await ordered(await childrenOf(rem))) {
+      const n = await nodeOf(plugin, child, childrenOf, depth - 1);
+      if (n) children.push(n);
+    }
+  }
+  return { id: rem._id, text, children, heading: !!(await rem.getFontSize()) };
+}
+
+/** List groups are read this deep: a lead-in, its items, and one nested list. */
+const LIST_DEPTH = 3;
+
+/**
+ * The statements a command on these Rems judges: a lead-in with its list as one group; a
+ * list item, as the group it belongs to; any other Rem on its own.
+ */
+async function statementsForRems(plugin: RNPlugin, rems: PluginRem[]): Promise<Statement[]> {
+  const out: Statement[] = [];
+  const children = (r: PluginRem) => r.getChildrenRem();
+  for (const rem of rems) {
+    const node = await nodeOf(plugin, rem, children, LIST_DEPTH);
+    if (!node) continue;
+    let statement = groupOf(node);
+    if (!statement) {
+      const parent = await rem.getParentRem();
+      const parentNode = parent ? await nodeOf(plugin, parent, children, LIST_DEPTH) : null;
+      const group = parentNode ? groupOf(parentNode) : null;
+      if (group?.members.some((m) => m.remId === rem._id)) statement = group;
+    }
+    statement ??= node.text ? { headId: rem._id, text: node.text, members: [] } : null;
+    if (statement && !out.some((s) => s.headId === statement!.headId)) out.push(statement);
+  }
+  return out;
+}
+
+/** Queue a Find Sources (or Check Statement) run for these statements; the tracker picks it up. */
+async function enqueueStatements(
+  plugin: RNPlugin,
+  statements: Statement[],
+  openSource: string | null | undefined,
+  check: boolean
 ): Promise<number> {
   const items: FindSourcesItem[] = [];
-  for (const remId of remIds) {
-    const rem = await plugin.rem.findOne(remId);
-    if (!rem) continue;
-    const texts = [await plainOf(plugin, rem.text), await plainOf(plugin, rem.backText)].map((t) => t.trim()).filter(Boolean);
-    if (!texts.length) continue;
-    items.push({ remId, title: shortTitle(texts.join(' → ')), texts, ancestors: await ancestorIds(rem) });
+  for (const st of statements) {
+    const head = await plugin.rem.findOne(st.headId);
+    if (!head || !st.text.trim()) continue;
+    items.push({
+      remId: st.headId,
+      title: shortTitle(st.text),
+      texts: [st.text],
+      ancestors: await ancestorIds(head),
+      members: st.members,
+    });
   }
   if (!items.length) return 0;
   const job: FindSourcesJob = {
@@ -205,11 +285,22 @@ export async function enqueueFindSources(
     items,
     openSourceRemId: openSource ?? null,
     queuedAt: Date.now(),
-    check: !!options.check,
+    check,
   };
   const queued = (await plugin.storage.getSession<FindSourcesJob[]>(pendingFindSourcesJobsKey)) || [];
   await plugin.storage.setSession(pendingFindSourcesJobsKey, [...queued, job]);
   return items.length;
+}
+
+/** Queue a run for these Rems, read as statements (a list item joins its group). Returns how many were queued. */
+export async function enqueueFindSources(
+  plugin: RNPlugin,
+  remIds: string[],
+  openSource?: string | null,
+  options: { check?: boolean } = {}
+): Promise<number> {
+  const rems = (await plugin.rem.findMany(remIds)) || [];
+  return enqueueStatements(plugin, await statementsForRems(plugin, rems), openSource, !!options.check);
 }
 
 const runningToast = (n: number, check = false) =>
@@ -240,6 +331,84 @@ async function startFromCommand(plugin: ReactRNPlugin, check: boolean) {
   const n = await enqueueFindSources(plugin, rems.map((r) => r._id), await openSourceRemId(plugin), { check });
   await plugin.app.toast(n ? runningToast(n, check) : 'The selected Rems have no text to look for.');
 }
+
+/** Rems searched at once in a tree run: each waits ~20 s on the provider (two Gemini calls). */
+const IN_FLIGHT = 3;
+/** A tree run stops collecting here: a summary that long is better run section by section. */
+const MAX_TREE_REMS = 120;
+/** Fewer words than this is a heading or a label, not a statement. */
+const MIN_WORDS = 6;
+
+/**
+ * The statements of the roots' subtrees (./outline): list groups as one, headings and
+ * labels left out, our own output skipped. With `skipPinned`, a statement any of whose
+ * Rems already has a pin is left out (it has its source).
+ */
+async function statementsInTree(
+  plugin: ReactRNPlugin,
+  roots: PluginRem[],
+  skipPinned: boolean
+): Promise<{ statements: Statement[]; skipped: number }> {
+  const byId = new Map<string, PluginRem>();
+  const byParent = new Map<string, PluginRem[]>();
+  for (const root of roots) {
+    for (const rem of [root, ...(await root.getDescendants())]) {
+      if (byId.has(rem._id)) continue;
+      byId.set(rem._id, rem);
+      if (rem.parent) byParent.set(rem.parent, [...(byParent.get(rem.parent) ?? []), rem]);
+    }
+  }
+  const children = async (r: PluginRem) => byParent.get(r._id) ?? [];
+  const nodes: OutlineNode[] = [];
+  for (const root of roots) {
+    const n = await nodeOf(plugin, root, children, Number.MAX_SAFE_INTEGER);
+    if (n) nodes.push(n);
+  }
+  const statements: Statement[] = [];
+  let skipped = 0;
+  for (const st of statementsInOutline(nodes, MIN_WORDS)) {
+    const rems = [st.headId, ...st.members.map((m) => m.remId)].map((id) => byId.get(id)).filter(Boolean) as PluginRem[];
+    const pinned = rems.some((r) => pinnedIds([...((r.text ?? []) as RichElement[]), ...((r.backText ?? []) as RichElement[])]).size);
+    if (skipPinned && pinned) skipped++;
+    else statements.push(st);
+  }
+  return { statements, skipped };
+}
+
+/** The tree commands: Find Sources (or Check Statement) for every statement under the focused or selected Rems. */
+async function startTreeFromCommand(plugin: ReactRNPlugin, check: boolean) {
+  const what = check ? 'Check Statements' : 'Find Sources';
+  const why = await findSourcesUnavailable(plugin);
+  if (why) {
+    await showMessageDialog(plugin, { tone: 'info', title: `${what} is not available`, message: why });
+    return;
+  }
+  const roots = await selectedOrFocusedRems(plugin);
+  if (!roots.length) {
+    await plugin.app.toast('Focus or select the Rem whose descendants hold the notes.');
+    return;
+  }
+  // Find Sources leaves out Rems that already have their source pinned; a check reads them all.
+  const { statements, skipped } = await statementsInTree(plugin, roots, !check);
+  if (!statements.length) {
+    await plugin.app.toast(
+      skipped ? `All ${skipped} statements there already have a pin.` : 'No statements there (headings and short labels are left out).'
+    );
+    return;
+  }
+  const taken = statements.slice(0, MAX_TREE_REMS);
+  const n = await enqueueStatements(plugin, taken, await openSourceRemId(plugin), check);
+  const minutes = Math.max(1, Math.round((n * (check ? 30 : 20)) / IN_FLIGHT / 60));
+  await plugin.app.toast(
+    `\ud83d\udd0e ${what}: ${n} Rem${n === 1 ? '' : 's'} in the background, about ${minutes} min` +
+      (skipped ? `; ${skipped} already pinned left out` : '') +
+      (statements.length > taken.length ? `; only the first ${MAX_TREE_REMS} of ${statements.length}` : '') +
+      '. A notice follows the progress.'
+  );
+}
+
+export const findSourcesInTree = (plugin: ReactRNPlugin) => startTreeFromCommand(plugin, false);
+export const checkStatementsInTree = (plugin: ReactRNPlugin) => startTreeFromCommand(plugin, true);
 
 /** Command: Find Sources for the selected Rems, else the focused one (as Pin Source Quote resolves them). */
 export const findSources = (plugin: ReactRNPlugin) => startFromCommand(plugin, false);
@@ -294,9 +463,15 @@ async function locateInRemNote(plugin: ReactRNPlugin, passage: FoundPassage): Pr
 }
 
 export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJob): Promise<void> {
-  const rems: ReviewRem[] = [];
-  for (const item of job.items) {
+  const noticeId = `${job.id}-notice`;
+  const what = job.check ? 'Check Statement' : 'Find Sources';
+  const slots: (ReviewRem | undefined)[] = new Array(job.items.length);
+  let stopped: string | undefined;
+  let done = 0;
+
+  const one = async (item: FindSourcesItem): Promise<ReviewRem> => {
     const lang = guessLang(item.texts.join(' ')) === 'en' ? 'en' : 'pt';
+    if (stopped) return { remId: item.remId, title: item.title, lang, passages: [], error: stopped };
     try {
       const res = await corpusRequest<{ items?: { remId: string; passages?: FoundPassage[] }[] }>(
         plugin,
@@ -312,32 +487,45 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
       const passages: ReviewPassage[] = [];
       for (const p of found) passages.push(await locateInRemNote(plugin, p));
       console.log(`[FindSources] ${item.title}: ${passages.length} passage(s)`, passages);
-      const rem: ReviewRem = { remId: item.remId, title: item.title, lang, passages };
+      const rem: ReviewRem = { remId: item.remId, title: item.title, lang, passages, members: item.members };
       if (job.check) await addCheck(plugin, rem, item.texts.join('\n'));
-      rems.push(rem);
+      return rem;
     } catch (e) {
       console.error('[FindSources] search failed for', item.remId, e);
       const message =
         e instanceof CorpusUnavailableError || e instanceof HelperUnreachableError
           ? (e as Error).message
           : `the search failed: ${(e as Error).message}`;
-      rems.push({ remId: item.remId, title: item.title, lang, passages: [], error: message });
-      if (e instanceof HelperUnreachableError) {
-        // Every other Rem would fail the same way.
-        for (const rest of job.items.slice(job.items.indexOf(item) + 1)) {
-          rems.push({ remId: rest.remId, title: rest.title, lang, passages: [], error: message });
-        }
-        break;
+      // Every other Rem would fail the same way.
+      if (e instanceof HelperUnreachableError) stopped = message;
+      return { remId: item.remId, title: item.title, lang, passages: [], error: message };
+    }
+  };
+
+  // A few Rems at a time, in their order; a progress notice for a batch.
+  let next = 0;
+  const worker = async () => {
+    while (next < job.items.length) {
+      const k = next++;
+      slots[k] = await one(job.items[k]);
+      done++;
+      if (job.items.length > IN_FLIGHT && done < job.items.length) {
+        await showNotice(plugin, {
+          id: noticeId,
+          tone: 'info',
+          title: `${what}: searching\u2026`,
+          message: `${done} of ${job.items.length} Rems done. The review opens from here when all are.`,
+        });
       }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(IN_FLIGHT, job.items.length) }, worker));
+  const rems = slots.filter((r): r is ReviewRem => !!r);
 
-  const noticeId = `${job.id}-notice`;
   const count = (role: PassageRole) => rems.reduce((n, r) => n + r.passages.filter((p) => p.role === role).length, 0);
   const total = rems.reduce((n, r) => n + r.passages.length, 0);
   const failed = rems.filter((r) => r.error);
   const subject = rems.length === 1 ? `\u201c${rems[0].title}\u201d` : `${rems.length} Rems`;
-  const what = job.check ? 'Check Statement' : 'Find Sources';
   const checked = rems.filter((r) => r.check);
   if (!total && !checked.length) {
     await showNotice(plugin, {
@@ -516,7 +704,16 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
     }
 
     // The Rem's own pins: sources only (related and diverging passages go under the Rem, as quotes).
-    const onRem = pinned.filter((p) => p.passage.role === 'source' && p.pins.length);
+    // In a list group, a passage that supports one item is pinned on that item (./outline).
+    const sources = pinned.filter((p) => p.passage.role === 'source' && p.pins.length);
+    const group = { headId: entry.remId, text: '', members: entry.members ?? [] };
+    const onItem = sources.filter((p) => pinTarget(group, p.passage.covers) !== entry.remId);
+    for (const p of onItem) {
+      const item = await plugin.rem.findOne(pinTarget(group, p.passage.covers));
+      if (item) await appendPins(item, p.pins);
+    }
+    const onRem = sources.filter((p) => !onItem.includes(p));
+    pinCount += onItem.reduce((n, p) => n + p.pins.length, 0);
     const fresh = await plugin.rem.findOne(entry.remId);
     const sides: ('text' | 'backText')[] = ['text', 'backText'];
     const atEnd = new Set(onRem.map((_, k) => k));
@@ -589,12 +786,13 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
         }
       }
     } else {
-      // Pins only: related and diverging passages still need a place to be pinned.
-      const extra = pinned.filter((p) => p.passage.role !== 'source' && p.pins.length).flatMap((p) => p.pins);
-      if (extra.length) {
-        const latest = await plugin.rem.findOne(entry.remId);
-        if (latest) await appendPins(latest, extra);
-        pinCount += extra.length;
+      // Pins only: related and diverging passages still need a place to be pinned, on
+      // the list item they support (in a group), else at the end of the Rem.
+      const extra = pinned.filter((p) => p.passage.role !== 'source' && p.pins.length);
+      for (const p of extra) {
+        const target = await plugin.rem.findOne(pinTarget(group, p.passage.covers));
+        if (target) await appendPins(target, p.pins);
+        pinCount += p.pins.length;
       }
     }
   }

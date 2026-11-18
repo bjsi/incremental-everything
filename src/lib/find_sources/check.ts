@@ -1,7 +1,7 @@
 /**
  * Check Statement: Find Sources' passages, then a verdict on the Rem's statement from
  * Claude (the AI helper's /run), based on those passages only. Plan:
- * plans/SOURCE_FINDER_PLAN.md (phase 3).
+ * plans/implemented/SOURCE_FINDER_PLAN.md (phase 3).
  */
 import { RNPlugin } from '@remnote/plugin-sdk';
 import { helperPost } from '../helper_client';
