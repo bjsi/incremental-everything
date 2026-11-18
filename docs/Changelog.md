@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.243 - November 18th, 2026
 
+### ✨ Improved
+
+**Find Rem**: added hierarchical search, as in Search & Browse's Move and Tag picker: Tab searches within the selected Rem (listing its children until you type), Shift+Tab goes back up, and Backspace in an empty box returns to the whole knowledge base.
+
+📖 [Finding & Navigating → Search within a Rem](Utilities-Finding-and-Navigating.md#search-within-a-rem)
+
 ### 📝 Changed
 
 **Add pronunciation**: a descriptor is now read after its concept (the first parent that is not a descriptor) and any descriptors in between, then its own front and back; in the queue the new audio no longer plays from the command, since the queue already plays it and the two overlapped.
