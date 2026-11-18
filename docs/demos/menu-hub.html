@@ -133,6 +133,7 @@ const ACTIONS = {
     { id: "audit", group: "Flashcards", label: "Audit Card Enablement", says: `opens Audit Card Enablement for <b>${DOC}</b>.` },
     { id: "audio", group: "Audio", label: "Audio Playlist (this document)", says: `opens the audio player on every audio under <b>${DOC}</b>.` },
     { id: "audio-tag", group: "Audio", label: "Audio Playlist (rems tagged with this)", says: `opens the audio player on the audios of every Rem tagged with <b>${DOC}</b>.` },
+    { id: "send-window", group: "Window", label: "Send to Another Window", says: `opens <b>${DOC}</b> in another RemNote window, then closes its pane here.` },
   ],
   queue: [
     { id: "q-priority-queue", group: "This queue", label: "Priority Queue", says: `opens the Priority Queue popup on this queue's scope, <b>${DOC}</b>.` },
@@ -200,7 +201,7 @@ function renderPane() {
   $("body").innerHTML = doc
     ? `<p class="title">${DOC}</p><div class="line" style="width:82%"></div><div class="line" style="width:64%"></div><div class="line" style="width:74%"></div>`
     : `<div class="card"><b>First law of thermodynamics</b><br>ΔU = Q − W<br><br><span style="font-size:12px;color:var(--c3)">Show Answer</span></div>`;
-  $("pane").style.height = doc ? "540px" : "400px";
+  $("pane").style.height = doc ? "590px" : "400px";
   $("dots").addEventListener("click", (e) => { e.stopPropagation(); state.menuOpen ? closeMenu() : openMenu(); });
   for (const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-pressed", String(b.dataset.view === state.view));
   hint();

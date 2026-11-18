@@ -231,3 +231,28 @@ The embeds a plugin can use (`fake_embed_definitions`): `RemViewer` and `RichTex
 **Where queue widgets appear on a phone** (read in the 1.30.4 bundle, November 17, 2026). The Beautiful queue's chrome has two branches: on a computer it renders the QueueToolbar widgets (`toolbarWidgets`) among its top-right actions; on a phone (`Env.mobile.mode.isPhone`) it renders none of them. The Compact queue's top bar renders them on both. QueueBelowTopBar is rendered in every layout, in the flow of the card box, so a widget there costs a row of the card on a phone. The Statistics plugin (1.6.0) registers its button at QueueBelowTopBar on a touch screen under 780 px wide for that reason. Hiding a widget: each wrapper carries the location's class (`rn-queue__widget-toolbar`, `rn-queue__widget-below-top-bar`) around `iframe[data-plugin-id][src*="widgetName=…"]`.
 
 **`currentIncRemKey` is written after `QueueLoadCard`.** `widgets/queue.tsx` sets it when it renders the item, so a listener on the event still reads the previous Incremental Rem. React to the key itself (a `plugin.track` on it), as `registerExtractEditorHost` does.
+
+## What "Read aloud" and Remy's voice mode read: the card plus one ancestor
+
+Read in the bundle (1.30.4 build override, chunk `89763`, components `BeautifulQueueTextToSpeech` and `TextToSpeech`; November 17, 2026).
+
+Every way the queue speaks a card (the Read cards aloud setting, the Play question / Read again button, the shortcut, and the dock line and autoplay in Talk to Remy, which read the same `{playFront, playBack}` object and the same `readContentAloud` autoplay hook) uses one text builder. The **answer** is the answer rich text only. The **question** is built by walking up from the card's Rem:
+
+```js
+chain = [rem]; r = parent(rem)
+while (r && !r.hasPowerup(CardCluster)) {      // Compact: stops instead at an Interactive Learn cluster
+  if (!(r.type === DESCRIPTOR || r.getSlotThisRepresentsId())) {   // an ordinary parent
+    if (r.type === CONCEPT && rem.type === CONCEPT) break;          // concept under concept: not read
+    chain.unshift(r); break;                                        // read it, then stop
+  }
+  chain.unshift(r); r = parent(r)               // descriptor / property: read it and keep climbing
+}
+// top of the chain: skipped if it is a Document (unless the card's Rem is a descriptor);
+// a Concept reads its front only; anything else reads its whole text (both sides)
+```
+
+So it reads **exactly one ordinary ancestor**: the parent, or, when the parent is a descriptor (or a property), every descriptor up to and including the first ordinary Rem above. It is not read when it is a Document, carries Card Cluster (Beautiful queue), or is a Concept above a Concept card, or when the card comes from a table column with column text-to-speech (`ctts`), which reads the question alone.
+
+**Nothing in the walk looks at hiding.** Hide in Queue, Remove from Queue, Remove Parent and the rest are CSS on the rendered queue; the reader works from the Rem data, so a hidden parent is read anyway. A plugin cannot change the text: there is no SDK hook, the on-device voice is the host's `speechSynthesis`, and the natural voice is synthesised on RemNote's server.
+
+What the text filter does drop, from the parent as from the card: URLs, the card delimiter, **pinned** Rem references (`i: 'q'` with `pin`), images, audio, and anything formatted as a card or cloze hint (the hint is read separately, after "Hint:", only for the card's own side). The read-aloud gate (`859326`) only ever enables text-to-speech per Rem (the text-to-speech powerup on the Rem, its document, or a column); there is no per-Rem "don't read".

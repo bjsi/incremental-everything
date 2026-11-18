@@ -18,11 +18,22 @@ Run **`Find Rem (insert reference / open in pane)`** (quick code `fir`) or press
 - **Opt+Enter / Alt+Enter** or **Opt/Alt+click** → inserts the Rem's **text followed by a pin** — the readable text plus a link chip (RemNote's paste "Text with Pin"). See [Insert text with a pin](#insert-text-with-a-pin) below.
 - **Shift+Enter** or **Shift+click** → opens the selected Rem in a **new pane** beside your current one (without inserting anything).
 - **Ctrl/Cmd+Shift+Enter** or **Ctrl/Cmd+Shift+click** → appends a **pin at the end of the Rem you are editing, keeping your selected text**. See [Pin a source at the end of a Rem](#pin-a-source-at-the-end-of-a-rem) below.
+- **Tab** → searches **within** the selected Rem; **Shift+Tab** goes back up. See [Search within a Rem](#search-within-a-rem) below.
 - **↑/↓** navigate · **Esc** closes.
 - **Concepts only** checkbox narrows results to Concept-type Rems.
 - **Drag the title row** to move the box if it covers what you need to see; the search box keeps your typing. It opens at your cursor again next time.
 
 The Rem you triggered the picker from is **excluded from results** — a Rem can't reference itself.
+
+### Search within a Rem { #search-within-a-rem }
+
+Like RemNote's own hierarchical search, Find Rem can narrow the search to one branch of your knowledge base:
+
+- **Tab** on a result makes it the scope: it shows as a chip in front of the box, and the list shows its children until you type. What you type then matches only Rems under it. Press **Tab** again to go one level deeper.
+- **Shift+Tab** goes back up one level; clicking a chip goes back to that level.
+- **Backspace** in an empty box leaves every scope, back to the whole knowledge base.
+
+The scope works with or without the [AI helper](#search-with-the-ai-helper). The children list shows the first 50; type to search all of them.
 
 ### Spotting PDF highlights
 
@@ -205,6 +216,21 @@ While it's waiting, click the button again to cancel. The request also expires a
 - **The other window's focused pane is replaced,** so the document it was showing, or a queue, gives way to the source.
 - **The other window doesn't come to the front by itself;** switch to it yourself.
 - **The viewer stays open** in the first window, so you can keep peeking at it.
+
+### Send to another window { #send-to-another-window }
+
+Moves a document, PDF or not, from a pane of this window to another RemNote window: it opens there, and its pane here closes. Desktop app only.
+
+- **From the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub):** the document's ⋯ menu → **Incremental RemNote…** → **Send to Another Window**.
+- **From the Omnibar:** **Send Pane to Another Window** sends the focused pane's document: the page the pane shows, not the bullet the cursor is on. With the cursor on a bullet of *Section V*, it sends *Section V*.
+
+1. A notice says the document is on its way. If another window is open, it opens there within a few seconds. If none is open, press **`⌘⇧N` / `Ctrl+Shift+N`**, and the new window opens it.
+2. Once the other window confirms it is open, the pane it came from closes here, and a notice says so.
+
+Dismiss the waiting notice to cancel. If no window takes the document within a minute, a notice says so and nothing closes.
+
+- **Only the pane closes, never the tab.** When the document is the only pane of its tab, it stays open here.
+- **The other window's focused pane is replaced,** as with [Open in another window](#open-in-another-window).
 
 ### Follow the queue
 

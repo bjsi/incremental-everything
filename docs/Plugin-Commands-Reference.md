@@ -460,6 +460,11 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
 
   📖 See [Utilities → Open Source in Popup](Utilities-Finding-and-Navigating.md#open-source-in-popup).
 
+- **Send Pane to Another Window**
+  Opens the focused pane's document in another RemNote window (press `⌘⇧N` / `Ctrl+Shift+N` if none is open), then closes that pane here. Also in the document's [Menu Hub](Plugin-Widgets-Reference.md#menu-hub). Desktop app only.
+
+  📖 See [Utilities → Send to another window](Utilities-Finding-and-Navigating.md#send-to-another-window).
+
 - **Follow the Queue's Sources in This Window**
   Makes this window show the sources pinned on the cards you practice in another window, up to 4 at a time. Run it again, or press **Stop** on its bar, to stop. Desktop app only.
 

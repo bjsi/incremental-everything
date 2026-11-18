@@ -582,6 +582,45 @@ class IndexSearchTest(unittest.TestCase):
         with self.assertRaises(SearchError):
             rb.browse(KB, 'bow', mode='notes', db_path=self.db, index_file=self.index)
 
+    def test_browse_card_counts_and_tag_refs(self):
+        by_id = {r['remId']: r for r in rb.browse(KB, 'bow', db_path=self.db, index_file=self.index)['rows']}
+        self.assertEqual(by_id[BOW]['ownCards'], 2)
+        self.assertEqual(by_id[BOW]['descCards'], 1)  # FLARE's cloze, below it
+        self.assertEqual(by_id[FLARE]['descCards'], 0)
+        self.assertEqual(by_id[BOW]['tagRefs'], [{'id': TAG, 'name': 'Anki Card', 'powerup': False}])
+        self.assertEqual(by_id[FLARE]['ancestorIds'], [ROOT, BOOK, BOW])
+        card = rb.browse(KB, f'cid:{C_CLOZE}', mode='cards', db_path=self.db, index_file=self.index)['rows'][0]
+        self.assertIn('textParts', card)  # a cloze card: its text in runs
+
+    def test_render_parts(self):
+        texts = rb.Texts(None)
+        rich = ['A parte ', {'i': 'm', 'cId': '4', 'text': 'de proa'}, '  do  convés ',
+                {'i': 'm', 'cId': '1', 'text': 'a vante'}, ', ', {'i': 'm', 'cId': '4', 'text': 'da popa'}, '.']
+        parts = texts.render_parts(rich, '4')
+        self.assertEqual(parts, [['A parte ', 0], ['de proa', 1], [' do convés ', 0], ['a vante', 2],
+                                 [', ', 0], ['da popa', 1], ['.', 0]])
+        self.assertEqual(''.join(t for t, _ in parts), texts.render(rich))
+        # Rem mode: every cloze is marked as the card's own.
+        self.assertEqual({m for t, m in texts.render_parts(rich) if t.strip() in ('de proa', 'a vante', 'da popa')}, {1})
+
+    def test_pick(self):
+        kids = rb.pick(KB, scope=BOOK, db_path=self.db, index_file=self.index)['rows']
+        self.assertEqual([r['remId'] for r in kids], [BOW])
+        self.assertTrue(kids[0]['hasChildren'])
+        found = rb.pick(KB, 'bow', scope=BOOK, db_path=self.db, index_file=self.index)['rows']
+        self.assertEqual({r['remId'] for r in found}, {BOW, FLARE})  # not OTHER, outside the scope
+        notes = rb.pick(KB, 'notes', db_path=self.db, index_file=self.index)['rows']
+        self.assertEqual([r['remId'] for r in notes], [DUP2])  # DUP1 has no Rem document: gone
+        top = rb.pick(KB, 'pscpp', db_path=self.db, index_file=self.index)['rows']
+        self.assertEqual(top[0]['remId'], ROOT)
+        self.assertTrue(top[0]['isDocument'])
+        recents = rb.pick(KB, ids=[FLARE, 'not-an-id', ROOT], db_path=self.db, index_file=self.index)['rows']
+        self.assertEqual([r['remId'] for r in recents], [FLARE, ROOT])
+        self.assertEqual(recents[0]['path'], ['PSCPP', 'Wärtsilä Encyclopedia of Ship Technology', 'Bow flare'])
+        self.assertEqual(rb.pick(KB, db_path=self.db, index_file=self.index)['rows'], [])
+        with self.assertRaises(SearchError):
+            rb.pick(KB, 'x', scope='bad id', db_path=self.db, index_file=self.index)
+
     def test_memory_state_uses_each_cards_scheduler(self):
         db = ri.ready(KB, self.db, self.index)
         try:

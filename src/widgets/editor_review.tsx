@@ -108,6 +108,8 @@ const EditorReviewInput: React.FC<{
   const activeReviewRemId = queueIncRemId ?? editorTimerRemId;
   const [days, setDays] = useState<string>('1');
   const [priority, setPriority] = useState<number>(10);
+  // The slot's priority when the popup loaded (see EditorReviewJob.basePriority).
+  const loadedPriorityRef = useRef<number | undefined>(undefined);
   const [note, setNote] = useState<string>('');
   const [reviewTimeMinutes, setReviewTimeMinutes] = useState<string>(
     initialReviewMinutes && initialReviewMinutes > 0 ? String(initialReviewMinutes) : ''
@@ -194,6 +196,7 @@ const EditorReviewInput: React.FC<{
           : null
       );
       setPriority(incRemData?.priority ?? 10);
+      loadedPriorityRef.current = incRemData?.priority;
 
       // Store the current nextRepDate for regression checks
       if (incRemData) {
@@ -340,6 +343,7 @@ const EditorReviewInput: React.FC<{
           kind: 'new',
           intervalDays: numDays,
           newPriority: priority,
+          basePriority: loadedPriorityRef.current,
           reviewTimeSeconds: Math.round(numMinutes * 60),
           overrideNextRepDate: dateOverride,
           note,
@@ -452,6 +456,7 @@ const EditorReviewInput: React.FC<{
       await plugin.storage.setSession(editorReviewTimerPausedAtKey, undefined);
       await plugin.storage.setSession('editor-review-timer-interval', resolvedInterval);
       await plugin.storage.setSession('editor-review-timer-priority', priority);
+      await plugin.storage.setSession('editor-review-timer-priority-base', loadedPriorityRef.current);
       // `remName` is filled by the initial-load effect, which a fast confirm
       // (⌘+Enter on a popup still loading) can outrun — parking the empty
       // string it starts as is what left the timer widget showing

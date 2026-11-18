@@ -12,6 +12,7 @@ import {
     editorReviewTimerStartKey,
     editorReviewTimerIntervalKey,
     editorReviewTimerPriorityKey,
+    editorReviewTimerPriorityBaseKey,
     editorReviewTimerRemNameKey,
     editorReviewTimerAccumulatedMsKey,
     editorReviewTimerPausedAtKey,
@@ -131,6 +132,7 @@ async function clearEditorTimerSession(plugin: RNPlugin): Promise<void> {
     await plugin.storage.setSession(editorReviewTimerStartKey, undefined);
     await plugin.storage.setSession(editorReviewTimerIntervalKey, undefined);
     await plugin.storage.setSession(editorReviewTimerPriorityKey, undefined);
+    await plugin.storage.setSession(editorReviewTimerPriorityBaseKey, undefined);
     await plugin.storage.setSession(editorReviewTimerRemNameKey, undefined);
     await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
     await plugin.storage.setSession(editorReviewTimerOriginKey, undefined);
@@ -384,6 +386,7 @@ export const handleReviewInEditorRem = async (
     // We do not set an interval since the repetition was already recorded above
     await plugin.storage.setSession('editor-review-timer-interval', null);
     await plugin.storage.setSession('editor-review-timer-priority', incRemInfo?.priority ?? 10);
+    await plugin.storage.setSession('editor-review-timer-priority-base', incRemInfo?.priority ?? 10);
     await plugin.storage.setSession('editor-review-timer-rem-name', remName || 'Unnamed Rem');
     await plugin.storage.setSession('editor-review-timer-from-queue', true);
     await plugin.storage.setSession('editor-review-timer-origin', 'queue');

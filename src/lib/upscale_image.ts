@@ -7,14 +7,21 @@
  * helper (scripts/media_bridge/media_bridge.py, POST /upscale), which runs
  * scripts/media_bridge/upscale_image.py: Codex CLI image generation signed in with
  * the user's ChatGPT plan, then a fidelity check (ink overlay, hue, OCR words,
- * zoomed crops of every changed region). The popup (widgets/upscale_image_popup)
- * shows the side-by-side and the check; only "Replace image" touches the rem.
+ * zoomed crops of every changed region).
+ *
+ * It runs in the background, as Read aloud does: the command queues an UpscaleJob and
+ * returns; the tracker (register/tracker.ts, persistent index widget) runs the rem's
+ * images one after another on the helper and posts a notice whose **Review** button
+ * opens the popup (widgets/upscale_image_popup) with the side-by-side and the check.
+ * Only "Replace image" there touches the rem. The job and the notice live in this
+ * window's session: a reload drops them (the helper's folder on disk keeps the files).
  */
 import { PluginRem, RNPlugin, RichTextInterface, SelectionType } from '@remnote/plugin-sdk';
-import { mediaBridgeEnabledId, UPSCALE_IMAGE_POPUP } from './consts';
+import { mediaBridgeEnabledId, pendingUpscaleJobsKey, UPSCALE_IMAGE_POPUP } from './consts';
 import { imageUrlsOf, prepareForSetText, storeImageInRemNote } from './localize_media';
 import { MEDIA_BRIDGE_URL } from './media_bridge';
 import { showMessageDialog } from './message_dialog';
+import { showNotice } from './notice';
 import { getIESetting } from './settings';
 
 /** The helper version that has /upscale. */
@@ -32,6 +39,23 @@ export interface UpscalePopupContext {
   title: string;
   kbId?: string;
   images: UpscaleTarget[];
+}
+
+/** What the Review button opens: the job's images with their finished results. */
+export interface UpscaleReviewContext extends UpscalePopupContext {
+  /** One per image, in order; a failure is `{ ok: false, message }`. */
+  results: UpscaleResult[];
+  /** The notice that opened it, dismissed once every image has been dealt with. */
+  noticeId?: string;
+}
+
+/** A background upscale (see the module comment). */
+export interface UpscaleJob extends UpscalePopupContext {
+  /** Unique per run, so a job the tracker reads twice runs once. */
+  id: string;
+  /** For Try again: what to keep. */
+  extra: string;
+  queuedAt: number;
 }
 
 export interface UpscaleCrop {
@@ -129,13 +153,112 @@ export async function openUpscaleImage(plugin: RNPlugin) {
     return;
   }
   const kb = await plugin.kb.getCurrentKnowledgeBaseData();
-  const context: UpscalePopupContext = {
+  await enqueueUpscaleJob(plugin, {
     remId: rem._id,
     title: await remTitle(plugin, rem),
     kbId: kb?._id,
     images,
+  });
+  const n = images.length;
+  await plugin.app.toast(
+    `🖼 Upscaling ${n === 1 ? 'the image' : `${n} images`} with ChatGPT in the background ` +
+      `(about ${45 * n} s). A notice will bring the comparison.`
+  );
+}
+
+// --- background jobs ------------------------------------------------------------------
+
+/** Waiting stops after this long per image, or after this many failed polls in a row. */
+const JOB_TIMEOUT_MS = 15 * 60_000;
+const JOB_MAX_POLL_FAILURES = 10;
+const JOB_POLL_MS = 2000;
+
+export async function enqueueUpscaleJob(
+  plugin: RNPlugin,
+  context: UpscalePopupContext,
+  extra = ''
+): Promise<void> {
+  const job: UpscaleJob = {
+    ...context,
+    id: `upscale-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    extra,
+    queuedAt: Date.now(),
   };
-  await plugin.widget.openPopup(UPSCALE_IMAGE_POPUP, context);
+  const queue = (await plugin.storage.getSession<UpscaleJob[]>(pendingUpscaleJobsKey)) || [];
+  await plugin.storage.setSession(pendingUpscaleJobsKey, [...queue, job]);
+}
+
+async function upscaleOne(context: UpscalePopupContext, image: UpscaleTarget, extra: string) {
+  try {
+    const taskId = await startUpscale(context, image, extra);
+    const until = Date.now() + JOB_TIMEOUT_MS;
+    let failures = 0;
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, JOB_POLL_MS));
+      try {
+        const task = await getUpscaleTask(taskId);
+        failures = 0;
+        if (task.status === 'done') return task.result ?? { ok: false, message: 'no result' };
+      } catch (err) {
+        // A helper restart forgets its tasks: that answer repeats, a network blip does not.
+        if (++failures >= JOB_MAX_POLL_FAILURES) {
+          return { ok: false, message: `lost contact with the helper (${String(err)})` };
+        }
+      }
+    }
+    return { ok: false, message: `the helper took more than ${JOB_TIMEOUT_MS / 60_000} minutes` };
+  } catch (err) {
+    return { ok: false, message: String(err) };
+  }
+}
+
+/**
+ * Run a job's images one after another (ChatGPT is slow, and the helper runs Codex for
+ * each), then post the notice: Review opens the popup with every result, failures
+ * included, so they can be tried again from there.
+ */
+export async function runUpscaleJob(plugin: RNPlugin, job: UpscaleJob): Promise<void> {
+  const name = job.title || 'Untitled rem';
+  const results: UpscaleResult[] = [];
+  for (const image of job.images) results.push(await upscaleOne(job, image, job.extra));
+
+  const ok = results.filter((r) => r.ok);
+  if (!ok.length) {
+    await showNotice(plugin, {
+      title: 'Upscale image: no result',
+      message: `“${name}”: ${results.map((r) => r.message ?? 'failed').join('; ')}`,
+      tone: 'error',
+      openRemId: job.remId,
+    });
+    return;
+  }
+  const toCheck = ok.filter((r) => r.verdict !== 'pass').length;
+  const failed = results.length - ok.length;
+  const parts = [
+    results.length === 1
+      ? 'the upscaled image is ready to compare'
+      : `${ok.length} of ${results.length} upscaled images are ready to compare`,
+    toCheck
+      ? `the check found differences in ${toCheck === 1 && ok.length === 1 ? 'it' : toCheck}`
+      : 'the check found no changes',
+    failed ? `${failed} failed` : '',
+  ].filter(Boolean);
+  const noticeId = `${job.id}-notice`;
+  const review: UpscaleReviewContext = {
+    remId: job.remId,
+    title: job.title,
+    kbId: job.kbId,
+    images: job.images,
+    results,
+    noticeId,
+  };
+  await showNotice(plugin, {
+    id: noticeId,
+    title: 'Upscale image: ready to review',
+    message: `“${name}”: ${parts.join('; ')}. Nothing is replaced until you approve it.`,
+    tone: toCheck || failed ? 'info' : 'success',
+    action: { label: 'Review', popup: UPSCALE_IMAGE_POPUP, data: review },
+  });
 }
 
 export async function startUpscale(

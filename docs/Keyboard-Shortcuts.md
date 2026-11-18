@@ -252,6 +252,9 @@ These keys are active **while a plugin popup or floating window is open** — th
 | | `Alt` + `Enter` | Insert the Rem's **text, then a pin** |
 | | `Shift` + `Enter` | Open the Rem in a new pane |
 | | `Ctrl`/`Cmd` + `Shift` + `Enter` | Append a **pin at the end of the Rem**, keeping selected text |
+| | `Tab` | Search within the selected Rem |
+| | `Shift` + `Tab` | Back up one level |
+| | `Backspace` (empty box) | Back to the whole knowledge base |
 | | `Esc` | Close the picker |
 | [Image Scan popup](Utilities-Finding-and-Navigating.md#filter-a-document-by-images) | `↑` / `↓` | Move between the two scopes (this Rem / whole knowledge base) |
 | | `Enter` | Run the selected scope — or, on the report, close the popup |

@@ -568,7 +568,8 @@ export async function playAudio(url: string): Promise<void> {
  * "Add pronunciation": the focused or selected Rems (in the queue, the card on screen),
  * front and back only, read aloud with the suggested engine, no popup; the audio goes
  * in as the Rem's first child, captioned 🔊, as Extra Card Detail. A single Rem's audio
- * plays as soon as it is ready.
+ * plays as soon as it is ready, except for the card on screen in the queue, which plays
+ * it itself.
  */
 export async function addPronunciation(plugin: ReactRNPlugin) {
   if (!(await getIESetting(plugin, mediaBridgeEnabledId))) {
@@ -581,7 +582,7 @@ export async function addPronunciation(plugin: ReactRNPlugin) {
     });
     return;
   }
-  const { remIds } = await resolvePriorityTargets(plugin);
+  const { remIds, source } = await resolvePriorityTargets(plugin);
   const rems = remIds.length ? ((await plugin.rem.findMany(remIds)) ?? []) : [];
   if (!rems.length) {
     await plugin.app.toast('No Rem to pronounce: place the cursor in a Rem, or select Rems.');
@@ -629,7 +630,9 @@ export async function addPronunciation(plugin: ReactRNPlugin) {
         failures.push(`“${label}”: ${result.message ?? 'no audio'}`);
         continue;
       }
-      if (rems.length === 1) void playAudio(result.url);
+      // The queue plays a card's Extra Card Detail audio by itself as soon as it appears:
+      // playing it here too would overlap the two.
+      if (rems.length === 1 && source !== 'queue') void playAudio(result.url);
       const placed = await placeAudio(plugin, rem._id, result.url, '🔊', true);
       if (placed.warning) warnings.push(placed.warning);
       costUsd += result.costUsd ?? 0;

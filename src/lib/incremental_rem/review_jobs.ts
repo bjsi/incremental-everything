@@ -87,6 +87,13 @@ export interface EditorReviewJob extends ReviewJobBase {
   overrideNextRepDate?: number;
   /** Left unset to keep the priority as it is. */
   newPriority?: number;
+  /**
+   * The slot's priority when the review began. When the slot holds something
+   * else by the time the job runs, the priority was changed during the review
+   * (Set Priority, the editor) and newPriority — a copy taken at the start — is
+   * dropped instead of reverting that change.
+   */
+  basePriority?: number;
   reviewTimeSeconds: number;
   /** Optional explicit note; a note parked for the rem is consumed either way. */
   note?: string;
@@ -424,8 +431,13 @@ export async function runReviewJob(
       // Skip the write (and its band sync, which looks up source highlights)
       // when nothing changes. A priority that was only recovered from history
       // or defaulted is written anyway, so the slot holds it from now on.
+      const changedDuringReview =
+        job.basePriority !== undefined &&
+        incRem.prioritySource === 'slot' &&
+        incRem.priority !== job.basePriority;
       const priorityChanged =
         job.newPriority !== undefined &&
+        !changedDuringReview &&
         (job.newPriority !== incRem.priority || incRem.prioritySource !== 'slot');
       if (priorityChanged) {
         // recordHistory: false — the rep entry written below carries this priority.
@@ -485,7 +497,8 @@ export async function runReviewJob(
           wasEarly: daysDifference < 0,
           daysEarlyOrLate: Math.round(daysDifference * 10) / 10,
           reviewTimeSeconds,
-          priority: incRem.priority, // Record priority at time of rep
+          // The priority the Rem leaves this rep with.
+          priority: priorityChanged ? job.newPriority! : incRem.priority,
           eventType: 'executeRepetition' as const,
         };
 

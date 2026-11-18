@@ -4,6 +4,7 @@ import {
   useAPIEventListener,
   usePlugin,
   useTrackerPlugin,
+  ReactRNPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import { withHoverTips } from '../components/HoverTipLayer';
@@ -23,6 +24,8 @@ import {
 import { FloatingPosition, useFloatingWidgetDrag } from '../lib/floating_widget_drag';
 import { resolveRemTextAsTitle } from '../lib/richTextRemRefs';
 import { showMessageDialog } from '../lib/message_dialog';
+import { canOpenInAnotherWindow } from '../lib/open_in_window';
+import { sendDocumentToAnotherWindow } from '../lib/send_to_window';
 import {
   MenuHubTarget,
   openAudioPlaylist,
@@ -66,6 +69,8 @@ type HubAction = {
   run: (plugin: Plugin, remId: string | undefined) => Promise<void>;
   /** Acts on the target Rem, so it is off while there is none. */
   needsRem?: boolean;
+  /** Needs a second window, which only the desktop app has; left out elsewhere. */
+  desktopOnly?: boolean;
 };
 
 const doc =
@@ -92,6 +97,14 @@ const DOCUMENT_ACTIONS: HubAction[] = [
   { id: 'audit', label: 'Audit Card Enablement', group: 'Flashcards', run: doc(openCardEnablementAudit), needsRem: true },
   { id: 'audio', label: 'Audio Playlist (this document)', group: 'Audio', run: doc(openAudioPlaylist), needsRem: true },
   { id: 'audio-tag', label: 'Audio Playlist (rems tagged with this)', group: 'Audio', run: doc(openTaggedAudioPlaylist), needsRem: true },
+  {
+    id: 'send-window',
+    label: 'Send to Another Window',
+    group: 'Window',
+    run: doc((plugin, remId) => sendDocumentToAnotherWindow(plugin as ReactRNPlugin, remId)),
+    needsRem: true,
+    desktopOnly: true,
+  },
 ];
 
 const QUEUE_ACTIONS: HubAction[] = [
@@ -122,6 +135,11 @@ function MenuHub() {
   const [instanceId, setInstanceId] = useState<number | null>(null);
   const [selected, setSelected] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
+  const [desktop, setDesktop] = useState(false);
+
+  useEffect(() => {
+    canOpenInAnotherWindow(plugin as ReactRNPlugin).then(setDesktop).catch(() => {});
+  }, [plugin]);
 
   useEffect(() => {
     (async () => {
@@ -136,7 +154,7 @@ function MenuHub() {
   const target = useTrackerPlugin((rp) => rp.storage.getSession<MenuHubTarget>(menuHubTargetKey), []);
   const mode = target?.mode ?? 'document';
   const remId = target?.remId;
-  const actions = mode === 'queue' ? QUEUE_ACTIONS : DOCUMENT_ACTIONS;
+  const actions = (mode === 'queue' ? QUEUE_ACTIONS : DOCUMENT_ACTIONS).filter((a) => desktop || !a.desktopOnly);
 
   useEffect(() => setSelected(0), [mode]);
 

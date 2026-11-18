@@ -79,3 +79,107 @@ export async function copyTextFromGesture(plugin: RNPlugin, text: string, label:
   await plugin.widget.openPopup(copyTextPopupWidgetId, { text, label, toast: clipboardToastText(label, text) });
   return false;
 }
+
+// --- Rem references -------------------------------------------------------------------
+//
+// RemNote's editor pastes the clipboard's `linear-editor/json` flavour (a rich-text
+// array) ahead of the plain text, as long as no `application/rem-id` comes with it (read
+// from its paste handler, 1.30.4). So several references, pins or "text + pin" go into
+// the one Rem the cursor is in. The flavour is written from a `copy` event, which the
+// gesture's execCommand('copy') fires in this frame; Chromium keeps custom types as web
+// custom data, which RemNote's own copy uses for this flavour. Which form is chosen at
+// copy time: RemNote reads the same payload for ⌘V, ⇧⌘V and the rest.
+
+/** reference: [[Rem]] · pin: 📍 · text-pin: the Rem's text, then a 📍 to it. */
+export type RemRefForm = 'reference' | 'pin' | 'text-pin';
+
+export interface RemRefItem {
+  remId: string;
+  /** Plain name, for the plain-text flavour. */
+  name: string;
+  /** The Rem's own rich text (text-pin). */
+  rich?: any[];
+}
+
+const textItem = (text: string) => ({ i: 'm', text });
+
+/** The Rem's text without its cloze marks, so the pasted copy makes no cards. */
+function stripClozes(rich: any[]): any[] {
+  return rich
+    .filter((el) => typeof el === 'string' || (el && typeof el === 'object'))
+    .map((el) => {
+      if (typeof el === 'string') return textItem(el);
+      const { cId, ...rest } = el;
+      return rest;
+    });
+}
+
+export function remRefsRichText(items: RemRefItem[], form: RemRefForm): { rich: any[]; plain: string } {
+  const rich: any[] = [];
+  const plain: string[] = [];
+  items.forEach((it, i) => {
+    if (i > 0) rich.push(textItem(form === 'reference' ? ', ' : ' '));
+    if (form === 'text-pin') {
+      rich.push(...stripClozes(it.rich ?? [it.name]));
+      rich.push(textItem(' '));
+    }
+    rich.push(form === 'reference' ? { i: 'q', _id: it.remId } : { i: 'q', _id: it.remId, pin: true, content: false });
+    plain.push(it.name);
+  });
+  return { rich, plain: plain.join(form === 'reference' ? ', ' : '\n') };
+}
+
+/** Write `flavours` from inside a click or key handler; true when the copy happened. */
+function copyFlavoursFromGesture(flavours: Record<string, string>): boolean {
+  let wrote = false;
+  const onCopy = (e: ClipboardEvent) => {
+    if (!e.clipboardData) return;
+    e.preventDefault();
+    for (const [type, data] of Object.entries(flavours)) e.clipboardData.setData(type, data);
+    wrote = true;
+  };
+  const area = document.createElement('textarea');
+  area.value = flavours['text/plain'] || ' ';
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  const before = document.activeElement as HTMLElement | null;
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  document.addEventListener('copy', onCopy, true);
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  } finally {
+    document.removeEventListener('copy', onCopy, true);
+    area.remove();
+    before?.focus?.();
+  }
+  return ok && wrote;
+}
+
+/**
+ * Copy references to these Rems, in `form`. Call synchronously from the click or key
+ * handler. Without the gesture, one Rem still goes through the helper as the text
+ * RemNote turns into a reference (`[[id`) or a pin (`[[*id`) on paste.
+ */
+export async function copyRemRefsFromGesture(plugin: RNPlugin, items: RemRefItem[], form: RemRefForm): Promise<boolean> {
+  if (!items.length) return false;
+  const { rich, plain } = remRefsRichText(items, form);
+  const one = form === 'reference' ? 'reference' : form === 'pin' ? 'pin' : 'text + pin';
+  const many = form === 'reference' ? 'references' : form === 'pin' ? 'pins' : 'texts + pins';
+  const label = items.length === 1 ? one : `${items.length} ${many}`;
+  if (copyFlavoursFromGesture({ 'text/plain': plain, 'linear-editor/json': JSON.stringify(rich) })) {
+    await plugin.app.toast(`📋 Copied ${label}. Paste it into a Rem (⌘V).`);
+    return true;
+  }
+  if (items.length === 1 && form !== 'text-pin' && (await copyViaBridge(plugin, `${form === 'pin' ? '[[*' : '[['}${items[0].remId}`))) {
+    await plugin.app.toast(`📋 Copied ${label}. Paste it into a Rem (⌘V).`);
+    return true;
+  }
+  await plugin.app.toast('Could not write the clipboard from here. Click the button (or press the keys) again.');
+  return false;
+}

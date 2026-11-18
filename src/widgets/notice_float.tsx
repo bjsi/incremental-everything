@@ -7,7 +7,7 @@ import '../rn_theme_vars.css';
 import { MessageBody } from '../components/MessageBody';
 import { noticesKey } from '../lib/consts';
 import { FloatingPosition, useFloatingWidgetDrag } from '../lib/floating_widget_drag';
-import { dismissNotices, Notice, NOTICE_POSITION } from '../lib/notice';
+import { answerNotice, dismissNotices, Notice, NOTICE_POSITION } from '../lib/notice';
 
 const button = (primary: boolean): React.CSSProperties => ({
   background: primary ? '#3B82F6' : 'var(--rn-clr-background-secondary)',
@@ -23,6 +23,8 @@ const edge = { error: '#EF4444', success: '#10B981', info: '#3B82F6' };
  * index opens and closes. It never takes focus: it arrives while the user is typing
  * elsewhere, often in a popup. Esc, once the card has been clicked, dismisses them all.
  * Dragging anywhere but a button moves it; it still opens at the same spot every time.
+ * A question (`notice.ask`, from `media_bridge.py ask`) shows its choices in place of
+ * Dismiss; the chosen one goes back to the tool that asked.
  */
 function NoticeFloat() {
   const plugin = usePlugin();
@@ -54,7 +56,17 @@ function NoticeFloat() {
     const rem = notice.openRemId ? await plugin.rem.findOne(notice.openRemId) : undefined;
     if (rem) await plugin.window.openRem(rem);
     else await plugin.app.toast('That Rem no longer exists.');
-    await dismissNotices(plugin, notice.id);
+    // A question stays up: the Rem is opened to decide it.
+    if (!notice.ask) await dismissNotices(plugin, notice.id);
+  };
+
+  const answer = async (notice: Notice, choice: string) => {
+    if (!(await answerNotice(plugin, notice, choice)))
+      await plugin.app.toast('Could not send the answer: is the Local Media Bridge running?');
+  };
+
+  const runAction = async (notice: Notice) => {
+    if (notice.action) await plugin.widget.openPopup(notice.action.popup, notice.action.data);
   };
 
   if (!list.length) return null;
@@ -106,22 +118,44 @@ function NoticeFloat() {
               {new Date(notice.at).toLocaleTimeString(undefined, { timeStyle: 'short' })}
             </span>
             <div className="flex items-center gap-2">
+              {notice.action && (
+                <button
+                  onClick={() => void runAction(notice)}
+                  className="py-1 px-3 text-sm font-medium rounded"
+                  style={button(true)}
+                >
+                  {notice.action.label}
+                </button>
+              )}
               {notice.openRemId && (
                 <button
                   onClick={() => void openRem(notice)}
                   className="py-1 px-3 text-sm font-medium rounded"
-                  style={button(true)}
+                  style={button(!notice.action && !notice.ask)}
                 >
                   Open Rem
                 </button>
               )}
-              <button
-                onClick={() => void dismissNotices(plugin, notice.id)}
-                className="py-1 px-3 text-sm font-medium rounded"
-                style={button(!notice.openRemId)}
-              >
-                Dismiss
-              </button>
+              {notice.ask ? (
+                notice.ask.choices.map((choice, k) => (
+                  <button
+                    key={choice}
+                    onClick={() => void answer(notice, choice)}
+                    className="py-1 px-3 text-sm font-medium rounded"
+                    style={button(k === 0)}
+                  >
+                    {choice}
+                  </button>
+                ))
+              ) : (
+                <button
+                  onClick={() => void dismissNotices(plugin, notice.id)}
+                  className="py-1 px-3 text-sm font-medium rounded"
+                  style={button(!notice.openRemId && !notice.action)}
+                >
+                  Dismiss
+                </button>
+              )}
             </div>
           </div>
         </div>

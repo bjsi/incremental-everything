@@ -385,6 +385,7 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-start', undefined);
     await plugin.storage.setSession('editor-review-timer-interval', undefined);
     await plugin.storage.setSession('editor-review-timer-priority', undefined);
+    await plugin.storage.setSession('editor-review-timer-priority-base', undefined);
     await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
     await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
     await plugin.storage.setSession('editor-review-timer-origin', undefined);

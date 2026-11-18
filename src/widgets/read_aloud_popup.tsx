@@ -84,6 +84,7 @@ const SKIP_LABELS: Record<string, string> = {
   drawings: 'drawing',
   embeds: 'embed',
   properties: 'property',
+  aiNotices: 'AI-audio notice',
 };
 
 /** en-US-AndrewMultilingualNeural → Andrew; Kore → Kore. */

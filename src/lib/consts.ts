@@ -673,6 +673,10 @@ export const editorReviewTimerRemIdKey = 'editor-review-timer-rem-id';
 export const editorReviewTimerStartKey = 'editor-review-timer-start';
 export const editorReviewTimerIntervalKey = 'editor-review-timer-interval';
 export const editorReviewTimerPriorityKey = 'editor-review-timer-priority';
+// The slot's priority when the review started. When the slot no longer holds it
+// at End Review, the priority was changed elsewhere during the review and that
+// newer value wins over the timer's copy.
+export const editorReviewTimerPriorityBaseKey = 'editor-review-timer-priority-base';
 export const editorReviewTimerRemNameKey = 'editor-review-timer-rem-name';
 // The timer's clock is a PAIR: elapsed = accumulated + (now − start), with
 // `paused-at` freezing the running segment. Anything adjusting the elapsed time
@@ -811,6 +815,9 @@ export const readAloudTagId = 'read-aloud-tag';
 // it and reports with a message dialog, so the popup can close at once. A queue, so two
 // Generates in quick succession cannot overwrite each other. See lib/read_aloud.ts.
 export const pendingReadAloudJobsKey = 'pendingReadAloudJobs';
+// Upscale jobs (lib/upscale_image.ts): the command starts them and returns; the tracker
+// waits for ChatGPT and posts a notice whose Review button opens the comparison popup.
+export const pendingUpscaleJobsKey = 'pendingUpscaleJobs';
 // Notices (lib/notice.ts): reports of background work, shown in a floating card instead
 // of a popup so they never close the popup the user is working in. Any widget appends to
 // this list; the index opens the card while it is non-empty.
@@ -904,6 +911,7 @@ export const searchBrowseRequestKey = 'search-browse-request'; // session: {acti
 export const searchBrowseAckKey = 'search-browse-ack'; // session: the `at` the browser last acted on
 export const savedSearchesKey = 'search-browse-saved'; // synced: SavedSearch[]
 export const searchHistoryKey = 'search-browse-history'; // local (per device): last searches, newest first
+export const searchBrowseRecentsKeyPrefix = 'search-browse-recents-'; // local (per device) + 'move' | 'tag': picker targets, newest first
 export const searchQueuesParentName = 'Search Queues';
 
 // Audio Playlist (lib/audio_playlist.ts; widgets/audio_playlist_float.tsx): the audios
@@ -931,3 +939,5 @@ export const EXTRACT_EDITOR_FLOAT = 'extract_editor_float';
 // Session: what the editor shows and how big it is (ExtractEditorTarget), and its float id.
 export const extractEditorTargetKey = 'extract-editor-target';
 export const extractEditorFloatIdKey = 'extract-editor-float-id';
+// Session key: a document the Menu Hub sent to another window, until it opens there (see lib/send_to_window.ts).
+export const sendToWindowPendingKey = 'send-to-window-pending';

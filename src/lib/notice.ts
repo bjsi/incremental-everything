@@ -1,6 +1,7 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 import { NOTICE_FLOAT, noticesKey } from './consts';
 import { MessageDialog } from './message_dialog';
+import { MEDIA_BRIDGE_URL } from './media_bridge_url';
 
 /**
  * Notices: the report of work that ran in the background (a Read Aloud job, a review
@@ -16,27 +17,79 @@ import { MessageDialog } from './message_dialog';
  * cannot start), where the popup's keyboard flow is worth more; use showNotice for
  * anything that can land while the user is busy elsewhere.
  */
-export type Notice = MessageDialog & { id: string; at: number };
+export type Notice = MessageDialog & {
+  id: string;
+  at: number;
+  /**
+   * A button that opens a popup with this data (the Upscale review). The notice stays
+   * after the click: the popup dismisses it (by `id`) once its work is finished, so a
+   * popup closed half-way can be opened again from the notice.
+   */
+  action?: { label: string; popup: string; data: unknown };
+  /**
+   * A question from an outside tool (`media_bridge.py ask`): one button per choice in
+   * place of Dismiss. The click posts the choice to the bridge (POST /answers), where the
+   * tool is waiting for it, and dismisses the notice. Dismissing it any other way
+   * (Dismiss all, Esc) answers "dismissed", so the tool never waits for nothing.
+   */
+  ask?: { id: string; choices: string[] };
+};
 
 /** Kept at most; the oldest go first. */
 const MAX_NOTICES = 10;
 /** Where the card always opens; the user can drag it elsewhere once it is up. */
 export const NOTICE_POSITION = { top: 64, right: 24 };
 
-export async function showNotice(plugin: RNPlugin, dialog: MessageDialog): Promise<void> {
+export async function showNotice(
+  plugin: RNPlugin,
+  dialog: MessageDialog & { action?: Notice['action']; ask?: Notice['ask']; id?: string }
+): Promise<void> {
   const notice: Notice = {
     ...dialog,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: dialog.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     at: Date.now(),
   };
-  const list = (await plugin.storage.getSession<Notice[]>(noticesKey)) || [];
-  await plugin.storage.setSession(noticesKey, [...list, notice].slice(-MAX_NOTICES));
+  const list = [...((await plugin.storage.getSession<Notice[]>(noticesKey)) || []), notice];
+  // Over the limit, the oldest plain notices go first: an open question stays until answered.
+  while (list.length > MAX_NOTICES) {
+    const k = list.findIndex((n) => !n.ask);
+    list.splice(k >= 0 ? k : 0, 1);
+  }
+  await plugin.storage.setSession(noticesKey, list);
+}
+
+/** Send the answer of an `ask` notice to the bridge; false when the helper is not reachable. */
+export async function postNoticeAnswer(askId: string, answer: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${MEDIA_BRIDGE_URL}/answers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ askId, answer }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Notice] could not post the answer', askId, err);
+    return false;
+  }
 }
 
 /** Drop one notice, or all of them; the card closes when none is left. */
 export async function dismissNotices(plugin: RNPlugin, id?: string): Promise<void> {
   const list = (await plugin.storage.getSession<Notice[]>(noticesKey)) || [];
+  const gone = id ? list.filter((n) => n.id === id) : list;
   await plugin.storage.setSession(noticesKey, id ? list.filter((n) => n.id !== id) : []);
+  // A question closed without a choice: say so, so its tool stops waiting.
+  await Promise.all(gone.filter((n) => n.ask).map((n) => postNoticeAnswer(n.ask!.id, 'dismissed')));
+}
+
+/** Answer an `ask` notice with one of its choices and close it. */
+export async function answerNotice(plugin: RNPlugin, notice: Notice, answer: string): Promise<boolean> {
+  if (!notice.ask) return false;
+  const sent = await postNoticeAnswer(notice.ask.id, answer);
+  if (!sent) return false;
+  const list = (await plugin.storage.getSession<Notice[]>(noticesKey)) || [];
+  await plugin.storage.setSession(noticesKey, list.filter((n) => n.id !== notice.id));
+  return true;
 }
 
 /**

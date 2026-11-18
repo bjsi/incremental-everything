@@ -35,6 +35,37 @@ An inline link is not an element of its own. It is a text span carrying the targ
 
 The bridge validates every call's arguments against a zod schema, whose reference element lists only `i`, `_id`, `aliasId`, `content`, `showFullName` and `textOfDeletedRem`. But it only calls `safeParse` to accept or reject; the handler receives the **raw** arguments. So `pin`, `cId` and any other field survive `rem.setText` / `setBackText`.
 
+## References on the clipboard
+
+Read in the bundle, 1.30.4, November 17, 2026.
+
+**What RemNote copies.** Its copy commands write plain text that its paste handler recognises
+when it is the whole clipboard:
+
+| Text | Copied by | Pasted as |
+|---|---|---|
+| `https://www.remnote.com/w/<id>…` (the Rem's URL, `?aliasId=` kept) | Copy Reference (`copyReference()`, what the SDK's `copyReferenceToClipboard` calls) | a reference |
+| `[[<id>` | | a reference |
+| `[[*<id>` | Copy Reference as a Pin | a pin |
+| `[[!<id>` | Copy Reference with content | a reference with `content: true` (cursor must be collapsed) |
+| `((<id>` | Copy Portal | a portal |
+| `##<id>` | Copy Tag | a tag on the Rem |
+| `[[.<id>` (as `application/rem-id`) | Copy Bullet (`copyRem()`) | the Rem itself |
+
+Only one Rem per clipboard that way: the detectors test the whole text, so two `[[*id` lines
+paste as text.
+
+**Several references into one Rem.** The editor's paste handler reads `linear-editor/json`
+(a rich-text array) before the plain text, whenever no `application/rem-id` comes with it, and
+inserts it into the Rem being edited. RemNote's own inline copy writes that flavour, sometimes as
+plain rich text, so `[{i:'q',_id}, {i:'m',text:', '}, {i:'q',_id,pin:true}]` pastes as written.
+A plugin frame can write it from a `copy` event fired by `execCommand('copy')` inside a click or
+key press (`copyRemRefsFromGesture` in `src/lib/clipboard.ts`).
+
+**The paste key can't choose the form.** ⌘V, ⇧⌘V (Paste Without Formatting) and
+⌥⇧⌘V (Paste as Single Bullet) read the same payload, and ⌥⌘V is Toggle Callout. A plugin that
+wants "paste as pin" must decide when copying.
+
 ## Where the links are stored
 
 On each Rem document in `remnote.db` (`quanta.doc`):

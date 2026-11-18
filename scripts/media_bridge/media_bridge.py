@@ -79,6 +79,9 @@ Endpoints (127.0.0.1:3460, CORS open, for the plugin iframe):
                                polling without v=2 is an older build: it gets only
                                localize jobs, the rest wait for a build that knows them.
   POST /result {jobId, …}      plugin answer
+  POST /answers {askId, answer}  the user's choice on an `ask` notice (askId = the job id);
+                               kept in answers.json, so it outlives a helper restart
+  GET  /answers/<askId>        {askId, status: pending|answered, answer?, at?}
   POST /clipboard {text}       puts text on the system clipboard (pbcopy). Plugin iframes
                                have no clipboard-write permission, so "Copy Rem ID" asks here.
   POST /shutdown
@@ -103,7 +106,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 17  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal
+VERSION = 18  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal, 18: ask + /answers, outline
 # The jobs a plugin build understands, by the protocol version it polls with.
 OPS_BY_PLUGIN_VERSION = {
     1: {"localize"},
@@ -121,9 +124,13 @@ OPS_BY_PLUGIN_VERSION = {
         "restore-audio", "notice", "set-text", "remove", "heading"},
     10: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
          "restore-audio", "notice", "set-text", "remove", "heading", "portal"},
+    11: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+         "restore-audio", "notice", "set-text", "remove", "heading", "portal", "ask"},
+    12: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+         "restore-audio", "notice", "set-text", "remove", "heading", "portal", "ask", "outline"},
 }
 # Jobs that may name no rem at all.
-OPS_WITHOUT_REMS = {"notice"}
+OPS_WITHOUT_REMS = {"notice", "ask"}
 KNOWN_OPS = OPS_BY_PLUGIN_VERSION[max(OPS_BY_PLUGIN_VERSION)]
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("REMNOTE_MEDIA_BRIDGE_PORT", "3460"))
@@ -156,6 +163,27 @@ UPSCALE_HOME = Path(os.environ.get("REMNOTE_UPSCALE_HOME", Path.home() / "Pictur
 
 _jobs: dict[str, dict] = {}
 _cond = threading.Condition()
+ANSWERS_FILE = HOME / "answers.json"
+_answers_lock = threading.Lock()
+
+
+def _load_answers() -> dict:
+    try:
+        return json.loads(ANSWERS_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _save_answer(ask_id: str, answer: str) -> None:
+    with _answers_lock:
+        data = _load_answers()
+        now = time.time()
+        data = {k: v for k, v in data.items() if now - v.get("at", now) < MAX_AGE_S}
+        data[ask_id] = {"answer": answer, "at": now}
+        HOME.mkdir(parents=True, exist_ok=True)
+        tmp = ANSWERS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data))
+        tmp.replace(ANSWERS_FILE)
 _plugin_seen = 0.0
 _plugin_version = 0
 
@@ -246,6 +274,12 @@ class Handler(BaseHTTPRequestHandler):
             if not job:
                 return self._json(404, {"error": "no such job"})
             return self._json(200, {k: job.get(k) for k in ("id", "op", "status", "remIds", "result")})
+        if url.path.startswith("/answers/"):
+            ask_id = url.path[len("/answers/"):]
+            got = _load_answers().get(ask_id)
+            if got:
+                return self._json(200, {"askId": ask_id, "status": "answered", **got})
+            return self._json(200, {"askId": ask_id, "status": "pending"})
         if url.path == "/next":
             query = parse_qs(url.query)
             _plugin_seen = time.time()
@@ -396,6 +430,12 @@ class Handler(BaseHTTPRequestHandler):
             proc = subprocess.run(["pbcopy"], input=text, text=True, capture_output=True, timeout=5)
             if proc.returncode != 0:
                 return self._json(500, {"error": proc.stderr.strip() or "pbcopy failed"})
+            return self._json(200, {"ok": True})
+        if url.path == "/answers":
+            ask_id, answer = body.get("askId"), body.get("answer")
+            if not isinstance(ask_id, str) or not ask_id or not isinstance(answer, str) or not answer:
+                return self._json(400, {"error": "askId and answer required"})
+            _save_answer(ask_id, answer)
             return self._json(200, {"ok": True})
         if url.path == "/result":
             job = _jobs.get(str(body.get("jobId")))
@@ -845,6 +885,55 @@ def _chunked_job(op: str, items: list, chunk: int, timeout: float, make) -> None
     finish({"ok": ok, "summary": f"{done}/{len(items)} done", "results": results}, ok)
 
 
+def outline(path: str, chunk: int, timeout: float, dry_run: bool) -> None:
+    """Plan file: JSON {create: [{key, parent, text, tag?}], order: [{parent, children}],
+    heading: [{rem, level}], document: [rem]} (see runOutline in the plugin). Runs creates, then orders, then
+    headings, in jobs of about `chunk` items. The ids of created rems go to <plan>.keys.json
+    as they come back, so a rerun after a failure resumes instead of creating them twice."""
+    plan = json.loads(Path(path).read_text())
+    keys_file = Path(path).with_suffix(".keys.json")
+    keys: dict = json.loads(keys_file.read_text()) if keys_file.exists() else {}
+    creates = [c for c in plan.get("create", []) if c["key"] not in keys]
+    orders, heads = plan.get("order", []), plan.get("heading", [])
+    if dry_run:
+        finish({"ok": True, "dryRun": True, "create": len(creates), "alreadyCreated": len(keys),
+                "orderParents": len(orders), "orderChildren": sum(len(o["children"]) for o in orders),
+                "heading": len(heads)}, True)
+    # the rems a job touches, keys resolved: the plugin waits for them to sync first
+    ids = lambda refs: sorted({keys.get(r, r) for r in refs if r and (not r.startswith("new:") or r in keys)})
+    failures: list = []
+    totals = {"created": 0, "placed": 0, "headed": 0}
+
+    def send(args: dict, refs: list[str], label: str) -> None:
+        result = run_job("outline", ids(refs), {**args, "keys": keys}, timeout)
+        keys.update(result.get("keys") or {})
+        keys_file.write_text(json.dumps(keys, indent=1))
+        for k in totals:
+            totals[k] += result.get(k) or 0
+        failures.extend(result.get("failures") or ([] if result.get("ok") else [{"step": label, "error": result.get("message")}]))
+        print(f"outline {label}: {result.get('summary')}", file=sys.stderr, flush=True)
+
+    for start in range(0, len(creates), chunk):
+        part = creates[start:start + chunk]
+        send({"create": part}, [c["parent"] for c in part], f"create {start + len(part)}/{len(creates)}")
+    batch: list = []
+    for o in orders + [None]:
+        if o is None or (batch and sum(len(b["children"]) for b in batch) + len(o["children"]) > chunk):
+            if batch:
+                send({"order": batch}, [r for b in batch for r in [b["parent"], *b["children"]]],
+                     f"order {len(batch)} parent(s)")
+            batch = []
+        if o is not None:
+            batch.append(o)
+    if plan.get("document"):
+        send({"document": plan["document"]}, plan["document"], "document")
+    for start in range(0, len(heads), chunk * 2):
+        part = heads[start:start + chunk * 2]
+        send({"heading": part}, [h["rem"] for h in part], f"heading {start + len(part)}/{len(heads)}")
+    ok = not failures
+    finish({"ok": ok, **totals, "keys": str(keys_file), "failures": failures}, ok)
+
+
 def set_text(path: str, chunk: int, timeout: float) -> None:
     """Edits file: JSON list of {remId, text?: {before, after}, backText?: {before, after}} (RemNote rich text)."""
     edits = json.loads(Path(path).read_text())
@@ -882,6 +971,65 @@ def notice(title: str, message: str, detail: str | None, rem: str | None, tone: 
         time.sleep(0.5)
     finish({"jobId": job_id, "status": "queued",
             "message": "RemNote has not picked it up yet; it shows when a RemNote window polls the bridge"}, True)
+
+
+def _need_version(op: str, version: int) -> None:
+    h = ensure_running()
+    if h.get("version", 1) < version:
+        sys.exit(
+            f"the running helper is an older version ({h.get('version')}); restart it so it knows '{op}': "
+            f"`{Path(__file__).name} stop` (or `launchctl kickstart -k gui/$(id -u)/com.incrementalremnote.media-bridge`)"
+        )
+
+
+def _answer_of(ask_id: str) -> dict:
+    return _request("GET", f"/answers/{ask_id}") or {"askId": ask_id, "status": "pending"}
+
+
+def ask(title: str, message: str, detail: str | None, items_file: str | None, rem: str | None,
+        choices: str, tone: str, wait: float) -> None:
+    """Ask the user in RemNote: a notice with one button per choice (default Accept / Reject).
+
+    Prints {askId, status: queued|shown|answered, answer?}. The question stays in RemNote
+    until answered; wait for it with `answer <askId> --wait N` (run that in the background).
+    """
+    _need_version("ask", 18)
+    args: dict = {"title": title, "message": message, "tone": tone,
+                  "choices": [c.strip() for c in choices.split(",") if c.strip()]}
+    if detail:
+        args["detail"] = detail
+    if items_file:
+        args["items"] = json.loads(Path(items_file).read_text())
+    job_id = _request("POST", "/jobs", {"op": "ask", "remIds": [rem] if rem else [], **args})["jobId"]
+    deadline = time.time() + wait
+    status = "queued"
+    while time.time() < deadline:
+        got = _answer_of(job_id)
+        if got.get("status") == "answered":
+            finish({**got, "askId": job_id}, True)
+        job = _request("GET", f"/jobs/{job_id}")
+        if job and job["status"] == "done":
+            if not (job["result"] or {}).get("ok", True):
+                finish({"askId": job_id, "status": "failed", **(job["result"] or {})}, False)
+            status = "shown"
+        time.sleep(0.5)
+    finish({"askId": job_id, "status": status}, True)
+
+
+def answer(ask_ids: str, wait: float, any_: bool) -> None:
+    """The answers to `ask` questions; waits up to `wait` s for all of them (or, with
+    --any, for the first). 'dismissed' = closed without a choice."""
+    _need_version("answer", 18)
+    ids = split_ids(ask_ids)
+    deadline = time.time() + wait
+    while True:
+        got = {i: _answer_of(i) for i in ids}
+        done = [i for i in ids if got[i].get("status") == "answered"]
+        if (len(done) == len(ids)) or (any_ and done) or time.time() >= deadline:
+            break
+        time.sleep(1.0)
+    out = {i: {"status": got[i].get("status"), "answer": got[i].get("answer")} for i in ids}
+    print(json.dumps({"answers": out, "pending": [i for i in ids if i not in done]}, ensure_ascii=False, indent=2))
 
 
 def restore_audio(rems: str, chunk: int, timeout: float) -> None:
@@ -1082,6 +1230,24 @@ def main() -> None:
     p_no.add_argument("--tone", choices=["success", "info", "error"], default="success")
     p_no.add_argument("--wait", type=float, default=10,
                       help="seconds to wait for RemNote to show it (it stays queued after that)")
+    p_ol = sub.add_parser("outline", help="create headers, set child order and heading levels from a plan file")
+    p_ol.add_argument("plan", help="JSON {create: [...], order: [...], heading: [...]}")
+    p_ol.add_argument("--chunk", type=int, default=30, help="items per plugin job (default 30)")
+    p_ol.add_argument("--dry-run", action="store_true", help="count what would be sent")
+    p_ol.add_argument("--timeout", type=float, default=300, help="seconds to wait for each job")
+    p_ask = sub.add_parser("ask", help="ask the user in RemNote: a notice with Accept / Reject (or other) buttons")
+    p_ask.add_argument("--title", required=True)
+    p_ask.add_argument("--message", default="")
+    p_ask.add_argument("--detail")
+    p_ask.add_argument("--items", help="JSON file: [{title, lines: [..]}], one box per proposed change")
+    p_ask.add_argument("--rem", help="rem id the Open Rem button opens (the question stays up)")
+    p_ask.add_argument("--choices", default="Accept,Reject", help="comma-separated button labels, first = primary")
+    p_ask.add_argument("--tone", choices=["success", "info", "error"], default="info")
+    p_ask.add_argument("--wait", type=float, default=10, help="seconds to wait for the card (or an answer)")
+    p_ans = sub.add_parser("answer", help="the answers to ask questions (waits for them)")
+    p_ans.add_argument("askIds", help="ask id, or several comma-separated")
+    p_ans.add_argument("--wait", type=float, default=0, help="seconds to wait for the answers")
+    p_ans.add_argument("--any", action="store_true", help="return as soon as one is answered")
     a = ap.parse_args()
     if a.cmd == "serve":
         serve()
@@ -1126,6 +1292,12 @@ def main() -> None:
         remove(a.expect, max(1, a.chunk), a.timeout)
     elif a.cmd == "notice":
         notice(a.title, a.message, a.detail, a.rem, a.tone, a.wait)
+    elif a.cmd == "outline":
+        outline(a.plan, max(1, a.chunk), a.timeout, a.dry_run)
+    elif a.cmd == "ask":
+        ask(a.title, a.message, a.detail, a.items, a.rem, a.choices, a.tone, a.wait)
+    elif a.cmd == "answer":
+        answer(a.askIds, a.wait, a.any)
 
 
 if __name__ == "__main__":

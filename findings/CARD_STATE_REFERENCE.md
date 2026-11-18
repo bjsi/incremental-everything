@@ -336,6 +336,25 @@ card does not un-practise it.
    `remDisableCardsAncestor`, `remDisablingAncestorId`, `clozeId`, `markupStillPresent`, plus a
    summary file with the bucket × cause matrix.
 
+## What RemNote's own Enable / Disable Card commands write
+
+Read in the bundle, 1.30.4, November 17, 2026. None of them is the Disable Descendant Cards
+powerup; that one is the separate "Enable/Disable Descendants" switch in the Rem's info panel.
+
+- **Command palette `/Enable Card` (`de`) and `/Disable Card` (`di`)**: `setForgetForFrontBack(bool)`,
+  which writes the Rem-wide `forget` flag and pushes `{forget, date}` onto the Rem's `history`.
+  Enabling a Rem whose forward and backward directions are both off also switches both on
+  (`enableBackSR = true`, `efc = false`). It never touches `dci`. Same effect as
+  `rem.setEnablePractice`, except for the history entry and that direction repair.
+- **The Browser's (card table's) Disable Cards / Enable Cards buttons** work per card, grouped by
+  Rem. If the selection holds every card the Rem should have (`cardTypesInRemThatShouldExist()`),
+  they write `forget`. Otherwise each card goes through `setEnableCardType(type, bool)`:
+  `'f'` → `efc` (disable forward), `'b'` → `enableBackSR`, a cloze id → `dci`. Enabling a card
+  of a Rem whose `forget` is on first asks to enable the whole Rem (`askToEnableEntireRem`).
+- A plugin can do all of it except the cloze part: `setEnablePractice` for `forget`,
+  `setPracticeDirection` for the two directions. Search & Browse's Cards on / Cards off
+  (`switchCards` in `src/lib/search_browse.ts`) follows the Browser, and skips single clozes.
+
 ## Re-enabling
 
 - Rem-level: `rem.setEnablePractice(true)`.

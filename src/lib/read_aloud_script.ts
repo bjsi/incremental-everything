@@ -162,6 +162,57 @@ async function spansOf(
   return out;
 }
 
+/**
+ * A notice that an audio was made by AI ("Audio gerado por IA, apenas para introduzir a
+ * matéria." over the audios of imported courses): about the audio, not the subject.
+ * Matched only as a whole sentence that ends its line and starts the Rem or follows a
+ * separator ("Title — Audio gerado por IA…"), so a note that talks about AI audio
+ * mid-sentence is still read. In Read aloud, a Rem whose notice sits right above an
+ * audio (a child audio Rem) is left out whole, title included (collect).
+ */
+const AI_NOTICE_RE = new RegExp(
+  '(^|\\s*[—–:|-]\\s*)' +
+    '(?:' +
+    '[áa]udio\\s+(?:gerad[oa]|criad[oa]|produzid[oa]|narrad[oa]|sintetizad[oa])\\s+(?:por|com)\\s+' +
+    '(?:(?:uma\\s+)?IA|intelig[êe]ncia\\s+artificial)' +
+    '|' +
+    '(?:AI|IA)[- ](?:generated|created|produced|narrated)\\s+audio' +
+    '|' +
+    'audio\\s+(?:generated|created|produced|narrated|synthesi[sz]ed)\\s+(?:by|with)\\s+' +
+    '(?:an\\s+)?(?:AI|artificial\\s+intelligence)' +
+    ')' +
+    '\\b[^.!?\\n]*[.!?]*[ \\t]*(?=\\n|$)',
+  'giu'
+);
+
+/** Spans with the AI-audio notices cut out (see AI_NOTICE_RE), counted in `stats`. */
+export function withoutAiNotices(spans: Span[], stats: ReadAloudStats): Span[] {
+  const plain = plainOf(spans);
+  const cuts = [...plain.matchAll(AI_NOTICE_RE)].map(
+    (m) => [m.index!, m.index! + m[0].length] as const
+  );
+  if (!cuts.length) return spans;
+  stats.skipped.aiNotices = (stats.skipped.aiNotices ?? 0) + cuts.length;
+  const out: Span[] = [];
+  let pos = 0;
+  for (const span of spans) {
+    const start = pos;
+    pos += span.text.length;
+    let text = '';
+    let at = start;
+    for (const [a, b] of cuts) {
+      if (b <= at || a >= pos) continue;
+      text += span.text.slice(at - start, Math.max(a, at) - start);
+      at = Math.min(b, pos);
+    }
+    text += span.text.slice(at - start);
+    // A formula is kept whole or dropped whole (its placeholder is never cut in two).
+    if (span.latex !== undefined && text !== span.text) continue;
+    if (text) out.push({ ...span, text });
+  }
+  return out;
+}
+
 const UNITS: Record<string, Record<Lang, string>> = {
   kN: { pt: 'quilonewtons', en: 'kilonewtons' },
   MN: { pt: 'meganewtons', en: 'meganewtons' },
@@ -290,14 +341,19 @@ async function collect(
     for (const child of included) await collect(plugin, child, out, stats, seen, depth);
     return;
   }
+  const children = await rem.getChildrenRem();
   if (isCode) count(stats, 'code');
   else {
-    const front = await spansOf(plugin, rem.text, stats);
-    const back = await spansOf(plugin, rem.backText, stats);
-    if (plainOf(front).trim() || plainOf(back).trim()) out.push({ front, back, depth });
+    const notices = stats.skipped.aiNotices ?? 0;
+    const front = withoutAiNotices(await spansOf(plugin, rem.text, stats), stats);
+    const back = withoutAiNotices(await spansOf(plugin, rem.backText, stats), stats);
+    // "Title — Audio gerado por IA…" right above its audio: the title is the audio's
+    // caption, and the audio is not read, so the whole line goes.
+    const audioCaption = (stats.skipped.aiNotices ?? 0) > notices && children.some(hasAudio);
+    if (!audioCaption && (plainOf(front).trim() || plainOf(back).trim()))
+      out.push({ front, back, depth });
   }
-  for (const child of await rem.getChildrenRem())
-    await collect(plugin, child, out, stats, seen, depth + 1);
+  for (const child of children) await collect(plugin, child, out, stats, seen, depth + 1);
 }
 
 /** Spans as written text for an LLM: italic as *x*, formulas as \(LaTeX\). */
@@ -370,31 +426,67 @@ export async function buildReadAloudScript(
   return { script: lines.join('\n'), source: outlineOf(raw), lang, title, stats };
 }
 
+/** RemType.DESCRIPTOR (type-only SDK import, as REM_TYPE_PORTAL). */
+const REM_TYPE_DESCRIPTOR = 2;
+/** A safety net for the descriptor chain walk. */
+const MAX_DESCRIPTOR_CHAIN = 10;
+
+/**
+ * A descriptor's chain, outermost first: the first ancestor that is not a descriptor
+ * (its concept, marked as one or not), then the descriptors in between. Empty for a
+ * Rem that is not a descriptor.
+ */
+async function descriptorChain(rem: PluginRem): Promise<PluginRem[]> {
+  if ((rem.type as number) !== REM_TYPE_DESCRIPTOR) return [];
+  const chain: PluginRem[] = [];
+  let parent = await rem.getParentRem();
+  for (let i = 0; parent && i < MAX_DESCRIPTOR_CHAIN; i++) {
+    chain.unshift(parent);
+    if ((parent.type as number) !== REM_TYPE_DESCRIPTOR) break;
+    parent = await parent.getParentRem();
+  }
+  return chain;
+}
+
+/** The language of a Rem's parents (up to three), English when they give no clue. */
+async function parentsLang(plugin: RNPlugin, rem: PluginRem): Promise<Lang> {
+  let parent = await rem.getParentRem();
+  const texts: string[] = [];
+  for (let i = 0; parent && i < 3; i++) {
+    texts.push(await plugin.richText.toString(parent.text ?? []));
+    parent = await parent.getParentRem();
+  }
+  return guessLang(texts.join(' ')) ?? 'en';
+}
+
 /**
  * One Rem, for a pronunciation: its front and back (no descendants) as one or two
- * script lines, each in its own language. A single word gives no language clue, so
- * an undecided side takes the other side's language, then the language of the Rem's
- * parents (up to three), then English.
+ * script lines, each in its own language. A descriptor is read in context: first the
+ * fronts of its chain (concept, then the descriptors above it, descriptorChain),
+ * then its own front and back. A single word gives no language clue, so an undecided
+ * side takes the other side's language, then the language of the Rem's parents (up to
+ * three), then English; an undecided chain line looks only at its own parents.
  */
 export async function buildRemScript(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<{ script: string; lang: Lang; title: string; stats: ReadAloudStats }> {
   const stats: ReadAloudStats = { rems: 1, lines: 0, skipped: {}, truncated: false };
-  const front = await spansOf(plugin, rem.text, stats);
-  const back = await spansOf(plugin, rem.backText, stats);
+  const chain = await descriptorChain(rem);
+  const front = withoutAiNotices(await spansOf(plugin, rem.text, stats), stats);
+  const back = withoutAiNotices(await spansOf(plugin, rem.backText, stats), stats);
   let context: Lang | null = null;
-  const contextLang = async (): Promise<Lang> => {
-    if (context) return context;
-    let parent = await rem.getParentRem();
-    const texts: string[] = [];
-    for (let i = 0; parent && i < 3; i++) {
-      texts.push(await plugin.richText.toString(parent.text ?? []));
-      parent = await parent.getParentRem();
-    }
-    context = guessLang(texts.join(' ')) ?? 'en';
-    return context;
-  };
+  const contextLang = async (): Promise<Lang> => (context ??= await parentsLang(plugin, rem));
+  const chainLines: string[] = [];
+  for (const link of chain) {
+    const spans = withoutAiNotices(await spansOf(plugin, link.text, stats), stats);
+    if (!plainOf(spans).trim()) continue;
+    stats.rems++;
+    // Only what is above the link: the descriptors below it may be in another language.
+    const lang = guessLang(plainOf(spans)) ?? (await parentsLang(plugin, link));
+    const text = renderLine(spans, lang);
+    if (text) chainLines.push(scriptLine(text, lang));
+  }
   const frontGuess = guessLang(plainOf(front));
   const backGuess = guessLang(plainOf(back));
   const sides: { spans: Span[]; lang: Lang }[] = [];
@@ -404,12 +496,15 @@ export async function buildRemScript(
   if (plainOf(back).trim()) {
     sides.push({ spans: back, lang: backGuess ?? frontGuess ?? (await contextLang()) });
   }
-  const lines = sides
-    .map(({ spans, lang }) => {
-      const text = renderLine(spans, lang);
-      return text ? scriptLine(text, lang) : '';
-    })
-    .filter(Boolean);
+  const lines = [
+    ...chainLines,
+    ...sides
+      .map(({ spans, lang }) => {
+        const text = renderLine(spans, lang);
+        return text ? scriptLine(text, lang) : '';
+      })
+      .filter(Boolean),
+  ];
   stats.lines = lines.length;
   const lang = sides[0]?.lang ?? 'en';
   const title = sides.length ? renderLine(sides[0].spans, sides[0].lang).replace(/[.:]$/, '') : '';

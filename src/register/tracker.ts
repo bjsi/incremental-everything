@@ -1,7 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache, writeIncRemCaches, applyIncRemCacheChanges } from '../lib/incremental_rem/cache';
 import { PriorityChangeEvent } from '../lib/priority_history';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, pendingIncRemTransferTailKey, pendingReadAloudJobsKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, pendingIncRemTransferTailKey, pendingReadAloudJobsKey, pendingUpscaleJobsKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -15,6 +15,7 @@ import { runReviewJob, ReviewJob, IncRemCacheChanges } from '../lib/incremental_
 import { runIncRemTransferTail, IncRemTransferTailJob } from '../lib/incremental_rem/transfer';
 import { showNotice } from '../lib/notice';
 import { ReadAloudJob, runReadAloudJob } from '../lib/read_aloud';
+import { runUpscaleJob, UpscaleJob } from '../lib/upscale_image';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
 // IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
@@ -787,6 +788,22 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       startedReadAloudJobs.add(job.id);
       console.log('[Tracker] readAloud job picked up for remId:', job.target.remId);
       void runReadAloudJob(plugin, job);
+    }
+  });
+
+  // Upscale jobs (lib/upscale_image.ts): the same hand-off for "Upscale image with
+  // ChatGPT". A job waits on ChatGPT for a minute or more per image, then posts a notice
+  // whose Review button opens the comparison; nothing touches the rem until approved.
+  const startedUpscaleJobs = new Set<string>();
+  plugin.track(async (rp) => {
+    const queued = await rp.storage.getSession<UpscaleJob[]>(pendingUpscaleJobsKey);
+    if (!queued || queued.length === 0) return;
+    await plugin.storage.setSession(pendingUpscaleJobsKey, null);
+    for (const job of queued) {
+      if (startedUpscaleJobs.has(job.id)) continue;
+      startedUpscaleJobs.add(job.id);
+      console.log('[Tracker] upscale job picked up for remId:', job.remId);
+      void runUpscaleJob(plugin, job);
     }
   });
 

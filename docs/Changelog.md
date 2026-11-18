@@ -2,6 +2,50 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.244 - November 18th, 2026
+
+### ✨ New
+
+**Send to another window**: added **Send to Another Window** to the document's Menu Hub, and the **Send Pane to Another Window** command, which open the document in another RemNote window (`⌘⇧N` if none is open) and close its pane here once it is open there. Desktop app only.
+
+📖 [Finding & Navigating → Send to another window](Utilities-Finding-and-Navigating.md#send-to-another-window)
+
+## v1.0.243 - November 18th, 2026
+
+### ✨ New
+
+**Questions from outside tools**: the notice card can now ask, with a button per answer (**Accept** / **Reject**, or labels the tool chooses) and **Open Rem** to look before deciding; the answer goes back to the tool (`media_bridge.py ask` / `answer`). And the Local Media Bridge can build an outline in one go (`outline`): create headers, put a parent's children in a given order, set heading levels and make documents — for example to mirror a book's table of contents in its notes. Restart the helper to get them.
+
+📖 [Local Media Bridge → Questions with buttons](Local-Media-Bridge.md#ask) · [Rem operations](Local-Media-Bridge.md#operations)
+
+### ✨ Improved
+
+**Find Rem**: added hierarchical search, as in Search & Browse's Move and Tag picker: Tab searches within the selected Rem (listing its children until you type), Shift+Tab goes back up, and Backspace in an empty box returns to the whole knowledge base.
+
+📖 [Finding & Navigating → Search within a Rem](Utilities-Finding-and-Navigating.md#search-within-a-rem)
+
+### 📝 Changed
+
+**Add pronunciation**: a descriptor is now read after its concept (the first parent that is not a descriptor) and any descriptors in between, then its own front and back; in the queue the new audio no longer plays from the command, since the queue already plays it and the two overlapped.
+
+📖 [Read Aloud → Descriptors are read with their concept](Read-Aloud.md#pronunciation-descriptors)
+
+**Read Aloud**: notices like *Audio gerado por IA, apenas para introduzir a matéria.* are no longer read, in all three modes, and a titled one right above its audio is left out whole; Azure is now suggested only for English text with 3 or more marked Portuguese terms (Gemini reads English terms in Portuguese well); and Portuguese from Gemini TTS through Google Cloud is Brazilian again (it could come out European on a short line). Restart the [Local Media Bridge](Local-Media-Bridge.md#run-at-login) helper to get the engine changes.
+
+📖 [Read Aloud → Reading rules](Read-Aloud.md#reading-rules)
+
+**Upscale image with ChatGPT**: now runs in the background, so the popup no longer has to stay open; when ChatGPT is done, a notice's **Review** button opens the comparison, and Try again goes back to the background with a new notice.
+
+📖 [Local Media Bridge → Upscale an image with ChatGPT](Local-Media-Bridge.md#upscale)
+
+## v1.0.241 - November 17th, 2026
+
+### ✨ New
+
+**Search & Browse**: added **Move…**, **Tag…** (add or remove), **Cards on / off** and **Copy refs** (references, pins, or text + pin, pasted into one Rem) for the selected rows; a **Cards** column *(on the Rem + below it)*; and clozes in blue, as in the queue. The Move and Tag picker searches as RemNote's Move Bullet does (Tab into a Rem, Shift+Tab back up), with **+ Create** (⌘Enter). Needs the updated [AI helper](Desktop-Helpers.md#updating) (`ai_ocr_helper.py`, `rem_browse.py`).
+
+📖 [Search Engine → Acting on the rows](Search-Engine.md#actions)
+
 ## v1.0.240 - November 17th, 2026
 
 ### 📝 Changed
@@ -293,7 +337,7 @@ A new **Desktop Helpers** page lists every helper the plugin works with (AI help
 
 Try it: click ⋯ (or ⋮ in the queue), then **Incremental RemNote…**. *(A mock: nothing runs.)*
 
-<iframe src="../demos/menu-hub.html" title="Menu Hub demo" loading="lazy" style="width:100%;height:620px;border:0;display:block"></iframe>
+<iframe src="../demos/menu-hub.html" title="Menu Hub demo" loading="lazy" style="width:100%;height:670px;border:0;display:block"></iframe>
 
 📖 [Menu Hub](Plugin-Widgets-Reference.md#menu-hub)
 

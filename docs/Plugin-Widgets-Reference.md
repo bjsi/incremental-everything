@@ -723,7 +723,7 @@ RemNote can't group a plugin's entries under one submenu, so the plugin puts a s
 
 Try it below: switch between the two menus, open one, and pick **Incremental RemNote…**; then use the mouse or the keys. *(A mock: a line under it says what each action would open.)*
 
-<iframe src="../demos/menu-hub.html" title="Menu Hub demo" loading="lazy" style="width:100%;height:620px;border:0;display:block"></iframe>
+<iframe src="../demos/menu-hub.html" title="Menu Hub demo" loading="lazy" style="width:100%;height:670px;border:0;display:block"></iframe>
 
 **From a document's ⋯ menu**, the header names the document, and the actions act on it:
 
@@ -736,6 +736,7 @@ Try it below: switch between the two menus, open one, and pick **Incremental Rem
 | Statistics | [Priority Shield History](#44-priority-shield-graph), [Study Dashboard](Study-Dashboard.md#opening-it) (opens in Document mode on this document) |
 | Flashcards | [Audit Card Enablement](#613-card-enablement-audit-popup) |
 | Audio | [Audio Playlist (this document)](Audio-Playlist.md), [Audio Playlist (rems tagged with this)](Audio-Playlist.md#start) |
+| Window | [Send to Another Window](Utilities-Finding-and-Navigating.md#send-to-another-window) (desktop app only) |
 
 **From the queue's ⋮ menu**, the header names the queue's scope, and the actions act on that queue:
 
