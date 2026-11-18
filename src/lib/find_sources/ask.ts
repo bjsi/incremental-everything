@@ -53,10 +53,17 @@ knowledge. When the passages do not settle the question, say so plainly; you may
 they do establish. Never say a passage does not state something its text states.
 - Numbers, units, conditions and definitions exactly as the passages give them.
 - Start with the core idea, then work up to the details and conditions.
-- When passages disagree (a different number, condition or definition), do not pick one \
-silently: say which source says what.
+- Say each fact once, as briefly as the question allows. The answer sentence gives the \
+conclusion; the sections only add what it does not (the definition, the reasons, the \
+conditions), never restate it or each other. A narrow factual question usually needs 1 or 2 \
+sections.
+- When the sources disagree (a different number, condition or definition), do not pick one \
+silently: say which source says what, once, where the point comes up. When the disagreement \
+IS the answer, the answer sentence and the sections already show it: leave "divergences" \
+empty.
 - Name sources through the quotes; the text itself names a book only when contrasting \
-sources ("Arte Naval dá 45°; Clark, 35–37°").
+sources ("Arte Naval dá 45°; Clark, 35–37°"). Never write "passages", "trechos" or their \
+numbers in the text.
 - Write in the language given as LANGUAGE. Use **bold** for the key terms and figures; no \
 other markup, no headings, no lists inside a text.
 
@@ -66,12 +73,13 @@ Reply with ONE JSON object and nothing else:
  "sections": [{"text": "1 to 3 sentences on one point", "quotes": [ ... ]}],
  "divergences": [{"text": "where the sources disagree and how", "quotes": [ ... ]}]}
 
-- "sections": 1 to 5, in teaching order. A topic (no question mark) gets the explanation it \
+- "sections": 1 to 4, in teaching order. A topic (no question mark) gets the explanation it \
 needs; a narrow question may need a single section.
 - Each section's "quotes": the evidence for THAT section, most important first, showing \
 exactly what supports each of its claims, so the student can check every sentence against \
 its quote. Two sections may quote the same passage with different excerpts.
-- "divergences": empty when the sources agree; each quotes every side.
+- "divergences": only a disagreement the answer and the sections have NOT already shown \
+(usually none); quote only what no section has quoted. Empty when the sources agree.
 - "covered": full = the passages answer it; partial = they answer part of it; none = they \
 do not.
 

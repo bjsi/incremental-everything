@@ -204,7 +204,7 @@ Written under the question, first among its children:
         • Outras passagens → accepted passages the answer did not use
 ```
 
-- With **Pins only** (`Q`), a section gets its pins at the end of its own text instead of quote Rems; with AI notes on, each quote gets its note.
+- `Q` chooses **Pins only** (a section gets its pins at the end of its own text) or **Pins + quotes**; there are no AI notes here, since the answer already explains. The same goes for Check Statement.
 - The question itself gets no pin. Each answer is **dated**: asking again adds a new one.
 
 ## Pinning every quote in a subtree { #quote-rems-in-descendants }

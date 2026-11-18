@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.246 - November 18th, 2026
+
+### ✨ Improved
+
+**Ask Your Sources**: made the answers shorter, saying each fact and quoting each passage once (no "Divergências" that repeats the sections when the disagreement is the answer itself); AI notes under quotes are now offered only in Find Sources, since Check Statement and Ask Your Sources already explain.
+
+📖 [Source Pins → Ask Your Sources](Source-Pins.md#ask-your-sources)
+
 ## v1.0.245 - November 18th, 2026
 
 ### ✨ New

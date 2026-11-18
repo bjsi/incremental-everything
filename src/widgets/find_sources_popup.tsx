@@ -17,6 +17,8 @@ import { emphasisSegments } from '../lib/find_sources/quote_text';
 
 /** Remembered per device: what to write besides the pins (an old boolean meant quotes or not). */
 const EXTRAS_KEY = 'find-sources-with-quotes';
+/** Check Statement and Ask Your Sources: their own choice, Pins only or Pins + quotes. */
+const EXPLAINED_EXTRAS_KEY = 'find-sources-explained-extras';
 const EXTRAS: { value: FindSourcesExtras; label: string; tip: string }[] = [
   { value: 'pins', label: 'Pins only', tip: 'Only the pins, on the Rem' },
   { value: 'quotes', label: 'Pins + quotes', tip: 'Also each quote as a child Rem, under Sources / Related material (Extra Card Detail)' },
@@ -101,8 +103,10 @@ function FindSourcesPopup() {
       );
       setSelected(initial);
       try {
-        const saved = await plugin.storage.getLocal<FindSourcesExtras | boolean>(EXTRAS_KEY);
-        setExtras(saved === true ? 'quotes' : EXTRAS.some((e) => e.value === saved) ? (saved as FindSourcesExtras) : 'pins');
+        // Check Statement and Ask Your Sources remember their own choice (no AI notes there).
+        const explained = !!data?.rems.some((r) => r.check || r.checkError || r.answer || r.answerError);
+        const saved = await plugin.storage.getLocal<FindSourcesExtras | boolean>(explained ? EXPLAINED_EXTRAS_KEY : EXTRAS_KEY);
+        setExtras(saved === true ? 'quotes' : EXTRAS.some((e) => e.value === saved) ? (saved as FindSourcesExtras) : explained ? 'quotes' : 'pins');
       } catch {
         /* per-device convenience only */
       }
@@ -170,13 +174,18 @@ function FindSourcesPopup() {
     if (target !== -1) setCursor(target);
   };
 
-  /** Pins only → Pins + quotes → Pins + quotes + AI notes → Pins only. */
+  /**
+   * Pins only → Pins + quotes → Pins + quotes + AI notes → Pins only. The AI notes only in
+   * Find Sources: Check Statement's observation and Ask Your Sources' answer already explain.
+   */
+  const choices = isCheck ? EXTRAS.filter((e) => e.value !== 'notes') : EXTRAS;
+  const extrasChoice: FindSourcesExtras = choices.some((e) => e.value === extras) ? extras : 'quotes';
   const cycleExtras = () => {
-    const next = EXTRAS[(EXTRAS.findIndex((e) => e.value === extras) + 1) % EXTRAS.length].value;
+    const next = choices[(choices.findIndex((e) => e.value === extrasChoice) + 1) % choices.length].value;
     setExtras(next);
     // Unpinnable rows cannot stay selected without quote Rems.
     if (next === 'pins') setSelected((s) => new Set([...s].filter((k) => rows.find((r) => keyOf(r) === k)?.p.pdfRemId)));
-    void plugin.storage.setLocal(EXTRAS_KEY, next).catch(() => {});
+    void plugin.storage.setLocal(isCheck ? EXPLAINED_EXTRAS_KEY : EXTRAS_KEY, next).catch(() => {});
   };
 
   const close = () => plugin.widget.closePopup();
@@ -203,7 +212,7 @@ function FindSourcesPopup() {
     await queueFindSourcesWrite(plugin, {
       id: `${review.jobId}-write-${Date.now()}`,
       noticeId: review.noticeId,
-      extras,
+      extras: extrasChoice,
       rems,
     });
     await plugin.app.toast(`📌 Pinning ${chosen.length} passage${chosen.length === 1 ? '' : 's'}…`);
@@ -433,9 +442,9 @@ function FindSourcesPopup() {
           onMouseDown={(e) => e.preventDefault()}
           className="py-1 px-2 rounded text-xs"
           style={{ border: '1px solid var(--rn-clr-border-primary)', background: 'transparent', color: 'inherit', cursor: 'pointer' }}
-          data-tip={`Q: ${EXTRAS.find((e) => e.value === extras)?.tip}. Press again for the next choice.`}
+          data-tip={`Q: ${EXTRAS.find((e) => e.value === extrasChoice)?.tip}. Press again for the next choice.`}
         >
-          {EXTRAS.find((e) => e.value === extras)?.label} ▾
+          {EXTRAS.find((e) => e.value === extrasChoice)?.label} ▾
         </button>
         <span className="text-xs" style={muted}>
           <span style={keyStyle}>↑↓</span> move · <span style={keyStyle}>Space</span> select · <span style={keyStyle}>A</span> all ≥ {ACCEPT_SCORE} ·{' '}

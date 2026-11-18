@@ -906,7 +906,8 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
         if (write.extras !== 'pins') {
           underCheck = new Set(entry.passages.filter((p) => p.basis));
           for (const { passage, pins } of pinned.filter((p) => underCheck.has(p.passage))) {
-            const added = await addQuoteRem(plugin, parentOfQuotes, passage, pins, write.extras === 'notes');
+            // The observation explains the verdict: no AI notes under its quotes.
+            const added = await addQuoteRem(plugin, parentOfQuotes, passage, pins, false);
             if (added.quote) quoteCount++;
             if (added.note) noteCount++;
           }
@@ -927,7 +928,8 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
         const header = await headerRem(plugin, rem, headerNames);
         if (!header) continue;
         for (const { passage, pins } of items) {
-          const added = await addQuoteRem(plugin, header, passage, pins, write.extras === 'notes');
+          // AI notes only in Find Sources: a check's observation already explains.
+          const added = await addQuoteRem(plugin, header, passage, pins, write.extras === 'notes' && !entry.check);
           if (added.quote) quoteCount++;
           if (added.note) noteCount++;
         }
@@ -994,6 +996,7 @@ async function writeAnswer(
   const counts = { quotes: 0, notes: 0, pins: 0 };
   const byIndex = new Map(pinned.filter((p) => p.passage.index !== undefined).map((p) => [p.passage.index!, p]));
   const used = new Set<number>();
+  const written = new Set<string>();
 
   const child = async (parent: PluginRem, text: RichElement[], first = false): Promise<PluginRem | undefined> => {
     const r = await plugin.rem.createRem();
@@ -1025,7 +1028,13 @@ async function writeAnswer(
     counts.pins += pins.length;
     if (!r || extras === 'pins') return;
     for (const p of mine) {
-      const added = await addQuoteRem(plugin, r, p.passage, p.pins, extras === 'notes');
+      // A quote already written for an earlier section is not repeated (a divergence that
+      // restates the sections would otherwise quote them all again).
+      const id = `${p.passage.index}:${excerptsOf(p.passage).join('|')}`;
+      if (written.has(id)) continue;
+      written.add(id);
+      // The answer explains each quote already: no AI notes under them.
+      const added = await addQuoteRem(plugin, r, p.passage, p.pins, false);
       if (added.quote) counts.quotes++;
       if (added.note) counts.notes++;
       counts.pins += p.pins.length;
@@ -1051,7 +1060,7 @@ async function writeAnswer(
           counts.pins += p.pins.length;
           continue;
         }
-        const added = await addQuoteRem(plugin, others, p.passage, p.pins, extras === 'notes');
+        const added = await addQuoteRem(plugin, others, p.passage, p.pins, false);
         if (added.quote) counts.quotes++;
         if (added.note) counts.notes++;
         counts.pins += p.pins.length;
