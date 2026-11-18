@@ -178,8 +178,26 @@ export function quoteRichText(p: ReviewPassage): RichElement[] {
 
 // --- 1. queue ---------------------------------------------------------------------------
 
-const plainOf = (plugin: RNPlugin, rt: RichTextInterface | undefined) =>
-  plugin.richText.toString(((rt ?? []) as RichTextInterface).filter((el) => !isPin(el)));
+/**
+ * The text a Rem's rich text shows, without pins. Only text runs, references and formulas
+ * go to RemNote's toString: other elements (an image, an audio) carry no words, and some
+ * are stored in shapes its validator rejects (an image with `percent: 0` made toString
+ * throw "Invalid input"). If it refuses anyway, the text is taken from the runs directly.
+ */
+async function plainOf(plugin: RNPlugin, rt: RichTextInterface | undefined): Promise<string> {
+  const textual = ((rt ?? []) as RichTextInterface).filter(
+    (el) => !isPin(el) && (typeof el === 'string' || ['m', 'q', 'x'].includes((el as { i?: string }).i ?? ''))
+  );
+  if (!textual.length) return '';
+  try {
+    return await plugin.richText.toString(textual);
+  } catch (e) {
+    console.warn('[FindSources] richText.toString refused a Rem text; reading its runs directly', e);
+    return textual
+      .map((el) => (typeof el === 'string' ? el : typeof (el as { text?: unknown }).text === 'string' ? (el as { text: string }).text : ''))
+      .join('');
+  }
+}
 
 const shortTitle = (text: string) => (text.length > 90 ? `${text.slice(0, 89)}…` : text);
 
@@ -245,16 +263,24 @@ async function statementsForRems(plugin: RNPlugin, rems: PluginRem[]): Promise<S
   const out: Statement[] = [];
   const children = (r: PluginRem) => r.getChildrenRem();
   for (const rem of rems) {
-    const node = await nodeOf(plugin, rem, children, LIST_DEPTH);
-    if (!node) continue;
-    let statement = groupOf(node);
-    if (!statement) {
-      const parent = await rem.getParentRem();
-      const parentNode = parent ? await nodeOf(plugin, parent, children, LIST_DEPTH) : null;
-      const group = parentNode ? groupOf(parentNode) : null;
-      if (group?.members.some((m) => m.remId === rem._id)) statement = group;
+    let statement: Statement | null = null;
+    try {
+      const node = await nodeOf(plugin, rem, children, LIST_DEPTH);
+      if (!node) continue;
+      statement = groupOf(node);
+      if (!statement) {
+        const parent = await rem.getParentRem();
+        const parentNode = parent ? await nodeOf(plugin, parent, children, LIST_DEPTH) : null;
+        const group = parentNode ? groupOf(parentNode) : null;
+        if (group?.members.some((m) => m.remId === rem._id)) statement = group;
+      }
+      statement ??= node.text ? { headId: rem._id, text: node.text, members: [] } : null;
+    } catch (e) {
+      // The outline around it could not be read: the Rem on its own.
+      console.warn('[FindSources] could not read the outline around', rem._id, e);
+      const text = await statementText(plugin, rem).catch(() => '');
+      statement = text ? { headId: rem._id, text, members: [] } : null;
     }
-    statement ??= node.text ? { headId: rem._id, text: node.text, members: [] } : null;
     if (statement && !out.some((s) => s.headId === statement!.headId)) out.push(statement);
   }
   return out;
@@ -451,7 +477,7 @@ async function locateInRemNote(plugin: ReactRNPlugin, passage: FoundPassage): Pr
       );
       const first = hits.find((h) => h.found);
       if (first) {
-        const name = await plugin.richText.toString((pdf.text ?? []) as RichTextInterface);
+        const name = await plainOf(plugin, pdf.text as RichTextInterface);
         return { ...passage, pdfRemId, pdfName: name, pdfPage: first.page };
       }
     } catch (e) {
@@ -607,7 +633,7 @@ const HEADERS = {
 /** A child of `parent` whose text is one of `names`, or a new one (Extra Card Detail) named `names[0]`. */
 async function headerRem(plugin: ReactRNPlugin, parent: PluginRem, names: string[]): Promise<PluginRem | undefined> {
   for (const child of await parent.getChildrenRem()) {
-    const text = (await plugin.richText.toString((child.text ?? []) as RichTextInterface)).trim();
+    const text = (await plainOf(plugin, child.text as RichTextInterface)).trim();
     if (names.includes(text)) return child;
   }
   const rem = await plugin.rem.createRem();

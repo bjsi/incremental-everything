@@ -13,10 +13,16 @@ const ring: React.CSSProperties = {
  * (a popup's teardown cuts a read-then-write short).
  */
 export async function runDialogFindSources(plugin: RNPlugin, dialog: MessageDialog | null, close: () => void) {
-  if (dialog?.findSources) {
-    await findSourcesFromDialog(plugin, dialog.findSources.remIds, dialog.findSources.openSourceRemId);
+  try {
+    if (dialog?.findSources) {
+      await findSourcesFromDialog(plugin, dialog.findSources.remIds, dialog.findSources.openSourceRemId);
+    }
+  } catch (e) {
+    console.error('[FindSources] could not queue the search', e);
+    await plugin.app.toast(`Could not start the search by meaning: ${(e as Error).message}`);
+  } finally {
+    close();
   }
-  close();
 }
 
 /**
