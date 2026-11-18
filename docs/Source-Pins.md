@@ -25,15 +25,17 @@ A toast reports where the passage was found and what was reused or created — f
 - The PDF is searched **page by page**; a sentence that runs across a page break is not matched yet.
 - If the same short phrase appears **word for word** more than once, the first occurrence is pinned.
 
-## With no source open: a source finder { #no-source-open }
+## Sources that are not open: a source finder { #no-source-open }
 
-If no PDF or article is open in any RemNote window, Pin Source Quote can still pin the quote when you have set up a **source finder**: a program on your computer that knows your books, for example a search index of your library. Given a quote, it says which book the quote comes from and which of your PDF Rems to try, in order. The quote is pinned from the first of them that holds the passage, in its page view.
+If no PDF or article is open in any RemNote window, or the one that is open does not hold the passage, Pin Source Quote can still pin the quote when you have set up a **source finder**: a program on your computer that knows your books, for example a search index of your library. Given a quote, it says which book the quote comes from and which of your PDF Rems to try, in order. The quote is pinned from the first of them that holds the passage, in its page view.
 
 The source finder gets each quote's text and the Rems above it, so it can tell the book from an attribution in the quote (*“…” (BPG 5.2.1)*), from the notes the quote sits in, or from the text itself. A book split into several PDFs is handled by listing them all.
 
+**When the open source misses:** the passages it holds are pinned there as usual, and only the others are looked up. The open PDF is not searched twice. The dialog says it was searched first and lists it as *(the open source)* among the PDFs tried.
+
 Since the PDF was not in front of you, a **confirmation dialog** follows instead of a toast. For each quote it shows the PDF and page it was pinned from, the book and how the source finder knew, and the highlights reused or created. The quotes that were not found are listed with the PDFs that were tried. If a pin points to the wrong PDF, remove it, open the right PDF and run the command again.
 
-Without a source finder, the command asks you to open the source, as before.
+Without a source finder, the command asks you to open the source, or says the passage is not in the open one, as before.
 
 ### Setting one up { #source-finder-setup }
 
@@ -95,7 +97,7 @@ Highlights never overlap — so every passage keeps a single highlight, and clic
 | Partly covered | Those highlights, plus new highlights for the uncovered stretches of at least four words |
 | Not highlighted | A new highlight |
 
-Running it again on the same Rem adds nothing twice. New highlights use the **Source Highlight Colour** setting (default orange; see [Settings → Other](Plugin-Settings-Reference.md#other)); a reused highlight keeps its own colour.
+Running it again on the same Rem adds nothing twice. With the [AI helper](Desktop-Helpers.md#ai-helper) running on the desktop app, this includes pages and highlights RemNote has not loaded yet this session, which it does not report to plugins: they are read from the knowledge base's database, so no second "Page 030" is created beside the real one. New highlights use the **Source Highlight Colour** setting (default orange; see [Settings → Other](Plugin-Settings-Reference.md#other)); a reused highlight keeps its own colour.
 
 ## PDFs with a Text Reader version { #text-reader }
 
@@ -135,6 +137,6 @@ This happens after the Rem is created and never slows down or interrupts Create 
 | *Passage not found in the PDFs of its book* | The source finder named a book, but none of the PDFs it listed holds the passage: the one you use may be a different edition, or missing from its list. Open the right PDF and run the command again. |
 | *AI helper is not running* | Start the helper ([Setting up the AI helper](Desktop-Helpers.md#setup)). |
 | *This PDF has no Highlights document yet — make one highlight in it first.* | Highlight anything in the source once, so RemNote creates its Highlights document, then try again. |
-| *Passage not found* | Check that the Rem's text was taken from this source, and that the right PDF or article is open. |
+| *Passage not found* | Check that the Rem's text was taken from this source, and that the right PDF or article is open. A paraphrase, translation or summary is not found. With a [source finder](#no-source-open), the dialog also lists the other PDFs it tried. |
 
 In web articles, an existing highlight that starts or ends **inside a formula** is not recognised when deciding what to reuse.

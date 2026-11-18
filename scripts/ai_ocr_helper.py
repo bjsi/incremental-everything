@@ -794,6 +794,84 @@ def handle_match(req, entry):
     return {'results': results}
 
 
+
+SOURCE_REM_ID = re.compile(r'^[A-Za-z0-9]{8,40}$')
+
+
+def _key_text(raw):
+    """Plain text of a Rem's `key` (rich text as stored: strings and {text} elements)."""
+    try:
+        parts = json.loads(raw) if raw else []
+    except ValueError:
+        return ''
+    return ''.join(p if isinstance(p, str) else str(p.get('text') or '') for p in parts if isinstance(p, (str, dict)))
+
+
+def _slot_value(ps, key):
+    """A powerup slot's stored value (`ps.<code>_<slot>.v.v[0]`): the highlight Data JSON."""
+    try:
+        value = ps[key]['v']['v'][0]
+    except (KeyError, IndexError, TypeError):
+        return None
+    return value if isinstance(value, str) else None
+
+
+def handle_source_highlights(req, entry):
+    """POST /source-highlights {sourceRemId, containerId?}: a PDF's or article's
+    Highlights container, the Rems in it ("Page NNN" Rems, or an article's highlights)
+    and the Rems under each page, with their highlight Data, read from remnote.db
+    (read-only).
+
+    Why: the plugin's getChildrenRem is answered from RemNote's in-memory graph,
+    which loads a parent's children from the database only when something asks
+    RemNote to (ensureLoadChildrenIdsAsync, not called on that path). A container
+    nothing has opened this session comes back with only the Rems already in memory,
+    and Pin Source Quote then made a second "Page 030" beside the real one. The
+    plugin merges this complete list with its own (which has what was created
+    seconds ago and may not be on disk yet)."""
+    if history_archive is None:
+        raise RuntimeError('history_archive.py is missing: download it next to ai_ocr_helper.py')
+    kb_id = history_archive.check_kb_id(req.get('kbId'))
+    source_id = req.get('sourceRemId')
+    container_id = req.get('containerId') or None
+    for rem_id in (source_id, container_id):
+        if rem_id is not None and not (isinstance(rem_id, str) and SOURCE_REM_ID.match(rem_id)):
+            raise ValueError(f'not a Rem id: {rem_id!r}')
+    if not source_id:
+        raise ValueError('no sourceRemId')
+    path = history_archive.remnote_db_path(kb_id)
+    if not path.exists():
+        return {'available': False, 'reason': f'no local database for this knowledge base ({path})'}
+    db = history_archive.open_remnote(path)
+    try:
+        db.execute('BEGIN')
+        if not container_id:
+            for rem_id, key in db.execute(
+                    "SELECT _id, json_extract(doc, '$.key') FROM quanta WHERE json_extract(doc, '$.parent') = ?",
+                    (source_id,)):
+                if _key_text(key).strip() == 'Highlights':
+                    container_id = rem_id
+                    break
+        items = []
+        if container_id:
+            # Two levels in one statement: each extra level is a full scan (no index on parent).
+            rows = db.execute(
+                "SELECT _id, json_extract(doc, '$.parent'), json_extract(doc, '$.key'), json_extract(doc, '$.ps') "
+                "FROM quanta WHERE json_extract(doc, '$.parent') = ?1 OR json_extract(doc, '$.parent') IN "
+                "(SELECT _id FROM quanta WHERE json_extract(doc, '$.parent') = ?1)", (container_id,))
+            for rem_id, parent, key, ps_raw in rows:
+                try:
+                    ps = json.loads(ps_raw) if ps_raw else {}
+                except ValueError:
+                    ps = {}
+                items.append({'remId': rem_id, 'parentId': parent, 'text': _key_text(key),
+                              'pdfData': _slot_value(ps, 'n_d'), 'htmlData': _slot_value(ps, 'hh_d')})
+        db.execute('COMMIT')
+    finally:
+        db.close()
+    entry.update(source=source_id, container=container_id, items=len(items))
+    return {'available': True, 'containerId': container_id, 'items': items}
+
 # ---------------------------------------------------------------------------
 # /video-frame, /video-transcribe — YouTube frames
 # ---------------------------------------------------------------------------
@@ -1471,7 +1549,7 @@ def handle_search_ai(req, entry):
 MEDIA_PREFIX = '/media/'
 MEDIA_CHUNK = 1 << 20
 
-ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/find-source': handle_find_source, '/corpus': handle_corpus, '/source': handle_source, '/match': handle_match,
+ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/find-source': handle_find_source, '/corpus': handle_corpus, '/source': handle_source, '/source-highlights': handle_source_highlights, '/match': handle_match,
           '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
           '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy,
           '/extract-title': handle_extract_title,

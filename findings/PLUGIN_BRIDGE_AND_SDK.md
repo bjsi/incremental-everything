@@ -28,10 +28,16 @@ Plugin storage has **no deletion API**. Writing `null` does not free a key.
 
 ## Reading Rems
 
-**`rem.children` is lazy.** The bridge fills it from a cache that loads only when something opens or expands the Rem, so it is `[]` for any document not opened this session. `parent` is stored and reliable. Reliable reads, cheapest first:
+**`rem.children` is lazy.** The bridge fills it from a cache that loads only when something opens or expands the Rem, so it is `[]` for any document not opened this session. `parent` is stored and reliable. Reads, cheapest first:
 1. Rems already in hand from `getAll()` or `getDescendants()`: group by `parent`, with zero extra calls.
 2. One `rem.getDescendants()`, grouped by `parent`.
 3. `rem.getChildrenRem()` for one Rem's direct children. Order is not guaranteed: use `positionAmongstSiblings()`.
+
+**`getChildrenRem()` can be incomplete, and so can `getDescendants()`** (read in app.asar, client of Nov 18, 2026). The bridge handler `name:"getChildrenRem"` returns `childrenRemAsync()`, which is `getTinyGraph().orderedChildrenNumberIds(parent)`: the children RemNote has in memory. A parent's children are loaded from the database into that graph once per session, by `ensureLoadChildrenIdsAsync()` (`t3`), and `childrenRemAsync()` does **not** await it (`childrenRemUnsortedAsync` and `childrenRemIdsAsync` do, but no plugin handler uses them). For a parent nothing has opened this session, the list holds only the children that reached memory some other way: created, edited or rendered this session. `getDescendants` and `allRemInDocumentOrPortal` recurse through the same `childrenRemAsync`. The `children` getter (lazy-cache type 1) reads the graph without loading either. By contrast, `remsReferencingThis` awaits its own load (`ensureLoadReferencesAsync`).
+- **Seen:** Pin Source Quote did not see a PDF's existing "Page 030", nor the pin of the same quote made under it the day before, and created a second "Page 030" beside it (Nov 18, 2026).
+- **What the plugin does:** where a missed child costs data, read the complete list from `remnote.db` through the AI helper and merge it with `getChildrenRem` (which has what was created seconds ago). Pin Source Quote does this through `/source-highlights` (`storedHighlights` in `src/lib/pdf_source_pins/index.ts`).
+- **Still exposed:** Repair PDF, the bridge's `outline` and `move` ordering, and the bridge's `remove` "has no children" check.
+- **Why the database:** it has no index on `parent`, so each level is a full scan of `quanta` (about 0.7 s for 450k Rems), and the helper caches nothing. The plugin keeps each listing for a minute.
 
 **Card fields** (measured August–September 2026):
 - Disabling a practice direction **removes** that card from `rem.getCards()`; its history survives, and re-enabling brings back the same record.

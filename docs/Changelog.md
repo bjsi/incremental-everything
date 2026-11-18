@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.245 - November 18th, 2026
+
+### ✨ Improved
+
+**Pin Source Quote**: a passage that is not in the open PDF or article is now looked up with your source finder in its book's other PDFs, and existing pages and highlights RemNote has not loaded yet are reused instead of duplicated (a second "Page 030"); the latter needs the AI helper, restarted.
+
+📖 [Source Pins → Sources that are not open](Source-Pins.md#no-source-open) · [Reusing highlights](Source-Pins.md#reusing-highlights)
+
 ## v1.0.244 - November 18th, 2026
 
 ### ✨ New
