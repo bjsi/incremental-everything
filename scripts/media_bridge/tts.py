@@ -12,8 +12,10 @@ Engines, chosen by ear on notes that mix English and Portuguese:
     whisper.cpp (whisper-cli + model, see verify_speech) and redone up to
     VERIFY_ATTEMPTS times when the transcript does not match; without whisper only the
     duration is checked. What still does not match comes back in "warnings".
-  - Azure en-US-AndrewMultilingualNeural, when the script has >= 3 inline foreign terms:
-    the only engine that switches language mid-sentence. Each language run goes in its
+  - Azure en-US-AndrewMultilingualNeural, when the script has >= 3 Portuguese terms
+    marked inside English lines: the only engine that switches language mid-sentence.
+    Gemini reads English terms inside a Portuguese line well, but Portuguese terms inside
+    an English line come out Spanish or English, so only those count (2026-11-18). Each language run goes in its
     own <voice> (inside a single <voice>, word-level <lang> is ignored).
   - ElevenLabs (eleven_multilingual_v2 by default), offered for users who have its key;
     like Gemini, one call per language block (no word-level language switch: the
@@ -83,7 +85,7 @@ GEMINI_VOICES = ["Kore", "Sadaltager", "Charon", "Fenrir", "Leda", "Orus", "Aoed
 AZURE_VOICE = "en-US-AndrewMultilingualNeural"
 LOCALE = {"en": "en-US", "pt": "pt-BR"}
 
-INLINE_LIMIT = 3          # inline-marked terms from which "auto" picks Azure
+INLINE_LIMIT = 3          # <pt> terms in English lines from which "auto" picks Azure
 MAX_CALL_CHARS = 1500     # characters per API call (~2 min of speech): Azure, ElevenLabs
 # Gemini TTS is a generative model: on long calls it sometimes keeps talking past the
 # text (invented sentences), loops on a phrase or skips words (found 2026-11-16 on a
@@ -289,6 +291,14 @@ def inline_count(items) -> int:
     return sum(len(INLINE.findall(i.text)) for i in items if isinstance(i, Line))
 
 
+def azure_terms(items) -> int:
+    """Portuguese terms marked inside English lines: what Gemini mispronounces (Spanish or
+    English), and so what sends "auto" to Azure. English terms in Portuguese lines do not
+    count: Gemini reads them well."""
+    return sum(1 for i in items if isinstance(i, Line) and i.lang == "en"
+               for m in INLINE.finditer(i.text) if m.group(1) == "pt")
+
+
 ENGINES = {
     "vertex": {"label": "Gemini TTS (Google Cloud)", "needs": ("GOOGLE_CLOUD_API_KEY",), "mixes": False},
     "gemini": {"label": "Gemini TTS", "needs": ("GEMINI_API_KEY",), "mixes": False},
@@ -337,17 +347,18 @@ def missing_keys(engine: str, key_set: dict) -> list[str]:
     return [n for n in ENGINES[engine]["needs"] if not key_set.get(n)]
 
 
-def suggest_engine(n_inline: int, available: list[str]) -> str | None:
-    """Azure for many inline terms (only it switches mid-sentence), else Gemini; among the available."""
-    order = (["azure", "vertex", "gemini"] if n_inline >= INLINE_LIMIT
+def suggest_engine(n_pt_in_en: int, available: list[str]) -> str | None:
+    """Azure for many Portuguese terms inside English lines (only it switches mid-sentence,
+    see azure_terms), else Gemini; among the available."""
+    order = (["azure", "vertex", "gemini"] if n_pt_in_en >= INLINE_LIMIT
              else ["vertex", "gemini", "azure"]) + ["elevenlabs"]
     return next((e for e in order if e in available), None)
 
 
-def choose_engine(requested: str, n_inline: int, available: list[str] | None = None) -> str | None:
+def choose_engine(requested: str, n_pt_in_en: int, available: list[str] | None = None) -> str | None:
     if requested and requested != "auto":
         return requested
-    return suggest_engine(n_inline, list(ENGINES) if available is None else available)
+    return suggest_engine(n_pt_in_en, list(ENGINES) if available is None else available)
 
 
 def engine_note(engine: str, n_inline: int) -> str:
@@ -487,12 +498,13 @@ def plan(script: str, engine: str = "auto", voice: str | None = None,
         return {"ok": False, "errors": errors}
     ks = keys() if key_set is None else key_set
     n_inline = inline_count(items)
+    n_azure = azure_terms(items)
     available = [e for e in ENGINES if not missing_keys(e, ks)]
-    suggested = suggest_engine(n_inline, available)
+    suggested = suggest_engine(n_azure, available)
     engines = [{"id": e, "label": ENGINES[e]["label"], "available": e in available,
                 "missing": missing_keys(e, ks), "voices": engine_voices(e),
                 "note": engine_note(e, n_inline), **_estimate(items, lines, e)} for e in ENGINES]
-    eng = choose_engine(engine, n_inline, available)
+    eng = choose_engine(engine, n_azure, available)
     if eng is None:
         return {"ok": False, "engines": engines, "errors": [
             "no TTS key found: set GEMINI_API_KEY, or AZURE_SPEECH_KEY and AZURE_SPEECH_REGION, "

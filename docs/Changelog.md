@@ -10,11 +10,9 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Read Aloud → Descriptors are read with their concept](Read-Aloud.md#pronunciation-descriptors)
 
-### 🐛 Fixed
+**Read Aloud**: notices like *Audio gerado por IA, apenas para introduzir a matéria.* are no longer read, in all three modes, and a titled one right above its audio is left out whole; Azure is now suggested only for English text with 3 or more marked Portuguese terms (Gemini reads English terms in Portuguese well); and Portuguese from Gemini TTS through Google Cloud is Brazilian again (it could come out European on a short line). Restart the [Local Media Bridge](Local-Media-Bridge.md#run-at-login) helper to get the engine changes.
 
-**Read Aloud**: Portuguese read by Gemini TTS through Google Cloud is Brazilian again; the engine got no language code and could pick European Portuguese on a short line. Restart the [Local Media Bridge](Local-Media-Bridge.md#run-at-login) helper to get the fix.
-
-📖 [Read Aloud → Engines and costs](Read-Aloud.md#engines)
+📖 [Read Aloud → Reading rules](Read-Aloud.md#reading-rules)
 
 ## v1.0.241 - November 17th, 2026
 
