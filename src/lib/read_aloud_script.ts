@@ -162,6 +162,57 @@ async function spansOf(
   return out;
 }
 
+/**
+ * A notice that an audio was made by AI ("Audio gerado por IA, apenas para introduzir a
+ * matéria." over the audios of imported courses): about the audio, not the subject.
+ * Matched only as a whole sentence that ends its line and starts the Rem or follows a
+ * separator ("Title — Audio gerado por IA…"), so a note that talks about AI audio
+ * mid-sentence is still read. In Read aloud, a Rem whose notice sits right above an
+ * audio (a child audio Rem) is left out whole, title included (collect).
+ */
+const AI_NOTICE_RE = new RegExp(
+  '(^|\\s*[—–:|-]\\s*)' +
+    '(?:' +
+    '[áa]udio\\s+(?:gerad[oa]|criad[oa]|produzid[oa]|narrad[oa]|sintetizad[oa])\\s+(?:por|com)\\s+' +
+    '(?:(?:uma\\s+)?IA|intelig[êe]ncia\\s+artificial)' +
+    '|' +
+    '(?:AI|IA)[- ](?:generated|created|produced|narrated)\\s+audio' +
+    '|' +
+    'audio\\s+(?:generated|created|produced|narrated|synthesi[sz]ed)\\s+(?:by|with)\\s+' +
+    '(?:an\\s+)?(?:AI|artificial\\s+intelligence)' +
+    ')' +
+    '\\b[^.!?\\n]*[.!?]*[ \\t]*(?=\\n|$)',
+  'giu'
+);
+
+/** Spans with the AI-audio notices cut out (see AI_NOTICE_RE), counted in `stats`. */
+export function withoutAiNotices(spans: Span[], stats: ReadAloudStats): Span[] {
+  const plain = plainOf(spans);
+  const cuts = [...plain.matchAll(AI_NOTICE_RE)].map(
+    (m) => [m.index!, m.index! + m[0].length] as const
+  );
+  if (!cuts.length) return spans;
+  stats.skipped.aiNotices = (stats.skipped.aiNotices ?? 0) + cuts.length;
+  const out: Span[] = [];
+  let pos = 0;
+  for (const span of spans) {
+    const start = pos;
+    pos += span.text.length;
+    let text = '';
+    let at = start;
+    for (const [a, b] of cuts) {
+      if (b <= at || a >= pos) continue;
+      text += span.text.slice(at - start, Math.max(a, at) - start);
+      at = Math.min(b, pos);
+    }
+    text += span.text.slice(at - start);
+    // A formula is kept whole or dropped whole (its placeholder is never cut in two).
+    if (span.latex !== undefined && text !== span.text) continue;
+    if (text) out.push({ ...span, text });
+  }
+  return out;
+}
+
 const UNITS: Record<string, Record<Lang, string>> = {
   kN: { pt: 'quilonewtons', en: 'kilonewtons' },
   MN: { pt: 'meganewtons', en: 'meganewtons' },
@@ -290,14 +341,19 @@ async function collect(
     for (const child of included) await collect(plugin, child, out, stats, seen, depth);
     return;
   }
+  const children = await rem.getChildrenRem();
   if (isCode) count(stats, 'code');
   else {
-    const front = await spansOf(plugin, rem.text, stats);
-    const back = await spansOf(plugin, rem.backText, stats);
-    if (plainOf(front).trim() || plainOf(back).trim()) out.push({ front, back, depth });
+    const notices = stats.skipped.aiNotices ?? 0;
+    const front = withoutAiNotices(await spansOf(plugin, rem.text, stats), stats);
+    const back = withoutAiNotices(await spansOf(plugin, rem.backText, stats), stats);
+    // "Title — Audio gerado por IA…" right above its audio: the title is the audio's
+    // caption, and the audio is not read, so the whole line goes.
+    const audioCaption = (stats.skipped.aiNotices ?? 0) > notices && children.some(hasAudio);
+    if (!audioCaption && (plainOf(front).trim() || plainOf(back).trim()))
+      out.push({ front, back, depth });
   }
-  for (const child of await rem.getChildrenRem())
-    await collect(plugin, child, out, stats, seen, depth + 1);
+  for (const child of children) await collect(plugin, child, out, stats, seen, depth + 1);
 }
 
 /** Spans as written text for an LLM: italic as *x*, formulas as \(LaTeX\). */
@@ -417,13 +473,13 @@ export async function buildRemScript(
 ): Promise<{ script: string; lang: Lang; title: string; stats: ReadAloudStats }> {
   const stats: ReadAloudStats = { rems: 1, lines: 0, skipped: {}, truncated: false };
   const chain = await descriptorChain(rem);
-  const front = await spansOf(plugin, rem.text, stats);
-  const back = await spansOf(plugin, rem.backText, stats);
+  const front = withoutAiNotices(await spansOf(plugin, rem.text, stats), stats);
+  const back = withoutAiNotices(await spansOf(plugin, rem.backText, stats), stats);
   let context: Lang | null = null;
   const contextLang = async (): Promise<Lang> => (context ??= await parentsLang(plugin, rem));
   const chainLines: string[] = [];
   for (const link of chain) {
-    const spans = await spansOf(plugin, link.text, stats);
+    const spans = withoutAiNotices(await spansOf(plugin, link.text, stats), stats);
     if (!plainOf(spans).trim()) continue;
     stats.rems++;
     // Only what is above the link: the descriptors below it may be in another language.
