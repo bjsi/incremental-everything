@@ -17,6 +17,8 @@ interface Fake {
   property?: boolean;
   table?: boolean;
   parent?: Fake;
+  /** RemType: 1 concept, 2 descriptor. */
+  type?: number;
 }
 
 const m = (text: string, f: Record<string, unknown> = {}) => ({ i: 'm', text, ...f });
@@ -26,7 +28,7 @@ function fakeRem(f: Fake): any {
     _id: f._id,
     text: f.text,
     backText: f.backText,
-    type: 0,
+    type: f.type ?? 0,
     isPowerupProperty: async () => !!f.property,
     isPowerupSlot: async () => false,
     isPowerup: async () => false,
@@ -244,5 +246,44 @@ describe('buildRemScript (pronunciation)', () => {
       fakeRem({ _id: 'W2', text: ['heave'], backText: ['The vertical motion of the ship'], parent })
     );
     assert.deepEqual(two.script.split('\n'), ['heave.', 'The vertical motion of the ship.']);
+  });
+  it('reads a descriptor after its chain: the first non-descriptor ancestor, then the descriptors', async () => {
+    // The real case: a0CUDx97PFgaVsi13 under the concept "Brake holding capacity".
+    const heading: Fake = {
+      _id: 'H',
+      text: ['7.3.3.1  Towing winch characteristics'],
+      parent: { _id: 'H2', text: ['7.3 Towing bitts, hooks and winches'] },
+    };
+    const concept: Fake = { _id: 'C', type: 1, text: ['Brake holding capacity'], parent: heading };
+    const card = (parent: Fake) =>
+      fakeRem({
+        _id: 'D',
+        type: 2,
+        text: ['em ', m('lupadas ', { b: true }), 'muito fortes o freio escorrega ou não nesse estágio?'],
+        backText: ['the brake will mostly not slip at that stage'],
+        parent,
+      });
+    const out = await buildRemScript(plugin, card(concept));
+    assert.deepEqual(out.script.split('\n'), [
+      'Brake holding capacity.',
+      '[pt] em lupadas muito fortes o freio escorrega ou não nesse estágio?',
+      'the brake will mostly not slip at that stage.',
+    ]);
+    assert.equal(out.title, 'em lupadas muito fortes o freio escorrega ou não nesse estágio?');
+
+    // Nested descriptors, under an ancestor that is not marked as a concept.
+    const middle: Fake = { _id: 'M', type: 2, text: ['em caso de trancos'], parent: { ...concept, type: 0 } };
+    const nested = await buildRemScript(plugin, card(middle));
+    assert.deepEqual(nested.script.split('\n').slice(0, 2), [
+      'Brake holding capacity.',
+      '[pt] em caso de trancos.',
+    ]);
+
+    // Not a descriptor: no chain.
+    const plain = await buildRemScript(
+      plugin,
+      fakeRem({ _id: 'P', text: ['heave'], backText: ['The vertical motion of the ship'], parent: concept })
+    );
+    assert.deepEqual(plain.script.split('\n'), ['heave.', 'The vertical motion of the ship.']);
   });
 });

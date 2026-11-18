@@ -370,31 +370,67 @@ export async function buildReadAloudScript(
   return { script: lines.join('\n'), source: outlineOf(raw), lang, title, stats };
 }
 
+/** RemType.DESCRIPTOR (type-only SDK import, as REM_TYPE_PORTAL). */
+const REM_TYPE_DESCRIPTOR = 2;
+/** A safety net for the descriptor chain walk. */
+const MAX_DESCRIPTOR_CHAIN = 10;
+
+/**
+ * A descriptor's chain, outermost first: the first ancestor that is not a descriptor
+ * (its concept, marked as one or not), then the descriptors in between. Empty for a
+ * Rem that is not a descriptor.
+ */
+async function descriptorChain(rem: PluginRem): Promise<PluginRem[]> {
+  if ((rem.type as number) !== REM_TYPE_DESCRIPTOR) return [];
+  const chain: PluginRem[] = [];
+  let parent = await rem.getParentRem();
+  for (let i = 0; parent && i < MAX_DESCRIPTOR_CHAIN; i++) {
+    chain.unshift(parent);
+    if ((parent.type as number) !== REM_TYPE_DESCRIPTOR) break;
+    parent = await parent.getParentRem();
+  }
+  return chain;
+}
+
+/** The language of a Rem's parents (up to three), English when they give no clue. */
+async function parentsLang(plugin: RNPlugin, rem: PluginRem): Promise<Lang> {
+  let parent = await rem.getParentRem();
+  const texts: string[] = [];
+  for (let i = 0; parent && i < 3; i++) {
+    texts.push(await plugin.richText.toString(parent.text ?? []));
+    parent = await parent.getParentRem();
+  }
+  return guessLang(texts.join(' ')) ?? 'en';
+}
+
 /**
  * One Rem, for a pronunciation: its front and back (no descendants) as one or two
- * script lines, each in its own language. A single word gives no language clue, so
- * an undecided side takes the other side's language, then the language of the Rem's
- * parents (up to three), then English.
+ * script lines, each in its own language. A descriptor is read in context: first the
+ * fronts of its chain (concept, then the descriptors above it, descriptorChain),
+ * then its own front and back. A single word gives no language clue, so an undecided
+ * side takes the other side's language, then the language of the Rem's parents (up to
+ * three), then English; an undecided chain line looks only at its own parents.
  */
 export async function buildRemScript(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<{ script: string; lang: Lang; title: string; stats: ReadAloudStats }> {
   const stats: ReadAloudStats = { rems: 1, lines: 0, skipped: {}, truncated: false };
+  const chain = await descriptorChain(rem);
   const front = await spansOf(plugin, rem.text, stats);
   const back = await spansOf(plugin, rem.backText, stats);
   let context: Lang | null = null;
-  const contextLang = async (): Promise<Lang> => {
-    if (context) return context;
-    let parent = await rem.getParentRem();
-    const texts: string[] = [];
-    for (let i = 0; parent && i < 3; i++) {
-      texts.push(await plugin.richText.toString(parent.text ?? []));
-      parent = await parent.getParentRem();
-    }
-    context = guessLang(texts.join(' ')) ?? 'en';
-    return context;
-  };
+  const contextLang = async (): Promise<Lang> => (context ??= await parentsLang(plugin, rem));
+  const chainLines: string[] = [];
+  for (const link of chain) {
+    const spans = await spansOf(plugin, link.text, stats);
+    if (!plainOf(spans).trim()) continue;
+    stats.rems++;
+    // Only what is above the link: the descriptors below it may be in another language.
+    const lang = guessLang(plainOf(spans)) ?? (await parentsLang(plugin, link));
+    const text = renderLine(spans, lang);
+    if (text) chainLines.push(scriptLine(text, lang));
+  }
   const frontGuess = guessLang(plainOf(front));
   const backGuess = guessLang(plainOf(back));
   const sides: { spans: Span[]; lang: Lang }[] = [];
@@ -404,12 +440,15 @@ export async function buildRemScript(
   if (plainOf(back).trim()) {
     sides.push({ spans: back, lang: backGuess ?? frontGuess ?? (await contextLang()) });
   }
-  const lines = sides
-    .map(({ spans, lang }) => {
-      const text = renderLine(spans, lang);
-      return text ? scriptLine(text, lang) : '';
-    })
-    .filter(Boolean);
+  const lines = [
+    ...chainLines,
+    ...sides
+      .map(({ spans, lang }) => {
+        const text = renderLine(spans, lang);
+        return text ? scriptLine(text, lang) : '';
+      })
+      .filter(Boolean),
+  ];
   stats.lines = lines.length;
   const lang = sides[0]?.lang ?? 'en';
   const title = sides.length ? renderLine(sides[0].spans, sides[0].lang).replace(/[.:]$/, '') : '';

@@ -50,14 +50,18 @@ Closing the popup loses nothing. Reopening it on the same Rem brings back the AI
 **Add pronunciation (Extra Card Detail)** (`pron`) gives a flashcard its spoken version, with no popup:
 
 1. In the editor, put the cursor in the Rem or select several. **In the queue, it acts on the card on screen** (or on the Rem selected in the previewer).
-2. Run **Add pronunciation**. It reads only the Rem itself, front then back, **not its children**, with the same [reading rules](#reading-rules): a cloze is read whole, a reference by the text it shows, pins are skipped.
-3. A few seconds later the audio **plays**, and it is added as the Rem's first child, captioned 🔊, with the **Extra Card Detail** powerup. It shows when the answer is revealed and makes no card of its own.
+2. Run **Add pronunciation**. It reads only the Rem itself, front then back, **not its children**, with the same [reading rules](#reading-rules): a cloze is read whole, a reference by the text it shows, pins are skipped. A **descriptor** is read [with its concept](#pronunciation-descriptors).
+3. A few seconds later the audio **plays**, and it is added as the Rem's first child, captioned 🔊, with the **Extra Card Detail** powerup. It shows when the answer is revealed and makes no card of its own. **In the queue it does not play from the command**: the queue plays a card's Extra Card Detail audio itself, and both would overlap.
 
 Pronunciations are kept apart from Read aloud's audios: they get the plugin's **Pronunciation** powerup (not the tag of *Read Aloud: Tag for Audio Rems*), whose pill shows a speaking-head icon instead of its name, and their bullet becomes that icon, in the editor and in the queue's *Extra details* (when a card has a single Extra Card Detail, which RemNote shows without a bullet, the icon takes the bullet's place; the 🔊 caption is written in brown text, which does not show on the emoji, so the queue can recognise it). The helper keeps their copies in a folder of their own, `pronunciations` inside the audio folder.
 
 The engine is the one the popup would suggest (Gemini TTS when its key is set; Azure for text with 3 or more marked foreign terms), with a random voice. A card costs a fraction of a cent. With several Rems selected, each gets its audio, and none plays.
 
-**The language of a short card.** A single word gives no clue, so an undecided side takes the language of the other side, then of the Rem's parents. A side that is all in *italics* in a note of the other language is read in that other language: *fairway* on the front of a card in Portuguese notes is pronounced in English, and *hidrovia* on its back in Portuguese.
+### Descriptors are read with their concept { #pronunciation-descriptors }
+
+A descriptor alone says little (*refere-se a que camada?*), so its pronunciation starts with the Rem it describes: the first parent that is **not** a descriptor (its concept, whether or not it is marked as one), then any descriptors in between, front only, then the card itself, front and back. For the descriptor *refere-se a que camada?* under the concept **Brake holding capacity**, the audio says “Brake holding capacity. Refere-se a que camada? Refers to the first layer on the drum.”
+
+**The language of a short card.** A single word gives no clue, so an undecided side takes the language of the other side, then of the Rem's parents (for a concept or descriptor read before the card, the language of the Rems above it). A side that is all in *italics* in a note of the other language is read in that other language: *fairway* on the front of a card in Portuguese notes is pronounced in English, and *hidrovia* on its back in Portuguese.
 
 **Playback.** The audio plays inside RemNote. If the app refuses to start it on its own, the helper plays it on the computer instead (with `ffplay`, which comes with ffmpeg, or `afplay` on macOS). The stored audio Rem plays like any other.
 
@@ -67,7 +71,7 @@ The popup lists every engine with its own estimate, and greys out those whose ke
 
 | Engine | Key(s) in the helper's `.env` | Notes |
 |---|---|---|
-| **Gemini TTS (Google Cloud)** | `GOOGLE_CLOUD_API_KEY` (optional `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`) | Gemini 3.8 Flash TTS through Vertex AI, billed to a Google Cloud billing account (and its credits). Suggested first when set. |
+| **Gemini TTS (Google Cloud)** | `GOOGLE_CLOUD_API_KEY` (optional `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`) | Gemini 3.8 Flash TTS through Vertex AI, billed to a Google Cloud billing account (and its credits). Suggested first when set. Each call gets its locale (`pt-BR` or `en-US`), as through the Gemini API. |
 | **Gemini TTS** | `GEMINI_API_KEY` | The same model through the Gemini API ([Google AI Studio](https://aistudio.google.com/apikey) key). |
 | **Azure multilingual** | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | Voice `en-US-AndrewMultilingualNeural`. The only engine that switches language **inside a sentence**, so it is suggested for scripts with 3 or more marked foreign terms. |
 | **ElevenLabs** | `ELEVENLABS_API_KEY` | Your account's voices, by first name. Suggested only when no other engine has a key. |

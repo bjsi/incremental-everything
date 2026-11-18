@@ -21,8 +21,9 @@ Engines, chosen by ear on notes that mix English and Portuguese:
     Voices are the account's own (GET /v2/voices, cached), shown by first name.
   - Gemini TTS on Google Cloud (Vertex AI generateContent, same model and voices), with
     an API key: billed to a Google Cloud billing account (and its credits) instead of
-    the Gemini API's; preferred over the Gemini API when both keys are set. The language
-    is detected from the text (one call per language block, as with Gemini).
+    the Gemini API's; preferred over the Gemini API when both keys are set. One call per
+    language block with its languageCode, as with Gemini (without one, a short
+    Portuguese line came out European Portuguese).
 Only engines whose keys are set are offered; "auto" suggests one of them, and any
 available engine may be picked instead. The script keeps its marks either way: Azure
 switches language on them, Gemini drops them and reads the term in the line's language.
@@ -553,10 +554,11 @@ def gemini(lang: str, text: str, dest: Path, key: str, voice: str, log) -> int:
     return _gemini_audio(json.loads(raw), dest)
 
 
-def vertex(text: str, dest: Path, key: str, voice: str, log) -> int:
-    """Gemini TTS through Google Cloud (Vertex AI). The 3.8 models detect the language
-    themselves; each call holds one language block. Without GOOGLE_CLOUD_PROJECT the key's
-    own project is used (the short publisher path)."""
+def vertex(lang: str, text: str, dest: Path, key: str, voice: str, log) -> int:
+    """Gemini TTS through Google Cloud (Vertex AI); each call holds one language block,
+    with its locale. Without a languageCode the model guesses the language from the text,
+    and on a short Portuguese line it picked European Portuguese (2026-11-18). Without
+    GOOGLE_CLOUD_PROJECT the key's own project is used (the short publisher path)."""
     cfg, ks = config(), keys()
     model = cfg.get("vertexModel") or cfg.get("geminiModel") or GEMINI_MODEL
     project = ks.get("GOOGLE_CLOUD_PROJECT")
@@ -567,7 +569,8 @@ def vertex(text: str, dest: Path, key: str, voice: str, log) -> int:
             if project else f"/v1/publishers/google/models/{model}")
     body = {"contents": [{"role": "user", "parts": [{"text": text}]}],
             "generationConfig": {"responseModalities": ["AUDIO"],
-                                 "speechConfig": {"voiceConfig": {"voice": voice}}}}
+                                 "speechConfig": {"languageCode": LOCALE[lang],
+                                                  "voiceConfig": {"voice": voice}}}}
     raw = _post(f"{host}{path}:generateContent",
                 {"x-goog-api-key": key, "Content-Type": "application/json"},
                 json.dumps(body).encode(), log)
@@ -793,7 +796,7 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
                 for attempt in range(1, VERIFY_ATTEMPTS + 1):
                     wa = tmp / f"s_{i:03d}_{attempt}.wav"
                     if eng == "vertex":
-                        tokens += vertex(c[2], wa, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
+                        tokens += vertex(c[1], c[2], wa, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
                     else:
                         tokens += gemini(c[1], c[2], wa, ks["GEMINI_API_KEY"], voice, log)
                     chk = verify_speech(c[2], wa, c[1], eng)

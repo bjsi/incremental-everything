@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.243 - November 18th, 2026
+
+### 📝 Changed
+
+**Add pronunciation**: a descriptor is now read after its concept (the first parent that is not a descriptor) and any descriptors in between, then its own front and back; in the queue the new audio no longer plays from the command, since the queue already plays it and the two overlapped.
+
+📖 [Read Aloud → Descriptors are read with their concept](Read-Aloud.md#pronunciation-descriptors)
+
+### 🐛 Fixed
+
+**Read Aloud**: Portuguese read by Gemini TTS through Google Cloud is Brazilian again; the engine got no language code and could pick European Portuguese on a short line. Restart the [Local Media Bridge](Local-Media-Bridge.md#run-at-login) helper to get the fix.
+
+📖 [Read Aloud → Engines and costs](Read-Aloud.md#engines)
+
 ## v1.0.241 - November 17th, 2026
 
 ### ✨ New
