@@ -16,17 +16,29 @@ import { MessageDialog } from './message_dialog';
  * cannot start), where the popup's keyboard flow is worth more; use showNotice for
  * anything that can land while the user is busy elsewhere.
  */
-export type Notice = MessageDialog & { id: string; at: number };
+export type Notice = MessageDialog & {
+  id: string;
+  at: number;
+  /**
+   * A button that opens a popup with this data (the Upscale review). The notice stays
+   * after the click: the popup dismisses it (by `id`) once its work is finished, so a
+   * popup closed half-way can be opened again from the notice.
+   */
+  action?: { label: string; popup: string; data: unknown };
+};
 
 /** Kept at most; the oldest go first. */
 const MAX_NOTICES = 10;
 /** Where the card always opens; the user can drag it elsewhere once it is up. */
 export const NOTICE_POSITION = { top: 64, right: 24 };
 
-export async function showNotice(plugin: RNPlugin, dialog: MessageDialog): Promise<void> {
+export async function showNotice(
+  plugin: RNPlugin,
+  dialog: MessageDialog & { action?: Notice['action']; id?: string }
+): Promise<void> {
   const notice: Notice = {
     ...dialog,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: dialog.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     at: Date.now(),
   };
   const list = (await plugin.storage.getSession<Notice[]>(noticesKey)) || [];

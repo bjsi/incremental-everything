@@ -14,6 +14,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Read Aloud → Reading rules](Read-Aloud.md#reading-rules)
 
+**Upscale image with ChatGPT**: now runs in the background, so the popup no longer has to stay open; when ChatGPT is done, a notice's **Review** button opens the comparison, and Try again goes back to the background with a new notice.
+
+📖 [Local Media Bridge → Upscale an image with ChatGPT](Local-Media-Bridge.md#upscale)
+
 ## v1.0.241 - November 17th, 2026
 
 ### ✨ New

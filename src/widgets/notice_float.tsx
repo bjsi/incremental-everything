@@ -57,6 +57,10 @@ function NoticeFloat() {
     await dismissNotices(plugin, notice.id);
   };
 
+  const runAction = async (notice: Notice) => {
+    if (notice.action) await plugin.widget.openPopup(notice.action.popup, notice.action.data);
+  };
+
   if (!list.length) return null;
   return (
     <div
@@ -106,11 +110,20 @@ function NoticeFloat() {
               {new Date(notice.at).toLocaleTimeString(undefined, { timeStyle: 'short' })}
             </span>
             <div className="flex items-center gap-2">
+              {notice.action && (
+                <button
+                  onClick={() => void runAction(notice)}
+                  className="py-1 px-3 text-sm font-medium rounded"
+                  style={button(true)}
+                >
+                  {notice.action.label}
+                </button>
+              )}
               {notice.openRemId && (
                 <button
                   onClick={() => void openRem(notice)}
                   className="py-1 px-3 text-sm font-medium rounded"
-                  style={button(true)}
+                  style={button(!notice.action)}
                 >
                   Open Rem
                 </button>
@@ -118,7 +131,7 @@ function NoticeFloat() {
               <button
                 onClick={() => void dismissNotices(plugin, notice.id)}
                 className="py-1 px-3 text-sm font-medium rounded"
-                style={button(!notice.openRemId)}
+                style={button(!notice.openRemId && !notice.action)}
               >
                 Dismiss
               </button>

@@ -113,13 +113,13 @@ Other commands: `start`, `status`, `stop`. Files are kept in `~/.remnote-media-b
 A figure taken from a scanned book is often blurry. ChatGPT's image model can redraw it at a higher resolution and usually keeps it exactly as it was: the same curves, labels and formulas. The command **Upscale image with ChatGPT** (`upi`) does this from inside RemNote, using your ChatGPT subscription rather than a paid API key.
 
 1. Put the cursor in the Rem that has the image and run **Upscale image with ChatGPT**.
-2. A popup opens and the helper sends the image to ChatGPT. This takes about 45 seconds per image. **Keep the popup open**: if you close it, the generation finishes but nothing is replaced (the result is only saved on disk).
-3. The popup shows the original beside the result and the outcome of an automatic check:
+2. The helper sends the image to ChatGPT **in the background**: about 45 seconds per image, while you keep working. When it is done, a notice appears at the top right, **Upscale image: ready to review**, saying whether the check found differences.
+3. Press **Review** on the notice. A popup shows the original beside the result and the outcome of an automatic check:
     - **✓ Same content**: no line, colour or word changed.
     - **⚠ Check before replacing**: something differs. The popup lists what, and shows zoomed views of each region that changed (original on the left, new on the right). **Differences** colours the overlay: grey is in both images, red only in the original, blue only in the new one.
-4. Compare the two images yourself, especially digits, symbols and formulas, which the check cannot read. Then press **Replace image**, or **Try again**, optionally with an instruction such as *the dashed lines must stay dashed*.
+4. Compare the two images yourself, especially digits, symbols and formulas, which the check cannot read. Then press **Replace image**, or **Try again**, optionally with an instruction such as *the dashed lines must stay dashed*: the image goes back to the background, and a new notice follows.
 
-**Replace image** stores the new image in RemNote and swaps it into the Rem in place: the caption, the display width and the flashcards stay as they were. A Rem with several images goes through them one at a time, and **Skip this image** passes one by. Every run is saved under `~/Pictures/remnote-upscale/<remId>/<date-time>/`, including the original, so a replaced image can always be put back by hand.
+**Replace image** stores the new image in RemNote and swaps it into the Rem in place: the caption, the display width and the flashcards stay as they were. A Rem with several images goes through them one at a time, and **Skip this image** passes one by. **Cancel** closes the popup but keeps the notice, so the review can be opened again; the notice goes once every image has been replaced, skipped or tried again. Nothing touches the Rem until you press Replace image. The job and its notice belong to this RemNote window: reloading RemNote drops them (the files stay in the folder below). Every run is saved under `~/Pictures/remnote-upscale/<remId>/<date-time>/`, including the original, so a replaced image can always be put back by hand.
 
 ### Setup { #upscale-setup }
 

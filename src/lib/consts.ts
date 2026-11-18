@@ -815,6 +815,9 @@ export const readAloudTagId = 'read-aloud-tag';
 // it and reports with a message dialog, so the popup can close at once. A queue, so two
 // Generates in quick succession cannot overwrite each other. See lib/read_aloud.ts.
 export const pendingReadAloudJobsKey = 'pendingReadAloudJobs';
+// Upscale jobs (lib/upscale_image.ts): the command starts them and returns; the tracker
+// waits for ChatGPT and posts a notice whose Review button opens the comparison popup.
+export const pendingUpscaleJobsKey = 'pendingUpscaleJobs';
 // Notices (lib/notice.ts): reports of background work, shown in a floating card instead
 // of a popup so they never close the popup the user is working in. Any widget appends to
 // this list; the index opens the card while it is non-empty.

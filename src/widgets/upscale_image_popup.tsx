@@ -4,22 +4,20 @@ import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
 import '../rn_theme_vars.css';
+import { dismissNotices } from '../lib/notice';
 import {
-  getUpscaleTask,
+  enqueueUpscaleJob,
   replaceRemImage,
-  startUpscale,
-  UpscalePopupContext,
   UpscaleResult,
+  UpscaleReviewContext,
 } from '../lib/upscale_image';
-
-const POLL_MS = 2000;
 
 type Phase =
   | { kind: 'loading' }
-  | { kind: 'running'; stage: string; elapsed: number }
-  | { kind: 'done'; result: UpscaleResult }
-  | { kind: 'error'; message: string }
-  | { kind: 'replacing'; result: UpscaleResult };
+  | { kind: 'review' }
+  | { kind: 'replacing' }
+  /** Replacing failed; the result can still be tried again or skipped. */
+  | { kind: 'error'; message: string };
 
 const muted = { color: 'var(--rn-clr-content-secondary)' };
 
@@ -84,89 +82,77 @@ function Verdict({ result }: { result: UpscaleResult }) {
 }
 
 /**
- * Upscale image with ChatGPT: runs the helper's /upscale on each image of the
- * rem in turn, shows the original beside the result and the fidelity check, and
- * swaps the image in the rem only on "Replace image" (lib/upscale_image.ts).
+ * Upscale image with ChatGPT, the review: opened by the Review button of the notice the
+ * background job posts (lib/upscale_image.ts), with every image's finished result. Shows
+ * the original beside the result and the fidelity check, and swaps the image in the rem
+ * only on "Replace image". Try again sends the image back to the background (a new notice
+ * follows); Cancel keeps the notice, so the review can be opened again.
  */
 export function UpscaleImagePopup() {
   const plugin = usePlugin();
-  const [context, setContext] = useState<UpscalePopupContext | null>(null);
+  const [context, setContext] = useState<UpscaleReviewContext | null>(null);
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [view, setView] = useState<'side' | 'diff'>('side');
   const [extra, setExtra] = useState('');
-  const [replaced, setReplaced] = useState(0);
-  const run = useRef(0);
+  const replaced = useRef(0);
+  const retried = useRef(0);
 
   useEffect(() => {
     (async () => {
       const ctx = await plugin.widget.getWidgetContext<WidgetLocation.Popup>();
-      setContext((ctx?.contextData as UpscalePopupContext) ?? null);
+      const data = (ctx?.contextData as UpscaleReviewContext) ?? null;
+      setContext(data);
+      setPhase(
+        data?.results?.length
+          ? { kind: 'review' }
+          : { kind: 'error', message: 'No result to review.' }
+      );
     })();
-    return () => {
-      run.current++; // stop polling when the popup closes
-    };
   }, []);
-
-  const start = async (ctx: UpscalePopupContext, i: number, extraText: string) => {
-    const mine = ++run.current;
-    setPhase({ kind: 'running', stage: 'starting', elapsed: 0 });
-    setView('side');
-    try {
-      const taskId = await startUpscale(ctx, ctx.images[i], extraText);
-      for (;;) {
-        await new Promise((r) => setTimeout(r, POLL_MS));
-        if (mine !== run.current) return;
-        const task = await getUpscaleTask(taskId);
-        if (mine !== run.current) return;
-        if (task.status === 'done') {
-          const result = task.result ?? { ok: false, message: 'no result' };
-          setPhase(
-            result.ok
-              ? { kind: 'done', result }
-              : { kind: 'error', message: result.message ?? 'failed' }
-          );
-          return;
-        }
-        setPhase({ kind: 'running', stage: task.stage, elapsed: task.elapsed });
-      }
-    } catch (err) {
-      if (mine === run.current) setPhase({ kind: 'error', message: String(err) });
-    }
-  };
-
-  useEffect(() => {
-    if (context) void start(context, 0, '');
-  }, [context]);
 
   const close = () => plugin.widget.closePopup();
 
-  const nextOrClose = async (count: number) => {
+  /** On to the next image, or, after the last, dismiss the notice and close. */
+  const next = async () => {
     if (!context) return;
     if (index + 1 < context.images.length) {
       setIndex(index + 1);
       setExtra('');
-      void start(context, index + 1, '');
-    } else {
-      if (count > 0)
-        await plugin.app.toast(
-          `Replaced ${count} image${count === 1 ? '' : 's'} with the upscaled version.`
-        );
-      close();
+      setView('side');
+      setPhase({ kind: 'review' });
+      return;
     }
+    // Awaited before closing: a popup's teardown cuts a read-then-write short.
+    if (context.noticeId) await dismissNotices(plugin, context.noticeId);
+    const done = [
+      replaced.current
+        ? `replaced ${replaced.current} image${replaced.current === 1 ? '' : 's'}`
+        : '',
+      retried.current ? `trying ${retried.current} again in the background` : '',
+    ].filter(Boolean);
+    if (done.length) await plugin.app.toast(`🖼 ${done.join('; ')}.`);
+    close();
   };
 
-  const replace = async (result: UpscaleResult) => {
+  const replace = async () => {
     if (!context) return;
-    setPhase({ kind: 'replacing', result });
+    setPhase({ kind: 'replacing' });
     try {
-      await replaceRemImage(plugin, context.remId, context.images[index], result);
-      const count = replaced + 1;
-      setReplaced(count);
-      await nextOrClose(count);
+      await replaceRemImage(plugin, context.remId, context.images[index], context.results[index]);
+      replaced.current++;
+      await next();
     } catch (err) {
       setPhase({ kind: 'error', message: `Replacing failed: ${String(err)}` });
     }
+  };
+
+  const tryAgain = async () => {
+    if (!context) return;
+    const { remId, title, kbId } = context;
+    await enqueueUpscaleJob(plugin, { remId, title, kbId, images: [context.images[index]] }, extra);
+    retried.current++;
+    await next();
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -177,7 +163,10 @@ export function UpscaleImagePopup() {
   };
 
   const total = context?.images.length ?? 0;
-  const result = phase.kind === 'done' || phase.kind === 'replacing' ? phase.result : null;
+  const current = phase.kind === 'loading' ? undefined : context?.results[index];
+  const result = current?.ok ? current : null;
+  const failure = current && !current.ok ? (current.message ?? 'failed') : null;
+  const decided = phase.kind === 'review' || phase.kind === 'error';
 
   return (
     <div
@@ -201,27 +190,18 @@ export function UpscaleImagePopup() {
       </div>
 
       <div className="flex flex-col gap-3" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        {(phase.kind === 'loading' || phase.kind === 'running') && (
+        {phase.kind === 'loading' && (
           <div className="py-8 text-center text-sm" style={muted}>
-            {phase.kind === 'running'
-              ? `${phase.stage[0]?.toUpperCase()}${phase.stage.slice(1)}… ${phase.elapsed} s (usually about 45 s)`
-              : 'Starting…'}
-            <div className="mt-2 text-xs">
-              ChatGPT is regenerating the figure at a higher resolution.
-            </div>
-            <div className="mt-1 text-xs font-semibold">
-              Keep this window open until the result appears: if you close it, nothing is replaced
-              (the result is only saved to the folder on disk).
-            </div>
+            Loading…
           </div>
         )}
 
-        {phase.kind === 'error' && (
+        {(failure || phase.kind === 'error') && (
           <div
             className="rounded px-3 py-2 text-sm"
             style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.5)' }}
           >
-            {phase.message}
+            {phase.kind === 'error' ? phase.message : `ChatGPT gave no result: ${failure}`}
           </div>
         )}
 
@@ -282,7 +262,7 @@ export function UpscaleImagePopup() {
         )}
       </div>
 
-      {(phase.kind === 'done' || phase.kind === 'error') && (
+      {decided && (
         <input
           value={extra}
           onChange={(e) => setExtra(e.target.value)}
@@ -309,15 +289,16 @@ export function UpscaleImagePopup() {
             Storing in RemNote…
           </span>
         )}
-        {(phase.kind === 'done' || phase.kind === 'error') && context && (
-          <Button label="Try again" onClick={() => void start(context, index, extra)} />
+        {decided && context && <Button label="Try again" onClick={() => void tryAgain()} />}
+        {decided && total > 1 && (
+          <Button
+            label={index + 1 < total ? 'Skip this image' : 'Skip'}
+            onClick={() => void next()}
+          />
         )}
-        {total > 1 && index + 1 < total && (phase.kind === 'done' || phase.kind === 'error') && (
-          <Button label="Skip this image" onClick={() => void nextOrClose(replaced)} />
-        )}
-        <Button label={phase.kind === 'running' ? 'Stop waiting' : 'Cancel'} onClick={close} />
-        {phase.kind === 'done' && (
-          <Button label="Replace image" primary onClick={() => void replace(phase.result)} />
+        <Button label="Cancel" onClick={close} />
+        {phase.kind === 'review' && result && (
+          <Button label="Replace image" primary onClick={() => void replace()} />
         )}
       </div>
     </div>
