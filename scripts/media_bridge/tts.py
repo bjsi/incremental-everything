@@ -45,7 +45,8 @@ from the .env file named by "envFile" in ~/.remnote-media-bridge/tts.json (or
 
 tts.json (optional): {"envFile": "...", "audioHome": "...", "geminiVoices": [...],
 "geminiModel": "...", "azureVoices": [...], "elevenModel": "...", "elevenUsdPerMChars": N,
-"pronunciationHome": "..." (default <audioHome>/pronunciations)}
+"pronunciationHome": "..." (default <audioHome>/pronunciations),
+"spokenAs": {"pt": {"IMO": "Imo"}} (acronyms said as a word in that language; see SPOKEN_AS)}
 ("azureVoice": "..." is still read)
 
 CLI:
@@ -137,6 +138,27 @@ ELEVEN_FALLBACK_VOICES = {"George": "JBFqnCBsd6RMkjVDRZzb", "Alice": "Xb7hH8MSUJ
                           "Brian": "nPczCjzI2devNBz1zQrb", "Eric": "cjVigY5qzO86Huf0OWal",
                           "Matilda": "XrExE9yKIg1WjnnlVkGX", "Daniel": "onwK4e9ZLuTAKqWW03F9"}
 VOICE_CACHE_S = 600
+
+# Acronyms said as a word in one language but spelled letter by letter in another. Gemini
+# pt-BR spells an all-caps "IMO" (I-eme-ó, ~0.4 s longer each time, 3 voices, 2026-11-19),
+# while Brazilians say "Imo" as a word; in English I-M-O is right, so only the pt text
+# changes. Whole word, case-sensitive, applied to the text sent to the engine (the script
+# and the plan keep the acronym). tts.json "spokenAs": {"pt": {"ABC": "Abc"}} adds to it.
+SPOKEN_AS = {"pt": {"IMO": "Imo"}}
+
+
+def spoken_as(lang: str) -> dict[str, str]:
+    table = dict(SPOKEN_AS.get(lang, {}))
+    table.update((config().get("spokenAs") or {}).get(lang, {}))
+    return table
+
+
+def respell(lang: str, text: str) -> str:
+    """The text as the engine should get it in this language (see SPOKEN_AS)."""
+    for word, said in spoken_as(lang).items():
+        text = re.sub(rf"(?<![\w-]){re.escape(word)}(?![\w-])", said, text)
+    return text
+
 
 INLINE = re.compile(r"<(pt|en)>(.*?)</\1>", re.S)
 LANG_PREFIX = re.compile(r"^\[(pt|en)\]\s*")
@@ -418,7 +440,7 @@ def build_calls(items, engine: str) -> list:
         last = calls[-1] if calls else None
         if engine in BLOCK_ENGINES:
             limit = CALL_CHARS.get(engine, MAX_CALL_CHARS)
-            for txt in _pieces(plain(it.text), limit):
+            for txt in _pieces(respell(it.lang, plain(it.text)), limit):
                 last = calls[-1] if calls else None
                 # Gemini TTS tends to loop when one call repeats a passage (forum report,
                 # gemini-3.8-flash-tts): a line already in the call starts a new one
@@ -616,7 +638,7 @@ def ssml(lines: list[Line], voice: str) -> str:
     for ln in lines:
         rs = runs(ln.lang, ln.text)
         for i, (g, t) in enumerate(rs):
-            piece = escape(t) + (LINE_BREAK if i == len(rs) - 1 else "")
+            piece = escape(respell(g, t)) + (LINE_BREAK if i == len(rs) - 1 else "")
             if merged and merged[-1][0] == g:
                 merged[-1][1] += piece
             else:
