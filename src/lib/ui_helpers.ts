@@ -25,6 +25,12 @@ import {
   CLOZE_EXTRACT_REVEAL_DECL,
   IGNORE_SHRINK_DECL,
   IGNORE_DIM_DECL,
+  IGNORE_SHRINK_TARGET,
+  IGNORE_DIM_TARGET,
+  QUIET_BULLET_TARGET,
+  QUIET_BULLET_DECL,
+  QUIET_BULLET_COLLAPSED_TARGET,
+  QUIET_BULLET_COLLAPSED_DECL,
 } from './tag_subtree_css';
 
 /**
@@ -289,9 +295,14 @@ export async function registerIgnoreTagCSS(plugin: ReactRNPlugin) {
   const css = `
     /* Shrink and dim rems tagged with #ignore so they read as archived snippets.
        Their descendants get the same rules from lib/tag_subtree_css. */
-    [data-rem-container-tags~="ignore"] .rem-text * {${IGNORE_SHRINK_DECL}
+    [data-rem-container-tags~="ignore"] ${IGNORE_SHRINK_TARGET} {${IGNORE_SHRINK_DECL}
     }
-    [data-rem-container-tags~="ignore"] .rem-text:not(:focus-within):not(:hover) * {${IGNORE_DIM_DECL}
+    [data-rem-container-tags~="ignore"] ${IGNORE_DIM_TARGET} {${IGNORE_DIM_DECL}
+    }
+    /* A small faint dot; a collapsed branch still shows RemNote's grey ring. */
+    [data-rem-container-tags~="ignore"] ${QUIET_BULLET_TARGET} {${QUIET_BULLET_DECL}
+    }
+    [data-rem-container-tags~="ignore"] ${QUIET_BULLET_COLLAPSED_TARGET} {${QUIET_BULLET_COLLAPSED_DECL}
     }
 
     /* Hide the #ignore tag chip in the editor tag bar to declutter */

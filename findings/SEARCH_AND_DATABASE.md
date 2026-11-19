@@ -159,3 +159,14 @@ weights), Questions and an imported one (SM-2). Only 138 Rems carry `src`.
 `key,u` is bumped by any write of the text, not only a person typing: 992 Rems got a new
 `key,u` within one minute on 2026-11-13. So "edited in the last N days" means "text
 written", as Anki's `edited:` does.
+
+## Code blocks: two storage formats { #code-blocks }
+
+Read from the main KB's `remnote.db` on 2026-11-19 (RemNote 1.30, setting **Bullet Code Blocks** on: "Store code blocks as separate bullets for easy reference").
+
+- **Current format:** the code is the Rem's plain text, `key: ["<code>"]`. The built-in **Code Block** powerup is applied (`apu.cd.v = true`), and the language is its slot: `ps.cd_l.v = {"v": ["css"], "s": "css"}`. The editor draws it with syntax colours. The user's Custom CSS blocks were converted to this in July 2026 (`apu.cd ,u` stamps around 1783460735000); the migration setting is gone, and only the toggle above remains.
+- **Legacy format:** the text is one inline code element, `key: [{"i": "m", "code": true, "text": "<code>", "language": "css"}]`, with no powerup. It draws as plain grey monospace. Older blocks that were never converted still look like this.
+- **The RemNote MCP writes the legacy format.** A fenced block sent to `edit_rem` or `append_doc` becomes the inline element. `edit_rem` on a block already in the current format rewrites its text to the legacy element and leaves `cd` and `cd_l` in place, producing a hybrid. A multi-line fenced block in `append_doc` is also split into several Rems unless it is the whole text of one bullet, and `- [ ]` is stored as literal text, not a to-do.
+- **Writing the current format from outside:** create or edit the Rem, then rewrite its text with the media bridge's `set-text` (`[{remId, text: {before: <key from the DB>, after: ["<code>"]}}]`). It keeps the powerup and the language slot. A Rem that never had `cd` still needs the powerup and the `cd_l` slot added; the bridge has no operation for that yet.
+
+Custom CSS blocks are toggled by the to-do status on their title Rem: **Unfinished (unchecked) = on, Done (checked) = off**.

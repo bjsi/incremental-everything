@@ -122,6 +122,10 @@ export const showPinRingIndicatorsSettingId = 'showPinRingIndicators';
 // Dashed orange outline on an audio player whose file is only linked, not stored
 // in RemNote (see lib/localize_media.ts). Off by default.
 export const showLinkedAudioIndicatorSettingId = 'showLinkedAudioIndicator';
+// Sets --in-extra-card-detail: 1 on every Extra Card Detail Rem and the Rems under
+// it in the editor, for the user's Custom CSS (lib/tag_subtree_css). Off by default:
+// it styles nothing itself and costs a lookup per parent Rem on each navigation.
+export const markExtraCardDetailSubtreesSettingId = 'markExtraCardDetailSubtrees';
 export const performanceModeId = 'performanceMode';
 export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
 /** Custom acronyms the Text Case Converter keeps uppercase in Title Case. */

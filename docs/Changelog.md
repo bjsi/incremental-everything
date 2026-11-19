@@ -2,6 +2,22 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.247 - November 19th, 2026
+
+### ✨ New
+
+**Extra Card Details**: added the setting **Mark Extra Card Detail Subtrees for Custom CSS**, which lets your own CSS style the Rems under an Extra Card Detail, and a suggested set of rules that makes Extra Card Details small, italic and muted in the editor, with a faint bullet and a 🧷 pill.
+
+![A Rem with an Extra Card Detail note under it: the note and its three children are smaller, italic and grey-green with faint bullets, the focused child is shown in full colour, and the rest of the outline is unchanged](assets/ecd-sample-css-rules.png){ width="900" }
+
+📖 [Colour Coding Reference → Quieter Extra Card Details](Colour-Coding-Reference.md#quieter-extra-card-details)
+
+### ✨ Improved
+
+**#ignore**: formulas in ignored Rems now keep their shape and shrink with the text instead of being squashed and faded, and ignored Rems get a small faint bullet that still shows collapsed children.
+
+📖 [Colour Coding Reference → Editor](Colour-Coding-Reference.md#editor)
+
 ## v1.0.246 - November 18th, 2026
 
 ### ✨ Improved
