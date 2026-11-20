@@ -110,6 +110,7 @@ Without whisper, only the length of each call is checked. A redone call is paid 
 | Tables | “Table omitted.” |
 | Formulas | Literal: “formula omitted”. Adapted and Summary: said in words. |
 | Portals | Their Rems, once. |
+| A descriptor you start on | Its concept first (front only), then any descriptors in between, then the Rem and its children, as [Add pronunciation](#pronunciation-descriptors) reads one. The audio is still named after the Rem. |
 | Bold, italic, links, page numbers, emoji, arrows | Formatting dropped; `p. 12` is read “page 12”, `kN` “kilonewtons” (and the Portuguese equivalents). |
 | Italic words in the other language | Marked as foreign terms (for example `<en>fairway</en>` in a Portuguese line), so Azure pronounces them in their own language. Acronyms are never marked. |
 

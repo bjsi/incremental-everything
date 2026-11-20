@@ -156,6 +156,14 @@ Neither part is a statement alone, so Find Sources and Check Statement read them
 - **Speed:** three statements at a time, in the background. A notice follows the progress and turns into the review when all are done.
 - **Reviewing:** one list for the whole run, grouped by note. `A` selects every passage scoring 9 or more, `Shift+A` only in the current note, and `PageDown` / `PageUp` jump between notes.
 
+### Descriptors and where the note sits { #find-sources-context }
+
+A note often means something only in its place in the outline. What is sent with it:
+
+- **A descriptor** (*Não pode rebocar em que método? → no cabo longo* under *Rebocadores com tubulão*) names no subject on its own, so it goes with its **concept**: the first Rem above it that is not a descriptor, then any descriptors in between, front only. The concept is searched with the note, and Claude reads the note as being about it. This applies to Find Sources, Check Statement and Ask Your Sources.
+- **Check Statement and Ask Your Sources** also give Claude up to three Rems above the note (above the concept, for a descriptor), up to and including its document, so a question under *3.3) Tug assistance in ice* is read as being about ice. Rems longer than a heading are left out. These go to Claude only, never to the search, where they would pull in passages about the whole topic.
+- **The review** shows what was sent, under each note's title: *3) Assisting methods › 3.3) Tug assistance in ice › Rebocadores com tubulão › this note*.
+
 ## Check Statement: is my note right? { #check-statement }
 
 **Check Statement against Sources** (`cks`) runs [Find Sources](#find-sources) on the focused or selected Rems, then asks Claude (Opus, through the [AI helper](Desktop-Helpers.md#ai-helper), on your Claude subscription) whether each note is right, judging **only from the passages found**, never from its own knowledge. Claude reads each passage in full and picks the words that show its verdict: those become the quotes, with their emphasis, and the pins. Same requirements as Find Sources, plus the Claude CLI signed in.
@@ -206,6 +214,16 @@ Written under the question, first among its children:
 
 - `Q` chooses **Pins only** (a section gets its pins at the end of its own text) or **Pins + quotes**; there are no AI notes here, since the answer already explains. The same goes for Check Statement.
 - The question itself gets no pin. Each answer is **dated**: asking again adds a new one.
+
+### Asking a follow-up { #ask-follow-up }
+
+When the answer misses a point, or you want another aspect in it, write what to change in the field at the bottom of the review (`F` puts the cursor there) and press `Enter` or **Ask again**: *include the effect of the ice thickness*, *shorter*, *say which book gives 45°*.
+
+- The question is **searched again** with your follow-up added, so a new aspect brings its own passages. The passages of the first answer that the new search does not find again are kept.
+- Claude **rewrites the whole answer** from the previous one and your request, still only from the passages, and says so when they do not cover what you asked.
+- It runs in the background like the first time. A new notice (*Ask Your Sources: follow-up ready to review*) opens a new review, which shows your follow-up under the question; you can follow up again from there.
+- Nothing is written until you accept an answer. With one question in the review, the old notice goes; in a review of several, the follow-up applies to the question under the cursor, and the old notice stays for the others.
+- `Esc` in the field goes back to the list.
 
 ## Pinning every quote in a subtree { #quote-rems-in-descendants }
 

@@ -10,11 +10,17 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Menu Hub](Plugin-Widgets-Reference.md#menu-hub)
 
-### 🐛 Fixed
+**Ask Your Sources**: added a follow-up field to the review (`F`, then `Enter`) that asks the question again with what to improve, correct or add, and brings the rewritten answer to a new review.
 
-**Read Aloud**: fixed Read Aloud stopping with an error on notes that contain a portal, and Gemini TTS redoing (and charging again for) Portuguese lines with dates or numbers that it had read correctly.
+📖 [Source Pins → Asking a follow-up](Source-Pins.md#ask-follow-up)
 
-📖 [Read Aloud → Gemini's audio is checked](Read-Aloud.md#checked)
+**Find Sources**: a descriptor (*Não pode rebocar em que método?* under *Rebocadores com tubulão*) is now searched and judged with its concept in Find Sources, Check Statement and Ask Your Sources; Check Statement and Ask Your Sources also give Claude the Rems above the note, up to its document; the review shows what was sent with each note.
+
+📖 [Source Pins → Descriptors and where the note sits](Source-Pins.md#find-sources-context)
+
+**Read Aloud**: started on a descriptor, it now reads its concept first, as Add pronunciation does; fixed it stopping with an error on notes that contain a portal, and Gemini TTS redoing (and charging again for) Portuguese lines with dates or numbers it had read correctly.
+
+📖 [Read Aloud → Reading rules](Read-Aloud.md#reading-rules) · [Gemini's audio is checked](Read-Aloud.md#checked)
 
 ## v1.0.248 - November 19th, 2026
 

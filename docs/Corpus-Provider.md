@@ -87,10 +87,11 @@ Asked by Find Sources, one Rem per request. It may take a while (the plugin wait
 
 ```json
 { "op": "find-passages",
-  "items": [ { "remId": "R1", "texts": ["front", "back"], "ancestors": ["parent id", "…"],
+  "items": [ { "remId": "R1", "texts": ["concept (a descriptor only)", "the note"], "ancestors": ["parent id", "…"],
                "openSourceRemId": "PdfRem or null" } ] }
 ```
 
+- `texts`: the note as one statement (a list joined with its lead-in). For a descriptor, its concept and any descriptors in between come first, as one text ([Descriptors and where the note sits](Source-Pins.md#find-sources-context)); for an Ask Your Sources follow-up, the follow-up comes last. Search them together, as one query.
 - `openSourceRemId`: the PDF or article open in a pane, if any. Search its book first, and the book whose notes `ancestors` belong to.
 - `mode` (optional): `"answer"` when the Rem is a question or a topic ([Ask Your Sources](Source-Pins.md#ask-your-sources)). Rank passages by whether they answer it rather than say the same; `role` then comes from the score, and a passage that disagrees with another one in the list keeps its role with `"diverges": true`.
 
