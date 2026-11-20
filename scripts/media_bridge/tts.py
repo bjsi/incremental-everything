@@ -617,6 +617,18 @@ def vertex(lang: str, text: str, dest: Path, key: str, voice: str, log) -> int:
     return _gemini_audio(json.loads(raw), dest)
 
 
+def unblocked(text: str, attempt: int) -> str:
+    """The text for this Gemini try. Short fragments split by a blank line ("Restricted
+    Channel.\n\nCanais dragados.", from a Classifique list) come back finishReason SAFETY on
+    every try, while the same words split by a single line break or a space pass
+    (gemini-3.8-flash-tts, 2026-11-20). A refused call is retried that way, and then flat."""
+    if attempt == 2:
+        return re.sub(r"\n\s*\n", "\n", text)
+    if attempt >= 3:
+        return " ".join(text.split())
+    return text
+
+
 def _gemini_audio(d: dict, dest: Path) -> int:
     """A generateContent answer -> WAV at dest; returns the audio tokens billed."""
     try:
@@ -863,7 +875,7 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix="tts-", dir=out.parent))
     tokens, done, prev_speech, parts = 0, 0, False, []
-    retries, warnings = 0, []
+    retries, warnings, azure_chars = 0, [], 0
     try:
         for i, c in enumerate(calls):
             if c[0] == "pause":
@@ -879,21 +891,33 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
                 best = None
                 for attempt in range(1, VERIFY_ATTEMPTS + 1):
                     wa = tmp / f"s_{i:03d}_{attempt}.wav"
+                    text = unblocked(c[2], attempt)
                     try:
                         if eng == "vertex":
-                            tokens += vertex(c[1], c[2], wa, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
+                            tokens += vertex(c[1], text, wa, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
                         else:
-                            tokens += gemini(c[1], c[2], wa, ks["GEMINI_API_KEY"], voice, log)
+                            tokens += gemini(c[1], text, wa, ks["GEMINI_API_KEY"], voice, log)
                     except NoAudio as e:
-                        if attempt == VERIFY_ATTEMPTS and best is None:
-                            raise NoAudio(f"call {done}/{total} ({c[1]}: {c[2][:120]!r}) blocked "
-                                          f"{VERIFY_ATTEMPTS} times. {e}") from e
                         retries += 1
                         reason = (re.search(r'"finishReason": "(\w+)"', str(e)) or [None, "empty answer"])[1]
-                        log(f"call {done}: no audio ({reason}); " + (f"trying again ({attempt + 1}/{VERIFY_ATTEMPTS})"
-                                                                     if attempt < VERIFY_ATTEMPTS else "keeping the best take"))
-                        continue
-                    chk = verify_speech(c[2], wa, c[1], eng)
+                        if attempt < VERIFY_ATTEMPTS:
+                            log(f"call {done}: no audio ({reason}); trying again ({attempt + 1}/{VERIFY_ATTEMPTS})")
+                            continue
+                        if best is not None:
+                            log(f"call {done}: no audio ({reason}); keeping the best take")
+                            break
+                        if missing_keys("azure", ks):
+                            raise NoAudio(f"call {done}/{total} ({c[1]}: {c[2][:120]!r}) blocked "
+                                          f"{VERIFY_ATTEMPTS} times, and no Azure key to read it instead. {e}") from e
+                        log(f"call {done}: no audio ({reason}) {VERIFY_ATTEMPTS} times; reading it with Azure")
+                        azure([Line(c[1], unblocked(c[2], VERIFY_ATTEMPTS))], wa, ks["AZURE_SPEECH_KEY"],
+                              ks["AZURE_SPEECH_REGION"], engine_voices("azure")[0], log)
+                        azure_chars += len(c[2])
+                        warnings.append(f"call {done} ({c[2][:50]}…): Gemini refused it {VERIFY_ATTEMPTS} times "
+                                        f"({reason}); read by Azure")
+                        best = (0, wa, {"problem": None})
+                        break
+                    chk = verify_speech(text, wa, c[1], eng)
                     score = chk.get("added", 0) + chk.get("missing", 0) + (1000 if chk["problem"] else 0)
                     if best is None or score < best[0]:
                         best = (score, wa, chk)
@@ -925,7 +949,8 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
                "retries": retries, "warnings": warnings}
     if eng in TOKEN_ENGINES:
         summary["audioTokens"] = tokens
-        summary["costUsd"] = round(tokens * gemini_usd_per_m_tokens() / 1e6, 3)
+        summary["costUsd"] = round(tokens * gemini_usd_per_m_tokens() / 1e6
+                                   + azure_chars * usd_per_m_chars("azure") / 1e6, 3)
     else:
         summary["costUsd"] = round(p["billedCharacters"] * usd_per_m_chars(eng) / 1e6, 3)
     return summary
