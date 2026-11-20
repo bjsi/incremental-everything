@@ -169,6 +169,12 @@ class TTSError(RuntimeError):
     pass
 
 
+class NoAudio(TTSError):
+    """A generateContent answer without audio. Seen with finishReason SAFETY on a plain
+    ten-token heading that the same voice read fine on every later try (2026-11-20): a
+    sporadic false positive of the output filter, so the call is worth trying again."""
+
+
 # --- configuration -------------------------------------------------------------------
 
 def config() -> dict:
@@ -616,7 +622,7 @@ def _gemini_audio(d: dict, dest: Path) -> int:
     try:
         data = d["candidates"][0]["content"]["parts"][0]["inlineData"]["data"]
     except (KeyError, IndexError):
-        raise TTSError(f"Gemini returned no audio: {json.dumps(d)[:400]}")
+        raise NoAudio(f"Gemini returned no audio: {json.dumps(d)[:400]}")
     audio = base64.b64decode(data)
     if audio[:4] == b"RIFF":
         dest.write_bytes(audio)
@@ -873,10 +879,19 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
                 best = None
                 for attempt in range(1, VERIFY_ATTEMPTS + 1):
                     wa = tmp / f"s_{i:03d}_{attempt}.wav"
-                    if eng == "vertex":
-                        tokens += vertex(c[1], c[2], wa, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
-                    else:
-                        tokens += gemini(c[1], c[2], wa, ks["GEMINI_API_KEY"], voice, log)
+                    try:
+                        if eng == "vertex":
+                            tokens += vertex(c[1], c[2], wa, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
+                        else:
+                            tokens += gemini(c[1], c[2], wa, ks["GEMINI_API_KEY"], voice, log)
+                    except NoAudio as e:
+                        if attempt == VERIFY_ATTEMPTS and best is None:
+                            raise
+                        retries += 1
+                        reason = (re.search(r'"finishReason": "(\w+)"', str(e)) or [None, "empty answer"])[1]
+                        log(f"call {done}: no audio ({reason}); " + (f"trying again ({attempt + 1}/{VERIFY_ATTEMPTS})"
+                                                                     if attempt < VERIFY_ATTEMPTS else "keeping the best take"))
+                        continue
                     chk = verify_speech(c[2], wa, c[1], eng)
                     score = chk.get("added", 0) + chk.get("missing", 0) + (1000 if chk["problem"] else 0)
                     if best is None or score < best[0]:
