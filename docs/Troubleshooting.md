@@ -430,7 +430,7 @@ Both issues can be introduced by manual reorganization of a PDF rem, restoring f
 ### Diagnosing with "Debug PDF"
 
 1. Open the rem you want to inspect in the RemNote editor (the PDF document rem itself, or any rem that has the PDF as a source).
-2. Type `/debug` in the editor to open the **Debug Widget** below the rem.
+2. Type `/debug` in the editor to open the **Debug Widget** below the rem, or use the document's ⋯ menu → **Incremental RemNote…** → **Debug**.
 3. Scroll to the **PDF Structure Debug** section at the bottom of the widget.
 4. Click **Debug PDF**.
 
@@ -479,7 +479,7 @@ Open the PDF in RemNote's PDF viewer and make **any single highlight** anywhere.
 **Step 2 — Run Repair PDF**
 
 1. Navigate to the PDF rem (or any rem that has it as a source).
-2. Type `/debug` → open the **Debug Widget**.
+2. Type `/debug` → open the **Debug Widget**. When no Rem can take the cursor (the PDF open in its viewer, say), use the document's ⋯ menu → **Incremental RemNote…** → **Debug** instead.
 3. Click **Repair PDF**.
 4. Review the list of detected issues in the confirmation dialog.
 5. Click **OK** to proceed.

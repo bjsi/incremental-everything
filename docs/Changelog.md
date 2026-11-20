@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.249 - November 20th, 2026
+
+### ✨ Improved
+
+**Menu Hub**: added **Debug** to a document's Menu Hub, which opens the Debug Widget on that document (Debug PDF, Repair PDF and the other diagnostics) without first putting the cursor in one of its Rems.
+
+📖 [Menu Hub](Plugin-Widgets-Reference.md#menu-hub)
+
+### 🐛 Fixed
+
+**Read Aloud**: fixed Read Aloud stopping with an error on notes that contain a portal, and Gemini TTS redoing (and charging again for) Portuguese lines with dates or numbers that it had read correctly.
+
+📖 [Read Aloud → Gemini's audio is checked](Read-Aloud.md#checked)
+
 ## v1.0.248 - November 19th, 2026
 
 ### ✨ Improved

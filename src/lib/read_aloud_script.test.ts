@@ -23,8 +23,10 @@ interface Fake {
   property?: boolean;
   table?: boolean;
   parent?: Fake;
-  /** RemType: 1 concept, 2 descriptor. */
+  /** RemType: 1 concept, 2 descriptor, 6 portal. */
   type?: number;
+  /** A portal's targets. */
+  portal?: Fake[];
 }
 
 const m = (text: string, f: Record<string, unknown> = {}) => ({ i: 'm', text, ...f });
@@ -40,7 +42,8 @@ function fakeRem(f: Fake): any {
     isPowerup: async () => false,
     isTable: async () => !!f.table,
     isCode: async () => false,
-    getPortalDirectlyIncludedRem: async () => [],
+    // As the bridge returns them: raw data, none of the methods.
+    getPortalDirectlyIncludedRem: async () => (f.portal ?? []).map((t) => ({ _id: t._id, text: t.text })),
     getChildrenRem: async () => (f.children ?? []).map(fakeRem),
     getParentRem: async () => (f.parent ? fakeRem(f.parent) : undefined),
   };
@@ -158,6 +161,34 @@ describe('buildReadAloudScript', () => {
     assert.equal(out.stats.skipped.pins, 1);
     assert.equal(out.stats.skipped.formulas, 1);
     assert.equal(out.stats.skipped.audio, 1);
+  });
+
+  it('reads the targets of a portal, which the bridge returns without methods', async () => {
+    const targets: Fake[] = [
+      { _id: 'PT1', text: ['Primeiro alvo'], children: [{ _id: 'PT1a', text: ['Filho do alvo'] }] },
+      { _id: 'PT2', text: ['Segundo alvo'] },
+    ];
+    const live: Record<string, Fake> = Object.fromEntries(targets.map((t) => [t._id, t]));
+    const withPortal = {
+      ...plugin,
+      rem: {
+        ...plugin.rem,
+        // Out of order on purpose: the portal's order is the one read.
+        findMany: async (ids: string[]) => [...ids].reverse().map((id) => fakeRem(live[id])),
+      },
+    };
+    const root: Fake = {
+      _id: 'R',
+      text: ['Documento com portal'],
+      children: [{ _id: 'PORTAL', text: [], type: 6, portal: targets }],
+    };
+    const out = await buildReadAloudScript(withPortal, fakeRem(root));
+    assert.deepEqual(out.source.split('\n'), [
+      '- Documento com portal',
+      '  - Primeiro alvo',
+      '    - Filho do alvo',
+      '  - Segundo alvo',
+    ]);
   });
 });
 

@@ -337,8 +337,19 @@ async function collect(
     return;
   }
   if ((rem.type as number) === REM_TYPE_PORTAL) {
-    const included = await rem.getPortalDirectlyIncludedRem().catch(() => [] as PluginRem[]);
-    for (const child of included) await collect(plugin, child, out, stats, seen, depth);
+    // The bridge hands these back as raw rem data, without the methods collect()
+    // calls ("isPowerupProperty is not a function"): re-fetch them by id, in order.
+    const raw = await rem.getPortalDirectlyIncludedRem().catch(() => [] as PluginRem[]);
+    const ids = (raw ?? []).map((r) => r?._id).filter(Boolean);
+    const byId = new Map(
+      ids.length
+        ? (((await plugin.rem.findMany(ids).catch(() => [])) ?? []) as PluginRem[]).map((r) => [r._id, r])
+        : []
+    );
+    for (const id of ids) {
+      const child = byId.get(id);
+      if (child) await collect(plugin, child, out, stats, seen, depth);
+    }
     return;
   }
   const children = await rem.getChildrenRem();

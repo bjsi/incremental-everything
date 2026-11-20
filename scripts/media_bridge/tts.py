@@ -719,21 +719,65 @@ def _en_number(n: int) -> str:
     return str(n)
 
 
+_PT_UNITS = ("zero um dois tres quatro cinco seis sete oito nove dez onze doze treze catorze quinze "
+             "dezesseis dezessete dezoito dezenove").split()
+_PT_TENS = "_ _ vinte trinta quarenta cinquenta sessenta setenta oitenta noventa".split()
+_PT_HUNDREDS = "_ cento duzentos trezentos quatrocentos quinhentos seiscentos setecentos oitocentos novecentos".split()
+
+
+def _pt_number(n: int) -> str:
+    """2026 -> 'dois mil e vinte e seis', up to 9,999; else the digits. Accents left out,
+    as _norm_words strips them before numbers are spelled."""
+    if n < 20:
+        return _PT_UNITS[n]
+    if n < 100:
+        return _PT_TENS[n // 10] + ("" if n % 10 == 0 else " e " + _PT_UNITS[n % 10])
+    if n < 1000:
+        if n == 100:
+            return "cem"
+        rest = n % 100
+        return _PT_HUNDREDS[n // 100] + ("" if rest == 0 else " e " + _pt_number(rest))
+    if n < 10000:
+        rest = n % 1000
+        head = "mil" if n < 2000 else _PT_UNITS[n // 1000] + " mil"
+        if rest == 0:
+            return head
+        # "e" before a round hundred or anything under 100: dois mil e trezentos, dois mil e seis
+        return head + (" e " if rest < 100 or rest % 100 == 0 else " ") + _pt_number(rest)
+    return str(n)
+
+
+# Portuguese forms a spelled number can take in the text but not in _pt_number
+_PT_SPELLING = {"uma": "um", "duas": "dois", "quatorze": "catorze"}
+_PT_FEMININE_HUNDREDS = re.compile(r"(?<=[a-z]{3})entas$")
+
 # British and American spellings compared as one (scripts are British, whisper American)
 _SPELLING = [(re.compile(r"oeuvre(s?)$"), r"euver\1"), (re.compile(r"oeuvr(ed|ing)$"), r"euver\1"),
              (re.compile(r"(?<=[a-z])tre(s?)$"), r"ter\1"),
              (re.compile(r"our(s?)$"), r"or\1"), (re.compile(r"(?<=[a-z]{3})is(e|ed|es|ing)$"), r"iz\1")]
 
 
-def _norm_words(text: str) -> list[str]:
+def _norm_words(text: str, lang: str = "en") -> list[str]:
+    """Words to compare a script line with its transcript. Numbers are spelled in the
+    line's language: whisper writes "20 de novembro de 2026" where the script says
+    "vinte de novembro de dois mil e vinte e seis" (spelled in English, every take of
+    such a line failed as words added and missing, and was paid for three times)."""
+    pt = lang == "pt"
     t = unicodedata.normalize("NFKD", text.lower())
     t = "".join(c for c in t if not unicodedata.combining(c))
-    t = re.sub(r"(\d),(\d{3})", r"\1\2", t)
-    t = re.sub(r"\d+", lambda m: _en_number(int(m.group())) if len(m.group()) <= 4 else m.group(), t)
+    if pt:
+        t = re.sub(r"(\d)\.(\d{3})\b", r"\1\2", t)  # 1.500 = mil e quinhentos
+    else:
+        t = re.sub(r"(\d),(\d{3})", r"\1\2", t)
+    speller = _pt_number if pt else _en_number
+    t = re.sub(r"\d+", lambda m: f" {speller(int(m.group()))} " if len(m.group()) <= 4 else m.group(), t)
     out = []
     for w in re.sub(r"[^a-z0-9]+", " ", t).split():
-        for pat, rep in _SPELLING:
-            w = pat.sub(rep, w)
+        if pt:
+            w = _PT_FEMININE_HUNDREDS.sub("entos", _PT_SPELLING.get(w, w))
+        else:
+            for pat, rep in _SPELLING:
+                w = pat.sub(rep, w)
         out.append(w)
     return out
 
@@ -760,7 +804,7 @@ def transcribe(wav: Path, lang: str) -> str | None:
 def verify_speech(text: str, wav: Path, lang: str, engine: str) -> dict:
     """Did the audio say the text? {seconds, expected, added, missing, problem}. `problem`
     is None when it did. Words come from a local whisper transcript when available."""
-    n = len(_norm_words(text))
+    n = len(_norm_words(text, lang))
     secs = duration(wav)
     expected = n / WORDS_PER_MIN.get(engine, 143.0) * 60
     res = {"seconds": round(secs, 1), "expected": round(expected, 1)}
@@ -771,7 +815,7 @@ def verify_speech(text: str, wav: Path, lang: str, engine: str) -> dict:
         problems.append(f"only {secs:.0f} s for ~{expected:.0f} s of text")
     heard = transcribe(wav, lang)
     if heard is not None:
-        a, b = _norm_words(text), _norm_words(heard)
+        a, b = _norm_words(text, lang), _norm_words(heard, lang)
         sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
         same = sum(m.size for m in sm.get_matching_blocks())
         added, missing = len(b) - same, len(a) - same

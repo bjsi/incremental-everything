@@ -149,6 +149,15 @@ export async function openDocumentStudyDashboard(plugin: Plugin, remId: string) 
   await plugin.widget.openPopup('study_dashboard', { remId, startInDocument: true });
 }
 
+/**
+ * The Debug popup (widgets/debug.tsx) on this document. The "Debug
+ * Incremental RemNote" command needs a focused Rem, which a PDF or a document
+ * title often doesn't give; the hub always knows its document.
+ */
+export async function openDocumentDebug(plugin: Plugin, remId: string) {
+  await plugin.widget.openPopup('debug', { remId });
+}
+
 // ── Queue menu ──────────────────────────────────────────────────────────────
 // These act on the queue being practised, whose scope the queue widget keeps
 // in currentSubQueueIdKey (null for the whole knowledge base).

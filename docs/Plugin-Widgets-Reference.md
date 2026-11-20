@@ -737,6 +737,7 @@ Try it below: switch between the two menus, open one, and pick **Incremental Rem
 | Flashcards | [Audit Card Enablement](#613-card-enablement-audit-popup) |
 | Audio | [Audio Playlist (this document)](Audio-Playlist.md), [Audio Playlist (rems tagged with this)](Audio-Playlist.md#start) |
 | Window | [Send to Another Window](Utilities-Finding-and-Navigating.md#send-to-another-window) (desktop app only) |
+| Debug | Debug (Incremental RemNote): the [Debug Widget](Plugin-Commands-Reference.md#system-maintenance-commands) on this document, e.g. for [Repair PDF](Troubleshooting.md#repairing-with-repair-pdf) |
 
 **From the queue's ⋮ menu**, the header names the queue's scope, and the actions act on that queue:
 

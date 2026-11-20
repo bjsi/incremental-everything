@@ -93,7 +93,7 @@ Durations are estimated from the word count at each engine's measured speaking r
 Gemini TTS is a generative model, and now and then it does not just read: it goes on past the end of the text with sentences of its own, loops on a phrase, or skips a clause. Long calls and repeated passages make this likelier. So the helper:
 
 - sends Gemini **short calls** (about 600 characters), and never two copies of the same passage in one call;
-- **transcribes each call** on your Mac with a local [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (`brew install whisper-cpp`, and the speech model that [Incremental Video](Incremental-Video.md#setup) transcripts use, in `~/.incremental-remnote/ai-ocr/whisper/`), and compares it with the script, numbers and British or American spellings counted as the same;
+- **transcribes each call** on your Mac with a local [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (`brew install whisper-cpp`, and the speech model that [Incremental Video](Incremental-Video.md#setup) transcripts use, in `~/.incremental-remnote/ai-ocr/whisper/`), and compares it with the script, numbers (written in digits or in words, in English or Portuguese) and British or American spellings counted as the same;
 - **makes the call again**, up to 3 times, when 5 or more words in a row are added or missing, or about 15 % of the words in all, and keeps the best take. What still does not match is reported.
 
 Without whisper, only the length of each call is checked. A redone call is paid again, so a summary may cost a little more than estimated. Azure and ElevenLabs read the text as written and are not checked.
