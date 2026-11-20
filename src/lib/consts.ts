@@ -122,6 +122,10 @@ export const showPinRingIndicatorsSettingId = 'showPinRingIndicators';
 // Dashed orange outline on an audio player whose file is only linked, not stored
 // in RemNote (see lib/localize_media.ts). Off by default.
 export const showLinkedAudioIndicatorSettingId = 'showLinkedAudioIndicator';
+// Sets --in-extra-card-detail: 1 on every Extra Card Detail Rem and the Rems under
+// it in the editor, for the user's Custom CSS (lib/tag_subtree_css). Off by default:
+// it styles nothing itself and costs a lookup per parent Rem on each navigation.
+export const markExtraCardDetailSubtreesSettingId = 'markExtraCardDetailSubtrees';
 export const performanceModeId = 'performanceMode';
 export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
 /** Custom acronyms the Text Case Converter keeps uppercase in Title Case. */
@@ -786,6 +790,20 @@ export const restoreHighlightBeforeAiCommandId = 'restore-highlight-before-ai';
 // Pin the source passage of the focused Rem's text in the open PDF (lib/source_pins).
 export const pinSourceQuoteCommandId = 'pin-source-quote';
 export const pinSourceQuotesInTreeCommandId = 'pin-source-quotes-in-tree';
+// Find Sources: the passages of the user's library that say what a note says, by meaning
+// (lib/find_sources): the command queues a job, the tracker asks the corpus provider
+// (find-passages) and posts a notice whose Review button opens the popup; the popup hands
+// the accepted passages back to the tracker, which pins them.
+export const findSourcesCommandId = 'find-sources';
+export const checkStatementCommandId = 'check-statement';
+export const askYourSourcesCommandId = 'ask-your-sources';
+export const findSourcesInTreeCommandId = 'find-sources-in-tree';
+export const checkStatementsInTreeCommandId = 'check-statements-in-tree';
+export const FIND_SOURCES_POPUP = 'find_sources_popup';
+export const pendingFindSourcesJobsKey = 'pendingFindSourcesJobs';
+export const pendingFindSourcesWritesKey = 'pendingFindSourcesWrites';
+/** "AI Note" powerup: an AI-written remark (Find Sources' reason for a passage), shown small and muted (registerAiNoteCSS). */
+export const aiNotePowerupCode = 'aiNote';
 // Store externally linked images/audio in RemNote itself (lib/localize_media.ts).
 export const localizeMediaCommandId = 'localize-external-media';
 export const localizeMediaTreeCommandId = 'localize-external-media-tree';

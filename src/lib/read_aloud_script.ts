@@ -6,6 +6,7 @@
  */
 import type { PluginRem, RichTextInterface, RNPlugin } from '@remnote/plugin-sdk';
 import { aliasTextOf } from './rem_aliases';
+import { descriptorChain } from './descriptor_chain';
 
 /** RemType.PORTAL. A type-only import keeps this module loadable outside RemNote (tests). */
 const REM_TYPE_PORTAL = 6;
@@ -337,8 +338,19 @@ async function collect(
     return;
   }
   if ((rem.type as number) === REM_TYPE_PORTAL) {
-    const included = await rem.getPortalDirectlyIncludedRem().catch(() => [] as PluginRem[]);
-    for (const child of included) await collect(plugin, child, out, stats, seen, depth);
+    // The bridge hands these back as raw rem data, without the methods collect()
+    // calls ("isPowerupProperty is not a function"): re-fetch them by id, in order.
+    const raw = await rem.getPortalDirectlyIncludedRem().catch(() => [] as PluginRem[]);
+    const ids = (raw ?? []).map((r) => r?._id).filter(Boolean);
+    const byId = new Map(
+      ids.length
+        ? (((await plugin.rem.findMany(ids).catch(() => [])) ?? []) as PluginRem[]).map((r) => [r._id, r])
+        : []
+    );
+    for (const id of ids) {
+      const child = byId.get(id);
+      if (child) await collect(plugin, child, out, stats, seen, depth);
+    }
     return;
   }
   const children = await rem.getChildrenRem();
@@ -401,7 +413,15 @@ export async function buildReadAloudScript(
 }> {
   const stats: ReadAloudStats = { rems: 0, lines: 0, skipped: {}, truncated: false };
   const raw: RawLine[] = [];
-  await collect(plugin, rem, raw, stats, new Set());
+  // A descriptor is read under its concept (lib/descriptor_chain): the fronts of its
+  // chain first, outermost first, then the Rem and its tree one level deeper.
+  const chain = await descriptorChain(rem).catch(() => [] as PluginRem[]);
+  for (const link of chain) {
+    const front = withoutAiNotices(await spansOf(plugin, link.text, stats), stats);
+    if (plainOf(front).trim()) raw.push({ front, back: [], depth: raw.length });
+  }
+  const top = raw.length;
+  await collect(plugin, rem, raw, stats, new Set(), top);
 
   const guesses = raw.map((l) => guessLang(plainOf([...l.front, ...l.back])));
   const pt = guesses.filter((g) => g === 'pt').length;
@@ -422,30 +442,9 @@ export async function buildReadAloudScript(
     lines.push(scriptLine(text, lineLang));
   });
   stats.lines = lines.length;
-  const title = raw.length ? renderLine(raw[0].front, guesses[0] ?? lang).replace(/[.:]$/, '') : '';
+  // The title is the Rem's own, not its concept's.
+  const title = raw[top] ? renderLine(raw[top].front, guesses[top] ?? lang).replace(/[.:]$/, '') : '';
   return { script: lines.join('\n'), source: outlineOf(raw), lang, title, stats };
-}
-
-/** RemType.DESCRIPTOR (type-only SDK import, as REM_TYPE_PORTAL). */
-const REM_TYPE_DESCRIPTOR = 2;
-/** A safety net for the descriptor chain walk. */
-const MAX_DESCRIPTOR_CHAIN = 10;
-
-/**
- * A descriptor's chain, outermost first: the first ancestor that is not a descriptor
- * (its concept, marked as one or not), then the descriptors in between. Empty for a
- * Rem that is not a descriptor.
- */
-async function descriptorChain(rem: PluginRem): Promise<PluginRem[]> {
-  if ((rem.type as number) !== REM_TYPE_DESCRIPTOR) return [];
-  const chain: PluginRem[] = [];
-  let parent = await rem.getParentRem();
-  for (let i = 0; parent && i < MAX_DESCRIPTOR_CHAIN; i++) {
-    chain.unshift(parent);
-    if ((parent.type as number) !== REM_TYPE_DESCRIPTOR) break;
-    parent = await parent.getParentRem();
-  }
-  return chain;
 }
 
 /** The language of a Rem's parents (up to three), English when they give no clue. */

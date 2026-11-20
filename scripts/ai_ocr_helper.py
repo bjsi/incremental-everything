@@ -29,6 +29,9 @@ It also archives review history (`/history/scan`, `/history/ghosts`,
 each knowledge base it has heard from out of remnote.db, read-only, so the
 Study Dashboard can keep counting the reps of Rems deleted since.
 
+It also runs one Claude turn for the plugin's AI features (`/run`: a system prompt
+and text in, a reply or a validated JSON object out), e.g. Check Statement's verdict.
+
 It also searches a knowledge base (`/search`, see rem_search.py): an Anki-style
 query (AND, OR, NOT, phrases, in:, tag:, is:, prop:…) run on remnote.db, read-only,
 because RemNote's own search only ever ORs the words. Keys beyond plain text use the
@@ -428,9 +431,10 @@ def transcribe(images, raw_text, extend=None):
     return bullets_to_markers(markup), model
 
 
-def run_claude(content, system_prompt):
+def run_claude(content, system_prompt, model=None):
     """One `claude -p` turn on `content` (message content blocks); returns the
-    reply text and the model that answered."""
+    reply text and the model that answered. `model`: an alias (sonnet, opus,
+    haiku), MODEL by default."""
     message = json.dumps({'type': 'user', 'message': {'role': 'user', 'content': content}})
 
     claude = find_claude()
@@ -441,7 +445,7 @@ def run_claude(content, system_prompt):
     # settings files (and so hooks) and session persistence.
     cmd = [claude, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
            '--tools', '', '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence',
-           '--model', MODEL, '--system-prompt', system_prompt]
+           '--model', model or MODEL, '--system-prompt', system_prompt]
     proc = subprocess.run(cmd, input=message + '\n', capture_output=True, text=True, timeout=240, cwd=HOME)
     model = None  # the model the CLI actually resolved the alias to, reported in its init event
     for line in proc.stdout.splitlines():
@@ -794,6 +798,84 @@ def handle_match(req, entry):
     return {'results': results}
 
 
+
+SOURCE_REM_ID = re.compile(r'^[A-Za-z0-9]{8,40}$')
+
+
+def _key_text(raw):
+    """Plain text of a Rem's `key` (rich text as stored: strings and {text} elements)."""
+    try:
+        parts = json.loads(raw) if raw else []
+    except ValueError:
+        return ''
+    return ''.join(p if isinstance(p, str) else str(p.get('text') or '') for p in parts if isinstance(p, (str, dict)))
+
+
+def _slot_value(ps, key):
+    """A powerup slot's stored value (`ps.<code>_<slot>.v.v[0]`): the highlight Data JSON."""
+    try:
+        value = ps[key]['v']['v'][0]
+    except (KeyError, IndexError, TypeError):
+        return None
+    return value if isinstance(value, str) else None
+
+
+def handle_source_highlights(req, entry):
+    """POST /source-highlights {sourceRemId, containerId?}: a PDF's or article's
+    Highlights container, the Rems in it ("Page NNN" Rems, or an article's highlights)
+    and the Rems under each page, with their highlight Data, read from remnote.db
+    (read-only).
+
+    Why: the plugin's getChildrenRem is answered from RemNote's in-memory graph,
+    which loads a parent's children from the database only when something asks
+    RemNote to (ensureLoadChildrenIdsAsync, not called on that path). A container
+    nothing has opened this session comes back with only the Rems already in memory,
+    and Pin Source Quote then made a second "Page 030" beside the real one. The
+    plugin merges this complete list with its own (which has what was created
+    seconds ago and may not be on disk yet)."""
+    if history_archive is None:
+        raise RuntimeError('history_archive.py is missing: download it next to ai_ocr_helper.py')
+    kb_id = history_archive.check_kb_id(req.get('kbId'))
+    source_id = req.get('sourceRemId')
+    container_id = req.get('containerId') or None
+    for rem_id in (source_id, container_id):
+        if rem_id is not None and not (isinstance(rem_id, str) and SOURCE_REM_ID.match(rem_id)):
+            raise ValueError(f'not a Rem id: {rem_id!r}')
+    if not source_id:
+        raise ValueError('no sourceRemId')
+    path = history_archive.remnote_db_path(kb_id)
+    if not path.exists():
+        return {'available': False, 'reason': f'no local database for this knowledge base ({path})'}
+    db = history_archive.open_remnote(path)
+    try:
+        db.execute('BEGIN')
+        if not container_id:
+            for rem_id, key in db.execute(
+                    "SELECT _id, json_extract(doc, '$.key') FROM quanta WHERE json_extract(doc, '$.parent') = ?",
+                    (source_id,)):
+                if _key_text(key).strip() == 'Highlights':
+                    container_id = rem_id
+                    break
+        items = []
+        if container_id:
+            # Two levels in one statement: each extra level is a full scan (no index on parent).
+            rows = db.execute(
+                "SELECT _id, json_extract(doc, '$.parent'), json_extract(doc, '$.key'), json_extract(doc, '$.ps') "
+                "FROM quanta WHERE json_extract(doc, '$.parent') = ?1 OR json_extract(doc, '$.parent') IN "
+                "(SELECT _id FROM quanta WHERE json_extract(doc, '$.parent') = ?1)", (container_id,))
+            for rem_id, parent, key, ps_raw in rows:
+                try:
+                    ps = json.loads(ps_raw) if ps_raw else {}
+                except ValueError:
+                    ps = {}
+                items.append({'remId': rem_id, 'parentId': parent, 'text': _key_text(key),
+                              'pdfData': _slot_value(ps, 'n_d'), 'htmlData': _slot_value(ps, 'hh_d')})
+        db.execute('COMMIT')
+    finally:
+        db.close()
+    entry.update(source=source_id, container=container_id, items=len(items))
+    return {'available': True, 'containerId': container_id, 'items': items}
+
 # ---------------------------------------------------------------------------
 # /video-frame, /video-transcribe — YouTube frames
 # ---------------------------------------------------------------------------
@@ -1143,6 +1225,62 @@ def handle_extract_title(req, entry):
     return {'title': title}
 
 
+
+# ---------------------------------------------------------------------------
+# /run — one Claude turn for the plugin's AI features (Check Statement, …)
+# ---------------------------------------------------------------------------
+
+RUN_MODELS = {'sonnet', 'opus', 'haiku'}
+MAX_RUN_SYSTEM_CHARS = 20_000
+MAX_RUN_TEXT_CHARS = 80_000
+
+
+def _json_object(reply):
+    """The JSON object in a reply: as is, inside a ```json fence, or from its first
+    { to its last }. None when there is none."""
+    text = reply.strip()
+    fence = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+    for candidate in (text, fence.group(1) if fence else None,
+                      text[text.find('{'):text.rfind('}') + 1] if '{' in text else None):
+        if not candidate:
+            continue
+        try:
+            value = json.loads(candidate)
+        except ValueError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def handle_run(req, entry):
+    """POST /run {system, text, json?, model?, task?}: one `claude -p` turn on the
+    user's subscription, with tools, MCP servers and settings off (run_claude). The
+    plugin writes the prompt; `task` only names it in the log. With `json`, the reply
+    must be one JSON object: it comes back parsed as `data`, after one retry that
+    asks for valid JSON when the first reply is not."""
+    system, text = req.get('system'), req.get('text')
+    if not isinstance(system, str) or not system.strip() or len(system) > MAX_RUN_SYSTEM_CHARS:
+        raise RuntimeError(f'need a system prompt, {MAX_RUN_SYSTEM_CHARS} characters at most')
+    if not isinstance(text, str) or not text.strip() or len(text) > MAX_RUN_TEXT_CHARS:
+        raise RuntimeError(f'need the text, {MAX_RUN_TEXT_CHARS} characters at most')
+    model = req.get('model') if req.get('model') in RUN_MODELS else None
+    entry.update(task=str(req.get('task') or '')[:60], chars=len(text))
+    reply, used = run_claude([{'type': 'text', 'text': text}], system, model)
+    entry['model'] = used
+    if not req.get('json'):
+        return {'text': reply, 'model': used}
+    data = _json_object(reply)
+    if data is None:
+        retry = (text + '\n\nYour previous reply was not one valid JSON object:\n' + reply[:4000] +
+                 '\n\nReply again with ONLY the JSON object, no other text.')
+        reply, used = run_claude([{'type': 'text', 'text': retry}], system, model)
+        data = _json_object(reply)
+        entry['retried'] = True
+    if data is None:
+        raise RuntimeError('Claude did not return a JSON object: ' + reply[:300])
+    return {'data': data, 'text': reply, 'model': used}
+
 # ---------------------------------------------------------------------------
 # Local videos: libraries, the macOS file dialogs, scanning, serving
 # ---------------------------------------------------------------------------
@@ -1471,10 +1609,10 @@ def handle_search_ai(req, entry):
 MEDIA_PREFIX = '/media/'
 MEDIA_CHUNK = 1 << 20
 
-ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/find-source': handle_find_source, '/corpus': handle_corpus, '/source': handle_source, '/match': handle_match,
+ROUTES = {'/ocr': handle_ocr, '/locate': handle_locate, '/find-source': handle_find_source, '/corpus': handle_corpus, '/source': handle_source, '/source-highlights': handle_source_highlights, '/match': handle_match,
           '/video-frame': handle_video_frame, '/video-transcribe': handle_video_transcribe,
           '/video-transcript': handle_video_transcript, '/transcript-tidy': handle_transcript_tidy,
-          '/extract-title': handle_extract_title,
+          '/extract-title': handle_extract_title, '/run': handle_run,
           '/video-choose': handle_video_choose, '/video-libraries': handle_video_libraries,
           '/video-library-relink': handle_video_library_relink, '/video-scan': handle_video_scan,
           '/video-file': handle_video_file,

@@ -5,6 +5,7 @@ import '../style.css';
 import '../App.css';
 import { MessageDialog } from '../lib/message_dialog';
 import { MessageBody } from '../components/MessageBody';
+import { FindSourcesButton, runDialogFindSources } from '../components/FindSourcesButton';
 
 /** The Enter that ran a command from the Omnibar can reach the popup; ignore Enter this soon after opening. */
 const ENTER_GRACE_MS = 300;
@@ -24,7 +25,7 @@ export function MessagePopup() {
   const [dialog, setDialog] = useState<MessageDialog | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const openedAt = useRef(Date.now());
-  const [selected, setSelected] = useState<'ok' | 'open'>('ok');
+  const [selected, setSelected] = useState<'ok' | 'open' | 'search'>('ok');
 
   useEffect(() => {
     (async () => {
@@ -55,17 +56,27 @@ export function MessagePopup() {
     close();
   };
 
+  // The buttons, left to right, that ←→ moves between.
+  const choices: ('search' | 'open' | 'ok')[] = [
+    ...(dialog?.findSources ? (['search'] as const) : []),
+    ...(openRemId ? (['open'] as const) : []),
+    'ok',
+  ];
+  const search = () => void runDialogFindSources(plugin, dialog, close);
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
-    } else if (openRemId && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    } else if (choices.length > 1 && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
-      setSelected((s) => (s === 'ok' ? 'open' : 'ok'));
+      const step = e.key === 'ArrowRight' ? 1 : choices.length - 1;
+      setSelected((s) => choices[(choices.indexOf(s) + step) % choices.length]);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (Date.now() - openedAt.current < ENTER_GRACE_MS) return;
       if (selected === 'open') void openRem();
+      else if (selected === 'search') search();
       else close();
     }
   };
@@ -81,9 +92,12 @@ export function MessagePopup() {
       <MessageBody dialog={dialog} />
       <div className="flex items-center justify-between">
         <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-          {openRemId ? '←→ choose · Enter confirm · Esc close' : 'Enter or Esc to close'}
+          {choices.length > 1 ? '←→ choose · Enter confirm · Esc close' : 'Enter or Esc to close'}
         </span>
         <div className="flex items-center gap-3">
+          {dialog?.findSources && (
+            <FindSourcesButton onClick={search} onHover={() => setSelected('search')} selected={selected === 'search'} />
+          )}
           {openRemId && (
             <button
               onClick={() => void openRem()}

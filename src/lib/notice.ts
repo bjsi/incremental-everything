@@ -49,7 +49,11 @@ export async function showNotice(
     id: dialog.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     at: Date.now(),
   };
-  const list = [...((await plugin.storage.getSession<Notice[]>(noticesKey)) || []), notice];
+  // A notice with the id of one already up replaces it (a background job's progress, then its result).
+  const list = [
+    ...((await plugin.storage.getSession<Notice[]>(noticesKey)) || []).filter((n) => n.id !== notice.id),
+    notice,
+  ];
   // Over the limit, the oldest plain notices go first: an open question stays until answered.
   while (list.length > MAX_NOTICES) {
     const k = list.findIndex((n) => !n.ask);

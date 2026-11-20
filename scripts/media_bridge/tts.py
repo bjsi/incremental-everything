@@ -45,7 +45,8 @@ from the .env file named by "envFile" in ~/.remnote-media-bridge/tts.json (or
 
 tts.json (optional): {"envFile": "...", "audioHome": "...", "geminiVoices": [...],
 "geminiModel": "...", "azureVoices": [...], "elevenModel": "...", "elevenUsdPerMChars": N,
-"pronunciationHome": "..." (default <audioHome>/pronunciations)}
+"pronunciationHome": "..." (default <audioHome>/pronunciations),
+"spokenAs": {"pt": {"IMO": "Imo"}} (acronyms said as a word in that language; see SPOKEN_AS)}
 ("azureVoice": "..." is still read)
 
 CLI:
@@ -137,6 +138,27 @@ ELEVEN_FALLBACK_VOICES = {"George": "JBFqnCBsd6RMkjVDRZzb", "Alice": "Xb7hH8MSUJ
                           "Brian": "nPczCjzI2devNBz1zQrb", "Eric": "cjVigY5qzO86Huf0OWal",
                           "Matilda": "XrExE9yKIg1WjnnlVkGX", "Daniel": "onwK4e9ZLuTAKqWW03F9"}
 VOICE_CACHE_S = 600
+
+# Acronyms said as a word in one language but spelled letter by letter in another. Gemini
+# pt-BR spells an all-caps "IMO" (I-eme-ó, ~0.4 s longer each time, 3 voices, 2026-11-19),
+# while Brazilians say "Imo" as a word; in English I-M-O is right, so only the pt text
+# changes. Whole word, case-sensitive, applied to the text sent to the engine (the script
+# and the plan keep the acronym). tts.json "spokenAs": {"pt": {"ABC": "Abc"}} adds to it.
+SPOKEN_AS = {"pt": {"IMO": "Imo"}}
+
+
+def spoken_as(lang: str) -> dict[str, str]:
+    table = dict(SPOKEN_AS.get(lang, {}))
+    table.update((config().get("spokenAs") or {}).get(lang, {}))
+    return table
+
+
+def respell(lang: str, text: str) -> str:
+    """The text as the engine should get it in this language (see SPOKEN_AS)."""
+    for word, said in spoken_as(lang).items():
+        text = re.sub(rf"(?<![\w-]){re.escape(word)}(?![\w-])", said, text)
+    return text
+
 
 INLINE = re.compile(r"<(pt|en)>(.*?)</\1>", re.S)
 LANG_PREFIX = re.compile(r"^\[(pt|en)\]\s*")
@@ -418,7 +440,7 @@ def build_calls(items, engine: str) -> list:
         last = calls[-1] if calls else None
         if engine in BLOCK_ENGINES:
             limit = CALL_CHARS.get(engine, MAX_CALL_CHARS)
-            for txt in _pieces(plain(it.text), limit):
+            for txt in _pieces(respell(it.lang, plain(it.text)), limit):
                 last = calls[-1] if calls else None
                 # Gemini TTS tends to loop when one call repeats a passage (forum report,
                 # gemini-3.8-flash-tts): a line already in the call starts a new one
@@ -616,7 +638,7 @@ def ssml(lines: list[Line], voice: str) -> str:
     for ln in lines:
         rs = runs(ln.lang, ln.text)
         for i, (g, t) in enumerate(rs):
-            piece = escape(t) + (LINE_BREAK if i == len(rs) - 1 else "")
+            piece = escape(respell(g, t)) + (LINE_BREAK if i == len(rs) - 1 else "")
             if merged and merged[-1][0] == g:
                 merged[-1][1] += piece
             else:
@@ -697,21 +719,65 @@ def _en_number(n: int) -> str:
     return str(n)
 
 
+_PT_UNITS = ("zero um dois tres quatro cinco seis sete oito nove dez onze doze treze catorze quinze "
+             "dezesseis dezessete dezoito dezenove").split()
+_PT_TENS = "_ _ vinte trinta quarenta cinquenta sessenta setenta oitenta noventa".split()
+_PT_HUNDREDS = "_ cento duzentos trezentos quatrocentos quinhentos seiscentos setecentos oitocentos novecentos".split()
+
+
+def _pt_number(n: int) -> str:
+    """2026 -> 'dois mil e vinte e seis', up to 9,999; else the digits. Accents left out,
+    as _norm_words strips them before numbers are spelled."""
+    if n < 20:
+        return _PT_UNITS[n]
+    if n < 100:
+        return _PT_TENS[n // 10] + ("" if n % 10 == 0 else " e " + _PT_UNITS[n % 10])
+    if n < 1000:
+        if n == 100:
+            return "cem"
+        rest = n % 100
+        return _PT_HUNDREDS[n // 100] + ("" if rest == 0 else " e " + _pt_number(rest))
+    if n < 10000:
+        rest = n % 1000
+        head = "mil" if n < 2000 else _PT_UNITS[n // 1000] + " mil"
+        if rest == 0:
+            return head
+        # "e" before a round hundred or anything under 100: dois mil e trezentos, dois mil e seis
+        return head + (" e " if rest < 100 or rest % 100 == 0 else " ") + _pt_number(rest)
+    return str(n)
+
+
+# Portuguese forms a spelled number can take in the text but not in _pt_number
+_PT_SPELLING = {"uma": "um", "duas": "dois", "quatorze": "catorze"}
+_PT_FEMININE_HUNDREDS = re.compile(r"(?<=[a-z]{3})entas$")
+
 # British and American spellings compared as one (scripts are British, whisper American)
 _SPELLING = [(re.compile(r"oeuvre(s?)$"), r"euver\1"), (re.compile(r"oeuvr(ed|ing)$"), r"euver\1"),
              (re.compile(r"(?<=[a-z])tre(s?)$"), r"ter\1"),
              (re.compile(r"our(s?)$"), r"or\1"), (re.compile(r"(?<=[a-z]{3})is(e|ed|es|ing)$"), r"iz\1")]
 
 
-def _norm_words(text: str) -> list[str]:
+def _norm_words(text: str, lang: str = "en") -> list[str]:
+    """Words to compare a script line with its transcript. Numbers are spelled in the
+    line's language: whisper writes "20 de novembro de 2026" where the script says
+    "vinte de novembro de dois mil e vinte e seis" (spelled in English, every take of
+    such a line failed as words added and missing, and was paid for three times)."""
+    pt = lang == "pt"
     t = unicodedata.normalize("NFKD", text.lower())
     t = "".join(c for c in t if not unicodedata.combining(c))
-    t = re.sub(r"(\d),(\d{3})", r"\1\2", t)
-    t = re.sub(r"\d+", lambda m: _en_number(int(m.group())) if len(m.group()) <= 4 else m.group(), t)
+    if pt:
+        t = re.sub(r"(\d)\.(\d{3})\b", r"\1\2", t)  # 1.500 = mil e quinhentos
+    else:
+        t = re.sub(r"(\d),(\d{3})", r"\1\2", t)
+    speller = _pt_number if pt else _en_number
+    t = re.sub(r"\d+", lambda m: f" {speller(int(m.group()))} " if len(m.group()) <= 4 else m.group(), t)
     out = []
     for w in re.sub(r"[^a-z0-9]+", " ", t).split():
-        for pat, rep in _SPELLING:
-            w = pat.sub(rep, w)
+        if pt:
+            w = _PT_FEMININE_HUNDREDS.sub("entos", _PT_SPELLING.get(w, w))
+        else:
+            for pat, rep in _SPELLING:
+                w = pat.sub(rep, w)
         out.append(w)
     return out
 
@@ -738,7 +804,7 @@ def transcribe(wav: Path, lang: str) -> str | None:
 def verify_speech(text: str, wav: Path, lang: str, engine: str) -> dict:
     """Did the audio say the text? {seconds, expected, added, missing, problem}. `problem`
     is None when it did. Words come from a local whisper transcript when available."""
-    n = len(_norm_words(text))
+    n = len(_norm_words(text, lang))
     secs = duration(wav)
     expected = n / WORDS_PER_MIN.get(engine, 143.0) * 60
     res = {"seconds": round(secs, 1), "expected": round(expected, 1)}
@@ -749,7 +815,7 @@ def verify_speech(text: str, wav: Path, lang: str, engine: str) -> dict:
         problems.append(f"only {secs:.0f} s for ~{expected:.0f} s of text")
     heard = transcribe(wav, lang)
     if heard is not None:
-        a, b = _norm_words(text), _norm_words(heard)
+        a, b = _norm_words(text, lang), _norm_words(heard, lang)
         sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
         same = sum(m.size for m in sm.get_matching_blocks())
         added, missing = len(b) - same, len(a) - same

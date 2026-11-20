@@ -23,6 +23,7 @@ import { registerWidgets } from '../register/widgets';
 import { registerMenus } from '../register/menus';
 import { registerCommands } from '../register/commands';
 import { registerMediaBridgeCommands } from '../register/media_bridge_commands';
+import { registerCorpusCommands } from '../register/corpus_commands';
 import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
 import { registerPrefetchTrackers } from '../lib/queue_prefetch';
 import {
@@ -59,7 +60,7 @@ import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cle
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
 import { refreshPriorityColorScale, restorePriorityColorScale } from '../lib/priority_color_scale';
-import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS, registerHasImageCSS, registerPinReferenceCSS } from '../lib/ui_helpers';
+import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerAiNoteCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS, registerHasImageCSS, registerPinReferenceCSS } from '../lib/ui_helpers';
 import { getIESetting } from '../lib/settings';
 import { StartupTaskBoard, waitForSessionFlag } from '../lib/startup_status';
 import { migrateIESettingsIfNeeded, settingIdsNeedingRegistration } from '../lib/settings_migration';
@@ -247,6 +248,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerPluginHidingCSS(plugin);
   await registerClozeExtractCSS(plugin);
   await registerTagBadgeCSS(plugin);
+  await registerAiNoteCSS(plugin);
   await registerIgnoreTagCSS(plugin);
   // Descendants of #cloze-extract / #ignore Rems; kept current by the listeners
   // in lib/tag_subtree_css. Not awaited: it walks the open panes.
@@ -257,6 +259,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerCommands(plugin);
   // Upscale image / Read aloud: registered only while the Local Media Bridge setting is on.
   registerMediaBridgeCommands(plugin);
+  registerCorpusCommands(plugin);
 
   // Remove Parent / Remove Grandparent commands are always available — they
   // wrap powerups that are always registered and don't conflict with anything.

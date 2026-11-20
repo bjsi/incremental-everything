@@ -20,6 +20,7 @@ div.rn-editor__rem__body.rem-container[data-rem-tags][data-rem-id]   ← the row
 - The editor is a **flat virtualized list**: a Rem's children are separate top-level rows, not DOM descendants. Block-level markers need the container div (`[data-container-node-id]`, class `container-node`). It carries `data-rem-container-tags` (the Rem's **own** tags and powerup names, never inherited), `data-rem-container-id` and `data-rem-container-property`.
 - Every container gets inline `z-index: 2` (content div 3, children div 1). Each is a stacking context painted below the later rows of its subtree, so an overlay on an ancestor cannot cover its descendants. Styling a subtree needs its Rem ids (`src/lib/tag_subtree_css.ts`).
 - The bullet box is `--rem-button-width: 24px`, `user-select: none` and not contenteditable: the safe place for editor chrome. A `background` on it plus `.rem-bullet__core { fill: transparent }` swaps the dot for an icon with no layout shift, and `.rem-bullet__ring` still signals a collapsed branch.
+- The bullet's SVG (`RemBullet` in the bundle, 2026-11-19): `viewBox="0 0 200 200"` holding `circle.rem-bullet__ring` (`r=100`, `fill: transparent`) under `circle.rem-bullet__core` (`fill: currentColor`, `r = 200·radius/(2·(radius+borderWidth))`). A collapsed branch adds `.rn-rem-bullet--hidden-children` to the svg, which fills the ring grey (`--rn-colors-gray-15`, `#3d3d46` in dark mode); hovering fills `.rem-bullet__ring--hover`. The CSS `r` property resizes the core (`r: 36px` = 36 viewBox units). With `fill-opacity`, that gives a small faint dot that still shows the grey ring when collapsed (the user's Extra Card Detail rule and the plugin's `#ignore` rules, `QUIET_BULLET_*` in `src/lib/tag_subtree_css.ts`; rendered in headless Chrome).
 - `data-rem-tags` also appears on rem references (`.rem-reference-container`) and PDF highlights, which have no bullet. A bare `[data-rem-tags~=…]` rule hits them too.
 - Other confirmed classes: `rem-container--with-tags`, `--focused`, `--spacious`, `--not-in-article`, `.toggle-collapse-button`, `.rn-doc-title`, `.rn-document[data-document-tags]`. The queue uses separate names: `.rn-queue-rem`, `.rn-bullet-container`, `.rem-bullet__document`, `data-queue-rem-tags`, `data-queue-rem-container-tags` (see `src/register/queue_display_powerups.ts`).
 
@@ -127,3 +128,28 @@ Read from the 1.28.57 bundle, Oct 26 2026. Every instance of a widget gets the s
 
 Used in v1.0.167 (`src/lib/editor_review_timer_primary.ts`): the timer's instances list their ids in a session key, and only the top-most, then left-most visible one renders. The sticky-header margin skips panes whose timer iframe is 0px tall.
 
+
+## Styling a tagged Rem's descendants: the plugin's marker { #subtree-marker }
+
+A CSS rule keyed on `data-rem-container-tags` styles only the tagged Rem's **own** row. The editor is a flat list (see [One editor row](#one-editor-row)): a child's row is not a DOM descendant of its parent's container, so no combinator reaches it. Custom CSS that claims to style "the Rem and its children" this way styles only the Rem itself (observed 2026-11-19 on Extra Card Detail children).
+
+`src/lib/tag_subtree_css.ts` works around it by Rem id. It walks the open panes, finds the Rems under a tagged parent, and registers rules against their `data-rem-container-id`. For `cloze-extract` and `ignore` it registers the styling itself. For Extra Card Detail (setting **Mark Extra Card Detail Subtrees for Custom CSS**, off by default) it registers only a marker: `--in-extra-card-detail: 1` on the ECD's own container and on every container under it. A custom property inherits from the container div into its row, and a **style query** reads it, so the user's Custom CSS decides the look:
+
+```css
+@container style(--in-extra-card-detail: 1) {
+  .rem-text:not(.extra-card-detail *) { font-size: 15px !important; font-style: italic; }
+}
+```
+
+Tested in headless Chrome 2026-11-19: the marked child and grandchild matched, the unmarked row did not. Every element is a style container for custom-property queries, so no `container-type` is needed. RemNote desktop runs Electron 44 (Chrome well past 111, where style queries arrived). `:not(.extra-card-detail *)` keeps the rule out of the queue's Extra details, whose nested editor renders the same Rem ids (see [Extra details in the queue](#extra-details)).
+
+Extra Card Detail is a powerup (`apu.x` in the Rem document), not a tag: `getTagRems()` does not list it, so the walk asks `hasPowerup(ExtraCardDetail)` per parent. The marker refreshes on navigation and after edits that move Rems in or out of a subtree, like the other subtree rules.
+
+## KaTeX: what CSS must not do, and what it cannot fix { #katex }
+
+Measured 2026-11-19 in RemNote and by rendering KaTeX 0.16 in headless Chrome with no RemNote CSS at all.
+
+- **Never set a font size on `*` inside a row.** KaTeX sizes each inner span in `em` (fraction parts, scripts, the vertical offsets of stacked lines). A rule like `[data-rem-container-tags~="x"] .rn-editor__rem__body__text * { font-size: 1rem !important }` gives all of them one size: the formula shrinks, and fractions and stacked lines overlap. Size `.rem-text` instead, and set block formulas back with `.katex-display > .katex { font-size: … }`. The plugin's `ignore` rules had this pattern until 2026-11-19; they now shrink `.rem-text :not(.katex, .katex *)` and dim `.rem-text` once (0.65, about what the old per-element 0.88 added up to two or three elements deep, so the hover/focus reveal stays visible), because opacity on every element compounded with depth and faded nested formulas almost to nothing.
+- **Editor rules reach the queue.** The queue's Extra details draw the ECD's children in a nested editor ([Extra details in the queue](#extra-details)), so an editor rule keyed on the ECD's container also applies there.
+- **Scale KaTeX relative to its text, not in px.** KaTeX's default is `.katex { font-size: 1.21em }`. Fixed px on `.katex-html` (the old "Bigger LaTeX" snippet) ignores headers, small notes and the queue's larger text. The user's Custom CSS now sets `--latex-display-scale` (1.4) and `--latex-inline-scale` (1.21) in em, and the tag rules read the display scale.
+- **Crowded rows in `\begin{array}` come from KaTeX, not CSS.** An array sets fractions in text style (small) and packs the rows tightly, so a numerator touches the denominator above it. The bare KaTeX render matched RemNote exactly. `\begin{gathered}` or `\begin{aligned}` with `\dfrac` fixes it; so does extra space with `\\[6pt]`.

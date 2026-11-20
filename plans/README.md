@@ -15,6 +15,7 @@ Finished plans, moved to [`implemented/`](implemented/). They are kept for their
 
 | File | Effort | Shipped |
 |---|---|---|
+| [SOURCE_FINDER_PLAN.md](implemented/SOURCE_FINDER_PLAN.md) | Find Sources, Check Statement and their tree versions: from a note (summary, translation, statement) to the canonical passages, by meaning, reviewed and pinned; verdicts by Claude; outline-aware lists | v1.0.245 |
 | [SEARCH_ENGINE_PLAN.md](implemented/SEARCH_ENGINE_PLAN.md) | An Anki-style query language run by the AI helper on remnote.db: AND/OR/NOT, scopes, tags, slots, cards, suppression causes, FSRS S/D/R per card's scheduler; Search & Browse with ✨ AI | v1.0.231 |
 | [HISTORY_ARCHIVE_PLAN.md](implemented/HISTORY_ARCHIVE_PLAN.md) | A desktop helper that archives the review history of deleted cards and IncRems (and where they lived in the tree), so the Study Dashboard keeps counting it | v1.0.217 |
 

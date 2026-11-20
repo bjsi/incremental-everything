@@ -82,6 +82,7 @@ import {
   hideDismissedTagSettingId,
   showPinRingIndicatorsSettingId,
   showLinkedAudioIndicatorSettingId,
+  markExtraCardDetailSubtreesSettingId,
   enableHideInQueueIntegrationId,
   logosBridgeEnabledId,
   logosAutoOpenId,
@@ -192,6 +193,7 @@ export interface IESettings {
   [hideDismissedTagSettingId]: boolean;
   [showPinRingIndicatorsSettingId]: boolean;
   [showLinkedAudioIndicatorSettingId]: boolean;
+  [markExtraCardDetailSubtreesSettingId]: boolean;
 
   // Integrations / performance
   [enableHideInQueueIntegrationId]: boolean;
@@ -298,6 +300,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [hideDismissedTagSettingId]: true,
   [showPinRingIndicatorsSettingId]: false,
   [showLinkedAudioIndicatorSettingId]: false,
+  [markExtraCardDetailSubtreesSettingId]: false,
 
   [enableHideInQueueIntegrationId]: false,
   [logosBridgeEnabledId]: false,
@@ -1070,6 +1073,17 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Draws a dashed orange outline and a link glyph on an audio player whose file lives on an ' +
       'outside server instead of in RemNote, so it would break if that server moved the file. ' +
       'Run "Store linked images & audio in RemNote" on the Rem to store it; the outline then goes.',
+  },
+  [markExtraCardDetailSubtreesSettingId]: {
+    kind: 'boolean',
+    group: 'editor',
+    helpPath: 'Colour-Coding-Reference/#quieter-extra-card-details',
+    title: 'Mark Extra Card Detail Subtrees for Custom CSS',
+    description:
+      'For your own Custom CSS: sets --in-extra-card-detail: 1 on every Extra Card Detail Rem ' +
+      'and on all the Rems under it in the editor, which RemNote gives no way to select. ' +
+      'Style them with @container style(--in-extra-card-detail: 1) { .rem-text { … } }. ' +
+      'Changes nothing by itself. Takes effect on the next navigation.',
   },
   [showPriorityBandsInTablesId]: {
     kind: 'boolean',

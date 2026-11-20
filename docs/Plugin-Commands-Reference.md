@@ -219,6 +219,21 @@ In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) opened from the queue's 
 - **[Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants)** (`Ctrl+Opt+Shift+Q` / `Ctrl+Alt+Shift+Q`) — `quick: psqd`
   Runs Pin Source Quote on every Rem formatted as a Quote in the focused Rem and all its descendants, or in each selected Rem's subtree; other Rems are left alone.
 
+- **[Find Sources (by meaning)](Source-Pins.md#find-sources)** — `quick: fsq`
+  Finds, in the background, the passages of your library that say what the focused or selected Rems say (summaries, paraphrases, translations), then a notice opens the review: accept passages and they are pinned, optionally with their quotes and AI notes as child Rems. Needs a [corpus provider](Corpus-Provider.md) with semantic search.
+
+- **[Check Statement against Sources](Source-Pins.md#check-statement)** — `quick: cks`
+  Find Sources, then Claude's verdict on each focused or selected Rem (✅ correct, ⚠️ partly, ❌ contradicted, ❔ not covered), judged only from the passages found, with an observation citing book and page; after review, written under the Rem as a dated Check Rem with the passages it rests on. Needs a [corpus provider](Corpus-Provider.md) with semantic search and the Claude CLI.
+
+- **[Ask Your Sources](Source-Pins.md#ask-your-sources)** — `quick: ask`
+  The focused Rem holds a question or a topic: Find Sources looks for the passages that answer it, then Claude answers only from them, with sections, quotes chosen per section and the sources' divergences; after review, written under the Rem as a dated answer. The review takes a [follow-up](Source-Pins.md#ask-follow-up) (`F`) to ask again with what to improve or add. Needs a corpus provider with semantic search and the Claude CLI.
+
+- **[Find Sources (by meaning) in descendants](Source-Pins.md#find-sources-in-descendants)** — `quick: fsqd`
+  Find Sources on every statement under the focused or selected Rems (a summary or course document): lists read as one statement with their lead-in, headings and short labels left out, statements already pinned skipped; three at a time in the background, one review for the run.
+
+- **[Check Statements against Sources in descendants](Source-Pins.md#find-sources-in-descendants)** — `quick: cksd`
+  Check Statement on every statement under the focused or selected Rems, the same way.
+
 - <a id="store-linked-images-audio-in-remnote"></a>**Store linked images & audio in RemNote** — `quick: slm`
   An image or audio added through **Embed Link** (or **Audio Search**) is saved as the bare web address: nothing is copied, so the Rem breaks the day that server moves or removes the file, and it does not play offline. This command fetches each such file, stores it in RemNote the way an uploaded file is stored, and points the Rem at the stored copy.
   Run it on the focused Rem or on a selection of Rems; front and back are both handled. The Rem itself is edited in place — only the address inside the image or audio changes — so its flashcards and their history are untouched. Files RemNote already stores, and video embeds such as YouTube, are left alone, so it is safe to re-run.
@@ -651,7 +666,7 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   Stops system checks when queues are temporarily empty.
 
 - **Debug Incremental RemNote**
-  Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search, and **[Repoint references](Utilities-Cleaning-Up.md#repair-broken-references)** for repairing references that show "Loading".
+  Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones), or, from a document's [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) → **Debug**, for that document when no Rem in it can be focused (a PDF, say) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search, and **[Repoint references](Utilities-Cleaning-Up.md#repair-broken-references)** for repairing references that show "Loading".
 
 - **Toggle Priority Band Colour Logging**
   Prints the band → percentile → colour mapping each priority badge stylesheet is built from, to your developer console. Off by default; the setting is per device and survives a reload, so the mapping can be inspected on the next start. Use it if a badge's colour looks out of step with the **[Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget)** for the same Rem.

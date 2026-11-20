@@ -50,14 +50,93 @@ It appears wherever a priority is shown as colour: the **table-cell badges** (`7
 | Dashed outline + 🔗 on an audio player | **orange** `#f97316` | The audio file is only linked, not stored in RemNote — see [Spotting linked audio](Utilities-Cleaning-Up.md#spotting-linked-audio) | Mark Audio That Is Only Linked |
 | Text background | **blue** `#8ad0f3` (dark `#1e496b`) | A PDF/web highlight you have **extracted** from (`#pdfextract`) | — |
 | Text background | **green** `#75f8b2` (dark `#1a5c3a`) | A highlight that is itself an Incremental Rem | — |
-| Dimmed, shrunk text | — | Tagged `#ignore` — archived, still readable; applies to the Rem **and its descendants** | — |
+| Dimmed, shrunk text, faint bullet | — | Tagged `#ignore` — archived, still readable; applies to the Rem **and its descendants** | — |
 | Faded, grayscaled, zoomed-out text | — | Tagged `#cloze-extract` — a cloze created with `Opt+Z`, safe to skip when reading; applies to the Rem **and its descendants** | — |
 | Yellow background + red text | — | Source text already used for a cloze (`Opt+Z`) | — |
 | Bookmark glyph in the [Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget) | **green** `#10b981` | The Rem has a [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) — expand the widget to see where | — |
 
 Both left borders run down the whole block, so an outline reads as one unit rather than a marked first line above unmarked children. Two places keep a single-line marker instead: the document you are currently inside, which is marked on its title only — a bar down the entire page says nothing useful — and the queue, portals, hover previews and PDF highlights, where there is no block to span.
 
-The `#ignore` and `#cloze-extract` treatments also cover the Rem's descendants in the open document, updating a moment after you add, move or re-tag a Rem. Hovering or focusing a row brings it back to full strength. Rems shown through a portal from another document keep their normal look.
+The `#ignore` and `#cloze-extract` treatments also cover the Rem's descendants in the open document, updating a moment after you add, move or re-tag a Rem. Hovering or focusing a row brings it back to full strength. Rems shown through a portal from another document keep their normal look. `#ignore` Rems also get a quiet bullet: a small faint dot that still shows RemNote's grey ring when the Rem's children are collapsed. Formulas in them shrink with the text and keep their shape.
+
+### Quieter Extra Card Details (a Custom CSS suggestion) { #quieter-extra-card-details }
+
+Extra Card Detail Rems are notes for the back of a card, but in the editor they read as loudly as the outline around them. The plugin draws nothing on them by default. These Custom CSS rules make them smaller, italic and muted, with a faint bullet and a 🧷 in place of the "Extra Card Detail" pill. The row you are editing gets its full colour back. The queue is left as RemNote draws it.
+
+![A Rem with an Extra Card Detail note under it: the note and its three children are smaller, italic and grey-green with faint bullets, the focused child is shown in full colour, and the rest of the outline is unchanged](assets/ecd-sample-css-rules.png){ width="900" }
+
+CSS alone reaches only the Extra Card Detail Rem itself: RemNote's editor draws a Rem's children as separate rows, so nothing in the page ties them to the Rem above. Turn on **Mark Extra Card Detail Subtrees for Custom CSS** ([Plugin Settings](Plugin-Settings-Reference.md#editor-indicators)) and the plugin marks the Rems under each Extra Card Detail with `--in-extra-card-detail: 1`, which the `@container style(…)` block below reads. Without the setting, the rules still style the Extra Card Detail Rem.
+
+To use them, paste the code into a code block under your **Custom CSS** document, and set `--ecd-block-latex-size` to the size of your normal text.
+
+```css
+:root {
+  --ecd-font-size: 0.8em;          /* Extra Card Detail text */
+  --ecd-block-latex-size: 16px;    /* block formulas: your normal text size */
+  --ecd-color: color-mix(in srgb, var(--rn-clr-content-tertiary, #8a8f98) 75%, #2e8b57);
+}
+
+/* The Extra Card Detail Rem (works without the plugin) */
+[data-rem-container-tags~="extra-card-detail" i]:not(.extra-card-detail *) .rem-text {
+  font-size: var(--ecd-font-size) !important;
+  font-style: italic;
+  color: var(--ecd-color);
+}
+[data-rem-container-tags~="extra-card-detail" i]:not(.extra-card-detail *) .rem-container:focus-within .rem-text {
+  color: var(--rn-clr-content-primary);
+}
+[data-rem-container-tags~="extra-card-detail" i]:not(.extra-card-detail *) .katex-display > .katex {
+  font-size: calc(1.21 * var(--ecd-block-latex-size));
+  color: var(--rn-clr-content-primary);
+}
+/* Bullet: a small faint dot; a collapsed Rem keeps RemNote's grey ring */
+[data-rem-container-tags~="extra-card-detail" i]:not(.extra-card-detail *) .rem-bullet__core {
+  r: 36px;
+  fill-opacity: 0.28;
+}
+[data-rem-container-tags~="extra-card-detail" i]:not(.extra-card-detail *) .rn-rem-bullet--hidden-children .rem-bullet__core {
+  fill-opacity: 0.55;
+}
+
+/* The Rems under it (needs the plugin setting) */
+@container style(--in-extra-card-detail: 1) {
+  .rem-text:not(.extra-card-detail *) {
+    font-size: var(--ecd-font-size) !important;
+    font-style: italic;
+    color: var(--ecd-color);
+  }
+  .rem-container:focus-within .rem-text:not(.extra-card-detail *) {
+    color: var(--rn-clr-content-primary);
+  }
+  .katex-display > .katex:not(.extra-card-detail *) {
+    font-size: calc(1.21 * var(--ecd-block-latex-size));
+    color: var(--rn-clr-content-primary);
+  }
+  .rem-bullet__core:not(.extra-card-detail *) {
+    r: 36px;
+    fill-opacity: 0.28;
+  }
+  .rn-rem-bullet--hidden-children .rem-bullet__core:not(.extra-card-detail *) {
+    fill-opacity: 0.55;
+  }
+}
+
+/* The pill: a faded 🧷 instead of "Extra Card Detail" */
+.hierarchy-editor__tag-bar__tag[data-test="Applied Powerup Pill Extra Card Detail"] {
+  font-size: 0;
+  opacity: 0.6;
+}
+.hierarchy-editor__tag-bar__tag[data-test="Applied Powerup Pill Extra Card Detail"]::before {
+  font-size: 12px;
+  content: '🧷';
+}
+```
+
+A few choices behind these rules, in case you adapt them:
+
+- **Size `.rem-text`, never every element (`*`).** Formulas are built from many nested pieces sized relative to each other; forcing one size on all of them squashes fractions and makes stacked lines overlap.
+- **`:not(.extra-card-detail *)`** keeps the rules out of the queue, whose Extra details show the same Rems.
+- **The pill is matched by its own label**, not by "any pill on an Extra Card Detail Rem", which would also turn the Rem's other tags into 🧷.
 
 ### Reference pin rings
 

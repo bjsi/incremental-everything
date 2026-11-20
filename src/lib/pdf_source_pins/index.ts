@@ -6,6 +6,7 @@ import {
   RichTextInterface,
 } from '@remnote/plugin-sdk';
 import { HelperUnreachableError as HelperDown, helperPost as sharedHelperPost } from '../helper_client';
+import { hasCorpusCapability } from '../corpus';
 import { HighlightColorName, sourceHighlightColorId } from '../consts';
 import { createHtmlHighlight, createPdfHighlight } from '../pdf_highlight_create';
 import { safeRemTextToString } from '../pdfUtils';
@@ -117,12 +118,90 @@ export async function sourceViews(rem: PluginRem): Promise<SourceView[]> {
   return views;
 }
 
+// ---------------------------------------------------------------------------
+// The source's highlight Rems, as remnote.db has them
+// ---------------------------------------------------------------------------
+
+/**
+ * One Rem in (or one level under) a source's Highlights container, read by the
+ * helper from remnote.db: a "Page NNN" Rem, a PDF highlight under one, or an
+ * article's highlight. Data is the highlight's stored Data JSON.
+ */
+interface StoredHighlightRem {
+  remId: string;
+  parentId: string;
+  text: string;
+  pdfData: string | null;
+  htmlData: string | null;
+}
+
+interface StoredHighlights {
+  containerId: string | null;
+  items: StoredHighlightRem[];
+}
+
+/** One listing per source for a minute: a run over many Rems reads the database once. */
+const STORED_TTL_MS = 60_000;
+const storedCache = new Map<string, { at: number; listing: Promise<StoredHighlights | null> }>();
+
+/**
+ * The source's Highlights container and the Rems in it, read from remnote.db by
+ * the helper (`/source-highlights`). getChildrenRem alone is not enough: RemNote
+ * answers it from its in-memory graph without loading a parent's children first,
+ * so for a container nothing has opened this session it can return only some of
+ * the pages, and a second "Page 030" was created beside the real one. What this
+ * adds is merged with getChildrenRem, which has what was created seconds ago.
+ * Null when the helper cannot say (web app, older helper): getChildrenRem only.
+ */
+function storedHighlights(plugin: ReactRNPlugin, sourceRemId: string): Promise<StoredHighlights | null> {
+  const cached = storedCache.get(sourceRemId);
+  if (cached && Date.now() - cached.at < STORED_TTL_MS) return cached.listing;
+  const listing = sharedHelperPost<{ available: boolean; reason?: string } & StoredHighlights>(
+    plugin,
+    '/source-highlights',
+    { sourceRemId },
+    { timeoutMs: 15_000 }
+  )
+    .then((res) => (res.available ? { containerId: res.containerId, items: res.items ?? [] } : null))
+    .catch((e) => {
+      console.warn('[SourcePins] Could not read the highlights from the database:', (e as Error).message);
+      return null;
+    });
+  storedCache.set(sourceRemId, { at: Date.now(), listing });
+  listing.then((result) => {
+    if (!result) storedCache.delete(sourceRemId);
+  });
+  return listing;
+}
+
+/** The highlight Rems a stored listing has under `parentId` that RemNote's own list lacked, if they still exist. */
+async function storedOnlyUnder(
+  plugin: ReactRNPlugin,
+  stored: StoredHighlights | null,
+  parentId: string,
+  known: Set<string>,
+  dataOf: (item: StoredHighlightRem) => string | null
+): Promise<{ remId: string; data: string }[]> {
+  const out: { remId: string; data: string }[] = [];
+  for (const item of stored?.items ?? []) {
+    const data = dataOf(item);
+    if (item.parentId !== parentId || known.has(item.remId) || !data) continue;
+    // The listing can be a minute old: skip a highlight deleted since.
+    if (await plugin.rem.findOne(item.remId)) out.push({ remId: item.remId, data });
+  }
+  return out;
+}
+
 /** RemNote's managed container is identifiable only by name + being a direct child of the source. */
 async function findHighlightsContainer(plugin: ReactRNPlugin, source: PluginRem) {
   for (const child of await source.getChildrenRem()) {
     if ((await safeRemTextToString(plugin, child.text)) === 'Highlights') return child;
   }
-  return null;
+  // Not in RemNote's in-memory list: the database may still have it.
+  const stored = await storedHighlights(plugin, source._id);
+  const fromDb = stored?.containerId ? await plugin.rem.findOne(stored.containerId) : undefined;
+  if (fromDb) console.log('[SourcePins] Highlights container found in the database only:', fromDb._id);
+  return fromDb ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,14 +238,33 @@ class PdfHighlightIndex {
   private constructor(
     private plugin: ReactRNPlugin,
     private containerId: string,
-    private pageCount: number
+    private pageCount: number,
+    private stored: StoredHighlights | null
   ) {}
 
-  static async load(plugin: ReactRNPlugin, container: PluginRem, pageCount: number) {
-    const index = new PdfHighlightIndex(plugin, container._id, pageCount);
-    for (const page of await container.getChildrenRem()) {
+  /**
+   * The pages RemNote lists, plus the ones only the database has (see
+   * storedHighlights): a page missing from both is the only one created.
+   */
+  static async load(plugin: ReactRNPlugin, source: PluginRem, container: PluginRem, pageCount: number) {
+    const stored = await storedHighlights(plugin, source._id);
+    const index = new PdfHighlightIndex(plugin, container._id, pageCount, stored);
+    const listed = await container.getChildrenRem();
+    for (const page of listed) {
       const n = pageNumberOfLabel(await safeRemTextToString(plugin, page.text));
       if (n !== null && !index.pageRems.has(n)) index.pageRems.set(n, page._id);
+    }
+    const seen = new Set(listed.map((r) => r._id));
+    const missed: string[] = [];
+    for (const item of stored?.items ?? []) {
+      if (item.parentId !== container._id || seen.has(item.remId)) continue;
+      const n = pageNumberOfLabel(item.text);
+      if (n === null || index.pageRems.has(n) || !(await plugin.rem.findOne(item.remId))) continue;
+      index.pageRems.set(n, item.remId);
+      missed.push(`${n}`);
+    }
+    if (missed.length) {
+      console.log(`[SourcePins] ${missed.length} page Rem(s) found in the database only (not loaded by RemNote): ${missed.join(', ')}`);
     }
     return index;
   }
@@ -180,17 +278,24 @@ class PdfHighlightIndex {
       const pageRemId = this.pageRems.get(n);
       const pageRem = pageRemId ? await this.plugin.rem.findOne(pageRemId) : undefined;
       if (!pageRem) continue;
-      for (const child of await pageRem.getChildrenRem()) {
-        if (!(await child.hasPowerup(BuiltInPowerupCodes.PDFHighlight))) continue;
-        const raw = await child.getPowerupProperty(BuiltInPowerupCodes.PDFHighlight, 'Data');
+      const add = (remId: string, raw: string | null | undefined) => {
         let data: any = null;
         try {
           data = raw ? JSON.parse(raw) : null;
         } catch {
-          continue;
+          return;
         }
         const rects = rectsOnPage(data, page, pageWidth, pageHeight);
-        if (rects.length) found.push({ remId: child._id, rects });
+        if (rects.length) found.push({ remId, rects });
+      };
+      const listed = await pageRem.getChildrenRem();
+      for (const child of listed) {
+        if (!(await child.hasPowerup(BuiltInPowerupCodes.PDFHighlight))) continue;
+        add(child._id, await child.getPowerupProperty(BuiltInPowerupCodes.PDFHighlight, 'Data'));
+      }
+      const known = new Set(listed.map((r) => r._id));
+      for (const h of await storedOnlyUnder(this.plugin, this.stored, pageRem._id, known, (i) => i.pdfData)) {
+        add(h.remId, h.data);
       }
     }
     this.highlights.set(page, found);
@@ -220,7 +325,7 @@ async function ensurePdfPins(
 ): Promise<ViewPinResult[]> {
   const pdfUrl = await source.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
   const located = await helperPost<{ pageCount: number; results: LocateResult[] }>(plugin, '/locate', { pdfUrl, quotes });
-  const index = dryRun ? null : await PdfHighlightIndex.load(plugin, container, located.pageCount);
+  const index = dryRun ? null : await PdfHighlightIndex.load(plugin, source, container, located.pageCount);
 
   const results: ViewPinResult[] = [];
   for (let k = 0; k < quotes.length; k++) {
@@ -287,19 +392,26 @@ async function ensureHtmlPins(
   // A dry run only measures matches, so it skips reading them.
   const existing: TextHighlight[] = [];
   if (!dryRun) {
-    for (const child of await container.getChildrenRem()) {
-      if (!(await child.hasPowerup(BuiltInPowerupCodes.HTMLHighlight))) continue;
-      const raw = await child.getPowerupProperty(BuiltInPowerupCodes.HTMLHighlight, 'Data');
+    const add = (remId: string, raw: string | null | undefined) => {
       let data: any = null;
       try {
         data = raw ? JSON.parse(raw) : null;
       } catch {
-        continue;
+        return;
       }
       const span = highlightSpan(article, data);
-      if (span) existing.push({ remId: child._id, intervals: [span] });
-      else console.warn('[SourcePins] HTML highlight anchor did not resolve', child._id, data);
+      if (span) existing.push({ remId, intervals: [span] });
+      else console.warn('[SourcePins] HTML highlight anchor did not resolve', remId, data);
+    };
+    const listed = await container.getChildrenRem();
+    for (const child of listed) {
+      if (!(await child.hasPowerup(BuiltInPowerupCodes.HTMLHighlight))) continue;
+      add(child._id, await child.getPowerupProperty(BuiltInPowerupCodes.HTMLHighlight, 'Data'));
     }
+    // The ones RemNote has not loaded this session (see storedHighlights).
+    const stored = await storedHighlights(plugin, source._id);
+    const known = new Set(listed.map((r) => r._id));
+    for (const h of await storedOnlyUnder(plugin, stored, container._id, known, (i) => i.htmlData)) add(h.remId, h.data);
   }
 
   const { results: matches } = await helperPost<{
@@ -511,25 +623,82 @@ async function viewSummary(plugin: ReactRNPlugin, sourceRemId: string, result: S
 /**
  * Pin the source of one Rem's text in `views`. Success is reported in a toast; a
  * failure is returned as a dialog for the caller to show, since the caller may
- * itself be a popup that a second popup would replace.
+ * itself be a popup that a second popup would replace. A passage that is not in
+ * the open source is looked up with the source finder (see pinQuotesInViews).
  */
 export async function pinQuoteInViews(
   plugin: ReactRNPlugin,
   request: PinQuoteRequest,
-  views: SourceView[]
+  views: SourceView[],
+  onProgress?: (done: number, total: number) => void
 ): Promise<PinOutcome> {
   const { result, error } = await pinOneQuote(plugin, request, views);
   if (error) return { ok: false, dialog: errorDialog(error) };
-  if (!result) return { ok: false, dialog: notFoundDialog(request.candidates) };
+  if (!result) {
+    const dialog = (await finderFallback(plugin, [request], 0, onProgress)) ?? notFoundDialog(request.candidates);
+    const stillMissing = dialog.items ? (dialog.items[0]?.tone === 'miss' ? [request.remId] : []) : [request.remId];
+    return { ok: false, dialog: await offerSearchByMeaning(plugin, dialog, stillMissing, request.sourceRemId) };
+  }
   await plugin.app.toast(`\ud83d\udccc ${await viewSummary(plugin, request.sourceRemId, result)}`);
   return { ok: true };
 }
 
 /**
+ * With a corpus provider that searches by meaning, a "not found" dialog offers Find
+ * Sources for the Rems that missed: a paraphrase, translation or summary is what the
+ * literal search cannot find.
+ */
+async function offerSearchByMeaning(
+  plugin: ReactRNPlugin,
+  dialog: MessageDialog,
+  remIds: string[],
+  openSourceRemId?: string
+): Promise<MessageDialog> {
+  if (!remIds.length || !(await hasCorpusCapability(plugin, 'semantic-search'))) return dialog;
+  return {
+    ...dialog,
+    findSources: { remIds, openSourceRemId: openSourceRemId ?? null },
+    detail:
+      `${dialog.detail ? `${dialog.detail} ` : ''}Search by meaning finds the passages that say the same thing in ` +
+      `other words or another language: about 25 s per Rem, in the background, then a notice to review them.`,
+  };
+}
+
+/**
+ * The Rems whose passage is not in the open source: ask the source finder which
+ * book each comes from and pin it from that book's PDFs, skipping the open source
+ * (already searched) unless the finder gives the literal text to look for there.
+ * Null when there is no source finder, so the caller shows its own dialog.
+ */
+async function finderFallback(
+  plugin: ReactRNPlugin,
+  missed: PinQuoteRequest[],
+  pinnedInOpen: number,
+  onProgress?: (done: number, total: number) => void
+): Promise<MessageDialog | null> {
+  if (!missed.length || !(await hasCorpusCapability(plugin, 'find-source'))) return null;
+  const openId = missed[0].sourceRemId;
+  const open = await plugin.rem.findOne(openId);
+  const openName = (open ? await safeRemTextToString(plugin, open.text).catch(() => '') : '') || 'the open source';
+  await plugin.app.toast(
+    `\ud83d\udd0e Not in \u201c${excerpt(openName, 40)}\u201d \u2014 asking your source finder\u2026`
+  );
+  const run = await pinFromSourceFinder(
+    plugin,
+    missed.map(({ remId, candidates }) => ({ remId, candidates })),
+    onProgress,
+    { searched: [openId] }
+  );
+  if (run.unavailable !== undefined) return null;
+  return finderPinDialog(run, { openSourceName: openName, pinnedInOpen });
+}
+
+/**
  * Pin the sources of several Rems (a multi-Rem selection), one after another.
- * Rems whose passage is not found are collected and listed at the end rather
- * than interrupting the run; a helper failure stops it, since every remaining
- * Rem would fail the same way.
+ * Rems whose passage is not found are collected rather than interrupting the
+ * run, then looked up with the source finder in the other books (see
+ * finderFallback); a helper failure stops it, since every remaining Rem would
+ * fail the same way.
  */
 export async function pinQuotesInViews(
   plugin: ReactRNPlugin,
@@ -537,9 +706,9 @@ export async function pinQuotesInViews(
   views: SourceView[],
   onProgress?: (done: number, total: number) => void
 ): Promise<PinOutcome> {
-  if (requests.length === 1) return pinQuoteInViews(plugin, requests[0], views);
+  if (requests.length === 1) return pinQuoteInViews(plugin, requests[0], views, onProgress);
 
-  const missed: string[] = [];
+  const missed: PinQuoteRequest[] = [];
   let pinned = 0;
   let created = 0;
   let reused = 0;
@@ -551,7 +720,7 @@ export async function pinQuotesInViews(
       dialog.detail = `Stopped after ${k} of ${requests.length} Rems; ${pinned} pinned.`;
       return { ok: false, dialog };
     }
-    if (!result) missed.push(excerpt(requests[k].candidates[0] ?? '', 90));
+    if (!result) missed.push(requests[k]);
     else {
       pinned++;
       created += result.created.length;
@@ -564,15 +733,21 @@ export async function pinQuotesInViews(
     `\ud83d\udccc ${pinned} of ${requests.length} Rems pinned \u2014 reused ${reused}, created ${created} highlight${created === 1 ? '' : 's'}.`
   );
   if (!missed.length) return { ok: true };
+  const fromFinder = await finderFallback(plugin, missed, pinned, onProgress);
+  if (fromFinder) {
+    const stillMissing = missed.filter((_, k) => fromFinder.items?.[k]?.tone === 'miss').map((r) => r.remId);
+    return { ok: false, dialog: await offerSearchByMeaning(plugin, fromFinder, stillMissing, missed[0].sourceRemId) };
+  }
+  const list = missed.map((r) => excerpt(r.candidates[0] ?? '', 90));
   return {
     ok: false,
-    dialog: {
+    dialog: await offerSearchByMeaning(plugin, {
       tone: 'info',
       title: `Passage not found for ${missed.length} of ${requests.length} Rems`,
       message: 'The others were pinned. These were not found in the open source:',
-      quote: missed.slice(0, 8).map((m) => `\u2022 ${m}`).join('\n') + (missed.length > 8 ? `\n\u2022 \u2026and ${missed.length - 8} more` : ''),
+      quote: list.slice(0, 8).map((m) => `\u2022 ${m}`).join('\n') + (list.length > 8 ? `\n\u2022 \u2026and ${list.length - 8} more` : ''),
       detail: 'Only text taken from the source matches \u2014 a paraphrase, translation or summary will not.',
-    },
+    }, missed.map((r) => r.remId), missed[0].sourceRemId),
   };
 }
 
@@ -645,13 +820,25 @@ export async function pinSourceQuotesInTree(plugin: ReactRNPlugin) {
  * multi-Rem or table-row selection, else the focused Rem. Same resolution as the
  * priority commands (lib/priority_targets).
  */
-async function selectedOrFocusedRems(plugin: ReactRNPlugin): Promise<PluginRem[]> {
+export async function selectedOrFocusedRems(plugin: ReactRNPlugin): Promise<PluginRem[]> {
   const { remIds } = await resolvePriorityTargets(plugin);
   if (!remIds.length) {
     console.warn(`[PinSourceQuote] No target Rem resolved on ${await plugin.window.getURL()}`);
     return [];
   }
   return (await plugin.rem.findMany(remIds)) || [];
+}
+
+/**
+ * The first PDF or saved article open in a pane, in this window first, then in the
+ * other RemNote windows (lib/window_sources.ts); undefined when none is.
+ */
+export async function openSourceRemId(plugin: ReactRNPlugin): Promise<string | undefined> {
+  for (const id of [...(await plugin.window.getOpenPaneRemIds()), ...(await sourcesInOtherWindows(plugin))]) {
+    const rem = await plugin.rem.findOne(id);
+    if (rem && (await sourceViews(rem)).length) return id;
+  }
+  return undefined;
 }
 
 async function pinSourcesOfRems(plugin: ReactRNPlugin, rems: PluginRem[]) {
@@ -695,7 +882,8 @@ async function pinSourcesOfRems(plugin: ReactRNPlugin, rems: PluginRem[]) {
     await plugin.app.toast('Open the source PDF or web article in a pane first (in any RemNote window).');
     return;
   }
-  await showMessageDialog(plugin, finderPinDialog(run));
+  const notPinned = run.rows.filter((r) => !r.pinned).map((r) => r.remId);
+  await showMessageDialog(plugin, await offerSearchByMeaning(plugin, finderPinDialog(run), notPinned));
 }
 
 // --- no source open: the source finder ---------------------------------------
@@ -751,7 +939,7 @@ export interface FinderPinRun {
   stopped?: string;
 }
 
-async function ancestorIds(rem: PluginRem, max = 40): Promise<string[]> {
+export async function ancestorIds(rem: PluginRem, max = 40): Promise<string[]> {
   const ids: string[] = [];
   let parent = await rem.getParentRem();
   while (parent && ids.length < max) {
@@ -766,13 +954,16 @@ async function ancestorIds(rem: PluginRem, max = 40): Promise<string[]> {
  * source finder (`/find-source`) which book the quote is from, given its text and
  * the Rems above it, and which of that book's RemNote PDFs to try, in order. The first PDF where the passage is found
  * is pinned (its page view). Also run by the Local Media Bridge's `pin-quote`
- * without `--source`.
+ * without `--source`, and by Pin Source Quote for the passages the open source
+ * does not hold (`searched`: the PDFs already searched with the Rem's own text).
  */
 export async function pinFromSourceFinder(
   plugin: ReactRNPlugin,
   requests: { remId: string; candidates: string[] }[],
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
+  options: { searched?: string[] } = {}
 ): Promise<FinderPinRun> {
+  const searched = new Set(options.searched ?? []);
   const items = [];
   for (const r of requests) {
     const rem = await plugin.rem.findOne(r.remId);
@@ -808,6 +999,12 @@ export async function pinFromSourceFinder(
         const views = source ? await sourceViews(source) : [];
         if (!source || !views.length) {
           row.tried.push(`${pdfRemId} (not a PDF in this knowledge base)`);
+          continue;
+        }
+        // Already searched with the Rem's own text (the open source); worth a
+        // second look only for the finder's literal text (quote-literal).
+        if (searched.has(pdfRemId) && !book.quote?.trim()) {
+          row.tried.push(`${await nameOf(pdfRemId, source)} (the open source)`);
           continue;
         }
         const view: SourceView = views.includes('pdf') ? 'pdf' : views[0];
@@ -848,8 +1045,15 @@ export async function pinFromSourceFinder(
 
 const bookName = (book: FoundBook) => book.cite || book.title;
 
-/** The confirmation shown after pinning from PDFs that were not open: per quote, which PDF and how its book was found. */
-export function finderPinDialog(run: FinderPinRun): MessageDialog {
+/**
+ * The confirmation shown after pinning from PDFs that were not open: per quote,
+ * which PDF and how its book was found. `fallback` when the finder was asked
+ * because an open source did not hold the passages.
+ */
+export function finderPinDialog(
+  run: FinderPinRun,
+  fallback?: { openSourceName: string; pinnedInOpen: number }
+): MessageDialog {
   const pinned = run.rows.filter((r) => r.pinned).length;
   const total = run.rows.length;
   const items = run.rows.map((row) => {
@@ -876,19 +1080,35 @@ export function finderPinDialog(run: FinderPinRun): MessageDialog {
         : ['Your source finder found no book for this quote.'],
     };
   });
+  const missed = total - pinned;
+  const open = fallback ? `\u201c${excerpt(fallback.openSourceName, 60)}\u201d` : '';
+  const title = fallback
+    ? total === 1
+      ? pinned
+        ? 'Pinned from another PDF'
+        : 'Passage not found'
+      : `Pinned ${pinned} of ${total} quotes from other PDFs`
+    : total === 1
+    ? pinned
+      ? 'Pinned from a PDF that was not open'
+      : 'Passage not found in the PDFs of its book'
+    : `Pinned ${pinned} of ${total} quotes from PDFs that were not open`;
+  const message = fallback
+    ? (fallback.pinnedInOpen ? `${fallback.pinnedInOpen} pinned in the open source, ${open}. ` : '') +
+      `${total === 1 ? 'This passage is' : 'These passages are'} not in ${fallback.pinnedInOpen ? 'it' : open}, ` +
+      `so your source finder looked for ${total === 1 ? 'its book' : 'their books'}:`
+    : 'No PDF or article was open, so each quote\u2019s book was found by your source finder.';
+  const hints = [
+    run.stopped ? `Stopped: ${run.stopped}` : '',
+    pinned ? 'Wrong PDF? Remove the pin, open the right PDF and run Pin Source Quote again.' : '',
+    missed ? 'Only text taken from the source matches \u2014 a paraphrase, translation or summary will not.' : '',
+  ];
   return {
     tone: pinned ? 'success' : 'info',
-    title:
-      total === 1
-        ? pinned
-          ? 'Pinned from a PDF that was not open'
-          : 'Passage not found in the PDFs of its book'
-        : `Pinned ${pinned} of ${total} quotes from PDFs that were not open`,
-    message: 'No PDF or article was open, so each quote\u2019s book was found by your source finder.',
+    title,
+    message,
     items,
-    detail:
-      (run.stopped ? `Stopped: ${run.stopped} ` : '') +
-      'Wrong PDF? Remove the pin, open the right PDF and run Pin Source Quote again.',
+    detail: hints.filter(Boolean).join(' '),
   };
 }
 

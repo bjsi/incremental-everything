@@ -2,6 +2,80 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.249 - November 20th, 2026
+
+### ✨ Improved
+
+**Menu Hub**: added **Debug** to a document's Menu Hub, which opens the Debug Widget on that document (Debug PDF, Repair PDF and the other diagnostics) without first putting the cursor in one of its Rems.
+
+📖 [Menu Hub](Plugin-Widgets-Reference.md#menu-hub)
+
+**Ask Your Sources**: added a follow-up field to the review (`F`, then `Enter`) that asks the question again with what to improve, correct or add, and brings the rewritten answer to a new review.
+
+📖 [Source Pins → Asking a follow-up](Source-Pins.md#ask-follow-up)
+
+**Find Sources**: a descriptor (*Não pode rebocar em que método?* under *Rebocadores com tubulão*) is now searched and judged with its concept in Find Sources, Check Statement and Ask Your Sources; Check Statement and Ask Your Sources also give Claude the Rems above the note, up to its document; the review shows what was sent with each note.
+
+📖 [Source Pins → Descriptors and where the note sits](Source-Pins.md#find-sources-context)
+
+**Read Aloud**: started on a descriptor, it now reads its concept first, as Add pronunciation does; fixed it stopping with an error on notes that contain a portal, and Gemini TTS redoing (and charging again for) Portuguese lines with dates or numbers it had read correctly.
+
+📖 [Read Aloud → Reading rules](Read-Aloud.md#reading-rules) · [Gemini's audio is checked](Read-Aloud.md#checked)
+
+## v1.0.248 - November 19th, 2026
+
+### ✨ Improved
+
+**Local Media Bridge**: added `strip-priority`, which removes the card priority from Rems that stopped being flashcards (values first, then the tag), and `card --practice on|off`, which switches a Rem's cards off or on as `/Disable Card` does.
+
+📖 [Local Media Bridge → Rem operations](Local-Media-Bridge.md#operations)
+
+## v1.0.247 - November 19th, 2026
+
+### ✨ New
+
+**Extra Card Details**: added the setting **Mark Extra Card Detail Subtrees for Custom CSS**, which lets your own CSS style the Rems under an Extra Card Detail, and a suggested set of rules that makes Extra Card Details small, italic and muted in the editor, with a faint bullet and a 🧷 pill.
+
+![A Rem with an Extra Card Detail note under it: the note and its three children are smaller, italic and grey-green with faint bullets, the focused child is shown in full colour, and the rest of the outline is unchanged](assets/ecd-sample-css-rules.png){ width="900" }
+
+📖 [Colour Coding Reference → Quieter Extra Card Details](Colour-Coding-Reference.md#quieter-extra-card-details)
+
+### ✨ Improved
+
+**#ignore**: formulas in ignored Rems now keep their shape and shrink with the text instead of being squashed and faded, and ignored Rems get a small faint bullet that still shows collapsed children.
+
+📖 [Colour Coding Reference → Editor](Colour-Coding-Reference.md#editor)
+
+## v1.0.246 - November 18th, 2026
+
+### ✨ Improved
+
+**Ask Your Sources**: made the answers shorter, saying each fact and quoting each passage once (no "Divergências" that repeats the sections when the disagreement is the answer itself); AI notes under quotes are now offered only in Find Sources, since Check Statement and Ask Your Sources already explain.
+
+📖 [Source Pins → Ask Your Sources](Source-Pins.md#ask-your-sources)
+
+## v1.0.245 - November 18th, 2026
+
+### ✨ New
+
+**Find Sources**: added a command (`fsq`, or **Search by meaning** when Pin Source Quote finds no match) that finds, by meaning, the passages of your library that say what a note says (a summary, paraphrase or translation), lets you review them, and pins the accepted ones, optionally with their trimmed, emphasised quotes and AI notes as child Rems; reads a list and its lead-in as one statement, and runs on a whole summary with `fsqd`; needs a corpus provider with semantic search.
+
+📖 [Source Pins → Find Sources](Source-Pins.md#find-sources) · [Lists in your notes](Source-Pins.md#find-sources-lists) · [Whole summaries](Source-Pins.md#find-sources-in-descendants)
+
+**Check Statement**: added a command (`cks`) that runs Find Sources on a note and asks Claude whether it is right, judged only from the passages found (✅ ⚠️ ❌ ❔), with an observation citing book and page, written after review as a dated Check Rem under the note; `cksd` checks every statement of a summary.
+
+📖 [Source Pins → Check Statement](Source-Pins.md#check-statement)
+
+**Ask Your Sources**: added a command (`ask`) that answers the question or topic written in a Rem from the passages of your library, in sections with the quotes each one rests on and the sources' divergences, written after review under the Rem; Check Statement and Ask Your Sources now let Claude pick the quoted words from each passage, and these commands appear only when your corpus provider searches by meaning.
+
+📖 [Source Pins → Ask Your Sources](Source-Pins.md#ask-your-sources)
+
+### ✨ Improved
+
+**Pin Source Quote**: a passage that is not in the open PDF or article is now looked up with your source finder in its book's other PDFs, and existing pages and highlights RemNote has not loaded yet are reused instead of duplicated (a second "Page 030"); the latter needs the AI helper, restarted.
+
+📖 [Source Pins → Sources that are not open](Source-Pins.md#no-source-open) · [Reusing highlights](Source-Pins.md#reusing-highlights)
+
 ## v1.0.244 - November 18th, 2026
 
 ### ✨ New

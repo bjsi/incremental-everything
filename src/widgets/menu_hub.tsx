@@ -32,6 +32,7 @@ import {
   openBatchCardPriority,
   openBatchPriority,
   openCardEnablementAudit,
+  openDocumentDebug,
   openDocumentStudyDashboard,
   openPdfControlPanel,
   openPriorityQueue,
@@ -105,6 +106,7 @@ const DOCUMENT_ACTIONS: HubAction[] = [
     needsRem: true,
     desktopOnly: true,
   },
+  { id: 'debug', label: 'Debug (Incremental RemNote)', group: 'Debug', run: doc(openDocumentDebug), needsRem: true },
 ];
 
 const QUEUE_ACTIONS: HubAction[] = [

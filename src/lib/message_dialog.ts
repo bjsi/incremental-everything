@@ -14,6 +14,11 @@ export interface MessageDialog {
   tone?: 'error' | 'info' | 'success';
   /** Adds an "Open Rem" button (←→ to reach it) that opens this Rem and closes the dialog. */
   openRemId?: string;
+  /**
+   * Adds a "Search by meaning" button (←→ to reach it) that queues Find Sources for these
+   * Rems (lib/find_sources): offered where Pin Source Quote found no literal match.
+   */
+  findSources?: { remIds: string[]; openSourceRemId?: string | null };
 }
 
 export interface MessageItem {

@@ -106,7 +106,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 18  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal, 18: ask + /answers, outline
+VERSION = 19  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal, 18: ask + /answers, outline, 19: strip-priority, card --practice
 # The jobs a plugin build understands, by the protocol version it polls with.
 OPS_BY_PLUGIN_VERSION = {
     1: {"localize"},
@@ -128,6 +128,8 @@ OPS_BY_PLUGIN_VERSION = {
          "restore-audio", "notice", "set-text", "remove", "heading", "portal", "ask"},
     12: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
          "restore-audio", "notice", "set-text", "remove", "heading", "portal", "ask", "outline"},
+    13: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+         "restore-audio", "notice", "set-text", "remove", "heading", "portal", "ask", "outline", "strip-priority"},
 }
 # Jobs that may name no rem at all.
 OPS_WITHOUT_REMS = {"notice", "ask"}
@@ -843,11 +845,18 @@ def pin_quote(rems: str, source: str, view: str | None, quote: str | None, timeo
     finish(result, bool(result.get("ok")))
 
 
-def card(rems: str, rem_type: str | None, direction: str | None, timeout: float) -> None:
-    if not rem_type and not direction:
-        sys.exit("give --type and/or --direction")
-    args = {k: v for k, v in (("remType", rem_type), ("direction", direction)) if v}
+def card(rems: str, rem_type: str | None, direction: str | None, practice: str | None, timeout: float) -> None:
+    if not rem_type and not direction and not practice:
+        sys.exit("give --type, --direction and/or --practice")
+    args: dict = {k: v for k, v in (("remType", rem_type), ("direction", direction)) if v}
+    if practice:
+        args["enablePractice"] = practice == "on"
     result = run_job("card", split_ids(rems), args, timeout)
+    finish(result, bool(result.get("ok")))
+
+
+def strip_priority(rems: str, timeout: float) -> None:
+    result = run_job("strip-priority", split_ids(rems), {}, timeout)
     finish(result, bool(result.get("ok")))
 
 
@@ -1194,6 +1203,12 @@ def main() -> None:
     p_card.add_argument("rems", help="rem id, or several comma-separated")
     p_card.add_argument("--type", dest="rem_type", choices=["concept", "descriptor", "default"])
     p_card.add_argument("--direction", choices=["forward", "backward", "both", "none"])
+    p_card.add_argument("--practice", choices=["on", "off"],
+                        help="RemNote's enable-practice flag (off = what /Disable Card does)")
+    p_sp = sub.add_parser("strip-priority", help="remove the CardPriority slots, then the tag, from rems "
+                          "(the plugin's own scoped removal; prints the removed values)")
+    p_sp.add_argument("rems", help="rem id, or several comma-separated")
+    p_sp.add_argument("--timeout", type=float, default=300)
     p_card.add_argument("--timeout", type=float, default=150)
     p_po = sub.add_parser("portal", help="make a portal under a parent that shows these rems")
     p_po.add_argument("rems", help="rem id, or several comma-separated (shown in this order)")
@@ -1277,7 +1292,9 @@ def main() -> None:
     elif a.cmd == "pin-quote":
         pin_quote(a.rems, a.source, a.view, a.quote, a.timeout)
     elif a.cmd == "card":
-        card(a.rems, a.rem_type, a.direction, a.timeout)
+        card(a.rems, a.rem_type, a.direction, a.practice, a.timeout)
+    elif a.cmd == "strip-priority":
+        strip_priority(a.rems, a.timeout)
     elif a.cmd == "portal":
         portal(a.rems, a.parent, a.position, a.timeout)
     elif a.cmd == "heading":
