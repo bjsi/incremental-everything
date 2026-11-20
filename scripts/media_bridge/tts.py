@@ -886,7 +886,8 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
                             tokens += gemini(c[1], c[2], wa, ks["GEMINI_API_KEY"], voice, log)
                     except NoAudio as e:
                         if attempt == VERIFY_ATTEMPTS and best is None:
-                            raise
+                            raise NoAudio(f"call {done}/{total} ({c[1]}: {c[2][:120]!r}) blocked "
+                                          f"{VERIFY_ATTEMPTS} times. {e}") from e
                         retries += 1
                         reason = (re.search(r'"finishReason": "(\w+)"', str(e)) or [None, "empty answer"])[1]
                         log(f"call {done}: no audio ({reason}); " + (f"trying again ({attempt + 1}/{VERIFY_ATTEMPTS})"
