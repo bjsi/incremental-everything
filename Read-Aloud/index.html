@@ -1,0 +1,3013 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Read-Aloud/">
+      
+      
+        <link rel="prev" href="../Corpus-Provider/">
+      
+      
+        <link rel="next" href="../Audio-Playlist/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Read Aloud - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#read-aloud" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Read Aloud
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AI-Transcription-of-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Transcription of PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Source-Pins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source Pins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Corpus-Provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus Provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read Aloud
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read Aloud
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-length" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary length
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drafts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drafts are kept
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pronunciation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add pronunciation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Add pronunciation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pronunciation-descriptors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Descriptors are read with their concept
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engines and costs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Engines and costs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gemini's audio is checked
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#script-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The script format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options in tts.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a terminal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Audio-Playlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audio Playlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History & Queue Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Repetition-History-and-Statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repetition History & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Desktop-Helpers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Desktop Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Chrome-Companion-Extension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chrome Companion Extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Companion-Privacy-Policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Companion Privacy Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Logos-Bible-Software-Integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logos Bible Software
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Local-Media-Bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Media Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Bridge-for-Other-Plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Priority Bridge for Other Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Text-and-Lists/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & Lists
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Outline-and-Headings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outline & Headings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Finding-and-Navigating/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding & Navigating
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Search-Engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Queue-Display/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue Display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-True-or-False-Cards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    True or False Cards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Multiple-Choice-Cards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple-Choice Cards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Cleaning-Up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning Up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Under-the-Hood/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Under the Hood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    8. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RemNote-Native-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RemNote Native Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Colour-Coding-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Colour Coding Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    9. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-length" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary length
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drafts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drafts are kept
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pronunciation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add pronunciation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Add pronunciation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pronunciation-descriptors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Descriptors are read with their concept
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engines and costs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Engines and costs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#checked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gemini's audio is checked
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#script-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The script format
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options in tts.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a terminal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="read-aloud">Read Aloud<a class="headerlink" href="#read-aloud" title="Permanent link">&para;</a></h1>
+<p><strong>Read aloud</strong> turns a document, or any Rem and everything under it, into a spoken audio file and puts it into the document as a playable audio Rem stored in RemNote. Listen to your notes on a walk, in the car, or before a review session.</p>
+<p>A second command, <a href="#pronunciation"><strong>Add pronunciation</strong></a>, does the same for a single card: it reads it aloud at once and keeps the audio as its Extra Card Detail.</p>
+<p>Read aloud reads the notes as they are (<strong>Literal</strong>), lightly reworked by AI so formulas and units can be heard (<strong>Adapted</strong>), or as a spoken <strong>Summary</strong> of the length you choose. The speech is made by a text-to-speech service with <strong>your own API key</strong>: Google's Gemini TTS, Microsoft Azure, or ElevenLabs. Nothing is paid for until you press <strong>Generate</strong>, and the popup shows the estimated cost first.</p>
+<p><strong>Desktop app only.</strong> It runs through the <a href="../Local-Media-Bridge/">Local Media Bridge</a> helper, and the command appears only while that setting is on. <strong>Languages:</strong> Portuguese and English, including English terms inside Portuguese notes and the reverse.</p>
+<h2 id="use">Using it<a class="headerlink" href="#use" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Put the cursor in the Rem or document to read (or select Rems), and run <strong>Read aloud</strong> (<code>ra</code>).</li>
+<li>The popup shows the <strong>script</strong>, the text that will be spoken. Edit it freely.</li>
+<li>Pick a <strong>mode</strong> (below), an <strong>engine</strong> and a <strong>voice</strong>. The line under them shows the estimate: words, duration, cost.</li>
+<li>Press <strong>Generate</strong> (<code>⌘↵</code> / <code>Ctrl+Enter</code>). The popup closes and the audio is made <strong>in the background</strong>, so you can keep working in RemNote (a 5-minute audio takes about a minute).</li>
+<li>When the audio is in, a notice appears at the top right, with the voice, duration and cost. <strong>Open Rem</strong> opens the read Rem, with the new audio at its top; <strong>Dismiss</strong> closes the notice. It never interrupts what you are doing: a popup you have open (another Read aloud, say) stays open, and the notice waits until you dismiss it. Drag it to move it if it is in the way.</li>
+</ol>
+<p>The audio is added as the <strong>first child</strong> of the read Rem, captioned <code>🔊 Audio (&lt;voice&gt;)</code> (<code>🔊 Audio Summary (&lt;voice&gt;)</code> for a summary; <code>Áudio</code> / <code>Resumo em Áudio</code> in a Portuguese note). It is stored in RemNote like an uploaded file, so it plays offline and syncs. Set <strong>Read Aloud: Tag for Audio Rems</strong> to tag every audio Rem, for example <code>AI audio</code>.</p>
+<p>An audio Rem and everything under it is never read again, so running Read aloud twice on a document does not read its previous audio or summary.</p>
+<h3 id="modes">Modes<a class="headerlink" href="#modes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What is spoken</th>
+<th>AI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Literal</strong></td>
+<td>The notes as written, with the <a href="#reading-rules">reading rules</a>. Formulas are skipped (“formula omitted”).</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Adapted</strong></td>
+<td>Everything in the notes, in the same order, made listenable: formulas and units said in words, abbreviations expanded, foreign terms marked. No content added or dropped.</td>
+<td>Writes the script</td>
+</tr>
+<tr>
+<td><strong>Summary</strong></td>
+<td>A spoken summary of a <a href="#summary-length">length you set</a>, most important points first. Optional <strong>additional instructions</strong>, e.g. <em>focus on the definitions</em> or <em>end with three questions for me to answer</em>.</td>
+<td>Writes the script</td>
+</tr>
+</tbody>
+</table>
+<p>In <strong>Adapted</strong> and <strong>Summary</strong>, press <strong>Write the script with AI</strong> (<code>⌘↵</code>), read the result, edit it if you like, then <strong>Generate</strong>. Formulas are read the way a teacher reads them: subscripts as “V sub A” in English and “V índice A” in Portuguese.</p>
+<p>With <strong>Also insert the summary text under the audio</strong> (on by default), a Summary's text is also added under its audio Rem, headed <em>Summary of this document, written by AI</em>, with one Rem per line and the foreign terms in italics.</p>
+<p>The AI step runs <code>claude -p</code> with your Claude subscription, at no per-call charge. When that fails (usage limit reached, the <code>claude</code> command not installed, any error) and an Anthropic API key is set, it runs on the API instead; the popup then shows the cost (a few cents for a note) and why <code>claude -p</code> failed. See <a href="#setup">Setup</a>.</p>
+<h3 id="summary-length">Summary length<a class="headerlink" href="#summary-length" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Length</strong>: a slider with the share of the note to keep, from 20 % to 80 % of its word count (default <strong>50 %</strong>).</li>
+<li><strong>at most … min</strong>: a cap, so a long chapter does not give a long summary.</li>
+</ul>
+<p>The target is the smaller of the two, and the popup shows it live (<em>≈ 351 words · about 2 min 27 s</em>, or <em>capped</em> when the maximum wins). Questions you ask for count within it. Models tend to overshoot a word limit: an answer more than 25 % over the target is sent back once to be shortened. The popup then shows <em>356 words for a target of 351</em>.</p>
+<h3 id="drafts">Drafts are kept<a class="headerlink" href="#drafts" title="Permanent link">&para;</a></h3>
+<p>Closing the popup loses nothing. Reopening it on the same Rem brings back the AI-written scripts and your edits to them, the summary options and the mode you used. A hand edit of the Literal script comes back only while the note is unchanged. When the note changed after an AI script was written, the popup says so: press <strong>Rewrite with AI</strong> to include the changes. Drafts are kept on this computer (the plugin's local storage, not synced), for the 30 Rems used most recently.</p>
+<h2 id="pronunciation">Add pronunciation<a class="headerlink" href="#pronunciation" title="Permanent link">&para;</a></h2>
+<p><strong>Add pronunciation (Extra Card Detail)</strong> (<code>pron</code>) gives a flashcard its spoken version, with no popup:</p>
+<ol>
+<li>In the editor, put the cursor in the Rem or select several. <strong>In the queue, it acts on the card on screen</strong> (or on the Rem selected in the previewer).</li>
+<li>Run <strong>Add pronunciation</strong>. It reads only the Rem itself, front then back, <strong>not its children</strong>, with the same <a href="#reading-rules">reading rules</a>: a cloze is read whole, a reference by the text it shows, pins are skipped. A <strong>descriptor</strong> is read <a href="#pronunciation-descriptors">with its concept</a>.</li>
+<li>A few seconds later the audio <strong>plays</strong>, and it is added as the Rem's first child, captioned 🔊, with the <strong>Extra Card Detail</strong> powerup. It shows when the answer is revealed and makes no card of its own. <strong>In the queue it does not play from the command</strong>: the queue plays a card's Extra Card Detail audio itself, and both would overlap.</li>
+</ol>
+<p>Pronunciations are kept apart from Read aloud's audios: they get the plugin's <strong>Pronunciation</strong> powerup (not the tag of <em>Read Aloud: Tag for Audio Rems</em>), whose pill shows a speaking-head icon instead of its name, and their bullet becomes that icon, in the editor and in the queue's <em>Extra details</em> (when a card has a single Extra Card Detail, which RemNote shows without a bullet, the icon takes the bullet's place; the 🔊 caption is written in brown text, which does not show on the emoji, so the queue can recognise it). The helper keeps their copies in a folder of their own, <code>pronunciations</code> inside the audio folder.</p>
+<p>The engine is the one the popup would suggest (Gemini TTS when its key is set; Azure for English text with 3 or more marked Portuguese terms), with a random voice. A card costs a fraction of a cent. With several Rems selected, each gets its audio, and none plays.</p>
+<h3 id="pronunciation-descriptors">Descriptors are read with their concept<a class="headerlink" href="#pronunciation-descriptors" title="Permanent link">&para;</a></h3>
+<p>A descriptor alone says little (<em>refere-se a que camada?</em>), so its pronunciation starts with the Rem it describes: the first parent that is <strong>not</strong> a descriptor (its concept, whether or not it is marked as one), then any descriptors in between, front only, then the card itself, front and back. For the descriptor <em>refere-se a que camada?</em> under the concept <strong>Brake holding capacity</strong>, the audio says “Brake holding capacity. Refere-se a que camada? Refers to the first layer on the drum.”</p>
+<p><strong>The language of a short card.</strong> A single word gives no clue, so an undecided side takes the language of the other side, then of the Rem's parents (for a concept or descriptor read before the card, the language of the Rems above it). A side that is all in <em>italics</em> in a note of the other language is read in that other language: <em>fairway</em> on the front of a card in Portuguese notes is pronounced in English, and <em>hidrovia</em> on its back in Portuguese.</p>
+<p><strong>Playback.</strong> The audio plays inside RemNote. If the app refuses to start it on its own, the helper plays it on the computer instead (with <code>ffplay</code>, which comes with ffmpeg, or <code>afplay</code> on macOS). The stored audio Rem plays like any other.</p>
+<h2 id="engines">Engines and costs<a class="headerlink" href="#engines" title="Permanent link">&para;</a></h2>
+<p>The popup lists every engine with its own estimate, and greys out those whose key is not set (“no key”). It preselects a suggestion; any available engine can be picked instead.</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Key(s) in the helper's <code>.env</code></th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Gemini TTS (Google Cloud)</strong></td>
+<td><code>GOOGLE_CLOUD_API_KEY</code> (optional <code>GOOGLE_CLOUD_PROJECT</code>, <code>GOOGLE_CLOUD_LOCATION</code>)</td>
+<td>Gemini 3.8 Flash TTS through Vertex AI, billed to a Google Cloud billing account (and its credits). Suggested first when set. Each call gets its locale (<code>pt-BR</code> or <code>en-US</code>), as through the Gemini API.</td>
+</tr>
+<tr>
+<td><strong>Gemini TTS</strong></td>
+<td><code>GEMINI_API_KEY</code></td>
+<td>The same model through the Gemini API (<a href="https://aistudio.google.com/apikey">Google AI Studio</a> key).</td>
+</tr>
+<tr>
+<td><strong>Azure multilingual</strong></td>
+<td><code>AZURE_SPEECH_KEY</code>, <code>AZURE_SPEECH_REGION</code></td>
+<td>Voice <code>en-US-AndrewMultilingualNeural</code>. The only engine that switches language <strong>inside a sentence</strong>, so it is suggested for scripts with 3 or more Portuguese terms marked inside English lines. English terms in Portuguese lines do not count: Gemini reads them well, while Portuguese words in an English sentence come out Spanish or English.</td>
+</tr>
+<tr>
+<td><strong>ElevenLabs</strong></td>
+<td><code>ELEVENLABS_API_KEY</code></td>
+<td>Your account's voices, by first name. Suggested only when no other engine has a key.</td>
+</tr>
+</tbody>
+</table>
+<p>Gemini and ElevenLabs speak one language per call: a marked foreign term is read in its line's language, and the popup says so when the script has any.</p>
+<p>Prices checked in November 2026 (the helper's <code>tts.py</code> holds them; check your provider's current prices):</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Billing</th>
+<th>A 5-minute Portuguese note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gemini TTS (either way)</td>
+<td>US$9 per million audio tokens, 25 per second of speech, until 31 Dec 2026; US$18 from 2027. Pauses are free.</td>
+<td>~US$0.07 (0.14 in 2027)</td>
+</tr>
+<tr>
+<td>Azure</td>
+<td>US$15 per million characters, <strong>including the SSML markup</strong> (the helper keeps it short)</td>
+<td>~US$0.09</td>
+</tr>
+<tr>
+<td>ElevenLabs</td>
+<td>Credits from your monthly plan; the estimate assumes ~US$0.20 per 1,000 characters</td>
+<td>~US$0.80</td>
+</tr>
+</tbody>
+</table>
+<p>Durations are estimated from the word count at each engine's measured speaking rate (Gemini about 143 words a minute).</p>
+<h3 id="checked">Gemini's audio is checked<a class="headerlink" href="#checked" title="Permanent link">&para;</a></h3>
+<p>Gemini TTS is a generative model, and now and then it does not just read: it goes on past the end of the text with sentences of its own, loops on a phrase, or skips a clause. Long calls and repeated passages make this likelier. So the helper:</p>
+<ul>
+<li>sends Gemini <strong>short calls</strong> (about 600 characters), and never two copies of the same passage in one call;</li>
+<li><strong>transcribes each call</strong> on your Mac with a local <a href="https://github.com/ggml-org/whisper.cpp">whisper.cpp</a> (<code>brew install whisper-cpp</code>, and the speech model that <a href="../Incremental-Video/#setup">Incremental Video</a> transcripts use, in <code>~/.incremental-remnote/ai-ocr/whisper/</code>), and compares it with the script, numbers (written in digits or in words, in English or Portuguese) and British or American spellings counted as the same;</li>
+<li><strong>makes the call again</strong>, up to 3 times, when 5 or more words in a row are added or missing, or about 15 % of the words in all, and keeps the best take. What still does not match is reported.</li>
+</ul>
+<p>Without whisper, only the length of each call is checked. A redone call is paid again, so a summary may cost a little more than estimated. Azure and ElevenLabs read the text as written and are not checked.</p>
+<h2 id="reading-rules">Reading rules<a class="headerlink" href="#reading-rules" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>In the notes</th>
+<th>Read aloud as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The tree</td>
+<td>In order, depth first, collapsed children included. A Rem with a back is read <em>front: back</em>.</td>
+</tr>
+<tr>
+<td>Rem references</td>
+<td>The text the reference shows (the alias, when it points at one).</td>
+</tr>
+<tr>
+<td>Pins (📌 references to highlights), tags, property Rems (<em>Next Rep Date</em>, <em>Priority</em>…), powerup slots</td>
+<td>Skipped.</td>
+</tr>
+<tr>
+<td>Images, audio, video, drawings, embeds, code</td>
+<td>Skipped silently (the popup counts what was skipped).</td>
+</tr>
+<tr>
+<td>Notices that an audio was made by AI (<em>Audio gerado por IA, apenas para introduzir a matéria.</em>, <em>AI-generated audio…</em>)</td>
+<td>Skipped, when the notice ends its line and starts the Rem or follows a dash or colon. A Rem whose notice sits right above an audio is left out whole, title included (<em>PP 8A Como ventos e ondas fecham portos — Audio gerado por IA…</em>). A sentence that only talks about AI audio is still read.</td>
+</tr>
+<tr>
+<td>Tables</td>
+<td>“Table omitted.”</td>
+</tr>
+<tr>
+<td>Formulas</td>
+<td>Literal: “formula omitted”. Adapted and Summary: said in words.</td>
+</tr>
+<tr>
+<td>Portals</td>
+<td>Their Rems, once.</td>
+</tr>
+<tr>
+<td>A descriptor you start on</td>
+<td>Its concept first (front only), then any descriptors in between, then the Rem and its children, as <a href="#pronunciation-descriptors">Add pronunciation</a> reads one. The audio is still named after the Rem.</td>
+</tr>
+<tr>
+<td>Bold, italic, links, page numbers, emoji, arrows</td>
+<td>Formatting dropped; <code>p. 12</code> is read “page 12”, <code>kN</code> “kilonewtons” (and the Portuguese equivalents).</td>
+</tr>
+<tr>
+<td>Italic words in the other language</td>
+<td>Marked as foreign terms (for example <code>&lt;en&gt;fairway&lt;/en&gt;</code> in a Portuguese line), so Azure pronounces them in their own language. Acronyms are never marked.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="script-format">The script format<a class="headerlink" href="#script-format" title="Permanent link">&para;</a></h3>
+<p>The script in the popup is plain text, one idea per line:</p>
+<table>
+<thead>
+<tr>
+<th>Mark</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[pt]</code> at the start of a line</td>
+<td>The line is in Portuguese (a line without it is English).</td>
+</tr>
+<tr>
+<td><code>&lt;en&gt;term&lt;/en&gt;</code> / <code>&lt;pt&gt;termo&lt;/pt&gt;</code></td>
+<td>A foreign term inside a line.</td>
+</tr>
+<tr>
+<td><code>[pause]</code> alone on a line</td>
+<td>Time to answer: the question on the line before, the answer on the line after. The pause lasts 5 s or more, longer for longer answers; <code>[pause 8]</code> sets 8 s.</td>
+</tr>
+</tbody>
+</table>
+<p>Anything an engine would read out wrongly (markdown, LaTeX, links, page numbers, other brackets) is listed in red under the script, and <strong>Generate</strong> stays off until it is fixed.</p>
+<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
+<ol>
+<li>The <a href="../Local-Media-Bridge/#setup">Local Media Bridge</a> setting on and its helper running, <strong>version 12 or later</strong> (<code>python3 media_bridge.py status</code>). After updating the plugin, restart the helper; the command says so when it is too old.</li>
+<li><strong>ffmpeg</strong> on the computer (<code>brew install ffmpeg</code> on macOS): the helper uses it to join the parts into one mp3.</li>
+<li>
+<p>At least one engine's key, in a <code>.env</code> file the helper reads (one <code>NAME=value</code> per line). Either put it at <code>~/.remnote-media-bridge/.env</code>, or point the helper at an existing file with <code>~/.remnote-media-bridge/tts.json</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="nt">"envFile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"~/path/to/.env"</span><span class="p">,</span><span class="w"> </span><span class="nt">"audioHome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"~/path/to/audios"</span><span class="p">}</span>
+</code></pre></div>
+<p>The helper reads the keys on every request, so a new key works without a restart. Keys never go into the plugin's settings, which RemNote syncs in plain text.</p>
+</li>
+<li>
+<p>For <strong>Adapted</strong> and <strong>Summary</strong>:</p>
+<ul>
+<li>the <a href="https://claude.com/claude-code">Claude Code</a> command <code>claude</code>, signed in with your Claude subscription; and/or</li>
+<li><code>ANTHROPIC_API_KEY</code> in the same <code>.env</code>, with the <code>anthropic</code> package installed in the Python that runs the helper (<code>python3 -m pip install anthropic</code>).</li>
+</ul>
+</li>
+</ol>
+<p><strong>Google Cloud key:</strong> in the Google Cloud console, pick the project whose billing account you want charged, enable the <strong>Vertex AI API</strong> (APIs &amp; Services → Library), then create an API key under APIs &amp; Services → Credentials. If it offers to authenticate through a service account, accept and give that account the <em>Vertex AI User</em> role. Restrict the key to the Vertex AI API.</p>
+<h3 id="options">Options in <code>tts.json</code><a class="headerlink" href="#options" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>What it sets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>envFile</code></td>
+<td>—</td>
+<td>The <code>.env</code> file with the keys.</td>
+</tr>
+<tr>
+<td><code>audioHome</code></td>
+<td><code>~/.remnote-media-bridge/audio</code></td>
+<td>Where a copy of every script and mp3 is kept, as <code>&lt;subject&gt;_&lt;remId&gt;.txt</code> / <code>.mp3</code>.</td>
+</tr>
+<tr>
+<td><code>pronunciationHome</code></td>
+<td><code>&lt;audioHome&gt;/pronunciations</code></td>
+<td>Where the copies of <a href="#pronunciation">pronunciations</a> go.</td>
+</tr>
+<tr>
+<td><code>geminiVoices</code></td>
+<td>14 voices</td>
+<td>The Gemini voices offered (and drawn from, when the voice is left on <em>Random</em>).</td>
+</tr>
+<tr>
+<td><code>geminiModel</code>, <code>vertexModel</code></td>
+<td><code>gemini-3.8-flash-tts</code></td>
+<td>The Gemini TTS model.</td>
+</tr>
+<tr>
+<td><code>azureVoices</code></td>
+<td><code>["en-US-AndrewMultilingualNeural"]</code></td>
+<td>The Azure voices offered.</td>
+</tr>
+<tr>
+<td><code>elevenModel</code></td>
+<td><code>eleven_multilingual_v2</code></td>
+<td>The ElevenLabs model.</td>
+</tr>
+<tr>
+<td><code>llmModel</code></td>
+<td><code>claude-opus-5-5</code></td>
+<td>The Claude model for Adapted and Summary (CLI and API).</td>
+</tr>
+<tr>
+<td><code>geminiUsdPerMTokens</code>, <code>elevenUsdPerMChars</code></td>
+<td>list prices</td>
+<td>Your own prices, for the estimates.</td>
+</tr>
+<tr>
+<td><code>verifySpeech</code></td>
+<td><code>true</code></td>
+<td><code>false</code> turns off the <a href="#checked">check of Gemini's audio</a>.</td>
+</tr>
+<tr>
+<td><code>whisperCli</code>, <code>whisperModel</code>, <code>whisperVadModel</code></td>
+<td><code>whisper-cli</code> on the PATH, the AI helper's models</td>
+<td>The transcriber used for the check.</td>
+</tr>
+</tbody>
+</table>
+<p>To change what the AI is asked to do, put your own instructions in <code>~/.remnote-media-bridge/read-aloud-summary.md</code> or <code>read-aloud-adapted.md</code>. They replace that mode's task; the rules of the script format are always added.</p>
+<h3 id="cli">From a terminal<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h3>
+<p>The engine is <code>scripts/media_bridge/tts.py</code>, which also works on its own with a script file:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3<span class="w"> </span>tts.py<span class="w"> </span>script.txt<span class="w"> </span>--plan<span class="w">                       </span><span class="c1"># engines, estimate; no cost</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>python3<span class="w"> </span>tts.py<span class="w"> </span>script.txt<span class="w"> </span>--engine<span class="w"> </span>azure<span class="w"> </span>--out<span class="w"> </span>note.mp3
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>python3<span class="w"> </span>spoken_script.py<span class="w"> </span>outline.md<span class="w"> </span>--mode<span class="w"> </span>summary<span class="w"> </span>--lang<span class="w"> </span>pt<span class="w"> </span>--words<span class="w"> </span><span class="m">350</span>
+</code></pre></div>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The command is not in the omnibar:</strong> turn on <strong>Local Media Bridge</strong>. Turning the setting off hides the command from the next reload.</li>
+<li><strong>“The media-bridge helper … is version N”:</strong> restart the helper (<code>curl -X POST localhost:3460/shutdown</code>, then <code>launchctl kickstart -k gui/$(id -u)/com.incrementalremnote.media-bridge</code> when it runs at login).</li>
+<li><strong>Every engine shows “no key”:</strong> the helper did not find the <code>.env</code>. Check <code>envFile</code> in <code>tts.json</code>, and the variable names above.</li>
+<li><strong>Portuguese spoken with a Spanish or English accent:</strong> the line is missing its <code>[pt]</code> mark, or the engine read a marked term in the line's language (choose Azure for an English text with many Portuguese terms).</li>
+<li><strong>The notice never came:</strong> the audio is made in the window where you pressed Generate, and reloading RemNote while it runs drops the job. The helper still keeps its copy of the mp3 in <code>audioHome</code> (see <a href="#options">Options</a>), so you can add that file by hand instead of paying for it again.</li>
+<li><strong>A summary is cut off or too long:</strong> lower the slider or the maximum, or press <strong>Rewrite with AI</strong>.</li>
+<li><strong>The audio says things the notes do not, repeats itself or skips a sentence:</strong> that is Gemini improvising (see <a href="#checked">Gemini's audio is checked</a>). Without whisper on this Mac the helper cannot catch it: install it, or generate again.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Priority Shield History</title>
+<!--
+  Interactive demo for docs/Prioritization-&-Sorting.md#priority-shield-history,
+  embedded there in an iframe. A mock of the Priority Shield History popup
+  (src/widgets/priority_shield_graph.tsx): the scope tabs, the three charts with
+  their colours, tooltips, the rebuilt days, drag-to-zoom and Optimize
+  Priorities Zoom. Example numbers only, drawn as plain SVG.
+
+  Theme: follows the manual's light/dark toggle (Material's data-md-color-scheme
+  on the parent page, same origin), else the OS setting.
+-->
+<style>
+:root {
+  --page: transparent;
+  --c1: rgb(41 41 54); --c2: rgb(99 99 123); --c3: rgb(145 145 168);
+  --border: rgb(220 220 230); --grid: rgb(0 0 0 / .13); --accent: #3b82f6;
+  --tip-bg: #fff; --tip-border: #d1d5db; --dismissed: #333; --select: rgb(136 132 216 / .3);
+  --btn: rgb(244 244 250);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+:root.dark {
+  --c1: rgb(235 235 237); --c2: rgb(190 190 198); --c3: rgb(148 148 159);
+  --border: rgb(60 60 70); --grid: rgb(255 255 255 / .13); --accent: #768dff;
+  --tip-bg: rgb(36 36 44); --tip-border: rgb(70 70 80); --dismissed: #c8c8d0; --btn: rgb(43 43 51);
+  color-scheme: dark;
+}
+html, body { margin: 0; background: var(--page); color: var(--c1); }
+body { padding: 4px 2px 8px; font-size: 13px; }
+h3 { margin: 0; text-align: center; font-size: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; color: var(--c2); font-size: 12px; margin: 8px 0 12px; }
+.controls label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+
+.tabs { display: flex; justify-content: center; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.tabs button { font: inherit; background: transparent; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 6px 16px; color: var(--c2); cursor: pointer; }
+.tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--c1); font-weight: 600; }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.chart { margin: 14px 0 22px; }
+.chead { position: relative; display: flex; justify-content: center; align-items: center; min-height: 26px; flex-wrap: wrap; gap: 4px; }
+.chead h4 { margin: 0; font-size: 14px; text-align: center; }
+.btns { position: absolute; right: 0; top: 0; display: flex; gap: 6px; }
+.btns button { font: inherit; font-size: 11px; color: var(--c1); background: var(--btn); border: 1px solid var(--border);
+  border-radius: 5px; padding: 2px 8px; cursor: pointer; }
+.btns button:focus-visible { outline: 2px solid var(--accent); }
+@media (max-width: 760px) { .btns { position: static; } .chead { flex-direction: column; } }
+.plot { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.plot svg { display: block; width: 100%; height: auto; overflow: visible; }
+.plot text { font-size: 12px; fill: var(--c2); }
+.tip { position: absolute; top: 6px; z-index: 5; pointer-events: none; background: var(--tip-bg); border: 1px solid var(--tip-border);
+  border-radius: 6px; box-shadow: 0 4px 12px rgb(0 0 0 / .15); padding: 8px 10px; font-size: 12px; line-height: 1.5; max-width: 330px; }
+.tip p { margin: 0; }
+.tip .d { font-weight: 600; margin-bottom: 2px; color: var(--c1); }
+.tip .sep { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
+.tip .note { color: var(--c3); font-size: 11px; margin-top: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 18px; justify-content: center; font-size: 12px; margin-top: 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+</style>
+</head>
+<body>
+<h3>Priority Shield History</h3>
+<div class="controls">
+  <label><input type="checkbox" id="weighted" checked> Show Weighted Shield</label>
+  <span>Hover for details · drag across a chart to zoom · ← → switch tabs</span>
+</div>
+<div class="tabs" role="tablist" aria-label="Scope">
+  <button role="tab" data-scope="kb">🌐 Knowledge Base</button>
+  <button role="tab" data-scope="doc">📄 Cell Biology</button>
+</div>
+<div id="charts"></div>
+
+<script>
+// ---------- Example data: 60 days, the last 6 recorded by v1.0.193, the rest rebuilt ----------
+const DAYS = 60, RECORDED_FROM = 54;
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function dateLabel(i) {
+  const d = new Date(2026, 10, 4); d.setDate(d.getDate() - (DAYS - 1 - i));
+  return MONTHS[d.getMonth()] + " " + String(d.getDate()).padStart(2, "0");
+}
+function rng(seed) {
+  return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const r1 = (v) => Math.round(v * 10) / 10;
+
+function makeScope(seed, b) {
+  const r = rng(seed), rows = { priority: [], card: [], incRem: [] };
+  let inc = b.inc, dis = b.dis, cards = b.cards;
+  for (let i = 0; i < DAYS; i++) {
+    inc += Math.round((r() - 0.3) * b.incStep); dis += Math.round(r() * b.disStep); cards += Math.round((r() - 0.15) * b.cardStep);
+    const incAbs = clamp(Math.round(b.incAbs + (r() - 0.5) * 5 + Math.sin(i / 9) * 2), 1, 100);
+    const cardAbs = clamp(Math.round(b.cardAbs + (r() - 0.5) * 5 + Math.sin(i / 6) * 2), 0, 100);
+    const date = dateLabel(i), recorded = i >= RECORDED_FROM, abs = Math.min(incAbs, cardAbs);
+    rows.card.push({ date, absolute: cardAbs, relative: r1(clamp(cardAbs * b.cardRel + (r() - 0.5) * 1.5, 0, 100)),
+      universe: cards, weighted: r1(b.cardW + (r() - 0.5) * 1.5) });
+    rows.incRem.push({ date, absolute: incAbs, incRems: inc, dismissed: dis });
+    rows.priority.push({ date, rebuilt: !recorded,
+      absolute: recorded ? abs : null,
+      absoluteRebuilt: !recorded || i === RECORDED_FROM ? abs : null, // the first recorded day bridges the two lines
+      relative: recorded ? r1(abs * b.priRel + r()) : null,
+      weighted: recorded ? r1(b.priW + (r() - 0.5)) : null,
+      incSide: incAbs, cardSide: cardAbs, cards, incRems: inc, dismissed: dis });
+  }
+  return rows;
+}
+const SCOPES = {
+  kb: { label: "🌐 Knowledge Base", rows: makeScope(7, { inc: 6250, dis: 300, cards: 66900, incStep: 12, disStep: 4, cardStep: 60,
+    incAbs: 9, cardAbs: 7, cardRel: 0.85, priRel: 0.75, cardW: 41.5, priW: 38.5 }) },
+  doc: { label: "📄 Cell Biology", rows: makeScope(11, { inc: 132, dis: 18, cards: 1690, incStep: 2, disStep: 0.6, cardStep: 4,
+    incAbs: 12, cardAbs: 18, cardRel: 1.4, priRel: 0.65, cardW: 68, priW: 61 }) },
+};
+
+// ---------- Colours: the plugin's (each axis = the series it measures; stacks = grey) ----------
+const C = {
+  priority: { abs: "#2b6cb0", rel: "#0d9488", uni: "#888888" },
+  card: { kb: { abs: "#c0392b", rel: "#e67e22", uni: "#2980b9" }, doc: { abs: "#d35400", rel: "#f1c40f", uni: "#16a085" } },
+  incRem: { abs: "#8884d8", uni: "#888888" },
+  weighted: "#ff6b6b",
+  cards: ["#c8902f", "rgb(200 144 47 / .18)"], incRems: ["#10b981", "rgb(16 185 129 / .18)"], dismissed: ["var(--dismissed)", "rgb(250 204 21 / .4)"],
+};
+const fmt = (v) => (v === null || v === undefined ? "N/A" : v);
+const pct = (v) => (v === null || v === undefined ? "N/A" : v + "%");
+const n = (v) => v.toLocaleString("en-US");
+const kfmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + "k" : String(Math.round(v)));
+
+// ---------- Chart specs per kind ----------
+function specs(scope) {
+  const s = SCOPES[scope], cc = C.card[scope], w = state.weighted;
+  return [
+    { kind: "priority", title: `${s.label} Priority Shield — IncRems + Cards`, rows: s.rows.priority,
+      absColor: C.priority.abs, pctColor: C.priority.rel, uniColor: C.priority.uni,
+      stack: [["cards", "Cards", C.cards], ["incRems", "IncRems", C.incRems], ["dismissed", "Dismissed Rems", C.dismissed, true]],
+      lines: [
+        { key: "absolute", name: "Absolute Priority", axis: "abs", color: C.priority.abs, dots: true },
+        { key: "absoluteRebuilt", axis: "abs", color: C.priority.abs, dash: "4 3", width: 1.5, opacity: 0.6 },
+        { key: "relative", name: "Relative Priority (%)", axis: "pct", color: C.priority.rel, dots: true },
+        w && { key: "weighted", name: "Weighted Shield (%)", axis: "pct", color: C.weighted, dash: "8 4", dots: 2 },
+      ],
+      tip: (d) => `
+        <p style="color:${C.priority.abs}">Absolute Priority: ${fmt(d.rebuilt ? d.absoluteRebuilt : d.absolute)}${d.rebuilt ? " (rebuilt)" : ""}</p>
+        <p style="color:${C.priority.abs};opacity:.8;font-size:11px">IncRem side: ${d.incSide} · Card side: ${d.cardSide}</p>
+        <p style="color:${C.priority.rel}">Relative Priority: ${pct(d.relative)}</p>
+        ${w ? `<p style="color:${C.weighted}">Weighted Shield: ${pct(d.weighted)}</p>` : ""}
+        <div class="sep">
+          <p style="color:${C.cards[0]}">Cards: ${n(d.cards)}</p>
+          <p style="color:${C.incRems[0]}">IncRems: ${n(d.incRems)}</p>
+          <p style="color:${C.priority.abs};font-weight:600">Priority Shield universe (IncRems + Cards): ${n(d.cards + d.incRems)}</p>
+          <p style="color:var(--dismissed)">Dismissed Rems (outside the shield): ${n(d.dismissed)}</p>
+        </div>
+        ${d.rebuilt ? `<p class="note">Rebuilt from the IncRem and Card Shield histories: the lower of the two sides, and their universes added up. Relative and weighted values were not recorded before v1.0.193.</p>` : ""}` },
+    { kind: "card", title: `${s.label} Card Shield — Cards only`, rows: s.rows.card,
+      absColor: cc.abs, pctColor: cc.rel, uniColor: cc.uni,
+      lines: [
+        { key: "universe", name: "Universe Size", axis: "uni", color: cc.uni, dash: "5 5", dots: true },
+        { key: "absolute", name: "Absolute Priority", axis: "abs", color: cc.abs, dots: true },
+        { key: "relative", name: "Relative Priority (%)", axis: "pct", color: cc.rel, dots: true },
+        w && { key: "weighted", name: "Weighted Shield (%)", axis: "pct", color: C.weighted, dash: "8 4", dots: 2 },
+      ],
+      tip: (d) => `
+        <p style="color:${cc.abs}">Absolute Priority: ${d.absolute}</p>
+        <p style="color:${cc.rel}">Relative Priority (%): ${pct(d.relative)}</p>
+        ${w ? `<p style="color:${C.weighted}">Weighted Shield (%): ${pct(d.weighted)}</p>` : ""}
+        <p style="color:${cc.uni}">Universe Size: ${n(d.universe)}</p>` },
+    { kind: "incRem", title: `${s.label} IncRem Shield — IncRems only`, rows: s.rows.incRem,
+      absColor: C.incRem.abs, pctColor: null, uniColor: C.incRem.uni,
+      stack: [["incRems", "Universe Size (IncRems)", [C.incRems[0], "transparent"]], ["dismissed", "Dismissed Rems", C.dismissed, true]],
+      lines: [{ key: "absolute", name: "Absolute Priority", axis: "abs", color: C.incRem.abs, dots: true }],
+      tip: (d) => `
+        <p style="color:${C.incRem.abs}">Absolute Priority: ${d.absolute}</p>
+        <div class="sep">
+          <p style="color:${C.incRems[0]}">Universe of Incremental Rems: ${n(d.incRems)}</p>
+          <p style="color:var(--dismissed)">Universe of Dismissed Rems: ${n(d.dismissed)}</p>
+          <p style="color:var(--dismissed);font-weight:600">IncRems + Dismissed: ${n(d.incRems + d.dismissed)}</p>
+          <p class="note" style="text-transform:uppercase;letter-spacing:.05em">Processing: ${(d.dismissed / (d.incRems + d.dismissed) * 100).toFixed(1)}%</p>
+        </div>` },
+  ];
+}
+
+// ---------- SVG chart ----------
+const NS = "http://www.w3.org/2000/svg", W = 960, H = 300, T = 10, B = H - 28, L = 40;
+const zoom = {}; // per chart title: { start, end, fit }
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function renderChart(spec) {
+  const z = zoom[spec.title] || (zoom[spec.title] = { start: 0, end: spec.rows.length - 1, fit: false });
+  const box = document.createElement("section");
+  box.className = "chart";
+  box.innerHTML = `<div class="chead"><h4></h4><div class="btns"><button class="fit"></button><button class="reset">Reset Data Range</button></div></div>
+    <div class="plot"><svg viewBox="0 0 ${W} ${H}" role="img"></svg><div class="tip" hidden></div></div><div class="legend"></div>`;
+  box.querySelector("h4").textContent = spec.title;
+  const svg = box.querySelector("svg"), tip = box.querySelector(".tip"), plot = box.querySelector(".plot");
+  const fitBtn = box.querySelector(".fit"), resetBtn = box.querySelector(".reset");
+  svg.setAttribute("aria-label", spec.title);
+  const lines = spec.lines.filter(Boolean);
+  const R = spec.pctColor ? W - 122 : W - 62;
+  let rows, x, yAbs, yPct, yUni, drag = null, hover = null;
+
+  function draw() {
+    svg.textContent = "";
+    rows = spec.rows.slice(z.start, z.end + 1);
+    const cnt = rows.length;
+    x = (i) => (cnt === 1 ? (L + R) / 2 : L + ((R - L) * i) / (cnt - 1));
+
+    // Y domains: 0–100, or framed on the visible priorities (Optimize Priorities Zoom).
+    let lo = 0, hi = 100;
+    if (z.fit) {
+      const vals = [];
+      for (const d of rows) for (const l of lines) if (l.axis !== "uni" && d[l.key] != null) vals.push(d[l.key]);
+      if (vals.length) { lo = Math.max(0, Math.floor(Math.min(...vals) - 5)); hi = Math.min(100, Math.ceil(Math.max(...vals) + 5)); if (hi === lo) hi = Math.min(100, hi + 5); }
+    }
+    const y = (v, a, b) => B - ((v - a) / (b - a)) * (B - T);
+    yAbs = (v) => y(clamp(v, lo, hi), lo, hi); yPct = yAbs;
+    const top = (d) => (spec.stack ? spec.stack.reduce((s, [k]) => s + d[k], 0) : d.universe);
+    const uMax = Math.ceil(Math.max(...rows.map(top)) * 1.1) || 10;
+    yUni = (v) => y(v, 0, uMax);
+    const yOf = (axis) => (axis === "abs" ? yAbs : axis === "pct" ? yPct : yUni);
+
+    // Grid and axes
+    const ticks = [0, 1, 2, 3, 4].map((k) => Math.round(lo + ((hi - lo) * k) / 4));
+    for (const t of ticks) el("line", { x1: L, x2: R, y1: yAbs(t), y2: yAbs(t), stroke: "var(--grid)", "stroke-dasharray": "3 3" }, svg);
+    const every = Math.max(1, Math.ceil(cnt / 8));
+    for (let i = 0; i < cnt; i += every) {
+      el("line", { x1: x(i), x2: x(i), y1: T, y2: B, stroke: "var(--grid)", "stroke-dasharray": "3 3" }, svg);
+      el("text", { x: x(i), y: B + 18, "text-anchor": "middle" }, svg).textContent = rows[i].date;
+    }
+    el("line", { x1: L, x2: R, y1: B, y2: B, stroke: "var(--c3)" }, svg);
+    const axis = (ax, color, labels, anchor, dx) => {
+      el("line", { x1: ax, x2: ax, y1: T, y2: B, stroke: color }, svg);
+      for (const [v, yy] of labels) {
+        el("line", { x1: ax, x2: ax + (anchor === "end" ? -5 : 5), y1: yy, y2: yy, stroke: color }, svg);
+        el("text", { x: ax + dx, y: yy + 4, "text-anchor": anchor, style: `fill:${color}` }, svg).textContent = v;
+      }
+    };
+    axis(L, spec.absColor, ticks.map((t) => [t, yAbs(t)]), "end", -8);
+    if (spec.pctColor) axis(R, spec.pctColor, ticks.map((t) => [t + "%", yPct(t)]), "start", 8);
+    axis(spec.pctColor ? R + 62 : R, spec.uniColor, [0, 1, 2, 3].map((k) => [kfmt((uMax * k) / 3), yUni((uMax * k) / 3)]), "start", 8);
+
+    // Stacked universe bands (bottom to top), then the lines over them.
+    if (spec.stack) {
+      const base = rows.map(() => 0);
+      for (const [key, , [stroke, fill], dashed] of spec.stack) {
+        const tops = rows.map((d, i) => base[i] + d[key]);
+        const up = tops.map((v, i) => `${x(i)},${yUni(v)}`), down = base.map((v, i) => `${x(i)},${yUni(v)}`).reverse();
+        el("polygon", { points: up.concat(down).join(" "), fill, stroke: "none" }, svg);
+        el("polyline", { points: up.join(" "), fill: "none", stroke, "stroke-width": 1.75, "stroke-dasharray": dashed ? "5 5" : null }, svg);
+        tops.forEach((v, i) => (base[i] = v));
+      }
+    }
+    for (const l of lines) {
+      const yy = yOf(l.axis);
+      let seg = [];
+      const flush = () => { if (seg.length > 1) el("polyline", { points: seg.join(" "), fill: "none", stroke: l.color, "stroke-width": l.width || 2,
+        "stroke-dasharray": l.dash, "stroke-opacity": l.opacity, "stroke-linejoin": "round" }, svg); seg = []; };
+      rows.forEach((d, i) => { if (d[l.key] == null) flush(); else seg.push(`${x(i)},${yy(d[l.key])}`); });
+      flush();
+      if (l.dots && cnt <= 31) rows.forEach((d, i) => { if (d[l.key] != null) el("circle", { cx: x(i), cy: yy(d[l.key]), r: l.dots === 2 ? 2 : 3,
+        fill: "var(--tip-bg)", stroke: l.color, "stroke-width": 1.5 }, svg); });
+    }
+
+    if (drag) {
+      const a = Math.min(drag.a, drag.b), b = Math.max(drag.a, drag.b);
+      el("rect", { x: x(a), y: T, width: Math.max(1, x(b) - x(a)), height: B - T, fill: "var(--select)" }, svg);
+    } else if (hover !== null && hover < cnt) {
+      el("line", { x1: x(hover), x2: x(hover), y1: T, y2: B, stroke: "var(--c3)" }, svg);
+    }
+    fitBtn.textContent = z.fit ? "Reset Y-Axis" : "Optimize Priorities Zoom";
+    resetBtn.hidden = z.start === 0 && z.end === spec.rows.length - 1;
+  }
+
+  // Pointer → row index
+  const indexAt = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * W;
+    const cnt = rows.length;
+    return cnt === 1 ? 0 : clamp(Math.round(((px - L) / (R - L)) * (cnt - 1)), 0, cnt - 1);
+  };
+  function showTip(i) {
+    const d = rows[i];
+    tip.innerHTML = `<p class="d">Date: ${d.date}</p>` + spec.tip(d);
+    tip.hidden = false;
+    const xp = (x(i) / W) * 100;
+    if (xp > 50) { tip.style.left = ""; tip.style.right = `calc(${100 - xp}% + 12px)`; }
+    else { tip.style.right = ""; tip.style.left = `calc(${xp}% + 12px)`; }
+  }
+  plot.addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType === "touch") return; // touch: tap shows the tooltip, the page keeps scrolling
+    const i = indexAt(ev); drag = { a: i, b: i }; tip.hidden = true; plot.setPointerCapture(ev.pointerId); draw();
+  });
+  plot.addEventListener("pointermove", (ev) => {
+    const i = indexAt(ev);
+    if (drag) { if (i !== drag.b) { drag.b = i; draw(); } return; }
+    if (i !== hover) { hover = i; draw(); }
+    showTip(i);
+  });
+  plot.addEventListener("pointerup", (ev) => {
+    if (ev.pointerType === "touch") { hover = indexAt(ev); draw(); showTip(hover); return; }
+    if (!drag) return;
+    const a = Math.min(drag.a, drag.b), b = Math.max(drag.a, drag.b);
+    drag = null;
+    if (b > a) { z.end = z.start + b; z.start = z.start + a; hover = null; }
+    draw();
+  });
+  plot.addEventListener("pointerleave", () => { if (!drag) { hover = null; tip.hidden = true; draw(); } });
+  fitBtn.addEventListener("click", () => { z.fit = !z.fit; draw(); });
+  resetBtn.addEventListener("click", () => { z.start = 0; z.end = spec.rows.length - 1; draw(); });
+
+  // Legend: every named series (the rebuilt line is explained in the tooltip only).
+  const legend = box.querySelector(".legend");
+  const items = [...(spec.stack || []).map(([, name, [stroke]]) => [name, stroke]), ...lines.filter((l) => l.name).map((l) => [l.name, l.color])];
+  for (const [name, color] of items) {
+    const s = document.createElement("span");
+    s.style.color = color;
+    s.innerHTML = `<svg width="16" height="10" viewBox="0 0 16 10"><line x1="0" x2="16" y1="5" y2="5" stroke="${color}" stroke-width="2"/><circle cx="8" cy="5" r="3" fill="var(--tip-bg)" stroke="${color}" stroke-width="1.5"/></svg>`;
+    s.append(name);
+    legend.appendChild(s);
+  }
+  draw();
+  return box;
+}
+
+// ---------- Page ----------
+const state = { scope: "doc", weighted: true }; // the plugin opens on the document tab
+function render() {
+  for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", String(b.dataset.scope === state.scope));
+  const charts = document.getElementById("charts");
+  charts.textContent = "";
+  for (const s of specs(state.scope)) charts.appendChild(renderChart(s));
+  fit();
+}
+for (const b of document.querySelectorAll(".tabs button")) b.addEventListener("click", () => { state.scope = b.dataset.scope; render(); });
+document.getElementById("weighted").addEventListener("change", (e) => { state.weighted = e.target.checked; render(); });
+document.addEventListener("keydown", (e) => {
+  if ((e.key !== "ArrowLeft" && e.key !== "ArrowRight") || e.target.tagName === "INPUT") return;
+  e.preventDefault();
+  state.scope = state.scope === "kb" ? "doc" : "kb";
+  render();
+  document.querySelector(`.tabs button[data-scope="${state.scope}"]`).focus();
+});
+
+// ---------- Theme: the manual's own toggle when embedded, else the OS ----------
+function applyTheme() {
+  let dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+  try {
+    const scheme = window.parent !== window && parent.document.body.getAttribute("data-md-color-scheme");
+    if (scheme) dark = scheme === "slate";
+  } catch (e) { /* not same-origin: keep the OS setting */ }
+  document.documentElement.classList.toggle("dark", dark);
+}
+applyTheme();
+try {
+  if (window.parent !== window) new parent.MutationObserver(applyTheme).observe(parent.document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
+} catch (e) {}
+if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+
+// ---------- Size the iframe to the content ----------
+function fit() {
+  try { if (window.frameElement) window.frameElement.style.height = document.documentElement.scrollHeight + "px"; } catch (e) {}
+}
+window.addEventListener("resize", fit);
+render();
+</script>
+</body>
+</html>

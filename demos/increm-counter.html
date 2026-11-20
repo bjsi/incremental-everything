@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IncRem Counter</title>
+<!--
+  Interactive demo of the IncRem Counter bar below a document's title
+  (src/widgets/inc_rem_counter.tsx), on a Rem-type IncRem opened as a page.
+  Example content only; nothing runs. Embedded in an iframe with one of:
+
+    (no query)        the counter alone, its IncRem List popup and 📊 graph
+                      → docs/IncRem-List-and-Main-View.md#increm-list-scoped
+    ?view=graph       same, with the Document Priority Distribution Graph open
+                      → docs/IncRem-List-and-Main-View.md#document-priority-distribution-graph
+    ?view=read-point  plus the Read Point row (src/components/ReadPointCrumbs.tsx)
+                      → docs/Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point
+                        and the Changelog
+
+  Theme: follows the manual's light/dark toggle (Material's data-md-color-scheme
+  on the parent page, same origin), else the OS setting.
+-->
+<style>
+:root {
+  --pane: #ffffff; --pane-ring: #e5e7eb; --text: #1f2937; --sub: #4b5563; --muted: #9ca3af;
+  --bar: #f6f7f9; --bar-border: #e5e7eb; --btn: #ffffff; --btn-hover: #eef0f3;
+  --blue: #3b82f6; --green: #10b981; --due: #f97316; --date: #2563eb; --date-bg: #eef2ff;
+  --chip-border: #d1d5db; --flash: rgba(59, 130, 246, .14); --status: #6b7280;
+  --popup: #ffffff; --popup-ring: #d9dce1; --shadow: 0 8px 28px rgba(0,0,0,.14);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+:root.dark {
+  --pane: #1b1c22; --pane-ring: #2c2e36; --text: #e5e7eb; --sub: #b4b9c2; --muted: #7a808c;
+  --bar: #23252d; --bar-border: #33363f; --btn: #1b1c22; --btn-hover: #30333c;
+  --blue: #60a5fa; --green: #34d399; --due: #fb923c; --date: #93b4ff; --date-bg: rgba(99, 132, 255, .15);
+  --chip-border: #3f424d; --flash: rgba(96, 165, 250, .18); --status: #9ca3af;
+  --popup: #23252d; --popup-ring: #3a3d47; --shadow: 0 8px 28px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+html, body { margin: 0; background: transparent; color: var(--text); }
+body { padding: 4px 2px 8px; font-size: 13px; -webkit-font-smoothing: antialiased; }
+
+.pane { position: relative; background: var(--pane); box-shadow: 0 0 0 1px var(--pane-ring); border-radius: 14px; padding: 12px 18px 18px; overflow: hidden; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; font-size: 12.5px; color: var(--muted); min-height: 20px; }
+.crumbs .sep { margin: 0 7px; opacity: .7; }
+.crumbs a { color: inherit; cursor: pointer; text-decoration: none; }
+.crumbs a:hover { color: var(--text); }
+.back { margin-left: auto; font: inherit; font-size: 12px; border: 1px solid var(--chip-border); background: transparent; color: var(--sub); border-radius: 6px; padding: 2px 9px; cursor: pointer; }
+.back[hidden] { display: none; }
+
+h1 { margin: 14px 0 8px; font-size: 22px; line-height: 1.25; font-weight: 700; border-left: 4px solid #2f7d32; padding-left: 10px; }
+.props { display: grid; grid-template-columns: max-content 1fr; gap: 6px 28px; margin: 6px 0 4px 14px; font-size: 13px; }
+.props .k { color: var(--muted); }
+.props .date { color: var(--date); background: var(--date-bg); border-radius: 5px; padding: 1px 7px; justify-self: start; }
+
+/* ---- the widget ---- */
+.widget { padding: 8px 0 4px; }
+.bar { background: var(--bar); border: 1px solid var(--bar-border); border-radius: 9px; padding: 8px 12px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.top .lbl { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.top .lbl b { font-size: 13px; }
+.top .n { font-size: 12px; color: var(--muted); }
+.top .n .d { color: var(--due); } .top .n .t { color: var(--blue); }
+.mini { font: inherit; font-size: 12px; color: var(--muted); background: var(--btn); border: 0; border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.mini:hover { background: var(--btn-hover); }
+.rp { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--bar-border); font-size: 12px; color: var(--sub); }
+.rp .name { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 600; color: var(--text); }
+.rp .name svg { color: var(--green); }
+.path { flex: 1; min-width: 120px; }
+.path .s { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+.path .s.last { font-weight: 600; color: var(--blue); }
+.path .gt { opacity: .6; margin: 0 3px; }
+.right { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.when { color: var(--muted); white-space: nowrap; margin-right: 4px; }
+.go { font: inherit; font-size: 12px; font-weight: 600; color: var(--blue); background: var(--btn); border: 1px solid var(--blue); border-radius: 5px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+.go:hover { background: var(--flash); }
+button:focus-visible, .s:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+/* ---- outline below the title ---- */
+.outline { margin: 12px 0 0 14px; font-size: 14px; line-height: 1.75; }
+.outline ul { list-style: none; margin: 0; padding-left: 20px; border-left: 1px solid var(--pane-ring); }
+.outline > ul { padding-left: 0; border-left: 0; }
+.outline li::before { content: "•"; color: var(--muted); margin-right: 8px; }
+.outline .rem { border-radius: 4px; padding: 0 3px; transition: background-color .4s ease; }
+.outline .rem.hit { background: var(--flash); box-shadow: inset 0 -2px 0 var(--blue); }
+.outline .caret { display: inline-block; width: 1px; height: 1.05em; background: var(--text); vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---- history popup ---- */
+.popup { position: absolute; right: 18px; top: 46px; width: min(330px, calc(100% - 36px)); background: var(--popup); box-shadow: 0 0 0 1px var(--popup-ring), var(--shadow); border-radius: 12px; padding: 12px 14px; display: none; z-index: 2; }
+.popup.open { display: block; }
+.popup h3 { margin: 0 0 2px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.popup h3 svg { color: var(--green); }
+.popup .of { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
+.popup .e { display: flex; justify-content: space-between; gap: 10px; padding: 6px 8px; border-radius: 7px; font-size: 12.5px; cursor: pointer; }
+.popup .e:hover, .popup .e.sel { background: var(--flash); }
+.popup .e .dt { color: var(--muted); white-space: nowrap; font-size: 11.5px; }
+.popup .e:first-of-type { font-weight: 600; }
+.popup .x, .list .x { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: var(--muted); font-size: 16px; cursor: pointer; }
+
+.mini.on { background: var(--btn-hover); color: var(--text); }
+
+/* ---- inline priority graph ---- */
+.graph { margin-top: 8px; border: 1px solid var(--bar-border); border-radius: 9px; padding: 10px 12px 8px; background: var(--pane); }
+.graph[hidden] { display: none; }
+.ghead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ghead b { font-size: 12.5px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--bar); border: 1px solid var(--bar-border); }
+.seg button { font: inherit; font-size: 11.5px; border: 0; background: transparent; color: var(--muted); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+.seg button.on { background: var(--pane); color: var(--blue); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; margin: 8px 0 2px; font-size: 11px; color: var(--sub); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.graph svg { display: block; width: 100%; height: auto; }
+.graph svg text { font-size: 9px; fill: var(--muted); }
+.graph svg .grid { stroke: var(--bar-border); stroke-dasharray: 3 3; }
+.graph svg rect.b { cursor: default; }
+.gfoot { text-align: center; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.tip { position: absolute; pointer-events: none; background: var(--popup); box-shadow: 0 0 0 1px var(--popup-ring), var(--shadow); border-radius: 7px; padding: 6px 9px; font-size: 11.5px; line-height: 1.45; display: none; z-index: 3; white-space: nowrap; }
+
+/* ---- IncRem List popup ---- */
+.list { position: absolute; left: 18px; right: 18px; top: 46px; background: var(--popup); box-shadow: 0 0 0 1px var(--popup-ring), var(--shadow); border-radius: 12px; padding: 12px 14px; display: none; z-index: 2; }
+.list.open { display: block; }
+.list h3 { margin: 0 0 8px; font-size: 13px; }
+.list table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.list th { text-align: left; font-weight: 600; font-size: 11px; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--bar-border); }
+.list td { padding: 6px; border-bottom: 1px solid var(--bar-border); }
+.list tr.r { cursor: pointer; }
+.list tr.r:hover td { background: var(--flash); }
+.list .ty { font-size: 10px; font-weight: 700; color: #7c3aed; background: rgba(124, 58, 237, .12); border-radius: 4px; padding: 1px 5px; }
+.list .pr { font-weight: 600; color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+.list .due { color: var(--due); white-space: nowrap; }
+.list .hide-narrow { }
+@media (max-width: 460px) { .list .hide-narrow { display: none; } }
+
+.status { min-height: 1.4em; margin-top: 10px; text-align: center; color: var(--status); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="rp" viewBox="0 0 24 24"><path fill="currentColor" d="M6 2h12a1 1 0 0 1 1 1v19l-7-5-7 5V3a1 1 0 0 1 1-1z"/></symbol>
+</svg>
+
+<div class="pane" id="pane">
+  <div class="crumbs" id="crumbs"></div>
+  <div id="view"></div>
+
+  <div class="list" id="list" role="dialog" aria-label="Inc Rems">
+    <button class="x" id="listClose" aria-label="Close">×</button>
+    <h3>📚 Inc Rems · PIANC 121 (Projetos de Portos)</h3>
+    <table>
+      <thead><tr><th>Type</th><th>Rem</th><th>Priority</th><th class="hide-narrow">Next rep</th></tr></thead>
+      <tbody id="listBody"></tbody>
+    </table>
+  </div>
+
+  <div class="tip" id="tip"></div>
+
+  <div class="popup" id="popup" role="dialog" aria-label="Read Points">
+    <button class="x" id="popupClose" aria-label="Close">×</button>
+    <h3><svg width="13" height="13"><use href="#rp"/></svg>Read Points</h3>
+    <div class="of">PIANC 121 (Projetos de Portos)</div>
+    <div class="e" data-id="def"><span>Definições Básicas</span><span class="dt">10/22/2026</span></div>
+    <div class="e" data-id="ch13"><span>1.3 Aspectos gerais sobre projetos</span><span class="dt">10/15/2026</span></div>
+    <div class="e" data-id="ch12"><span>1.2 Escopo</span><span class="dt">10/08/2026</span></div>
+  </div>
+</div>
+<div class="status" id="status">Click the path, <b>Go to Read Point</b> or <b>History ↗</b>. <em>(A mock: nothing runs.)</em></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const ICON = '<svg width="13" height="13"><use href="#rp"/></svg>';
+
+// The outline of the IncRem: id → [text, parent]
+const REMS = {
+  doc:  ["PIANC 121 (Projetos de Portos)", null],
+  ch1:  ["Chapter 1", "doc"],
+  ch12: ["1.2 Escopo", "ch1"],
+  ch13: ["1.3 Aspectos gerais sobre projetos de portos", "ch1"],
+  def:  ["Definições Básicas", "ch13"],
+  bac:  ["Bacia de evolução", "def"],
+  can:  ["Canal de acesso", "def"],
+  ch2:  ["Chapter 2", "doc"],
+  ch3:  ["Chapter 3", "doc"],
+};
+const ROOT_CRUMBS = ["Sierra Pilots", "Cursos", "Manobra - matéria nova"];
+const READ_POINT = "def";
+const VIEW = new URLSearchParams(location.search).get("view") || "";
+const SHOW_READ_POINT = VIEW === "read-point";
+let graphOpen = VIEW === "graph";
+let graphMode = "abs";
+
+// The document's IncRems (the document itself + its chapters), for the list popup.
+const INCREMS = [
+  ["doc", 20, "Nov 1st", "#84cc16"],
+  ["ch1", 25, "Oct 30th", "#22c55e"],
+  ["ch2", 30, "Nov 2nd", "#14b8a6"],
+  ["ch3", 35, "Nov 5th", "#0ea5e9"],
+];
+
+// Priority buckets of 5: [incRemDue, incRemProcessed, cardDue, cardProcessed]
+const BUCKETS = {
+  abs: { 4: [1, 0, 6, 9], 5: [1, 0, 11, 14], 6: [1, 0, 0, 3], 7: [1, 0, 2, 5] },
+  pct: { 7: [1, 0, 4, 6], 9: [1, 0, 13, 17], 11: [1, 0, 0, 4], 13: [1, 0, 2, 4] },
+};
+const SEGMENT_CHARS = 40;
+
+const children = (id) => Object.keys(REMS).filter((k) => REMS[k][1] === id);
+const ancestors = (id) => { const out = []; for (let p = REMS[id][1]; p; p = REMS[p][1]) out.unshift(p); return out; };
+const cut = (t) => (t.length > SEGMENT_CHARS ? t.slice(0, SEGMENT_CHARS) + "…" : t);
+
+function say(html) { $("status").innerHTML = html; fit(); }
+
+function outlineHtml(id, focus) {
+  const kids = children(id);
+  if (!kids.length) return "";
+  return "<ul>" + kids.map((k) =>
+    `<li><span class="rem${k === focus ? " hit" : ""}" data-rem="${k}">${REMS[k][0]}${k === focus ? '<span class="caret"></span>' : ""}</span>${outlineHtml(k, focus)}</li>`
+  ).join("") + "</ul>";
+}
+
+function renderCrumbs(id) {
+  const trail = [...ROOT_CRUMBS.map((t) => [null, t]), ...ancestors(id).map((a) => [a, REMS[a][0]])];
+  $("crumbs").innerHTML =
+    trail.map(([a, t], i) => (i ? '<span class="sep">›</span>' : "") + (a ? `<a data-open="${a}">${cut(t)}</a>` : `<span>${t}</span>`)).join("") +
+    `<button class="back" id="back"${id === "doc" ? " hidden" : ""}>← Back</button>`;
+}
+
+function docView() {
+  const path = [...ancestors(READ_POINT).filter((a) => a !== "doc"), READ_POINT];
+  return `
+    <h1>${REMS.doc[0]}</h1>
+    <div class="props">
+      <span class="k">Next Rep Date</span><span class="date">November 1st, 2026</span>
+      <span class="k">Priority</span><span>20</span>
+    </div>
+    <div class="widget">
+      <div class="bar">
+        <div class="top">
+          <span class="lbl" id="openList" title="Open the IncRem List for this document">📚 <b>Inc Rems</b> <span class="n" title="due / total"><span class="d">4</span> / <span class="t">4</span></span></span>
+          <span><button class="mini${graphOpen ? " on" : ""}" id="graphBtn" title="${graphOpen ? "Hide" : "Show"} Priority Distribution Graph">📊</button> <button class="mini" data-say="Opens <b>All Inc Rems</b>: every IncRem in the knowledge base (<code>Opt+Shift+I</code>)." title="View All (Opt+Shift+I)">View All</button></span>
+        </div>
+        ${SHOW_READ_POINT ? `<div class="rp">
+          <span class="name">${ICON}Read Point</span>
+          <span class="path">${path.map((id, i) =>
+            (i ? '<span class="gt">›</span>' : "") +
+            `<span class="s${id === READ_POINT ? " last" : ""}" tabindex="0" data-open="${id}" title="${REMS[id][0]}">${cut(REMS[id][0])}</span>`).join("")}</span>
+          <span class="right">
+            <span class="when" title="Set on 10/22/2026, 18:42">10/22/2026</span>
+            <button class="go" data-open="${READ_POINT}">Go to Read Point</button>
+            <button class="mini" id="history">History ↗</button>
+          </span>
+        </div>` : ""}
+      </div>
+      <div class="graph" id="graph"${graphOpen ? "" : " hidden"}>${graphHtml()}</div>
+    </div>
+    <div class="outline">${outlineHtml("doc")}</div>`;
+}
+
+function graphHtml() {
+  const W = 520, H = 170, L = 26, R = 26, T = 8, B = 30, n = 20;
+  const data = BUCKETS[graphMode];
+  const incMax = 2, cardMax = 30;
+  const bw = (W - L - R) / n;
+  let g = "";
+  for (let k = 0; k <= 2; k++) {
+    const y = T + (H - T - B) * (1 - k / 2);
+    g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/>`;
+    g += `<text x="${L - 5}" y="${y + 3}" text-anchor="end" style="fill:#3b82f6">${incMax * k / 2}</text>`;
+    g += `<text x="${W - R + 5}" y="${y + 3}" style="fill:#ef4444">${cardMax * k / 2}</text>`;
+  }
+  const ph = H - T - B;
+  for (let i = 0; i < n; i++) {
+    const x = L + i * bw;
+    const [iD, iP, cD, cP] = data[i] || [0, 0, 0, 0];
+    const lab = graphMode === "abs" ? `${i * 5}-${i * 5 + 5}` : `${i * 5}-${i * 5 + 5}%`;
+    const tip = `${lab}|${iD + iP}|${iD}|${iP}|${cD + cP}|${cD}|${cP}`;
+    const stack = (vals, cols, x0, max) => {
+      let y = H - B, out = "";
+      vals.forEach((v, j) => { const h = (v / max) * ph; if (h > 0) { y -= h; out += `<rect class="b" data-tip="${tip}" x="${x0}" y="${y}" width="${bw * 0.36}" height="${h}" fill="${cols[j]}"/>`; } });
+      return out;
+    };
+    g += stack([iP, iD], ["#bfdbfe", "#3b82f6"], x + bw * 0.1, incMax);
+    g += stack([cP, cD], ["#fecaca", "#ef4444"], x + bw * 0.52, cardMax);
+    if (i % 2 === 0) g += `<text x="${x + bw / 2}" y="${H - B + 12}" text-anchor="middle">${i * 5}</text>`;
+  }
+  g += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" style="stroke:var(--muted)"/>`;
+  return `
+    <div class="ghead"><b>Priority Distribution</b>
+      <span class="seg"><button data-mode="abs" class="${graphMode === "abs" ? "on" : ""}">Absolute Priority</button><button data-mode="pct" class="${graphMode === "pct" ? "on" : ""}">KB Percentile</button></span>
+    </div>
+    <div class="legend"><span><i style="background:#3b82f6"></i>IncRems · Due</span><span><i style="background:#bfdbfe"></i>IncRems · Processed</span><span><i style="background:#ef4444"></i>Cards · Due</span><span><i style="background:#fecaca"></i>Cards · Processed</span></div>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Priority distribution of this document">${g}</svg>
+    <div class="gfoot">${graphMode === "abs" ? "X-Axis: Absolute Priority (0-100)" : "X-Axis: KB-wide Relative Percentile (0-100%)"}</div>`;
+}
+
+function renderList() {
+  $("listBody").innerHTML = INCREMS.map(([id, p, next, col]) =>
+    `<tr class="r" data-row="${id}"><td><span class="ty">REM</span></td><td>${REMS[id][0]}</td><td><span class="pr" style="background:${col}">P${p}</span></td><td class="due hide-narrow">${next}</td></tr>`).join("");
+}
+
+function remView(id) {
+  return `<h1 style="border-left-color:transparent">${REMS[id][0]}</h1><div class="outline">${outlineHtml(id) || '<ul><li><span class="rem hit"><span class="caret"></span></span></li></ul>'}</div>`;
+}
+
+function show(id) {
+  $("popup").classList.remove("open");
+  $("list").classList.remove("open");
+  renderCrumbs(id);
+  $("view").innerHTML = id === "doc" ? docView() : remView(id);
+  if (id === "doc") say(SHOW_READ_POINT
+    ? 'Click the path, <b>Go to Read Point</b> or <b>History ↗</b>. <em>(A mock: nothing runs.)</em>'
+    : 'Click <b>Inc Rems</b>, <b>📊</b> or <b>View All</b>. <em>(A mock: nothing runs.)</em>');
+  else if (id === READ_POINT) say("Opened the bookmarked Rem with the cursor in it — right where you stopped reading.");
+  else say(`Opened <b>${REMS[id][0]}</b>, one step on the way to the read point.`);
+  fit();
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-open], [data-say], [data-mode], [data-row], #back, #history, #popupClose, #openList, #listClose, #graphBtn, .popup .e");
+  if (!t) return;
+  if (t.id === "openList") { renderList(); $("popup").classList.remove("open"); $("list").classList.add("open"); say("The <b>IncRem List</b>: this document's IncRems, to filter, sort, reprioritize or review in sequence."); return; }
+  if (t.id === "listClose") { $("list").classList.remove("open"); fit(); return; }
+  if (t.dataset.row) { say(`Opens <b>${REMS[t.dataset.row][0]}</b> and closes the list.`); $("list").classList.remove("open"); return; }
+  if (t.id === "graphBtn") {
+    graphOpen = !graphOpen;
+    $("graph").hidden = !graphOpen; t.classList.toggle("on", graphOpen);
+    say(graphOpen ? "The priority distribution of this document's IncRems and cards. Hover a bar for its counts." : "Graph hidden.");
+    return;
+  }
+  if (t.dataset.mode) {
+    graphMode = t.dataset.mode; $("graph").innerHTML = graphHtml();
+    say(graphMode === "abs" ? "Absolute priority: where the items sit on the 0–100 scale." : "KB percentile: how they rank against the whole knowledge base.");
+    return;
+  }
+  if (t.id === "back") return show("doc");
+  if (t.id === "history") { $("popup").classList.add("open"); say("The Read Points popup: every saved position, newest first. Click one to jump there."); return; }
+  if (t.id === "popupClose") { $("popup").classList.remove("open"); return; }
+  if (t.matches(".popup .e")) return show(t.dataset.id);
+  if (t.dataset.open) return show(t.dataset.open);
+  if (t.dataset.say) say(t.dataset.say);
+});
+document.addEventListener("mousemove", (e) => {
+  const tip = $("tip"), r = e.target.closest && e.target.closest("rect.b");
+  if (!r) { tip.style.display = "none"; return; }
+  const [lab, it, id, ip, ct, cd, cp] = r.dataset.tip.split("|");
+  const pct = (a, b) => (+b ? Math.round((a / b) * 100) : 0);
+  tip.innerHTML = `<b>${lab}</b><br><span style="color:#3b82f6">IncRems: ${it}</span> · Due ${id} · Processed ${ip} (${pct(ip, it)}%)<br><span style="color:#ef4444">Cards: ${ct}</span> · Due ${cd} · Processed ${cp} (${pct(cp, ct)}%)`;
+  const box = $("pane").getBoundingClientRect();
+  tip.style.display = "block";
+  const x = Math.min(e.clientX - box.left + 12, box.width - tip.offsetWidth - 8);
+  tip.style.left = Math.max(8, x) + "px";
+  tip.style.top = (e.clientY - box.top + 14) + "px";
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { $("popup").classList.remove("open"); $("list").classList.remove("open"); }
+  if (e.key === "Enter" && e.target.dataset && e.target.dataset.open) show(e.target.dataset.open);
+});
+
+show("doc");
+
+// ---- Theme: the manual's own toggle when embedded, else the OS ----
+function applyTheme() {
+  let dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+  try {
+    const scheme = window.parent !== window && parent.document.body.getAttribute("data-md-color-scheme");
+    if (scheme) dark = scheme === "slate";
+  } catch (e) { /* not same-origin: keep the OS setting */ }
+  document.documentElement.classList.toggle("dark", dark);
+}
+applyTheme();
+try {
+  if (window.parent !== window) new parent.MutationObserver(applyTheme).observe(parent.document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
+} catch (e) {}
+if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+
+// ---- Size the iframe to the content (the row wraps on narrow screens) ----
+function fit() {
+  try { if (window.frameElement) window.frameElement.style.height = document.documentElement.scrollHeight + "px"; } catch (e) {}
+}
+window.addEventListener("load", fit);
+window.addEventListener("resize", fit);
+</script>
+</body>
+</html>
