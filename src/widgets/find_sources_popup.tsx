@@ -5,7 +5,9 @@ import '../style.css';
 import '../App.css';
 import '../rn_theme_vars.css';
 import { withHoverTips } from '../components/HoverTipLayer';
+import { dismissNotices } from '../lib/notice';
 import {
+  enqueueAskFollowUp,
   FindSourcesExtras,
   FindSourcesReview,
   PassageRole,
@@ -85,6 +87,9 @@ function FindSourcesPopup() {
   const [extras, setExtras] = useState<FindSourcesExtras>('pins');
   const withQuotes = extras !== 'pins';
   const [busy, setBusy] = useState(false);
+  /** Ask Your Sources: what to improve or add, sent with Ask again. */
+  const [followUp, setFollowUp] = useState('');
+  const followUpRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const openedAt = useRef(Date.now());
@@ -190,6 +195,38 @@ function FindSourcesPopup() {
 
   const close = () => plugin.widget.closePopup();
 
+  /** The Rem a follow-up asks again: the one under the cursor (the only one, usually). */
+  const followUpRem = rows[cursor]?.rem ?? review?.rems.findIndex((r) => r.answer || r.answerError) ?? 0;
+
+  /**
+   * Ask again with the follow-up: queued for the tracker like the first run (a new notice
+   * opens a new review). With one Rem, this review's notice goes: its answer is replaced.
+   */
+  const askAgain = async () => {
+    if (!review || busy) return;
+    const text = followUp.trim();
+    if (!text) {
+      await plugin.app.toast('Write what to improve or add first.');
+      followUpRef.current?.focus();
+      return;
+    }
+    const rem = review.rems[followUpRem];
+    if (!rem) return;
+    setBusy(true);
+    // All awaited before closing: a popup's teardown cuts a read-then-write short.
+    const queued = await enqueueAskFollowUp(plugin, rem, text, review.openSourceRemId);
+    if (!queued) {
+      setBusy(false);
+      await plugin.app.toast('That Rem is gone or has no text to ask about.');
+      return;
+    }
+    if (review.rems.length === 1) await dismissNotices(plugin, review.noticeId);
+    await plugin.app.toast(
+      '\ud83d\udcac Asking your sources again with the follow-up, in the background (about 60 s). A notice will say when it is ready to review.'
+    );
+    close();
+  };
+
   const write = async () => {
     if (!review || busy) return;
     const chosen = rows.filter((r) => selected.has(keyOf(r)) && selectable(r));
@@ -221,6 +258,17 @@ function FindSourcesPopup() {
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if ((e.target as HTMLElement).tagName === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+    // The follow-up field: typing stays in it; Enter asks again, Esc goes back to the list.
+    if ((e.target as HTMLElement).tagName === 'INPUT' && e.target === followUpRef.current) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        void askAgain();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        containerRef.current?.focus();
+      }
+      return;
+    }
     const row = rows[cursor];
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -243,6 +291,9 @@ function FindSourcesPopup() {
     } else if (e.key === 'q' || e.key === 'Q') {
       e.preventDefault();
       cycleExtras();
+    } else if (isAsk && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault();
+      followUpRef.current?.focus();
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (Date.now() - openedAt.current >= ENTER_GRACE_MS) void write();
@@ -279,6 +330,16 @@ function FindSourcesPopup() {
             <div className="text-sm font-semibold" style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', paddingBottom: 2 }}>
               {rem.title}
             </div>
+            {(rem.outline || rem.context) && (
+              <div className="text-xs" style={muted} data-tip="Where the note sits, as sent with it: the outline path to the AI only, a descriptor's concept to the search too">
+                {[rem.outline, rem.context].filter(Boolean).join(' › ')} › <i>this note</i>
+              </div>
+            )}
+            {rem.followUp && (
+              <div className="text-xs" style={muted}>
+                Follow-up: “{rem.followUp}”
+              </div>
+            )}
             {rem.error && (
               <div className="text-xs" style={{ color: '#EF4444' }}>
                 {rem.error}
@@ -436,6 +497,41 @@ function FindSourcesPopup() {
         ))}
       </div>
 
+      {isAsk && (
+        <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
+          <input
+            ref={followUpRef}
+            value={followUp}
+            onChange={(e) => setFollowUp(e.target.value)}
+            placeholder={`Optional follow-up${multi ? ` for “${review.rems[followUpRem]?.title ?? ''}”` : ''}: what to improve or add (e.g. “include the effect of the ice thickness”), then Enter`}
+            className="text-sm rounded px-2 py-1"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              border: '1px solid var(--rn-clr-border-primary)',
+              background: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+            }}
+          />
+          <button
+            onClick={() => void askAgain()}
+            onMouseDown={(e) => e.preventDefault()}
+            disabled={busy || !followUp.trim()}
+            className="py-1 px-3 rounded text-sm"
+            style={{
+              border: '1px solid var(--rn-clr-border-primary)',
+              background: 'transparent',
+              color: 'inherit',
+              cursor: 'pointer',
+              opacity: busy || !followUp.trim() ? 0.5 : 1,
+            }}
+            data-tip="Ask again with this follow-up: a new search and a rewritten answer, reviewed from a new notice. Nothing is written now."
+          >
+            Ask again
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 text-sm" style={{ borderTop: '1px solid var(--rn-clr-border-primary)', paddingTop: 8 }}>
         <button
           onClick={cycleExtras}
@@ -453,7 +549,13 @@ function FindSourcesPopup() {
               <span style={keyStyle}>⇧A</span> this Rem · <span style={keyStyle}>PgDn</span> next Rem ·{' '}
             </>
           )}
-          <span style={keyStyle}>Q</span> what to add · <span style={keyStyle}>Esc</span> later
+          <span style={keyStyle}>Q</span> what to add ·{' '}
+          {isAsk && (
+            <>
+              <span style={keyStyle}>F</span> follow-up ·{' '}
+            </>
+          )}
+          <span style={keyStyle}>Esc</span> later
         </span>
         <button
           onClick={() => void write()}

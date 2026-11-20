@@ -8,7 +8,7 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 import { helperPost } from '../helper_client';
 import { ChosenQuote, parseChosenQuotes } from './quote_text';
-import { passageLines, PromptPassage, QUOTE_RULES } from './check';
+import { NoteSetting, passageLines, PromptPassage, QUOTE_RULES, SETTING_RULES, settingLines } from './check';
 export { boldToRichText } from './quote_text';
 
 export interface AnswerSection {
@@ -29,6 +29,21 @@ export interface SourcesAnswer {
   /** Every passage the answer uses. */
   basis: number[];
   model?: string;
+}
+
+/** Asked again from the review: what to improve or add, and the answer it rewrites. */
+export interface FollowUp {
+  instruction: string;
+  previous?: SourcesAnswer;
+}
+
+/** The previous answer as plain text for the follow-up prompt (its passage numbers are stale). */
+function previousText(a: SourcesAnswer): string {
+  return [
+    a.answer,
+    ...a.sections.map((s) => `- ${s.text}`),
+    ...a.divergences.map((s) => `- (divergence) ${s.text}`),
+  ].join('\n');
 }
 
 /** Same reasoning as Check Statement's verdict: once per Rem, the stronger model. */
@@ -67,6 +82,12 @@ numbers in the text.
 - Write in the language given as LANGUAGE. Use **bold** for the key terms and figures; no \
 other markup, no headings, no lists inside a text.
 
+When a FOLLOW-UP REQUEST is given (with the PREVIOUS ANSWER it asks to change), write the \
+whole answer again: keep what the previous answer got right, and change, correct, add or \
+cut what the request asks for (another aspect, more detail, a shorter answer, a point it \
+missed). The request never relaxes the rules above: everything still comes from the \
+passages, and when they do not cover what it asks, say so in the answer.
+
 Reply with ONE JSON object and nothing else:
 {"answer": "the direct answer in one sentence",
  "covered": "full" | "partial" | "none",
@@ -83,6 +104,8 @@ its quote. Two sections may quote the same passage with different excerpts.
 - "covered": full = the passages answer it; partial = they answer part of it; none = they \
 do not.
 
+${SETTING_RULES}
+
 ${QUOTE_RULES}`;
 
 /** Ask Claude for the answer to one Rem's question or topic, from the passages found for it. */
@@ -90,9 +113,17 @@ export async function askSources(
   plugin: RNPlugin,
   question: string,
   lang: 'pt' | 'en',
-  passages: PromptPassage[]
+  passages: PromptPassage[],
+  followUp?: FollowUp,
+  setting?: NoteSetting
 ): Promise<SourcesAnswer> {
-  const lines = [`LANGUAGE: ${lang === 'pt' ? 'Brazilian Portuguese' : 'English'}`, '', 'QUESTION OR TOPIC:', question.trim(), '', 'PASSAGES:'];
+  const lines = [`LANGUAGE: ${lang === 'pt' ? 'Brazilian Portuguese' : 'English'}`, '', ...settingLines(setting)];
+  lines.push('QUESTION OR TOPIC:', question.trim(), '');
+  if (followUp?.instruction.trim()) {
+    if (followUp.previous) lines.push('PREVIOUS ANSWER:', previousText(followUp.previous), '');
+    lines.push('FOLLOW-UP REQUEST:', followUp.instruction.trim(), '');
+  }
+  lines.push('PASSAGES:');
   passages.forEach((p, k) => lines.push(...passageLines(p, k)));
   const res = await helperPost<{ data?: any; model?: string }>(
     plugin,

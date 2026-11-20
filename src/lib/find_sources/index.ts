@@ -26,7 +26,6 @@ import { HelperUnreachableError } from '../helper_client';
 import { showMessageDialog } from '../message_dialog';
 import { dismissNotices, showNotice } from '../notice';
 import {
-  ancestorIds,
   appendPins,
   ensureSourcePins,
   isPin,
@@ -35,10 +34,11 @@ import {
   sourceViews,
 } from '../pdf_source_pins';
 import { guessLang } from '../read_aloud_script';
+import { noteSurroundings as surroundings } from './surroundings';
 import { placeInline, pinnedIds, RichElement } from './placement';
 import { attribution, ChosenQuote, emphasisSegments, mergedQuote, segmentsToRichText } from './quote_text';
-import { checkHeader, checkStatement, StatementCheck, VERDICTS } from './check';
-import { AnswerSection, answerHeader, askSources, boldToRichText, SourcesAnswer } from './ask';
+import { checkHeader, checkStatement, NoteSetting, StatementCheck, VERDICTS } from './check';
+import { AnswerSection, answerHeader, askSources, boldToRichText, FollowUp, SourcesAnswer } from './ask';
 import { groupOf, OutlineNode, pinTarget, Statement, StatementMember, statementsInOutline } from './outline';
 
 export const SEMANTIC_SEARCH = 'semantic-search';
@@ -86,8 +86,23 @@ export interface FindSourcesItem {
   title: string;
   texts: string[];
   ancestors: string[];
+  /**
+   * A descriptor's concept and the descriptors above it ("Rebocadores com tubulão"), which
+   * the note means nothing without: searched with it, and given to Claude as its CONTEXT.
+   */
+  context?: string;
+  /** Ask Your Sources / Check Statement: the Rems above (noteSurroundings), for Claude only. */
+  outline?: string;
   /** A list group's items (./outline), where a passage that supports one item is pinned. */
   members?: StatementMember[];
+  /**
+   * Ask Your Sources, asked again from the review: what to improve or add. It joins the
+   * search texts (more passages for a new aspect), and Claude rewrites `previousAnswer`
+   * with it. `previousPassages` stay in the list, so the first answer's evidence is kept.
+   */
+  followUp?: string;
+  previousAnswer?: SourcesAnswer;
+  previousPassages?: ReviewPassage[];
 }
 
 export interface FindSourcesJob {
@@ -130,6 +145,14 @@ export interface ReviewRem {
   members?: StatementMember[];
   /** Ask Your Sources: the answer to the Rem's question or topic. */
   answer?: SourcesAnswer;
+  /** A descriptor's concept (FindSourcesItem.context), shown above the review. */
+  context?: string;
+  /** The Rems above the note sent to Claude (FindSourcesItem.outline), shown above the review. */
+  outline?: string;
+  /** Ask Your Sources: the question or topic as asked (the review's follow-up asks it again). */
+  question?: string;
+  /** Ask Your Sources: the follow-up this answer was rewritten with. */
+  followUp?: string;
   /** Ask Your Sources: why there is no answer (the helper or Claude failed). */
   answerError?: string;
   /** Check Statement: why there is no verdict (the helper or Claude failed). */
@@ -140,6 +163,8 @@ export interface FindSourcesReview {
   jobId: string;
   noticeId: string;
   rems: ReviewRem[];
+  /** The source open when the run started, which a follow-up searches with again. */
+  openSourceRemId?: string | null;
 }
 
 /**
@@ -235,6 +260,7 @@ export async function findSourcesUnavailable(plugin: RNPlugin): Promise<string |
 const statementText = async (plugin: RNPlugin, rem: PluginRem) =>
   [await plainOf(plugin, rem.text), await plainOf(plugin, rem.backText)].map((t) => t.trim()).filter(Boolean).join(' ');
 
+
 /** Rems in their order among siblings (getChildrenRem and getDescendants promise none). */
 async function ordered(rems: PluginRem[]): Promise<PluginRem[]> {
   const at = await Promise.all(rems.map((r) => r.positionAmongstSiblings().catch(() => 0)));
@@ -316,7 +342,7 @@ async function enqueueStatements(
       remId: st.headId,
       title: shortTitle(st.text),
       texts: [st.text],
-      ancestors: await ancestorIds(head),
+      ...(await surroundings(head, (r) => plainOf(plugin, r.text), !!(mode.check || mode.ask))),
       members: st.members,
     });
   }
@@ -480,6 +506,60 @@ export const checkStatementCommand = (plugin: ReactRNPlugin) => startFromCommand
  */
 export const askYourSourcesCommand = (plugin: ReactRNPlugin) => startFromCommand(plugin, 'ask');
 
+/**
+ * Ask Your Sources, from the review: ask one Rem's question again with a follow-up (what to
+ * improve, correct or add). Runs in the background like the first run; a new notice opens
+ * a new review.
+ */
+export async function enqueueAskFollowUp(
+  plugin: RNPlugin,
+  rem: ReviewRem,
+  followUp: string,
+  openSource: string | null | undefined
+): Promise<boolean> {
+  const head = await plugin.rem.findOne(rem.remId);
+  const question = rem.question?.trim() || (head ? await plainOf(plugin, head.text as RichTextInterface) : '');
+  if (!head || !question) return false;
+  const job: FindSourcesJob = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    items: [
+      {
+        remId: rem.remId,
+        title: rem.title,
+        texts: [question],
+        ...(await surroundings(head, (r) => plainOf(plugin, r.text), true)),
+        members: rem.members,
+        followUp: followUp.trim(),
+        previousAnswer: rem.answer,
+        previousPassages: rem.passages,
+      },
+    ],
+    openSourceRemId: openSource ?? null,
+    queuedAt: Date.now(),
+    ask: true,
+  };
+  const queued = (await plugin.storage.getSession<FindSourcesJob[]>(pendingFindSourcesJobsKey)) || [];
+  await plugin.storage.setSession(pendingFindSourcesJobsKey, [...queued, job]);
+  return true;
+}
+
+/**
+ * A follow-up's passages: the new search's, then the earlier ones it did not find again
+ * (same book, and the earlier quote inside a new passage's chunk or quote). The earlier
+ * ones have lost their chunk, so Claude reads them as quoted.
+ */
+function withPreviousPassages(found: ReviewPassage[], previous: ReviewPassage[] | undefined): ReviewPassage[] {
+  const bookOf = (p: FoundPassage) => p.book.id || p.book.title;
+  const norm = (t: string) => t.replace(/\s+/g, ' ').trim().toLowerCase();
+  const kept = (previous ?? []).filter((old) => {
+    const first = norm(excerptsOf(old)[0] ?? '').slice(0, 80);
+    return !found.some(
+      (p) => bookOf(p) === bookOf(old) && !!first && (norm(p.context ?? '').includes(first) || norm(p.quote).includes(first))
+    );
+  });
+  return [...found, ...kept.map((p) => ({ ...p, basis: false, index: undefined }))];
+}
+
 /** For "Search by meaning" in Pin Source Quote's dialog: queue and say so. */
 export async function findSourcesFromDialog(plugin: RNPlugin, remIds: string[], openSource?: string | null) {
   const n = await enqueueFindSources(plugin, remIds, openSource);
@@ -541,7 +621,8 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
           items: [
             {
               remId: item.remId,
-              texts: item.texts,
+              // The provider joins the texts into one query: the concept first, as in the outline.
+              texts: [...(item.context ? [item.context] : []), ...item.texts, ...(item.followUp ? [item.followUp] : [])],
               ancestors: item.ancestors,
               openSourceRemId: job.openSourceRemId,
               ...(job.ask ? { mode: 'answer' } : {}),
@@ -551,13 +632,25 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
         { timeoutMs: FIND_TIMEOUT_MS, capability: SEMANTIC_SEARCH }
       );
       const found = res.items?.find((it) => it.remId === item.remId)?.passages ?? [];
-      const passages: ReviewPassage[] = [];
-      for (const p of found) passages.push(await locateInRemNote(plugin, p));
+      const located: ReviewPassage[] = [];
+      for (const p of found) located.push(await locateInRemNote(plugin, p));
+      const passages = item.followUp ? withPreviousPassages(located, item.previousPassages) : located;
       console.log(`[FindSources] ${item.title}: ${passages.length} passage(s)`, passages);
-      const rem: ReviewRem = { remId: item.remId, title: item.title, lang, passages, members: item.members };
+      const rem: ReviewRem = { remId: item.remId, title: item.title, lang, passages, members: item.members, context: item.context, outline: item.outline };
       passages.forEach((p, k) => (p.index = k));
-      if (job.check) await addCheck(plugin, rem, item.texts.join('\n'));
-      if (job.ask) await addAnswer(plugin, rem, item.texts.join('\n'));
+      const setting: NoteSetting = { context: item.context, outline: item.outline };
+      if (job.check) await addCheck(plugin, rem, item.texts.join('\n'), setting);
+      if (job.ask) {
+        rem.question = item.texts.join('\n');
+        rem.followUp = item.followUp;
+        await addAnswer(
+          plugin,
+          rem,
+          rem.question,
+          item.followUp ? { instruction: item.followUp, previous: item.previousAnswer } : undefined,
+          setting
+        );
+      }
       // The full chunks served the verdict or answer; the review and the write do not need them.
       passages.forEach((p) => delete p.context);
       return rem;
@@ -616,7 +709,7 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
     count('diverges') ? `${count('diverges')} diverge${count('diverges') === 1 ? 's' : ''}` : '',
     failed.length ? `${failed.length} failed` : '',
   ].filter(Boolean);
-  const review: FindSourcesReview = { jobId: job.id, noticeId, rems };
+  const review: FindSourcesReview = { jobId: job.id, noticeId, rems, openSourceRemId: job.openSourceRemId };
   const verdicts = job.check
     ? rems.length === 1 && rems[0].check
       ? `${VERDICTS[rems[0].check.verdict].icon} ${VERDICTS[rems[0].check.verdict][rems[0].lang]}. `
@@ -638,7 +731,7 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
   await showNotice(plugin, {
     id: noticeId,
     tone: job.check ? worst : job.ask ? (rems.some((r) => r.answerError) ? 'error' : 'success') : count('source') ? 'success' : 'info',
-    title: `${what}: ready to review`,
+    title: `${what}: ${job.items.some((it) => it.followUp) ? 'follow-up ' : ''}ready to review`,
     message: `${subject}: ${verdicts}${answered}${parts.join(' \u00b7 ')}. Nothing is written until you accept it.`,
     action: { label: 'Review', popup: FIND_SOURCES_POPUP, data: review },
   });
@@ -648,7 +741,7 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
  * Check Statement: Claude's verdict on the Rem's statement from the passages found
  * (all of them, pinnable or not), and which of them it rests on.
  */
-async function addCheck(plugin: ReactRNPlugin, rem: ReviewRem, statement: string) {
+async function addCheck(plugin: ReactRNPlugin, rem: ReviewRem, statement: string, setting?: NoteSetting) {
   if (!rem.passages.length) {
     rem.check = {
       verdict: 'not-covered',
@@ -662,7 +755,7 @@ async function addCheck(plugin: ReactRNPlugin, rem: ReviewRem, statement: string
     return;
   }
   try {
-    rem.check = await checkStatement(plugin, statement, rem.lang, rem.passages);
+    rem.check = await checkStatement(plugin, statement, rem.lang, rem.passages, setting);
     rem.check.basis.forEach((k) => (rem.passages[k].basis = true));
     takeChosenQuotes(rem, rem.check.quotes);
     console.log('[CheckStatement]', rem.title, rem.check);
@@ -673,7 +766,13 @@ async function addCheck(plugin: ReactRNPlugin, rem: ReviewRem, statement: string
 }
 
 /** Ask Your Sources: Claude's answer from the passages found, and which of them it uses. */
-async function addAnswer(plugin: ReactRNPlugin, rem: ReviewRem, question: string) {
+async function addAnswer(
+  plugin: ReactRNPlugin,
+  rem: ReviewRem,
+  question: string,
+  followUp?: FollowUp,
+  setting?: NoteSetting
+) {
   if (!rem.passages.length) {
     rem.answer = {
       answer: rem.lang === 'pt' ? 'Nenhuma passagem da bibliografia trata disto.' : 'No passage of the bibliography deals with this.',
@@ -685,7 +784,7 @@ async function addAnswer(plugin: ReactRNPlugin, rem: ReviewRem, question: string
     return;
   }
   try {
-    rem.answer = await askSources(plugin, question, rem.lang, rem.passages);
+    rem.answer = await askSources(plugin, question, rem.lang, rem.passages, followUp, setting);
     rem.answer.basis.forEach((k) => (rem.passages[k].basis = true));
     takeChosenQuotes(rem, [...rem.answer.sections, ...rem.answer.divergences].flatMap((sec) => sec.quotes));
     console.log('[AskSources]', rem.title, rem.answer);

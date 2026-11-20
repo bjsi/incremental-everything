@@ -56,6 +56,33 @@ point (the term, number, condition), copied exactly; shown in bold.
 - "key": optionally the single word or figure the point turns on most, inside one \
 "emphasis"; shown in bold italics. "" when none stands out.`;
 
+/**
+ * Where the note sits, for Claude only (the search gets the descriptor chain alone,
+ * lib/find_sources enqueueStatements): `context` = a descriptor's concept and the
+ * descriptors above it, which complete the note; `outline` = a few Rems above that, up to
+ * the document, as background.
+ */
+export interface NoteSetting {
+  context?: string;
+  outline?: string;
+}
+
+export const SETTING_RULES = `Where the note sits in the student's outline may be given:
+- OUTLINE PATH: the Rems above the note, outermost first, up to its document. Background \
+only, to tell what the note is about (a question under "Tug assistance in ice" is about ice \
+even when it does not say so); never a claim to check or a question to answer.
+- CONTEXT: the topic the note is a descriptor of (e.g. "Rebocadores com tubulão" above \
+"Não pode rebocar em que método?"). The note means nothing without it: read the note as \
+being about that topic.`;
+
+/** The OUTLINE PATH and CONTEXT lines of a prompt, outermost first; none when not given. */
+export function settingLines(s: NoteSetting | undefined): string[] {
+  const out: string[] = [];
+  if (s?.outline?.trim()) out.push('OUTLINE PATH:', s.outline.trim(), '');
+  if (s?.context?.trim()) out.push('CONTEXT:', s.context.trim(), '');
+  return out;
+}
+
 const SYSTEM = `You check a statement from a student's study notes against passages from the \
 bibliography of a maritime pilotage exam (shiphandling, hydrodynamics, IMO rules, Brazilian \
 maritime law; English and Portuguese). Each passage is given in full.
@@ -78,6 +105,8 @@ term), and where the sources diverge from each other. Name the source as given i
 (e.g. "PIANC 121, p. 30"). No preamble, no restating the verdict word.
 - "quotes": the evidence for the verdict, most important first: one quote per passage the \
 verdict rests on, showing exactly what supports or contradicts the statement.
+
+${SETTING_RULES}
 
 ${QUOTE_RULES}`;
 
@@ -110,9 +139,11 @@ export async function checkStatement(
   plugin: RNPlugin,
   statement: string,
   lang: 'pt' | 'en',
-  passages: PromptPassage[]
+  passages: PromptPassage[],
+  setting?: NoteSetting
 ): Promise<StatementCheck> {
-  const lines = [`LANGUAGE: ${lang === 'pt' ? 'Brazilian Portuguese' : 'English'}`, '', 'STATEMENT:', statement.trim(), '', 'PASSAGES:'];
+  const lines = [`LANGUAGE: ${lang === 'pt' ? 'Brazilian Portuguese' : 'English'}`, '', ...settingLines(setting)];
+  lines.push('STATEMENT:', statement.trim(), '', 'PASSAGES:');
   passages.forEach((p, k) => lines.push(...passageLines(p, k)));
   const res = await helperPost<{ data?: any; model?: string }>(
     plugin,

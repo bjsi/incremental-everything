@@ -163,6 +163,25 @@ describe('buildReadAloudScript', () => {
     assert.equal(out.stats.skipped.audio, 1);
   });
 
+  it('reads a descriptor under its concept, with the title its own', async () => {
+    const concept: Fake = { _id: 'CON', text: ['Rebocadores com tubulão'] };
+    const desc: Fake = {
+      _id: 'DSC',
+      type: 2,
+      parent: concept,
+      text: ['Não pode rebocar em que método?'],
+      backText: ['no cabo longo'],
+      children: [{ _id: 'DSC1', text: ['O navio assistido pode não reagir a tempo.'] }],
+    };
+    const out = await buildReadAloudScript(plugin, fakeRem(desc));
+    assert.equal(out.title, 'Não pode rebocar em que método?');
+    assert.deepEqual(out.source.split('\n'), [
+      '- Rebocadores com tubulão',
+      '  - Não pode rebocar em que método? ⇒ no cabo longo',
+      '    - O navio assistido pode não reagir a tempo.',
+    ]);
+  });
+
   it('reads the targets of a portal, which the bridge returns without methods', async () => {
     const targets: Fake[] = [
       { _id: 'PT1', text: ['Primeiro alvo'], children: [{ _id: 'PT1a', text: ['Filho do alvo'] }] },
