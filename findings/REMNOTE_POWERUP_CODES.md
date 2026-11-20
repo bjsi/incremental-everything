@@ -98,7 +98,7 @@ Legend: ✅ same in both · ⚠️ in both, but disagreeing · ❌ not in the SD
 | ❌ | MCAT2 | `mcat2` | — | not in the SDK |
 | ❌ | MCAT3 | `mcat3` | — | not in the SDK |
 | ❌ | SavedPrompts | `asp` | — | not in the SDK |
-| ❌ | QueueEditStatus | `qe` | Dismissed `d` | not in the SDK |
+| ❌ | QueueEditStatus | `qe` | Dismissed `d` | not in the SDK. Unrelated to the Rem *field* `qe` (QUEUE_IS_EXPANDED_RAW), which sits on many multi-line questions but marks nothing |
 | ❌ | AudioRecording | `au` | AudioFileNames `a`, AudioFileStartTimes `ast`, HasAIComputedTitle `ait`, HasTranscript `ht`, TranscriptionLanguageCode `tlc`, Theme `h`, FontFamily `ff`, FontSize `fs`, LineHeight `lh`, PDFPageAlignment `pdfpa` | not in the SDK |
 | ❌ | QuizExplanation | `qx` | — | not in the SDK |
 | ❌ | AIPracticeExam | `aipx` | LatestPracticeExamId `eid` | not in the SDK |

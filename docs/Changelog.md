@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.248 - November 19th, 2026
+
+### ✨ Improved
+
+**Local Media Bridge**: added `strip-priority`, which removes the card priority from Rems that stopped being flashcards (values first, then the tag), and `card --practice on|off`, which switches a Rem's cards off or on as `/Disable Card` does.
+
+📖 [Local Media Bridge → Rem operations](Local-Media-Bridge.md#operations)
+
 ## v1.0.247 - November 19th, 2026
 
 ### ✨ New

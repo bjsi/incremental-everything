@@ -30,6 +30,7 @@ import { restoreMislabelledAudio } from './audio_restore';
 import { isPin, pinFromSourceFinder, pinOneQuote, SourceView, sourceViews } from './pdf_source_pins';
 import { quoteCandidates } from './pdf_source_pins/quote';
 import { applyHeadingLevel, clearHeading, getHeadingLevel, HeadingLevel } from './outline_restructure';
+import { removeCardPriorityFromRems } from './card_priority/remove_scoped';
 
 export interface BridgeOpJob {
   id: string;
@@ -660,7 +661,11 @@ const TYPE_NAMES = ['default', 'concept', 'descriptor'];
 export async function runCard(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<BridgeOpResult> {
   const typeName = job.remType === undefined ? undefined : String(job.remType);
   const direction = job.direction === undefined ? undefined : (String(job.direction) as Direction);
-  if (typeName === undefined && direction === undefined) throw new OpError('Give --type and/or --direction.');
+  // RemNote's own enable flag (the Rem's `forget` field, what /Disable Card writes).
+  const enablePractice = typeof job.enablePractice === 'boolean' ? job.enablePractice : undefined;
+  if (typeName === undefined && direction === undefined && enablePractice === undefined) {
+    throw new OpError('Give --type, --direction and/or --practice.');
+  }
   if (typeName !== undefined && !(typeName in REM_TYPES)) throw new OpError(`Unknown type “${typeName}”.`);
   if (direction !== undefined && !DIRECTIONS.includes(direction)) throw new OpError(`Unknown direction “${direction}”.`);
   const { byId } = await findRems(plugin, job.remIds);
@@ -675,16 +680,22 @@ export async function runCard(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<
     try {
       if (typeName !== undefined) await rem.setType(REM_TYPES[typeName]);
       if (direction !== undefined) await rem.setPracticeDirection(direction);
+      if (enablePractice !== undefined) await rem.setEnablePractice(enablePractice);
       const after = (await plugin.rem.findOne(remId)) ?? rem;
       const nowType = TYPE_NAMES[after.type as number] ?? String(after.type);
       const nowDirection = await after.getPracticeDirection();
-      const ok = (typeName === undefined || nowType === typeName) && (direction === undefined || nowDirection === direction);
+      const nowPractice = !(after as unknown as { forget?: boolean }).forget;
+      const ok =
+        (typeName === undefined || nowType === typeName) &&
+        (direction === undefined || nowDirection === direction) &&
+        (enablePractice === undefined || nowPractice === enablePractice);
       results.push({
         remId,
         ok,
         title: await remTitle(plugin, after),
         type: nowType,
         direction: nowDirection,
+        ...(enablePractice !== undefined ? { enablePractice: nowPractice } : {}),
         ...(ok ? {} : { error: 'RemNote did not keep the change' }),
       });
     } catch (err) {
@@ -692,7 +703,13 @@ export async function runCard(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<
     }
   }
   const done = results.filter((r) => r.ok).length;
-  const what = [typeName, direction].filter(Boolean).join(', ');
+  const what = [
+    typeName,
+    direction,
+    enablePractice === undefined ? undefined : enablePractice ? 'practice on' : 'practice off',
+  ]
+    .filter(Boolean)
+    .join(', ');
   return {
     ok: done === job.remIds.length,
     summary: `${plural(done, 'rem')} set to ${what}` + (done < job.remIds.length ? `, ${job.remIds.length - done} failed` : ''),
@@ -700,6 +717,42 @@ export async function runCard(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<
   };
 }
 
+
+// --- strip-priority ----------------------------------------------------------
+
+/**
+ * Strip the CardPriority tag from rems through the plugin's own scoped removal:
+ * slot values first (priority, hidden priorityValue, source, lastUpdated, the
+ * priority history), then the powerup, then the band tag, then the cache entry.
+ * For rems that stopped being flashcards. The captured rows come back so the
+ * caller can keep them for an undo.
+ */
+export async function runStripPriority(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<BridgeOpResult> {
+  const { byId } = await findRems(plugin, job.remIds);
+  const targets = [];
+  const results: Array<{ remId: string; ok: boolean; error?: string; skipped?: string }> = [];
+  for (const remId of job.remIds) {
+    const rem = byId.get(remId);
+    if (!rem) results.push({ remId, ok: false, error: 'rem not found' });
+    else if (!(await rem.hasPowerup('cardPriority'))) results.push({ remId, ok: true, skipped: 'no CardPriority tag' });
+    else targets.push({ remId, text: await remTitle(plugin, rem) });
+  }
+  const outcome = await removeCardPriorityFromRems(plugin, targets, 'media bridge strip-priority');
+  const failed = new Map(outcome.failed.map((f) => [f.remId, f.error]));
+  for (const { remId } of targets) {
+    const rem = await plugin.rem.findOne(remId);
+    const still = rem ? await rem.hasPowerup('cardPriority') : false;
+    const error = failed.get(remId) ?? (still ? 'still tagged after removal' : undefined);
+    results.push({ remId, ok: !error, ...(error ? { error } : {}) });
+  }
+  const done = results.filter((r) => r.ok).length;
+  return {
+    ok: done === job.remIds.length,
+    summary: `CardPriority removed from ${plural(outcome.removed, 'rem')}` + (done < job.remIds.length ? `, ${job.remIds.length - done} failed` : ''),
+    results,
+    removedRows: outcome.removal.rows,
+  };
+}
 
 // --- portal ------------------------------------------------------------------
 
@@ -1145,6 +1198,7 @@ const OPS: Record<string, (plugin: ReactRNPlugin, job: BridgeOpJob) => Promise<B
   pin: runPin,
   'pin-quote': runPinQuote,
   card: runCard,
+  'strip-priority': runStripPriority,
   heading: runHeading,
   portal: runPortal,
   audio: runAudio,

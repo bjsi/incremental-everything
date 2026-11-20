@@ -55,11 +55,14 @@ for a while; RemNote's own search has the same delay.
   applied powerups, `ps` powerup slots (`"<code>_<slot>": {v: {v: richText, s: text},
   ",u": ms}`), `bpc` older slot cache, `rcrt` the powerup a Rem represents, `al` aliases
   (`[{aliasId, alias}]`, not Rems), `ie` not shown in the editor, `dci` disabled cloze ids,
-  `forget`, `efc`, `enableBackSR`, `ny`, `docUpdated`, and a `<field>,u` write time per field.
+  `forget`, `efc`, `enableBackSR`, `ny`, `docUpdated`, `qe` queue-expanded (display only),
+  `srcRemId`/`srcRemC` (set by an import of a RemNote export; `createdAt` is then the import
+  time), and a `<field>,u` write time per field. `value` absent or `null` = no back; `[]` is an
+  empty back that the editor still draws (see [STRAY_CARDS_AND_BACK_TEXT.md](STRAY_CARDS_AND_BACK_TEXT.md)).
 - **Card:** `rId` Rem, `c` type (`f`, `b`, or a cloze id), `n` next time, `a` active next
   time, `h` history (`date`, `score`, …), `ml` mastery level (New, Acquiring, Growing,
   Solidifying, Retaining, NotYetLearned), `l` last repetition, `t` times wrong in a row,
-  `e` created, `b` no longer generated, `ny` Learn New.
+  `e` created (kept across an import of a RemNote export), `b` no longer generated, `ny` Learn New.
 - **Rating scores in `h`** (bundle enum `QueueInteractionScore`): 0.01 TOO_EARLY (a
   skip), 0 AGAIN, 0.5 HARD, 1 GOOD, 1.5 EASY, 2 VIEWED_AS_LEECH, 3 RESET, 4 MANUAL_DATE,
   5 MANUAL_EASE. Counts in the main KB: 1 (211,677), 0.5 (20,544), 1.5 (17,500), 0 (16,511),
