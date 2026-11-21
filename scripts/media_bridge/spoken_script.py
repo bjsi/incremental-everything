@@ -16,8 +16,10 @@ subscription, no per-call charge); when it fails (usage limit, not installed, an
 error) and ANTHROPIC_API_KEY is set (same places as the TTS keys, see tts.py), the
 Anthropic API is used instead (official `anthropic` SDK; about US$0.05-0.10 a note).
 
-Config in ~/.remnote-media-bridge/tts.json (optional): "llmModel" (default
-claude-opus-5-5, for both the CLI and the API). A file
+Config in ~/.remnote-media-bridge/tts.json (optional): "llmModel", one model for both
+modes or {"adapted": ..., "summary": ...} (defaults: claude-sonnet-5-5 for adapted, a
+rewording job the format check catches; claude-opus-5-5 for summary, which has to judge
+what to keep; same model for the CLI and the API). A file
 ~/.remnote-media-bridge/read-aloud-adapted.md or read-aloud-summary.md replaces that
 mode's task instructions (the script-format rules are always added).
 
@@ -38,7 +40,9 @@ from pathlib import Path
 from typing import Callable
 
 MODES = ("adapted", "summary")
-DEFAULT_MODEL = "claude-opus-5-5"
+# Adapted only rewrites the note for the ear (and tts.check() plus a retry guard the
+# format), so Sonnet does it; Summary decides what matters, so it keeps Opus.
+DEFAULT_MODELS = {"adapted": "claude-sonnet-5-5", "summary": "claude-opus-5-5"}
 CLI_TIMEOUT_S = 300
 MAX_TOKENS = 16000
 # A summary this much over its target gets one retry asking to shorten it.
@@ -210,6 +214,13 @@ def word_count(script: str) -> int:
     return sum(len(tts.plain(i.text).split()) for i in tts.parse(script) if isinstance(i, tts.Line))
 
 
+def model_for(mode: str, configured) -> str:
+    """tts.json "llmModel": a model for both modes, or a {mode: model} object."""
+    if isinstance(configured, dict):
+        configured = configured.get(mode)
+    return configured if isinstance(configured, str) and configured.strip() else DEFAULT_MODELS[mode]
+
+
 def write(mode: str, source: str, lang: str = "pt", title: str = "",
           target_words: int | None = None, instructions: str = "",
           key_set: dict | None = None,
@@ -222,7 +233,7 @@ def write(mode: str, source: str, lang: str = "pt", title: str = "",
         raise LLMError("nothing to read")
     log = progress or (lambda _m: None)
     tts = _tts()
-    model = tts.config().get("llmModel") or DEFAULT_MODEL
+    model = model_for(mode, tts.config().get("llmModel"))
     key = (tts.keys() if key_set is None else key_set).get("ANTHROPIC_API_KEY")
     system, user = build_prompt(mode, source, lang, title, target_words, instructions)
     started = time.time()

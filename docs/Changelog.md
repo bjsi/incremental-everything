@@ -4,6 +4,12 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.250 - November 21st, 2026
 
+### ✨ Improved
+
+**Read Aloud**: **Adapted** scripts are now written by Sonnet, faster and lighter on your Claude usage; **Summary** stays on Opus, and `llmModel` in `tts.json` can set each mode's model.
+
+📖 [Read Aloud → Modes](Read-Aloud.md#modes)
+
 ### 🐛 Fixed
 
 **History Sidebars**: fixed Shift+click on an entry's text in the Flashcard, Visited Rem and Incremental Rem History opening the Rem in place instead of in a new pane, and leaving the whole sidebar's text selected.

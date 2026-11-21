@@ -32,7 +32,7 @@ In **Adapted** and **Summary**, press **Write the script with AI** (`⌘↵`), r
 
 With **Also insert the summary text under the audio** (on by default), a Summary's text is also added under its audio Rem, headed *Summary of this document, written by AI*, with one Rem per line and the foreign terms in italics.
 
-The AI step runs `claude -p` with your Claude subscription, at no per-call charge. When that fails (usage limit reached, the `claude` command not installed, any error) and an Anthropic API key is set, it runs on the API instead; the popup then shows the cost (a few cents for a note) and why `claude -p` failed. See [Setup](#setup).
+The AI step runs `claude -p` with your Claude subscription, at no per-call charge: Sonnet writes **Adapted**, which only rewords the note, and Opus writes **Summary**, which has to choose what to keep ([`llmModel`](#options) changes either). When that fails (usage limit reached, the `claude` command not installed, any error) and an Anthropic API key is set, it runs on the API instead; the popup then shows the cost (a few cents for a note) and why `claude -p` failed. See [Setup](#setup).
 
 ### Summary length { #summary-length }
 
@@ -155,7 +155,7 @@ Anything an engine would read out wrongly (markdown, LaTeX, links, page numbers,
 | `geminiModel`, `vertexModel` | `gemini-3.8-flash-tts` | The Gemini TTS model. |
 | `azureVoices` | `["en-US-AndrewMultilingualNeural"]` | The Azure voices offered. |
 | `elevenModel` | `eleven_multilingual_v2` | The ElevenLabs model. |
-| `llmModel` | `claude-opus-5-5` | The Claude model for Adapted and Summary (CLI and API). |
+| `llmModel` | `claude-sonnet-5-5` for Adapted, `claude-opus-5-5` for Summary | The Claude model (CLI and API): one model for both modes, or `{"adapted": …, "summary": …}`. |
 | `geminiUsdPerMTokens`, `elevenUsdPerMChars` | list prices | Your own prices, for the estimates. |
 | `verifySpeech` | `true` | `false` turns off the [check of Gemini's audio](#checked). |
 | `whisperCli`, `whisperModel`, `whisperVadModel` | `whisper-cli` on the PATH, the AI helper's models | The transcriber used for the check. |
