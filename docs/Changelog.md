@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.250 - November 21st, 2026
+
+### 🐛 Fixed
+
+**History Sidebars**: fixed Shift+click on an entry's text in the Flashcard, Visited Rem and Incremental Rem History opening the Rem in place instead of in a new pane, and leaving the whole sidebar's text selected.
+
+📖 [Flashcard History](History-Queue-Dashboard-and-Mastery-Drill.md#flashcard-history)
+
 ## v1.0.249 - November 20th, 2026
 
 ### ✨ Improved

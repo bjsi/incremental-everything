@@ -231,7 +231,7 @@ A distinct widget that serves as a **chronological log** of all your Incremental
 - Each entry also shows an **item-type badge** — 📄 PDF, 🖍️ PDF Extract, 📑 PDF Note, 🌐 Web, 🔖 Web Extract, ▶️ YouTube, ✂️ Video Extract, 🎬 Video or 📝 Rem — the same labels the [IncRem List & Main View](#51-increm-list-main-view) uses, so you can tell at a glance whether a line in the log was a PDF page you read or a note you extracted. It is resolved in the background for the rows on screen and appears a moment after the list does; entries whose Rem no longer exists simply have none.
 - Each entry also shows a **priority badge** (colored by KB-wide percentile) — click it to edit the IncRem's priority with an inline slider, without leaving the sidebar.
 - Searchable by text content; shows "seen X ago" (reviews), "created X ago" (creation events), or "dismissed X ago" (standalone dismissals).
-- Click an entry to open the Rem; **Shift+click** opens it in a new pane beside your current document.
+- Click an entry to open the Rem; **Shift+click** (anywhere on the entry, its text included) opens it in a new pane beside your current document. The entry text can't be selected; expand the entry to select or copy from it.
 - Useful companion to the [History and Final Drill](https://www.remnote.com/plugins/final_drill_and_history) plugin.
 
 ![Incremental Rem History Widget showing Created and Reviewed badges](assets/incremental-history-created.png){ width="400" }
