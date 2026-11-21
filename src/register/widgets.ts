@@ -92,6 +92,20 @@ const SIDEBAR_END_PADDING_CSS = `
   }
 `;
 
+// The Rem text in the history sidebars (Flashcard/Rem/Incremental History) is a
+// <RemViewer>, which RemNote draws in its own page over our iframe. A Shift+click there
+// (open in a new pane) also extends the host's text selection over the whole sidebar,
+// and clicks in the widget can't clear it. The rows are links, not text to copy, so
+// make them unselectable. Only the RemViewer rows carry this class; the expanded
+// RemHierarchyEditorTree stays selectable.
+const HISTORY_ROW_NO_SELECT_CSS = `
+  .ie-history-row-text,
+  .ie-history-row-text * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+`;
+
 // A floating widget's wrapper is z-50, but the reader's Notes (z 12), Explain (z 20)
 // and every default popup (z 30) sit below it, in #controlled-popup-portal. While the
 // Source float is open, lift that whole portal: popups keep their order among themselves.
@@ -300,6 +314,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   await plugin.app.registerCSS('queue-below-top-bar', QUEUE_BELOW_TOP_BAR_CSS);
   await plugin.app.registerCSS('queue-toolbar-frame', TOOLBAR_FRAME_CSS);
   await plugin.app.registerCSS('sidebar-end-padding', SIDEBAR_END_PADDING_CSS);
+  await plugin.app.registerCSS('history-row-no-select', HISTORY_ROW_NO_SELECT_CSS);
   await plugin.app.registerCSS('editor-review-timer-sticky', EDITOR_REVIEW_TIMER_STICKY_CSS);
 
   // The Priority Queue popup: status, refresh/drain/refill/practise for the
