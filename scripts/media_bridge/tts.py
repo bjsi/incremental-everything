@@ -167,6 +167,38 @@ def respell(lang: str, text: str) -> str:
 
 
 INLINE = re.compile(r"<(pt|en)>(.*?)</\1>", re.S)
+
+# Portuguese phrases an English line says in English instead of reading them in a
+# Portuguese voice. The PSCPP index labels a passage the exam does not ask for "fora do
+# edital"; in English that is "out of the exam syllabus" (user's wording, 2026-11-21).
+# Applied when the script is parsed, so the engine choice, the estimate and the audio all
+# see the English. Bare text and a <pt> mark holding exactly the phrase change; a longer
+# <pt> term that merely contains it stays as written. Portuguese lines are untouched.
+IN_ENGLISH = {"fora do edital": "out of the exam syllabus"}
+
+
+def _phrase(pt: str) -> str:
+    return re.sub(r"\s+", " ", pt.strip()).lower()
+
+
+def english_phrases(text: str) -> str:
+    """An English line with the IN_ENGLISH phrases said in English (see IN_ENGLISH)."""
+    table = {_phrase(pt): en for pt, en in IN_ENGLISH.items()}
+
+    def bare(s: str) -> str:
+        for pt, en in table.items():
+            words = r"\s+".join(map(re.escape, pt.split()))
+            s = re.sub(rf"(?<!\w){words}(?!\w)", en, s, flags=re.I)
+        return s
+
+    out, pos = [], 0
+    for m in INLINE.finditer(text):
+        out.append(bare(text[pos:m.start()]))
+        said = table.get(_phrase(m.group(2))) if m.group(1) == "pt" else None
+        out.append(said or m.group(0))
+        pos = m.end()
+    out.append(bare(text[pos:]))
+    return "".join(out)
 LANG_PREFIX = re.compile(r"^\[(pt|en)\]\s*")
 PAUSE = re.compile(r"^\[(?:pause|pausa)(?:\s+(\d+(?:[.,]\d+)?))?\]$", re.I)
 
@@ -277,7 +309,8 @@ def parse(script: str) -> list[Line | Pause]:
             items.append(Pause(round(sec, 1)))
             continue
         m = LANG_PREFIX.match(line)
-        items.append(Line(m.group(1) if m else "en", line[m.end():] if m else line))
+        lang, text = (m.group(1), line[m.end():]) if m else ("en", line)
+        items.append(Line(lang, english_phrases(text) if lang == "en" else text))
     return items
 
 

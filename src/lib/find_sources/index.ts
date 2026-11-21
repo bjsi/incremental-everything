@@ -194,9 +194,10 @@ export const excerptsOf = (p: FoundPassage): string[] => (p.excerpts?.length ? p
 
 /**
  * A quote Rem's text, in the skills' format: ⚠️ for a diverging passage, “quote” with its
- * emphasis (bold; the key word bold italic), then (cite, §x.y, PDF p. N; fora do edital).
+ * emphasis (bold; the key word bold italic), then (cite, §x.y, PDF p. N; fora do edital),
+ * the last part in the note's language.
  */
-export function quoteRichText(p: ReviewPassage): RichElement[] {
+export function quoteRichText(p: ReviewPassage, lang: 'pt' | 'en'): RichElement[] {
   const text: RichElement[] = [
     `${p.role === 'diverges' || p.diverges ? '\u26a0\ufe0f ' : ''}\u201c`,
     ...segmentsToRichText(emphasisSegments(p.quote, p.emphasis, p.key)),
@@ -205,6 +206,7 @@ export function quoteRichText(p: ReviewPassage): RichElement[] {
       sectionNumber: p.sectionNumber,
       page: p.pdfPage ?? p.page,
       edital: p.edital,
+      lang,
     })}`,
   ];
   // Adjacent plain strings merged: RemNote stores them as one.
@@ -863,7 +865,8 @@ async function addQuoteRem(
   header: PluginRem,
   passage: ReviewPassage,
   pins: string[],
-  note: boolean
+  note: boolean,
+  lang: 'pt' | 'en'
 ): Promise<{ quote: boolean; note: boolean }> {
   let quoteRem: PluginRem | undefined;
   for (const child of await header.getChildrenRem()) {
@@ -875,7 +878,7 @@ async function addQuoteRem(
     quoteRem = await plugin.rem.createRem();
     if (!quoteRem) return added;
     await quoteRem.setText([
-      ...quoteRichText(passage),
+      ...quoteRichText(passage, lang),
       ...pins.flatMap((id) => [' ', { i: 'q' as const, _id: id, pin: true }]),
     ] as RichTextInterface);
     await appendAsLastChild(plugin, quoteRem, header._id);
@@ -1006,7 +1009,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
           underCheck = new Set(entry.passages.filter((p) => p.basis));
           for (const { passage, pins } of pinned.filter((p) => underCheck.has(p.passage))) {
             // The observation explains the verdict: no AI notes under its quotes.
-            const added = await addQuoteRem(plugin, parentOfQuotes, passage, pins, false);
+            const added = await addQuoteRem(plugin, parentOfQuotes, passage, pins, false, entry.lang);
             if (added.quote) quoteCount++;
             if (added.note) noteCount++;
           }
@@ -1028,7 +1031,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
         if (!header) continue;
         for (const { passage, pins } of items) {
           // AI notes only in Find Sources: a check's observation already explains.
-          const added = await addQuoteRem(plugin, header, passage, pins, write.extras === 'notes' && !entry.check);
+          const added = await addQuoteRem(plugin, header, passage, pins, write.extras === 'notes' && !entry.check, entry.lang);
           if (added.quote) quoteCount++;
           if (added.note) noteCount++;
         }
@@ -1133,7 +1136,7 @@ async function writeAnswer(
       if (written.has(id)) continue;
       written.add(id);
       // The answer explains each quote already: no AI notes under them.
-      const added = await addQuoteRem(plugin, r, p.passage, p.pins, false);
+      const added = await addQuoteRem(plugin, r, p.passage, p.pins, false, lang);
       if (added.quote) counts.quotes++;
       if (added.note) counts.notes++;
       counts.pins += p.pins.length;
@@ -1159,7 +1162,7 @@ async function writeAnswer(
           counts.pins += p.pins.length;
           continue;
         }
-        const added = await addQuoteRem(plugin, others, p.passage, p.pins, false);
+        const added = await addQuoteRem(plugin, others, p.passage, p.pins, false, lang);
         if (added.quote) counts.quotes++;
         if (added.note) counts.notes++;
         counts.pins += p.pins.length;

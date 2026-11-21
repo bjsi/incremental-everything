@@ -85,7 +85,7 @@ Gemini and ElevenLabs speak one language per call: a marked foreign term is read
 
 ### Gemini + Azure (mixed) { #mixed }
 
-A long note often has only a few English lines with Portuguese words in them: a *Parallels in the bibliography* section naming *A manobrabilidade do navio no século 21*, a term like *fora do edital*. Gemini would read those words in Spanish or English, and Azure would read the whole note in its own voice. **Gemini + Azure** splits the script line by line:
+A long note often has only a few English lines with Portuguese words in them: a *Parallels in the bibliography* section naming *A manobrabilidade do navio no século 21*, a term like *calado aéreo*. Gemini would read those words in Spanish or English, and Azure would read the whole note in its own voice. **Gemini + Azure** splits the script line by line:
 
 - an English line with a Portuguese term marked in it goes to **Azure**, which switches language mid-sentence;
 - every other line, Portuguese quotes and English lines alike, goes to **Gemini** (on Google Cloud when its key is set), in the voice you pick.
@@ -127,6 +127,7 @@ Without whisper, only the length of each call is checked. A redone call is paid 
 | A descriptor you start on | Its concept first (front only), then any descriptors in between, then the Rem and its children, as [Add pronunciation](#pronunciation-descriptors) reads one. The audio is still named after the Rem. |
 | Bold, italic, links, page numbers, emoji, arrows | Formatting dropped; `p. 12` is read “page 12”, `kN` “kilonewtons” (and the Portuguese equivalents). |
 | Italic words in the other language | Marked as foreign terms (for example `<en>fairway</en>` in a Portuguese line), so Azure pronounces them in their own language. Acronyms are never marked. |
+| *fora do edital* in an English line (a passage the exam does not ask for) | Said in English, *out of the exam syllabus*, in the line's own voice; a Portuguese line keeps *fora do edital*. The helper makes the swap even in a script you edited by hand. |
 
 ### The script format { #script-format }
 

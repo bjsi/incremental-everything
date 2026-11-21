@@ -79,6 +79,8 @@ The script is plain text for a text-to-speech engine, one idea per line:
 Portuguese line) or <pt>…</pt> (a Portuguese term in an English line). Mark only terms \
 written in the other language (the outline usually has them in *italics*); never names, \
 acronyms or units.
+- "fora do edital" (a passage the exam does not ask for) is said "out of the exam \
+syllabus" in an English line, unmarked; a Portuguese line keeps "fora do edital".
 - Nothing that would be read aloud wrongly: no markdown (no **, #, list dashes, "> "), \
 no LaTeX or $, no links, no page numbers, no square brackets except [pt], [en] and \
 [pause], no emoji or arrows, no "[…]".

@@ -6,13 +6,17 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ Improved
 
-**Read Aloud**: added the **Gemini + Azure** engine, now suggested instead of Azure, which gives Azure only the English lines with Portuguese terms and keeps the rest in the Gemini voice; **Adapted** scripts are now written by Sonnet (**Summary** stays on Opus) and can say formulas too long to follow by ear by what they compute.
+**Read Aloud**: added the **Gemini + Azure** engine, now suggested instead of Azure, which gives Azure only the English lines with Portuguese terms and keeps the rest in the Gemini voice; **Adapted** scripts are now written by Sonnet (**Summary** stays on Opus) and can say formulas too long to follow by ear by what they compute; *fora do edital* in an English line is now said *out of the exam syllabus*.
 
-📖 [Read Aloud → Gemini + Azure](Read-Aloud.md#mixed) · [Long formulas](Read-Aloud.md#long-formulas)
+📖 [Read Aloud → Gemini + Azure](Read-Aloud.md#mixed) · [Long formulas](Read-Aloud.md#long-formulas) · [Reading rules](Read-Aloud.md#reading-rules)
 
 **Repetition History**: each review row of a Rem-type IncRem now records the read point the session ended on, shown under the row like a PDF bookmark (`Read point: “…”`).
 
 📖 [Repetition History → Notes and where you stopped](Repetition-History-and-Statistics.md#notes-and-where-you-stopped)
+
+**Find Sources**: in an English note, a quote from a passage the exam does not ask for now ends its attribution with *out of the exam syllabus* instead of *fora do edital*, in Find Sources, Check Statement and Ask Your Sources and in the review.
+
+📖 [Source Pins → What gets written](Source-Pins.md#find-sources-written)
 
 ### 🐛 Fixed
 

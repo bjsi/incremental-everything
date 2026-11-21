@@ -126,7 +126,7 @@ Each row shows the book, the page in your RemNote PDF, the quote with the words 
             • Métodos probabilísticos dão dimensões ótimas e economias…   (AI Note)
 ```
 
-- **Quotes** keep only the words that bear on your note: the rest of the passage is cut with `[…]`, and each part gets its own pin, so the pin opens the whole context. The words the point turns on are in **bold**, the one word or figure it hinges on in ***bold italics***. The attribution reads `(book, §section, PDF p. N)`, with `; fora do edital` for a passage the exam does not ask for.
+- **Quotes** keep only the words that bear on your note: the rest of the passage is cut with `[…]`, and each part gets its own pin, so the pin opens the whole context. The words the point turns on are in **bold**, the one word or figure it hinges on in ***bold italics***. The attribution reads `(book, §section, PDF p. N)`, with `; fora do edital` for a passage the exam does not ask for (`; out of the exam syllabus` when the note is in English; the review shows the same label).
 - **Where the pins go:** at the end of the Rem (of its back, when it has one). When the Rem mixes what several passages say, each pin goes right after the sentence it supports, as long as that sentence can be found with certainty; any other goes at the end.
 - **Running it again** reuses the highlights, the headers and the quote Rems already there, and adds nothing twice.
 

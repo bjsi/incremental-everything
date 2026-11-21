@@ -113,7 +113,7 @@ Answer, sources first:
 - `covers`: the part of the Rem's own text this passage supports, copied from it; empty when it supports all of it. Drives where the pin goes.
 - `role`: `source` (says what the Rem says), `related` (same point, adds or explains) or `diverges` (contradicts it). `score`: 0–10.
 - `why`: one line, in the Rem's language, on what the passage says. Written under the quote as an AI Note when the user asks for it.
-- `page`: a page in your copy of the book; the plugin searches its RemNote PDF from there. `sectionNumber` and `edital` (anything but `sim` reads *fora do edital*) go into the attribution.
+- `page`: a page in your copy of the book; the plugin searches its RemNote PDF from there. `sectionNumber` and `edital` (anything but `sim` reads *fora do edital*, or *out of the exam syllabus* in an English note) go into the attribution.
 - `context` (optional): the whole passage the quote was cut from, a few thousand characters at most. Never quoted as is: Check Statement and Ask Your Sources give it to Claude, which picks its own excerpts from it (checked against it before use).
 - Each excerpt should make sense on its own: when it says "these values" or "it", keep the words it points back to.
 
