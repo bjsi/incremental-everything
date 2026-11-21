@@ -6,9 +6,9 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ Improved
 
-**Read Aloud**: **Adapted** scripts are now written by Sonnet, faster and lighter on your Claude usage; **Summary** stays on Opus, and `llmModel` in `tts.json` can set each mode's model.
+**Read Aloud**: **Adapted** scripts are now written by Sonnet, faster and lighter on your Claude usage (**Summary** stays on Opus), and can say formulas too long to follow by ear by what they compute (**Simplify formulas too long to follow by ear**).
 
-📖 [Read Aloud → Modes](Read-Aloud.md#modes)
+📖 [Read Aloud → Long formulas](Read-Aloud.md#long-formulas)
 
 ### 🐛 Fixed
 

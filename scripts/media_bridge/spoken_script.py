@@ -4,7 +4,9 @@
 Two modes, both starting from the outline the plugin builds from the rem tree (same
 rems and skips as the Literal script, but formulas kept as LaTeX, italics as *x*):
   - adapted: the whole note, content unchanged, made listenable (formulas and units in
-    words, foreign terms marked, abbreviations expanded);
+    words, foreign terms marked, abbreviations expanded); with simplify_long_formulas (the
+    popup's checkbox), a formula too long to follow by ear is said by what it computes and
+    depends on instead of symbol by symbol;
   - summary: a spoken summary of about a target number of words (the plugin sets it: a
     share of the note's length, capped by a maximum duration), plus the user's
     additional instructions. A summary more than 25 % over the target gets one retry
@@ -108,6 +110,22 @@ not in the note.""",
 }
 
 
+# Added to the Adapted task when the popup's "long formulas" checkbox is on.
+LONG_FORMULAS = """\
+Long formulas are the one exception to keeping everything word for word. A listener \
+cannot follow a formula with an integral, a sum, nested fractions or more than about a \
+dozen symbols, so never read such a formula aloud, not even partly: no integral limits, \
+no "dx", no "divided by" inside "divided by". Say instead, in one or two short \
+sentences, what it computes, what it is proportional to and which quantities it depends \
+on, and keep any definition of a new symbol it introduces; add no interpretation the \
+note does not give (no ranges, limits or trends worked out from it). Example: for \
+$N(t) \\propto \\int_{-L/2}^{L/2} x \\sin(kx\\cos\\chi - \\omega_e t)\\,dx = \
+\\frac{L^2}{2}\\,\\frac{\\sin a - a\\cos a}{a^2}\\cos(\\omega_e t)$, say "O momento de \
+guinada, somando a força ao longo do casco, sai proporcional a L ao quadrado, vezes uma \
+função de a, vezes o cosseno de ômega índice e vezes t." Short formulas (F = m a, \
+k = 2 pi over L sub w) are still read in full."""
+
+
 def task_text(mode: str) -> str:
     custom = _tts().BRIDGE_HOME / f"read-aloud-{mode}.md"
     try:
@@ -117,13 +135,16 @@ def task_text(mode: str) -> str:
 
 
 def build_prompt(mode: str, source: str, lang: str, title: str,
-                 target_words: int | None = None, instructions: str = "") -> tuple[str, str]:
+                 target_words: int | None = None, instructions: str = "",
+                 simplify_long_formulas: bool = False) -> tuple[str, str]:
     """(system, user) for one run."""
     language = LANG_NAME.get(lang, "the note's language")
     system = (f"You write scripts that are turned into speech.\n\n{SCRIPT_RULES}\n\n"
               f"Write in {language}, the note's language; a line the note writes in the other "
               "language keeps that language and its prefix.")
     parts = [task_text(mode)]
+    if mode == "adapted" and simplify_long_formulas:
+        parts.append(LONG_FORMULAS)
     if mode == "summary" and target_words:
         parts.append(f"Length: about {target_words} words, never more. Any questions and answers "
                      "asked for below count within it. Leave out the less important details to "
@@ -223,7 +244,7 @@ def model_for(mode: str, configured) -> str:
 
 def write(mode: str, source: str, lang: str = "pt", title: str = "",
           target_words: int | None = None, instructions: str = "",
-          key_set: dict | None = None,
+          key_set: dict | None = None, simplify_long_formulas: bool = False,
           progress: Callable[[str], None] | None = None) -> dict:
     """Outline -> {script, errors, via, model, costUsd, fallbackReason?, seconds}.
     Raises LLMError when neither the CLI nor the API answered."""
@@ -235,7 +256,8 @@ def write(mode: str, source: str, lang: str = "pt", title: str = "",
     tts = _tts()
     model = model_for(mode, tts.config().get("llmModel"))
     key = (tts.keys() if key_set is None else key_set).get("ANTHROPIC_API_KEY")
-    system, user = build_prompt(mode, source, lang, title, target_words, instructions)
+    system, user = build_prompt(mode, source, lang, title, target_words, instructions,
+                                simplify_long_formulas)
     started = time.time()
     cost, fallback = 0.0, None
 
@@ -296,15 +318,19 @@ def main() -> None:
     ap.add_argument("--lang", choices=["pt", "en"], default="pt")
     ap.add_argument("--words", type=int, help="summary target in words")
     ap.add_argument("--instructions", default="")
+    ap.add_argument("--simplify-long-formulas", action="store_true",
+                    help="adapted: say long formulas by what they compute, not symbol by symbol")
     ap.add_argument("--prompt", action="store_true", help="print the prompt; no call")
     a = ap.parse_args()
     source = a.outline.read_text(encoding="utf-8")
     if a.prompt:
-        system, user = build_prompt(a.mode, source, a.lang, "", a.words, a.instructions)
+        system, user = build_prompt(a.mode, source, a.lang, "", a.words, a.instructions,
+                                    a.simplify_long_formulas)
         print(system, "\n\n---\n\n", user)
         return
     try:
         res = write(a.mode, source, a.lang, "", a.words, a.instructions,
+                    simplify_long_formulas=a.simplify_long_formulas,
                     progress=lambda m: print(f"  {m}", file=sys.stderr, flush=True))
     except LLMError as e:
         raise SystemExit(str(e))

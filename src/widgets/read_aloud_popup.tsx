@@ -153,6 +153,7 @@ export function ReadAloudPopup() {
   const [share, setShare] = useState(DEFAULT_SHARE);
   const [instructions, setInstructions] = useState('');
   const [insertText, setInsertText] = useState(true);
+  const [simplifyLongFormulas, setSimplifyLongFormulas] = useState(false);
   const [engine, setEngine] = useState('auto');
   const [voice, setVoice] = useState('');
   const [plan, setPlan] = useState<TtsPlan | null>(null);
@@ -183,6 +184,7 @@ export function ReadAloudPopup() {
         if (draft.share) setShare(draft.share);
         if (draft.instructions) setInstructions(draft.instructions);
         if (draft.insertText !== undefined) setInsertText(draft.insertText);
+        if (draft.simplifyLongFormulas) setSimplifyLongFormulas(true);
         if (draft.mode && (draft.mode === 'literal' || draft[draft.mode])) setMode(draft.mode);
       }
       setRestored(true);
@@ -208,13 +210,25 @@ export function ReadAloudPopup() {
         share,
         instructions,
         insertText,
+        ...(simplifyLongFormulas ? { simplifyLongFormulas } : {}),
       };
       const worthKeeping =
         literalEdited || !!scripts.adapted || !!scripts.summary || !!instructions.trim();
       saveDraft(plugin, context.remId, worthKeeping ? draft : undefined).catch(() => {});
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [restored, context, scripts, written, maxMinutes, share, instructions, insertText, mode]);
+  }, [
+    restored,
+    context,
+    scripts,
+    written,
+    maxMinutes,
+    share,
+    instructions,
+    insertText,
+    simplifyLongFormulas,
+    mode,
+  ]);
 
   // Summary length: a share of the note (its Literal script), capped by the maximum length.
   const literalWords = scriptWords(scripts.literal);
@@ -256,7 +270,8 @@ export function ReadAloudPopup() {
         context,
         target,
         target === 'summary' ? targetWords : null,
-        target === 'summary' ? instructions : ''
+        target === 'summary' ? instructions : '',
+        target === 'adapted' && simplifyLongFormulas
       );
       for (;;) {
         await sleep(POLL_MS);
@@ -444,6 +459,22 @@ export function ReadAloudPopup() {
             style={{ ...fieldStyle, resize: 'none' }}
           />
         </div>
+      )}
+
+      {mode === 'adapted' && (
+        <label className="flex items-center gap-1 text-xs" style={{ flexShrink: 0 }}>
+          <input
+            type="checkbox"
+            checked={simplifyLongFormulas}
+            onChange={(e) => setSimplifyLongFormulas(e.target.checked)}
+            disabled={busy}
+          />
+          Simplify formulas too long to follow by ear
+          <span style={muted}>
+            : say what they compute and depend on, not every symbol (short ones are still read in
+            full)
+          </span>
+        </label>
       )}
 
       {mode !== 'literal' && (

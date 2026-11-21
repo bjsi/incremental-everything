@@ -30,6 +30,10 @@ An audio Rem and everything under it is never read again, so running Read aloud 
 
 In **Adapted** and **Summary**, press **Write the script with AI** (`⌘↵`), read the result, edit it if you like, then **Generate**. Formulas are read the way a teacher reads them: subscripts as “V sub A” in English and “V índice A” in Portuguese.
 
+### Long formulas { #long-formulas }
+
+Adapted reads every formula in full. Tick **Simplify formulas too long to follow by ear** (Adapted only) and a formula with an integral, a sum, nested fractions or more than about a dozen symbols is said by what it computes and depends on instead: *the yaw moment comes out proportional to L squared, times a function of a, times the cosine of omega sub e t*, rather than every limit, `dx` and fraction. Short formulas (*F = m a*) are still read in full, and nothing is added that the note does not say. The checkbox is kept with the note's draft, and it needs the media-bridge helper at version 20 or later.
+
 With **Also insert the summary text under the audio** (on by default), a Summary's text is also added under its audio Rem, headed *Summary of this document, written by AI*, with one Rem per line and the foreign terms in italics.
 
 The AI step runs `claude -p` with your Claude subscription, at no per-call charge: Sonnet writes **Adapted**, which only rewords the note, and Opus writes **Summary**, which has to choose what to keep ([`llmModel`](#options) changes either). When that fails (usage limit reached, the `claude` command not installed, any error) and an Anthropic API key is set, it runs on the API instead; the popup then shows the cost (a few cents for a note) and why `claude -p` failed. See [Setup](#setup).

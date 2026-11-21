@@ -66,7 +66,7 @@ Endpoints (127.0.0.1:3460, CORS open, for the plugin iframe):
   POST /tts {script, engine?, voice?, remId?, subject?, purpose?} → {taskId}; purpose
                                "pronunciation" keeps the copy in tts.py's pronunciationHome   (plugin → helper: the
                                "Read aloud" command; runs tts.py: Gemini or Azure TTS, mp3)
-  POST /tts/write {mode: adapted|summary, source, lang, title?, targetWords?, instructions?}
+  POST /tts/write {mode: adapted|summary, source, lang, title?, targetWords?, instructions?, simplifyLongFormulas?}
                                → {taskId}: an LLM writes the spoken script from the plugin's
                                outline (spoken_script.py: `claude -p`, Anthropic API fallback);
                                result {script, errors, via, model, costUsd, fallbackReason?}
@@ -106,7 +106,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 19  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal, 18: ask + /answers, outline, 19: strip-priority, card --practice
+VERSION = 20  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal, 18: ask + /answers, outline, 19: strip-priority, card --practice, 20: /tts/write simplifyLongFormulas
 # The jobs a plugin build understands, by the protocol version it polls with.
 OPS_BY_PLUGIN_VERSION = {
     1: {"localize"},
@@ -396,6 +396,7 @@ class Handler(BaseHTTPRequestHandler):
                 "source": source, "lang": body.get("lang") if body.get("lang") in ("pt", "en") else "en",
                 "title": str(body.get("title") or ""), "targetWords": target,
                 "instructions": str(body.get("instructions") or ""),
+                "simplifyLongFormulas": body.get("simplifyLongFormulas") is True,
                 "status": "running", "stage": "starting", "result": None, "createdAt": time.time(),
             }
             _tts_tasks[task["id"]] = task
@@ -558,6 +559,7 @@ def _run_write(task: dict) -> None:
         spoken = _spoken_module()
         res = spoken.write(task["mode"], task["source"], task["lang"], task["title"],
                            task["targetWords"], task["instructions"],
+                           simplify_long_formulas=task["simplifyLongFormulas"],
                            progress=lambda msg: task.__setitem__("stage", msg))
         task["result"] = {"ok": True, **res}
     except Exception as err:  # reported to the plugin, which shows it
