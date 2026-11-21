@@ -129,6 +129,7 @@ function formatRepContext(ctx: NonNullable<IncrementalRep['context']>): string {
     if (video) parts.push(video);
     if (ctx.pdfName) parts.push(ctx.pdfName);
     if (ctx.bookmark) parts.push(`🔖 “${ctx.bookmark}”`);
+    if (ctx.readPoint) parts.push(`Read point: “${ctx.readPoint}”`);
     // Imported-from-flashcard provenance (eventType 'importedRep').
     if (ctx.flashcardName || ctx.flashcardScore !== undefined) {
         const label = scoreLabel(ctx.flashcardScore);

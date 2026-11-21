@@ -208,6 +208,13 @@ export const IncrementalRep = z.object({
       /** Text of the last bookmark/highlight rem from this session, if any. */
       bookmark: z.string().optional(),
       /**
+       * Read point of a rem-type IncRem (a bookmarked descendant in its own
+       * outline, see lib/remReadPoint.ts) at the time of this entry: its text,
+       * and its id so the row can lead back to it.
+       */
+      readPoint: z.string().optional(),
+      readPointRemId: z.string().optional(),
+      /**
        * Playback position in seconds, where the video was left (any video
        * IncRem: RemNote video, local video, YouTube link, Video Extract). For an
        * extract it is a time in the whole video, between videoStart and videoEnd.

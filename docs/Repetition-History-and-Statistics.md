@@ -19,6 +19,7 @@ Gives you detailed insights into your review history for any specific Incrementa
 A row can have a line under it with the **📝 note** you typed during that review, and where the review left its source:
 
 - **PDF or web page:** the page, the page range, the PDF's name and the last bookmark (`p.57 of 40–80 · Deep Learning.pdf · 🔖 “…”`).
+- **Rem-type IncRem (an outline):** the [read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) the review ended on (`Read point: “…”`), so a read point moved during the session shows where you stopped. A Rem with both a PDF and a read point shows both. Recorded from v1.0.250; older rows have none.
 - **Video:** the time the video was left at, with the extract's range or the video's length, and the speed (`▶ 1:42 of 1:26–2:04 · 1.5×`). See [Incremental Video](Incremental-Video.md#history).
 
 Since each row keeps its own position, the history shows how far every session got.

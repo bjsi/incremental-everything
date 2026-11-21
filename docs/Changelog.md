@@ -10,6 +10,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Read Aloud → Gemini + Azure](Read-Aloud.md#mixed) · [Long formulas](Read-Aloud.md#long-formulas)
 
+**Repetition History**: each review row of a Rem-type IncRem now records the read point the session ended on, shown under the row like a PDF bookmark (`Read point: “…”`).
+
+📖 [Repetition History → Notes and where you stopped](Repetition-History-and-Statistics.md#notes-and-where-you-stopped)
+
 ### 🐛 Fixed
 
 **History Sidebars**: fixed Shift+click on an entry's text in the Flashcard, Visited Rem and Incremental Rem History opening the Rem in place instead of in a new pane, and leaving the whole sidebar's text selected.
