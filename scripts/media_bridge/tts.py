@@ -26,6 +26,11 @@ Engines, chosen by ear on notes that mix English and Portuguese:
     the Gemini API's; preferred over the Gemini API when both keys are set. One call per
     language block with its languageCode, as with Gemini (without one, a short
     Portuguese line came out European Portuguese).
+  - Mixed (Gemini + Azure): each line goes to the engine that reads it best. An English
+    line with Portuguese terms marked in it (at least `mixedAzureTerms` in tts.json,
+    default 1) goes to Azure, every other line to Gemini (on Google Cloud when its key is
+    set, else the Gemini API), so the listener hears two voices. "auto" suggests it
+    instead of Azure when both keys are set: most of the note keeps the Gemini voice.
 Only engines whose keys are set are offered; "auto" suggests one of them, and any
 available engine may be picked instead. The script keeps its marks either way: Azure
 switches language on them, Gemini drops them and reads the term in the line's language.
@@ -86,7 +91,8 @@ GEMINI_VOICES = ["Kore", "Sadaltager", "Charon", "Fenrir", "Leda", "Orus", "Aoed
 AZURE_VOICE = "en-US-AndrewMultilingualNeural"
 LOCALE = {"en": "en-US", "pt": "pt-BR"}
 
-INLINE_LIMIT = 3          # <pt> terms in English lines from which "auto" picks Azure
+INLINE_LIMIT = 3          # <pt> terms in English lines from which "auto" picks Mixed (or Azure)
+MIXED_AZURE_TERMS = 1     # Mixed: <pt> terms an English line needs to go to Azure
 MAX_CALL_CHARS = 1500     # characters per API call (~2 min of speech): Azure, ElevenLabs
 # Gemini TTS is a generative model: on long calls it sometimes keeps talking past the
 # text (invented sentences), loops on a phrase or skips words (found 2026-11-16 on a
@@ -124,7 +130,7 @@ ATTEMPTS = 6
 # silence the helper adds, not billed): US$9 per million tokens through 2026-12-31,
 # US$18 from 2027-01-01 (ai.google.dev/gemini-api/docs/pricing; the 3.1 preview was
 # US$20). "geminiUsdPerMTokens" in tts.json overrides the schedule.
-WORDS_PER_MIN = {"vertex": 143.0, "gemini": 143.0, "azure": 126.0, "elevenlabs": 150.0}
+WORDS_PER_MIN = {"vertex": 143.0, "gemini": 143.0, "azure": 126.0, "elevenlabs": 150.0}  # mixed: per call
 AZURE_LINE_BREAK_S = 0.75  # the <break/> between lines inside one Azure call
 GEMINI_TOKENS_PER_S = 25.0
 GEMINI_PRICE_SCHEDULE = [("2027-01-01", 18.0), ("0000-00-00", 9.0)]  # (from date, US$ per M tokens), newest first
@@ -327,11 +333,32 @@ def azure_terms(items) -> int:
                for m in INLINE.finditer(i.text) if m.group(1) == "pt")
 
 
+def pt_terms(line: Line) -> int:
+    """Portuguese terms marked in an English line (0 for a Portuguese line)."""
+    return 0 if line.lang != "en" else sum(1 for m in INLINE.finditer(line.text) if m.group(1) == "pt")
+
+
+def mixed_azure_terms() -> int:
+    try:
+        return max(1, int(config().get("mixedAzureTerms") or MIXED_AZURE_TERMS))
+    except (TypeError, ValueError):
+        return MIXED_AZURE_TERMS
+
+
+def mixed_gemini(key_set: dict) -> str:
+    """The Gemini engine Mixed uses: Google Cloud when its key is set, else the Gemini API."""
+    return "vertex" if key_set.get("GOOGLE_CLOUD_API_KEY") else "gemini"
+
+
 ENGINES = {
     "vertex": {"label": "Gemini TTS (Google Cloud)", "needs": ("GOOGLE_CLOUD_API_KEY",), "mixes": False},
     "gemini": {"label": "Gemini TTS", "needs": ("GEMINI_API_KEY",), "mixes": False},
     "azure": {"label": "Azure multilingual", "needs": ("AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"),
               "mixes": True},
+    "mixed": {"label": "Gemini + Azure (mixed)",
+              "needs": ("GOOGLE_CLOUD_API_KEY", "AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"),
+              # GEMINI_API_KEY stands in for GOOGLE_CLOUD_API_KEY (see mixed_gemini)
+              "alt": {"GOOGLE_CLOUD_API_KEY": "GEMINI_API_KEY"}, "mixes": True},
     "elevenlabs": {"label": "ElevenLabs", "needs": ("ELEVENLABS_API_KEY",), "mixes": False},
 }
 # Engines that make one call per language block (the line's language for every word).
@@ -363,6 +390,7 @@ def eleven_voices(key: str | None = None) -> dict[str, str]:
 
 
 def engine_voices(engine: str) -> list[str]:
+    """Mixed: the Gemini voices (Azure reads its lines with its first voice)."""
     cfg = config()
     if engine == "azure":
         return cfg.get("azureVoices") or [cfg.get("azureVoice") or AZURE_VOICE]
@@ -372,14 +400,17 @@ def engine_voices(engine: str) -> list[str]:
 
 
 def missing_keys(engine: str, key_set: dict) -> list[str]:
-    return [n for n in ENGINES[engine]["needs"] if not key_set.get(n)]
+    alt = ENGINES[engine].get("alt", {})
+    return [n for n in ENGINES[engine]["needs"]
+            if not key_set.get(n) and not (n in alt and key_set.get(alt[n]))]
 
 
 def suggest_engine(n_pt_in_en: int, available: list[str]) -> str | None:
-    """Azure for many Portuguese terms inside English lines (only it switches mid-sentence,
-    see azure_terms), else Gemini; among the available."""
-    order = (["azure", "vertex", "gemini"] if n_pt_in_en >= INLINE_LIMIT
-             else ["vertex", "gemini", "azure"]) + ["elevenlabs"]
+    """Many Portuguese terms inside English lines (only Azure switches mid-sentence, see
+    azure_terms): Mixed, which gives only those lines to Azure, else Azure; otherwise
+    Gemini. Among the available."""
+    order = (["mixed", "azure", "vertex", "gemini"] if n_pt_in_en >= INLINE_LIMIT
+             else ["vertex", "gemini", "azure", "mixed"]) + ["elevenlabs"]
     return next((e for e in order if e in available), None)
 
 
@@ -389,8 +420,14 @@ def choose_engine(requested: str, n_pt_in_en: int, available: list[str] | None =
     return suggest_engine(n_pt_in_en, list(ENGINES) if available is None else available)
 
 
-def engine_note(engine: str, n_inline: int) -> str:
+def engine_note(engine: str, n_inline: int, n_azure_lines: int = 0) -> str:
     """How the engine treats the script's <pt>/<en> marks."""
+    if engine == "mixed":
+        if not n_azure_lines:
+            return "no line has enough Portuguese terms for Azure: all read by Gemini, one voice"
+        azure_voice = voice_label(engine_voices("azure")[0])
+        return (f"{n_azure_lines} English line{'s' if n_azure_lines != 1 else ''} with Portuguese terms "
+                f"read by Azure ({azure_voice}), the rest by Gemini: two voices")
     if not n_inline:
         return ""
     terms = f"{n_inline} marked term{'s' if n_inline != 1 else ''}"
@@ -433,10 +470,16 @@ def _pieces(text: str, limit: int) -> list[str]:
     return out
 
 
-def build_calls(items, engine: str) -> list:
+def azure_line(line: Line) -> bool:
+    """Mixed: does this line go to Azure?"""
+    return pt_terms(line) >= mixed_azure_terms()
+
+
+def build_calls(items, engine: str, gemini_engine: str = "vertex") -> list:
     """Calls and pauses, in order.
     Gemini, ElevenLabs: (engine, lang, text)  consecutive lines of one language, no pause between.
     Azure:  ("azure", [Line, ...])  consecutive lines, no pause between.
+    Mixed: each line as Azure (azure_line) or as `gemini_engine`, so c[0] names the real engine.
     GAP_S goes between consecutive calls; a [pause] takes its place."""
     calls: list = []
     for it in items:
@@ -444,19 +487,22 @@ def build_calls(items, engine: str) -> list:
             calls.append(("pause", it.seconds))
             continue
         last = calls[-1] if calls else None
-        if engine in BLOCK_ENGINES:
-            limit = CALL_CHARS.get(engine, MAX_CALL_CHARS)
+        eng = engine
+        if engine == "mixed":
+            eng = "azure" if azure_line(it) else gemini_engine
+        if eng in BLOCK_ENGINES:
+            limit = CALL_CHARS.get(eng, MAX_CALL_CHARS)
             for txt in _pieces(respell(it.lang, plain(it.text)), limit):
                 last = calls[-1] if calls else None
                 # Gemini TTS tends to loop when one call repeats a passage (forum report,
                 # gemini-3.8-flash-tts): a line already in the call starts a new one
-                repeat = (engine in TOKEN_ENGINES and last and last[0] == engine
+                repeat = (eng in TOKEN_ENGINES and last and last[0] == eng
                           and _repeats(txt, last[2]))
-                if (last and last[0] == engine and last[1] == it.lang and not repeat
+                if (last and last[0] == eng and last[1] == it.lang and not repeat
                         and len(last[2]) + len(txt) <= limit):
-                    calls[-1] = (engine, it.lang, last[2] + "\n\n" + txt)
+                    calls[-1] = (eng, it.lang, last[2] + "\n\n" + txt)
                 else:
-                    calls.append((engine, it.lang, txt))
+                    calls.append((eng, it.lang, txt))
         else:
             if last and last[0] == "azure" and sum(len(f.text) for f in last[1]) + len(it.text) <= MAX_CALL_CHARS:
                 last[1].append(it)
@@ -494,12 +540,36 @@ def azure_billed_chars(calls) -> int:
     return sum(len(_UNBILLED_TAGS.sub("", ssml(c[1], AZURE_VOICE))) for c in calls if c[0] == "azure")
 
 
-def _estimate(items, lines, engine: str) -> dict:
-    calls = build_calls(items, engine)
+def _mixed_estimate(calls) -> tuple[float, float, int]:
+    """Mixed: (seconds of speech, US$, Azure billed characters), each call at its engine's rate."""
+    speech, cost = 0.0, 0.0
+    for c in calls:
+        if c[0] == "pause":
+            continue
+        if c[0] == "azure":
+            secs = sum(len(plain(l.text).split()) for l in c[1]) / WORDS_PER_MIN["azure"] * 60
+            secs += AZURE_LINE_BREAK_S * (len(c[1]) - 1)
+        else:
+            secs = len(c[2].split()) / WORDS_PER_MIN[c[0]] * 60
+            cost += secs * GEMINI_TOKENS_PER_S * gemini_usd_per_m_tokens() / 1e6
+        speech += secs
+    billed = azure_billed_chars(calls)
+    return speech, cost + billed * usd_per_m_chars("azure") / 1e6, billed
+
+
+def _estimate(items, lines, engine: str, gemini_engine: str = "vertex") -> dict:
+    calls = build_calls(items, engine, gemini_engine)
     n_calls = sum(1 for c in calls if c[0] != "pause")
     pauses = [c[1] for c in calls if c[0] == "pause"]
     chars = sum(len(plain(l.text)) for l in lines)
     words = sum(len(plain(l.text).split()) for l in lines)
+    if engine == "mixed":
+        speech, cost, billed = _mixed_estimate(calls)
+        wpm = round(words / speech * 60, 1) if speech else WORDS_PER_MIN[gemini_engine]
+        seconds = speech + sum(pauses) + GAP_S * max(0, n_calls - 1)
+        return {"calls": n_calls, "answerPauses": pauses, "characters": chars, "billedCharacters": billed,
+                "wordsPerMinute": wpm, "estSeconds": round(seconds), "estCostUsd": round(cost, 3),
+                "azureLines": sum(1 for l in lines if azure_line(l))}
     speech = words / WORDS_PER_MIN[engine] * 60
     seconds = speech + sum(pauses) + GAP_S * max(0, n_calls - 1)
     if engine == "azure":
@@ -529,9 +599,12 @@ def plan(script: str, engine: str = "auto", voice: str | None = None,
     n_azure = azure_terms(items)
     available = [e for e in ENGINES if not missing_keys(e, ks)]
     suggested = suggest_engine(n_azure, available)
+    gem = mixed_gemini(ks)
+    n_azure_lines = sum(1 for l in lines if azure_line(l))
     engines = [{"id": e, "label": ENGINES[e]["label"], "available": e in available,
                 "missing": missing_keys(e, ks), "voices": engine_voices(e),
-                "note": engine_note(e, n_inline), **_estimate(items, lines, e)} for e in ENGINES]
+                "note": engine_note(e, n_inline, n_azure_lines), **_estimate(items, lines, e, gem)}
+               for e in ENGINES]
     eng = choose_engine(engine, n_azure, available)
     if eng is None:
         return {"ok": False, "engines": engines, "errors": [
@@ -868,9 +941,12 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
     if p["missing"]:
         raise TTSError(f"missing {', '.join(p['missing'])} (environment, or the envFile in {CONFIG_FILE})")
     voice = voice if voice in p["voices"] else random.choice(p["voices"])
+    # Mixed: `voice` is the Gemini one; Azure reads its lines with its first voice.
+    azure_voice = engine_voices("azure")[0] if eng == "mixed" else voice
 
-    calls = build_calls(parse(script), eng)
+    calls = build_calls(parse(script), eng, mixed_gemini(ks))
     total = sum(1 for c in calls if c[0] != "pause")
+    used = {c[0] for c in calls if c[0] != "pause"}
     out = Path(out).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix="tts-", dir=out.parent))
@@ -885,15 +961,15 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
             if prev_speech:
                 parts.append(silence(GAP_S, tmp / f"g_{i:03d}.wav"))
             done += 1
-            log(f"{ENGINES[eng]['label']} {done}/{total}")
+            log(f"{ENGINES[c[0]]['label']} {done}/{total}")
             w = tmp / f"s_{i:03d}.wav"
-            if eng in TOKEN_ENGINES:
+            if c[0] in TOKEN_ENGINES:
                 best = None
                 for attempt in range(1, VERIFY_ATTEMPTS + 1):
                     wa = tmp / f"s_{i:03d}_{attempt}.wav"
                     text = unblocked(c[2], attempt)
                     try:
-                        if eng == "vertex":
+                        if c[0] == "vertex":
                             tokens += vertex(c[1], text, wa, ks["GOOGLE_CLOUD_API_KEY"], voice, log)
                         else:
                             tokens += gemini(c[1], text, wa, ks["GEMINI_API_KEY"], voice, log)
@@ -917,7 +993,7 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
                                         f"({reason}); read by Azure")
                         best = (0, wa, {"problem": None})
                         break
-                    chk = verify_speech(text, wa, c[1], eng)
+                    chk = verify_speech(text, wa, c[1], c[0])
                     score = chk.get("added", 0) + chk.get("missing", 0) + (1000 if chk["problem"] else 0)
                     if best is None or score < best[0]:
                         best = (score, wa, chk)
@@ -929,10 +1005,10 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
                 shutil.move(best[1], w)
                 if best[2]["problem"]:
                     warnings.append(f"call {done} ({c[2][:50]}…): {best[2]['problem']}")
-            elif eng == "elevenlabs":
+            elif c[0] == "elevenlabs":
                 elevenlabs(c[1], c[2], w, ks["ELEVENLABS_API_KEY"], voice, log)
             else:
-                azure(c[1], w, ks["AZURE_SPEECH_KEY"], ks["AZURE_SPEECH_REGION"], voice, log)
+                azure(c[1], w, ks["AZURE_SPEECH_KEY"], ks["AZURE_SPEECH_REGION"], azure_voice, log)
             parts.append(w)
             prev_speech = True
         log("joining")
@@ -943,11 +1019,16 @@ def synthesize(script: str, out: Path, engine: str = "auto", voice: str | None =
         shutil.rmtree(tmp, ignore_errors=True)
 
     secs = round(duration(out), 1)
-    summary = {"file": str(out), "engine": eng, "voice": voice, "voiceLabel": voice_label(voice),
+    label = voice_label(voice)
+    if eng == "mixed":
+        azure_chars += azure_billed_chars(calls)  # Azure bills the SSML markup too
+        label = " + ".join([voice_label(voice)] * bool(used & set(TOKEN_ENGINES))
+                           + [voice_label(azure_voice)] * ("azure" in used)) or label
+    summary = {"file": str(out), "engine": eng, "voice": voice, "voiceLabel": label,
                "seconds": secs, "characters": p["characters"], "inlineTerms": p["inlineTerms"],
                "answerPauses": len(p["answerPauses"]), "title": p["title"],
                "retries": retries, "warnings": warnings}
-    if eng in TOKEN_ENGINES:
+    if eng in TOKEN_ENGINES or eng == "mixed":
         summary["audioTokens"] = tokens
         summary["costUsd"] = round(tokens * gemini_usd_per_m_tokens() / 1e6
                                    + azure_chars * usd_per_m_chars("azure") / 1e6, 3)

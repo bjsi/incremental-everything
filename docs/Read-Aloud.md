@@ -77,10 +77,20 @@ The popup lists every engine with its own estimate, and greys out those whose ke
 |---|---|---|
 | **Gemini TTS (Google Cloud)** | `GOOGLE_CLOUD_API_KEY` (optional `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`) | Gemini 3.8 Flash TTS through Vertex AI, billed to a Google Cloud billing account (and its credits). Suggested first when set. Each call gets its locale (`pt-BR` or `en-US`), as through the Gemini API. |
 | **Gemini TTS** | `GEMINI_API_KEY` | The same model through the Gemini API ([Google AI Studio](https://aistudio.google.com/apikey) key). |
-| **Azure multilingual** | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | Voice `en-US-AndrewMultilingualNeural`. The only engine that switches language **inside a sentence**, so it is suggested for scripts with 3 or more Portuguese terms marked inside English lines. English terms in Portuguese lines do not count: Gemini reads them well, while Portuguese words in an English sentence come out Spanish or English. |
+| **Azure multilingual** | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | Voice `en-US-AndrewMultilingualNeural`. The only engine that switches language **inside a sentence**. Suggested for scripts with 3 or more Portuguese terms marked inside English lines when **Gemini + Azure** is not available. English terms in Portuguese lines do not count: Gemini reads them well, while Portuguese words in an English sentence come out Spanish or English. |
+| **Gemini + Azure (mixed)** | `GOOGLE_CLOUD_API_KEY` (or `GEMINI_API_KEY`) and the Azure keys | Azure reads only the English lines with Portuguese terms; Gemini reads the rest. Suggested for scripts with 3 or more Portuguese terms in English lines. See [below](#mixed). |
 | **ElevenLabs** | `ELEVENLABS_API_KEY` | Your account's voices, by first name. Suggested only when no other engine has a key. |
 
 Gemini and ElevenLabs speak one language per call: a marked foreign term is read in its line's language, and the popup says so when the script has any.
+
+### Gemini + Azure (mixed) { #mixed }
+
+A long note often has only a few English lines with Portuguese words in them: a *Parallels in the bibliography* section naming *A manobrabilidade do navio no século 21*, a term like *fora do edital*. Gemini would read those words in Spanish or English, and Azure would read the whole note in its own voice. **Gemini + Azure** splits the script line by line:
+
+- an English line with a Portuguese term marked in it goes to **Azure**, which switches language mid-sentence;
+- every other line, Portuguese quotes and English lines alike, goes to **Gemini** (on Google Cloud when its key is set), in the voice you pick.
+
+So the note keeps the Gemini voice and only those lines change to Andrew; the popup says how many (*3 English lines with Portuguese terms read by Azure (Andrew), the rest by Gemini: two voices*). The estimate prices each part at its own engine's rate, Gemini's lines are [checked](#checked) as usual, and the audio's caption names both voices (*Charon + Andrew*). It is suggested instead of Azure whenever both keys are set; `mixedAzureTerms` in [`tts.json`](#options) sets how many Portuguese terms a line needs to go to Azure (default 1).
 
 Prices checked in November 2026 (the helper's `tts.py` holds them; check your provider's current prices):
 
@@ -159,6 +169,7 @@ Anything an engine would read out wrongly (markdown, LaTeX, links, page numbers,
 | `geminiModel`, `vertexModel` | `gemini-3.8-flash-tts` | The Gemini TTS model. |
 | `azureVoices` | `["en-US-AndrewMultilingualNeural"]` | The Azure voices offered. |
 | `elevenModel` | `eleven_multilingual_v2` | The ElevenLabs model. |
+| `mixedAzureTerms` | `1` | How many Portuguese terms an English line needs to go to Azure in [Gemini + Azure](#mixed). |
 | `llmModel` | `claude-sonnet-5-5` for Adapted, `claude-opus-5-5` for Summary | The Claude model (CLI and API): one model for both modes, or `{"adapted": …, "summary": …}`. |
 | `geminiUsdPerMTokens`, `elevenUsdPerMChars` | list prices | Your own prices, for the estimates. |
 | `verifySpeech` | `true` | `false` turns off the [check of Gemini's audio](#checked). |

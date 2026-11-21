@@ -6,9 +6,9 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ Improved
 
-**Read Aloud**: **Adapted** scripts are now written by Sonnet, faster and lighter on your Claude usage (**Summary** stays on Opus), and can say formulas too long to follow by ear by what they compute (**Simplify formulas too long to follow by ear**).
+**Read Aloud**: added the **Gemini + Azure** engine, now suggested instead of Azure, which gives Azure only the English lines with Portuguese terms and keeps the rest in the Gemini voice; **Adapted** scripts are now written by Sonnet (**Summary** stays on Opus) and can say formulas too long to follow by ear by what they compute.
 
-📖 [Read Aloud → Long formulas](Read-Aloud.md#long-formulas)
+📖 [Read Aloud → Gemini + Azure](Read-Aloud.md#mixed) · [Long formulas](Read-Aloud.md#long-formulas)
 
 ### 🐛 Fixed
 
