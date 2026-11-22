@@ -836,6 +836,10 @@ export const pendingReadAloudJobsKey = 'pendingReadAloudJobs';
 // Upscale jobs (lib/upscale_image.ts): the command starts them and returns; the tracker
 // waits for ChatGPT and posts a notice whose Review button opens the comparison popup.
 export const pendingUpscaleJobsKey = 'pendingUpscaleJobs';
+// Whole-KB image scans (lib/image_scan.ts): "Tag Rems With Images" / "Remove HasImage
+// Tags" on the whole knowledge base run for up to an hour, so the popup queues them here
+// and closes; the tracker runs them and reports progress and the result as a notice.
+export const pendingImageScanJobsKey = 'pendingImageScanJobs';
 // Notices (lib/notice.ts): reports of background work, shown in a floating card instead
 // of a popup so they never close the popup the user is working in. Any widget appends to
 // this list; the index opens the card while it is non-empty.

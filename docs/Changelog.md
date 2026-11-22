@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.251 - November 22nd, 2026
+
+### ✨ Improved
+
+**Tag Rems With Images**: a whole-knowledge-base run (and the whole-KB cleanup of **Remove HasImage Tags**) now works in the background, so the popup closes at once and a notice shows its progress and then its result, instead of the popup having to stay open for the whole run.
+
+📖 [Filter a Document by Images → A whole-KB run works in the background](Utilities-Finding-and-Navigating.md#whole-kb-background)
+
 ## v1.0.250 - November 21st, 2026
 
 ### ✨ Improved

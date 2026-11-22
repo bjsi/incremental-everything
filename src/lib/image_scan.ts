@@ -5,8 +5,16 @@ import {
   RichTextInterface,
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
-import { hasImagePowerupCode, pdfAreaHighlightPowerupCode } from './consts';
+import {
+  hasImagePowerupCode,
+  hasImagePowerupName,
+  pdfAreaHighlightPowerupCode,
+  pdfAreaHighlightPowerupName,
+  pendingImageScanJobsKey,
+  noticesKey,
+} from './consts';
 import { SuppressionLease } from './operation_suppression';
+import { showNotice } from './notice';
 
 /**
  * Scanning for images and marking what is found with the HasImage powerup.
@@ -510,6 +518,10 @@ export async function scanAndTagImages(
     // Clamped: derived by subtraction, so accumulated float error can otherwise
     // print a negative tenth of a second on a run whose walk was ~0.
     timing.walkMs = Math.max(0, now() - tWalk - timing.yieldMs);
+    // Everything later works from `pending` and `areaCandidates`. A whole-KB run
+    // holds ~400k Rem objects here, and it runs in the index widget for up to an
+    // hour of writes, so let them go now rather than when the call returns.
+    rems.length = 0;
 
     // PHASE 1.5 — confirm which image-only rems are clippings from a source.
     // Reads only, and only for candidates, so this is bounded by the number of
@@ -575,7 +587,7 @@ export async function scanAndTagImages(
   timing.totalMs = now() - t0;
   console.log(`[ImageScan] ${formatScanTiming(timing)} · total ${(timing.totalMs / 1000).toFixed(1)}s`);
 
-  onProgress?.(`Scanned ${rems.length} Rems.`, rems.length, rems.length);
+  onProgress?.(`Scanned ${result.scanned} Rems.`, result.scanned, result.scanned);
   return result;
 }
 
@@ -682,4 +694,164 @@ export async function removeImageTags(
 
   onProgress?.(`Removed ${result.removed} tags.`, tagged.length, tagged.length);
   return result;
+}
+
+// --- background jobs (whole knowledge base) ----------------------------------------
+
+/**
+ * Elapsed time for a report line. Minutes once a run is long enough for seconds
+ * to stop being readable — a first whole-KB pass is measured in tens of minutes,
+ * where "1704.3s" is a number nobody parses.
+ */
+export const formatElapsed = (ms: number): string => {
+  const seconds = ms / 1000;
+  if (seconds < 90) return `${seconds.toFixed(1)}s`;
+  const mins = Math.floor(seconds / 60);
+  return `${mins}m ${Math.round(seconds - mins * 60)}s`;
+};
+
+/**
+ * A whole-KB run handed off by the popup. Such a run takes up to an hour (a first
+ * pass over 413k Rems wrote 22,916 tags at ~13/s), and inside the popup it died
+ * with the popup. The tracker (register/tracker.ts, in the persistent index
+ * widget) runs it instead, posts its progress as a notice and replaces that
+ * notice with the result. Lives in this window's session: a reload of RemNote
+ * drops a running job, which costs nothing but time — the run is idempotent, so
+ * starting it again picks up where the writes stopped.
+ */
+export interface ImageScanJob {
+  /** Unique per run, so a job the tracker reads twice runs once. */
+  id: string;
+  mode: 'tag' | 'remove';
+  queuedAt: number;
+}
+
+export async function enqueueImageScanJob(plugin: RNPlugin, mode: ImageScanJob['mode']): Promise<void> {
+  const job: ImageScanJob = {
+    id: `image-scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    mode,
+    queuedAt: Date.now(),
+  };
+  const queue = (await plugin.storage.getSession<ImageScanJob[]>(pendingImageScanJobsKey)) || [];
+  await plugin.storage.setSession(pendingImageScanJobsKey, [...queue, job]);
+}
+
+/** Progress notices are rewritten at most this often: each one is a session write. */
+const PROGRESS_NOTICE_MS = 5000;
+
+/** Index only: set while a whole-KB job runs, so a second one is refused, not interleaved. */
+let activeImageScanJob: ImageScanJob['mode'] | null = null;
+
+/** Run a whole-KB tag or cleanup pass and report it with notices. */
+export async function runImageScanJob(plugin: RNPlugin, job: ImageScanJob): Promise<void> {
+  const label = job.mode === 'remove' ? `Remove ${hasImagePowerupName} Tags` : 'Tag Rems With Images';
+  const noticeId = `${job.id}-notice`;
+
+  if (activeImageScanJob) {
+    // Two passes over the same tags would race each other's writes, and the
+    // second would only redo what the first is doing.
+    await showNotice(plugin, {
+      title: `${label}: not started`,
+      message: `A whole-knowledge-base ${
+        activeImageScanJob === 'remove' ? 'cleanup' : 'scan'
+      } is already running. Its notice reports when it is done.`,
+      tone: 'info',
+    });
+    return;
+  }
+  activeImageScanJob = job.mode;
+
+  // Progress goes to one notice, rewritten in place. Throttled, serialized (each
+  // write is a read-modify-write of the notice list), and stopped for good once
+  // the user dismisses it: the result still arrives, but a progress card that
+  // keeps coming back after being closed is a nag.
+  let lastPost = 0;
+  let posted = false;
+  let dismissed = false;
+  let chain = Promise.resolve();
+  const onProgress: ImageScanProgress = (message) => {
+    const t = Date.now();
+    if (dismissed || t - lastPost < PROGRESS_NOTICE_MS) return;
+    lastPost = t;
+    chain = chain
+      .then(async () => {
+        if (posted) {
+          const list = (await plugin.storage.getSession<Array<{ id: string }>>(noticesKey)) || [];
+          if (!list.some((n) => n.id === noticeId)) {
+            dismissed = true;
+            return;
+          }
+        }
+        posted = true;
+        await showNotice(plugin, {
+          id: noticeId,
+          tone: 'info',
+          title: `${label}: running…`,
+          message: `Whole knowledge base — ${message}`,
+          detail:
+            'Runs in the background: keep working. A reload of RemNote stops it; anything already written stays, and running it again resumes the work.',
+        });
+      })
+      .catch((e) => console.warn('[ImageScan] progress notice failed', e));
+  };
+
+  try {
+    if (job.mode === 'remove') {
+      const r = await removeImageTags(plugin, { kind: 'kb' }, onProgress);
+      await chain;
+      await showNotice(plugin, {
+        id: noticeId,
+        tone: r.failed ? 'info' : 'success',
+        title: `${label}: done`,
+        message:
+          r.considered === 0
+            ? 'Nothing in the knowledge base carried the tag, so there was nothing to clear.'
+            : `Cleared ${r.removed} tag${r.removed === 1 ? '' : 's'} in the whole knowledge base. Took ${formatElapsed(r.timing.totalMs)}.`,
+        detail: [
+          r.failed ? `${r.failed} failed to write — see the console.` : '',
+          'Run Tag Rems With Images at any time to rebuild the tag from scratch.',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      });
+    } else {
+      const r = await scanAndTagImages(plugin, { kind: 'kb' }, onProgress);
+      await chain;
+      const area =
+        r.areaHighlights > 0 || r.areaUntagged > 0
+          ? `, ${r.areaHighlights} PDF area highlight${r.areaHighlights === 1 ? '' : 's'} (#${pdfAreaHighlightPowerupName}${
+              r.areaTagged ? `, +${r.areaTagged}` : ''
+            }${r.areaUntagged ? `, −${r.areaUntagged}` : ''})`
+          : '';
+      await showNotice(plugin, {
+        id: noticeId,
+        tone: r.failed ? 'info' : 'success',
+        title: `${label}: done`,
+        message:
+          `Scanned ${r.scanned} Rems in the whole knowledge base: ${r.withImages} hold an image, ` +
+          `${r.tagged} newly tagged, ${r.untagged} cleared${area}. Took ${formatElapsed(r.timing.totalMs)}.`,
+        detail: [
+          r.failed ? `${r.failed} failed to write — see the console.` : '',
+          `To filter a document by it: Cmd/Ctrl+Shift+F, then pick ${hasImagePowerupName}.`,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      });
+    }
+  } catch (e) {
+    console.error('[ImageScan] background job failed:', e);
+    await chain;
+    await showNotice(plugin, {
+      id: noticeId,
+      tone: 'error',
+      title: `${label}: stopped`,
+      message: (e as any)?.message ?? String(e),
+      detail:
+        job.mode === 'remove'
+          ? 'Tags already removed stay removed; running it again clears the rest.'
+          : 'Anything already tagged stays; running it again resumes the work.',
+    });
+  } finally {
+    activeImageScanJob = null;
+  }
 }

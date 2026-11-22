@@ -340,7 +340,8 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   Scans for images and tags each Rem that holds one with **`HasImage`** — so RemNote's native document filter can isolate them. Checks **front text and back text**, so an image on the back of a flashcard counts.
 
   - **Popup first:** the [Image Scan popup](Plugin-Widgets-Reference.md#69-image-scan-popup) offers two scopes — the **focused Rem** (or the **open document**), named on the button so you can verify the target, or the **whole knowledge base**.
-  - **Reports in place:** the same popup shows live progress and then the result — scanned, holding images, tagged, cleared — alongside how to filter a document and how to build a Search Portal on the tag. It stays open until you close it.
+  - **Reports in place:** for a scoped run, the same popup shows live progress and then the result — scanned, holding images, tagged, cleared — alongside how to filter a document and how to build a Search Portal on the tag. It stays open until you close it.
+  - **Whole KB in the background:** a whole-knowledge-base run closes the popup at once and reports its progress and result in a notice, so you can keep working ([details](Utilities-Finding-and-Navigating.md#whole-kb-background)).
   - **Self-correcting:** Rems inside the scanned scope that carry the tag but no longer hold an image lose it, so a re-run never leaves stale marks. Nothing outside the scope is touched.
   - **Invisible tag:** the `HasImage` chip is hidden from the editor tag bar (your own tags on the same Rem stay visible).
 
@@ -351,7 +352,7 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   📖 See [Utilities → Filter a Document by Images](Utilities-Finding-and-Navigating.md#filter-a-document-by-images) for the full workflow.
 
 - **Remove `HasImage` Tags** — `quick: rmimg`
-  Takes the **`HasImage`** tag off every Rem that carries it, in the focused Rem's subtree (or open document) or across the **whole knowledge base**. Same popup, same scopes and keys as the scan above.
+  Takes the **`HasImage`** tag off every Rem that carries it, in the focused Rem's subtree (or open document) or across the **whole knowledge base**. Same popup, same scopes and keys as the scan above; the whole-KB cleanup runs in the background with a notice, too.
 
   - **Nothing is lost:** the tag is derived from the images themselves, so **Tag Rems With Images** rebuilds it exactly. Re-running the scan *is* the undo — which is why this command has none of its own.
   - **Cost:** the same per tag as applying them, so clearing a whole knowledge base takes as long as tagging it. Prefer the document scope unless you want the tag gone everywhere.

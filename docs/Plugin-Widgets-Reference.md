@@ -599,7 +599,7 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 ![The Image Scan popup showing both scope options and the keyboard hints](assets/tag-rems-with-images-popup.png){ width="600" }
 
 - **Two scopes.** The first button names the Rem it would scan — the **focused Rem**, or the **open document** when nothing is focused — so you can see the target before committing. The second scans the **whole knowledge base** (slow on a large one). If there was no focused Rem or open document, the first button is disabled and the whole-KB option still works.
-- **Live progress** while it runs (`Scanning 1,400 / 5,200 Rems…`), because a whole-KB scan is not instant.
+- **Live progress** while a scoped run works (`Scanning 1,400 / 5,200 Rems…`). A **whole-KB** run closes the popup at once instead and reports its progress and result in a [notice](Utilities-Finding-and-Navigating.md#whole-kb-background), so it never holds the popup open.
 - **The report stays on screen**: Rems scanned, how many hold an image, how many were newly tagged, and how many had the tag cleared. Under it sit the two ways to use the tag — the document **Filter** and a **Search Portal** — so you don't have to remember the shortcut.
 - **Scan again** returns to the scope choice without reopening the command; **?** in the header opens this feature's documentation.
 - **Keyboard-driven:** `↑`/`↓` move between the scopes, `Enter` runs the selected one (and closes the popup from the report), `Esc` cancels — ignored while a scan is running so a reflex press can't abort it.

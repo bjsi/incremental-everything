@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
 import {
+  enqueueImageScanJob,
+  formatElapsed,
   ImageScanResult,
   ImageScanScope,
   ImageTagRemovalResult,
@@ -32,18 +34,6 @@ const openDocs = () => {
     link.click();
     setTimeout(() => document.body.removeChild(link), 100);
   }
-};
-
-/**
- * Elapsed time for the report line. Minutes once a run is long enough for
- * seconds to stop being readable — a first whole-KB pass is measured in tens of
- * minutes, where "1704.3s" is a number nobody parses.
- */
-const formatElapsed = (ms: number): string => {
-  const seconds = ms / 1000;
-  if (seconds < 90) return `${seconds.toFixed(1)}s`;
-  const mins = Math.floor(seconds / 60);
-  return `${mins}m ${Math.round(seconds - mins * 60)}s`;
 };
 
 type Phase = 'confirm' | 'running' | 'done' | 'error';
@@ -78,7 +68,6 @@ export function ImageScanPopup() {
   const [progress, setProgress] = useState('');
   const [result, setResult] = useState<ImageScanResult | null>(null);
   const [removal, setRemoval] = useState<ImageTagRemovalResult | null>(null);
-  const [ranOnKb, setRanOnKb] = useState(false);
   const [error, setError] = useState('');
 
   /** Which scope button the keyboard is on: 0 = this Rem, 1 = whole KB. */
@@ -108,7 +97,20 @@ export function ImageScanPopup() {
   }, [phase]);
 
   const run = async (scope: ImageScanScope) => {
-    setRanOnKb(scope.kind === 'kb');
+    if (scope.kind === 'kb') {
+      // A whole-KB pass runs for up to an hour, and inside this popup it would die
+      // with it. The tracker in the index widget runs it instead and reports with a
+      // notice (lib/image_scan.ts runImageScanJob), so the popup just hands it off.
+      try {
+        await enqueueImageScanJob(plugin, mode);
+        close();
+      } catch (e) {
+        console.error('[ImageScan] could not queue the whole-KB job:', e);
+        setError((e as any)?.message ?? String(e));
+        setPhase('error');
+      }
+      return;
+    }
     setPhase('running');
     setProgress('Starting…');
     const onProgress = (message: string) => setProgress(message);
@@ -315,8 +317,8 @@ export function ImageScanPopup() {
                 style={{ color: 'var(--rn-clr-content-tertiary)' }}
               >
                 {mode === 'remove'
-                  ? 'One write per tagged Rem — minutes if there are thousands'
-                  : 'Every Rem, every document — slow on a large knowledge base'}
+                  ? 'Runs in the background — a notice reports when it is done'
+                  : 'Every Rem, every document — runs in the background, a notice reports when it is done'}
               </div>
             </button>
           </div>
@@ -338,14 +340,15 @@ export function ImageScanPopup() {
         <div className="flex flex-col gap-2 py-4">
           <div className="text-sm font-medium">
             {mode === 'remove' ? '🧹 Clearing tags in ' : '🔍 Scanning '}
-            {ranOnKb ? 'the whole knowledge base' : `"${scopeName || 'Untitled'}"`}…
+            {`"${scopeName || 'Untitled'}"`}…
           </div>
           <div className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
             {progress}
           </div>
           {/* The scan runs inside this popup, so closing it stops the walk. The
               work already written stays valid — the command is idempotent — but
-              the run would be incomplete, which matters most on a KB scan. */}
+              the run would be incomplete. (Whole-KB runs never get here: they go to
+              the tracker as a background job.) */}
           <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
             {mode === 'remove'
               ? 'Keep this popup open until it finishes — closing it stops the cleanup (tags already removed stay removed, and re-running clears the rest).'
@@ -359,7 +362,7 @@ export function ImageScanPopup() {
           <div className="text-sm">
             Cleared <span className="font-bold">{removal.removed}</span> #{hasImagePowerupName} tag
             {removal.removed === 1 ? '' : 's'} in{' '}
-            {ranOnKb ? 'the whole knowledge base' : `"${scopeName || 'Untitled'}"`}.
+            {`"${scopeName || 'Untitled'}"`}.
           </div>
 
           {removal.failed > 0 && (
@@ -396,7 +399,7 @@ export function ImageScanPopup() {
           <div className="text-sm">
             Scanned <span className="font-bold">{result.scanned}</span> Rem
             {result.scanned === 1 ? '' : 's'} in{' '}
-            {ranOnKb ? 'the whole knowledge base' : `"${scopeName || 'Untitled'}"`}.
+            {`"${scopeName || 'Untitled'}"`}.
           </div>
 
           <div className="flex flex-col gap-1 text-sm">
