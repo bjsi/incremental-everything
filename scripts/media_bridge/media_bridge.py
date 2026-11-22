@@ -68,7 +68,7 @@ Endpoints (127.0.0.1:3460, CORS open, for the plugin iframe):
                                "Read aloud" command; runs tts.py: Gemini or Azure TTS, mp3)
   POST /tts/write {mode: adapted|summary, source, lang, title?, targetWords?, instructions?, simplifyLongFormulas?}
                                → {taskId}: an LLM writes the spoken script from the plugin's
-                               outline (spoken_script.py: `claude -p`, Anthropic API fallback);
+                               outline (spoken_script.py: Antigravity for adapted, then `claude -p`, then the Anthropic API);
                                result {script, errors, via, model, costUsd, fallbackReason?}
   POST /tts/play {url}         plays one of the helper's served audio files on this computer
                                (ffplay, or afplay on macOS): "Add pronunciation" when RemNote

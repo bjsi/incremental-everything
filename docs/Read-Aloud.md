@@ -36,7 +36,15 @@ Adapted reads every formula in full. Tick **Simplify formulas too long to follow
 
 With **Also insert the summary text under the audio** (on by default), a Summary's text is also added under its audio Rem, headed *Summary of this document, written by AI*, with one Rem per line and the foreign terms in italics.
 
-The AI step runs `claude -p` with your Claude subscription, at no per-call charge: Sonnet writes **Adapted**, which only rewords the note, and Opus writes **Summary**, which has to choose what to keep ([`llmModel`](#options) changes either). When that fails (usage limit reached, the `claude` command not installed, any error) and an Anthropic API key is set, it runs on the API instead; the popup then shows the cost (a few cents for a note) and why `claude -p` failed. See [Setup](#setup).
+### Which AI writes the script { #which-ai }
+
+Sonnet writes **Adapted**, which only rewords the note, and Opus writes **Summary**, which has to choose what to keep. Each try below is used only when the one before it fails, and the line next to the button says which one wrote the script and why the others failed:
+
+1. **Adapted only:** Sonnet through the Antigravity CLI (`agy`), on your Google plan's quota, so your Claude subscription is kept for the rest ([`agyModel`](#options) changes the model or turns this off).
+2. `claude -p` with your Claude subscription, at no per-call charge ([`llmModel`](#options) changes either mode's model).
+3. The Anthropic API, when its key is set; the popup then shows the cost (a few cents for a note).
+
+See [Setup](#setup).
 
 ### Summary length { #summary-length }
 
@@ -154,6 +162,7 @@ Anything an engine would read out wrongly (markdown, LaTeX, links, page numbers,
     The helper reads the keys on every request, so a new key works without a restart. Keys never go into the plugin's settings, which RemNote syncs in plain text.
 
 4. For **Adapted** and **Summary**:
+    - for Adapted, optionally the Antigravity CLI `agy` (`brew install --cask antigravity-cli`, then run `agy` once to sign in);
     - the [Claude Code](https://claude.com/claude-code) command `claude`, signed in with your Claude subscription; and/or
     - `ANTHROPIC_API_KEY` in the same `.env`, with the `anthropic` package installed in the Python that runs the helper (`python3 -m pip install anthropic`).
 
@@ -172,6 +181,7 @@ Anything an engine would read out wrongly (markdown, LaTeX, links, page numbers,
 | `elevenModel` | `eleven_multilingual_v2` | The ElevenLabs model. |
 | `mixedAzureTerms` | `1` | How many Portuguese terms an English line needs to go to Azure in [Gemini + Azure](#mixed). |
 | `llmModel` | `claude-sonnet-5-5` for Adapted, `claude-opus-5-5` for Summary | The Claude model (CLI and API): one model for both modes, or `{"adapted": …, "summary": …}`. |
+| `agyModel` | `claude-sonnet-5-5-medium` for Adapted, none for Summary | The model tried first through Antigravity (see `agy models`), in the same shape; `""` or `null` skips Antigravity for that mode. |
 | `geminiUsdPerMTokens`, `elevenUsdPerMChars` | list prices | Your own prices, for the estimates. |
 | `verifySpeech` | `true` | `false` turns off the [check of Gemini's audio](#checked). |
 | `whisperCli`, `whisperModel`, `whisperVadModel` | `whisper-cli` on the PATH, the AI helper's models | The transcriber used for the check. |
@@ -191,6 +201,7 @@ python3 spoken_script.py outline.md --mode summary --lang pt --words 350
 ## Troubleshooting { #troubleshooting }
 
 - **The command is not in the omnibar:** turn on **Local Media Bridge**. Turning the setting off hides the command from the next reload.
+- **The popup still says `claude -p` after updating the helper:** an older helper is still running and answering. `pgrep -fl "media_bridge.py serve"` should show one process; stop any other, and the one started at login takes over.
 - **“The media-bridge helper … is version N”:** restart the helper (`curl -X POST localhost:3460/shutdown`, then `launchctl kickstart -k gui/$(id -u)/com.incrementalremnote.media-bridge` when it runs at login).
 - **Every engine shows “no key”:** the helper did not find the `.env`. Check `envFile` in `tts.json`, and the variable names above.
 - **Portuguese spoken with a Spanish or English accent:** the line is missing its `[pt]` mark, or the engine read a marked term in the line's language (choose Azure for an English text with many Portuguese terms).

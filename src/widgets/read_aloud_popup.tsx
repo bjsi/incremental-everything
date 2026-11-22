@@ -51,14 +51,22 @@ const DEFAULT_SHARE = 50;
 /** Words per minute when the helper has not said yet (Gemini measures ~143). */
 const FALLBACK_WPM = 140;
 
-function writtenInfo(w: WriteResult | undefined, currentHash: string | undefined): string {
+function writtenInfo(
+  w: WriteResult | undefined,
+  currentHash: string | undefined,
+  mode: ReadAloudMode
+): string {
   if (!w) {
-    return "Written with claude -p (your Claude subscription); if that fails, with the Anthropic API key in the helper's .env.";
+    return mode === 'adapted'
+      ? "Written with Claude Sonnet through the Antigravity CLI (your Google plan); if its quota is used up, with claude -p (your Claude subscription), then with the Anthropic API key in the helper's .env."
+      : "Written with claude -p (your Claude subscription); if that fails, with the Anthropic API key in the helper's .env.";
   }
   const how =
-    w.via === 'claude-cli'
-      ? 'with claude -p (your subscription)'
-      : `with the Anthropic API, ~US$${(w.costUsd ?? 0).toFixed(2)}`;
+    w.via === 'antigravity'
+      ? 'through Antigravity (your Google plan)'
+      : w.via === 'claude-cli'
+        ? 'with claude -p (your subscription)'
+        : `with the Anthropic API, ~US$${(w.costUsd ?? 0).toFixed(2)}`;
   const when = w.writtenAt
     ? ` on ${new Date(w.writtenAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
     : '';
@@ -66,10 +74,16 @@ function writtenInfo(w: WriteResult | undefined, currentHash: string | undefined
     w.sourceHash && currentHash && w.sourceHash !== currentHash
       ? ' The note has changed since: rewrite to include the changes.'
       : '';
+  // Results saved before Antigravity carry the bare claude -p error.
+  const fallback = w.fallbackReason
+    ? / failed: /.test(w.fallbackReason)
+      ? ` ${w.fallbackReason}.`
+      : ` claude -p failed: ${w.fallbackReason}.`
+    : '';
   return (
     `Written by ${w.model ?? 'Claude'} ${how}${when}` +
     (w.targetWords ? ` (${w.words ?? '?'} words for a target of ${w.targetWords}).` : '.') +
-    (w.fallbackReason ? ` claude -p failed: ${w.fallbackReason}.` : '') +
+    fallback +
     stale
   );
 }
@@ -486,7 +500,7 @@ export function ReadAloudPopup() {
             title={script.trim() ? 'Replaces the script below' : '⌘↵'}
           />
           <span style={muted}>
-            {writtenInfo(written[mode], context ? sourceHash(context.source) : undefined)}
+            {writtenInfo(written[mode], context ? sourceHash(context.source) : undefined, mode)}
           </span>
         </div>
       )}

@@ -68,7 +68,7 @@ export interface WriteResult {
   message?: string;
   script?: string;
   errors?: string[];
-  via?: 'claude-cli' | 'anthropic-api';
+  via?: 'antigravity' | 'claude-cli' | 'anthropic-api';
   model?: string;
   costUsd?: number;
   fallbackReason?: string;

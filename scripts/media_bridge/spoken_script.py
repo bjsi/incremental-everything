@@ -13,15 +13,21 @@ rems and skips as the Literal script, but formulas kept as LaTeX, italics as *x*
     asking to shorten it.
 
 The answer is a script in tts.py's format, checked with tts.check(); one retry fixes
-what the check finds. The LLM is the user's `claude` CLI (`claude -p`, their
-subscription, no per-call charge); when it fails (usage limit, not installed, any
-error) and ANTHROPIC_API_KEY is set (same places as the TTS keys, see tts.py), the
-Anthropic API is used instead (official `anthropic` SDK; about US$0.05-0.10 a note).
+what the check finds. The LLM is tried in this order, each one only when the one
+before failed (quota used up, not installed, any error):
+  1. Adapted only: the Antigravity CLI (`agy --print`, the user's Google plan) with
+     Claude Sonnet, so the Claude subscription is kept for the rest;
+  2. the user's `claude` CLI (`claude -p`, their subscription, no per-call charge);
+  3. when ANTHROPIC_API_KEY is set (same places as the TTS keys, see tts.py), the
+     Anthropic API (official `anthropic` SDK; about US$0.05-0.10 a note).
+The retries (format fix, shortening) stay on the route that wrote the first answer.
 
 Config in ~/.remnote-media-bridge/tts.json (optional): "llmModel", one model for both
 modes or {"adapted": ..., "summary": ...} (defaults: claude-sonnet-5-5 for adapted, a
 rewording job the format check catches; claude-opus-5-5 for summary, which has to judge
-what to keep; same model for the CLI and the API). A file
+what to keep; same model for the CLI and the API). "agyModel", same shape, is the
+Antigravity model (see `agy models`; default claude-sonnet-5-5-medium for adapted,
+none for summary); "" or null turns Antigravity off for that mode. A file
 ~/.remnote-media-bridge/read-aloud-adapted.md or read-aloud-summary.md replaces that
 mode's task instructions (the script-format rules are always added).
 
@@ -45,6 +51,10 @@ MODES = ("adapted", "summary")
 # Adapted only rewrites the note for the ear (and tts.check() plus a retry guard the
 # format), so Sonnet does it; Summary decides what matters, so it keeps Opus.
 DEFAULT_MODELS = {"adapted": "claude-sonnet-5-5", "summary": "claude-opus-5-5"}
+# Tried before claude -p: Adapted goes to Sonnet on the Antigravity quota first.
+DEFAULT_AGY_MODELS = {"adapted": "claude-sonnet-5-5-medium", "summary": None}
+# agy takes the prompt as an argument; macOS caps argv + environment at 1 MB.
+AGY_MAX_PROMPT_BYTES = 600_000
 CLI_TIMEOUT_S = 300
 MAX_TOKENS = 16000
 # A summary this much over its target gets one retry asking to shorten it.
@@ -168,7 +178,70 @@ def clean(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
-# --- the two ways to call Claude ---------------------------------------------------------
+# --- the three ways to call the model ------------------------------------------------------
+
+ROUTE_LABELS = {"antigravity": "Antigravity", "claude-cli": "claude -p", "anthropic-api": "Anthropic API"}
+
+
+def find_agy() -> str | None:
+    for c in (shutil.which("agy"), "/opt/homebrew/bin/agy", "/usr/local/bin/agy",
+              Path.home() / ".local/bin/agy"):
+        if c and Path(c).exists():
+            return str(c)
+    return None
+
+
+def _quota_error(text: str) -> bool:
+    t = text.lower()
+    return any(k in t for k in ("resource_exhausted", "quota", "rate limit", "rate_limit",
+                                "usage limit", "exhausted", "429"))
+
+
+def run_agy(system: str, user: str, model: str) -> dict:
+    """One turn of the Antigravity CLI. agy has no system-prompt flag, so the rules go
+    first in the prompt. It runs as an agent: the working folder is an empty one, and
+    the prompt says not to use tools (headless mode denies the ones that ask anyway)."""
+    agy = find_agy()
+    if not agy:
+        raise LLMError("the agy CLI is not installed (brew install --cask antigravity-cli)")
+    prompt = (f"<instructions>\n{system}\n\nDo not use any tools and do not read or write "
+              f"files: answer in this one reply.\n</instructions>\n\n{user}")
+    if len(prompt.encode("utf-8")) > AGY_MAX_PROMPT_BYTES:
+        raise LLMError("the note is too long to pass to agy")
+    cwd = _tts().BRIDGE_HOME / "agy-work"
+    cwd.mkdir(parents=True, exist_ok=True)
+    cmd = [agy, "--print", prompt, "--model", model, "--disable-slash-commands",
+           "--output-format", "stream-json", "--print-timeout", f"{CLI_TIMEOUT_S}s"]
+    try:
+        proc = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                              timeout=CLI_TIMEOUT_S + 60, cwd=cwd)
+    except subprocess.TimeoutExpired:
+        raise LLMError(f"agy took more than {CLI_TIMEOUT_S} s")
+    # The result's "response" is only the turn's LAST agent message, which can be empty
+    # (measured in formulatex.py): rebuild each step from its deltas, keep the last one
+    # with text.
+    steps: dict[int, str] = {}
+    res: dict = {}
+    for line in proc.stdout.splitlines():
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        su = ev.get("step_update") or {}
+        if su.get("step_type") == "agent_response" and su.get("text_delta"):
+            steps[su.get("step_index", 0)] = steps.get(su.get("step_index", 0), "") + su["text_delta"]
+        if ev.get("event") == "result":
+            res = ev.get("result") or {}
+    if proc.returncode or res.get("status") != "SUCCESS":
+        detail = (str(res.get("error") or "") or proc.stderr or proc.stdout).strip()
+        if _quota_error(detail):
+            raise LLMError(f"the quota for {model} is used up")
+        raise LLMError(f"agy status {res.get('status') or proc.returncode}: {detail.splitlines()[0][:300] if detail else 'no output'}")
+    texts = [t for t in steps.values() if t.strip()] or [res.get("response") or ""]
+    if not texts[-1].strip():
+        raise LLMError("agy returned no text")
+    return {"text": texts[-1], "via": "antigravity", "model": model}
+
 
 def find_claude() -> str | None:
     # launchd carries a minimal PATH, so check the usual install spots too.
@@ -244,6 +317,18 @@ def model_for(mode: str, configured) -> str:
     return configured if isinstance(configured, str) and configured.strip() else DEFAULT_MODELS[mode]
 
 
+def agy_model_for(mode: str, config: dict) -> str | None:
+    """tts.json "agyModel" (same shape as llmModel); "" or null turns Antigravity off."""
+    if "agyModel" not in config:
+        return DEFAULT_AGY_MODELS[mode]
+    configured = config["agyModel"]
+    if isinstance(configured, dict):
+        if mode not in configured:
+            return DEFAULT_AGY_MODELS[mode]
+        configured = configured[mode]
+    return configured.strip() if isinstance(configured, str) and configured.strip() else None
+
+
 def write(mode: str, source: str, lang: str = "pt", title: str = "",
           target_words: int | None = None, instructions: str = "",
           key_set: dict | None = None, simplify_long_formulas: bool = False,
@@ -256,29 +341,43 @@ def write(mode: str, source: str, lang: str = "pt", title: str = "",
         raise LLMError("nothing to read")
     log = progress or (lambda _m: None)
     tts = _tts()
-    model = model_for(mode, tts.config().get("llmModel"))
+    config = tts.config()
+    model = model_for(mode, config.get("llmModel"))
+    agy_model = agy_model_for(mode, config)
     key = (tts.keys() if key_set is None else key_set).get("ANTHROPIC_API_KEY")
     system, user = build_prompt(mode, source, lang, title, target_words, instructions,
                                 simplify_long_formulas)
     started = time.time()
-    cost, fallback = 0.0, None
+    cost = 0.0
+    routes = (["antigravity"] if agy_model else []) + ["claude-cli"] + (["anthropic-api"] if key else [])
 
-    def call(prompt: str, use_api: bool) -> dict:
+    def call(prompt: str, route: str) -> dict:
         nonlocal cost
-        res = run_api(system, prompt, model, key) if use_api else run_cli(system, prompt, model)
+        if route == "antigravity":
+            res = run_agy(system, prompt, agy_model)
+        elif route == "claude-cli":
+            res = run_cli(system, prompt, model)
+        else:
+            res = run_api(system, prompt, model, key)
         cost += res.get("costUsd", 0.0)
         return res
 
-    log("writing with Claude (claude -p)")
-    try:
-        res = call(user, False)
-    except LLMError as err:
-        if not key:
-            raise LLMError(f"{err}. Set ANTHROPIC_API_KEY for the helper to use the API instead.")
-        fallback = str(err)
-        log("claude -p failed; writing with the Anthropic API")
-        res = call(user, True)
-    use_api = res["via"] == "anthropic-api"
+    failures: list[str] = []
+    res = None
+    for route in routes:
+        log(f"writing with {ROUTE_LABELS[route]}"
+            + (f" ({agy_model})" if route == "antigravity" else ""))
+        try:
+            res = call(user, route)
+            break
+        except LLMError as err:
+            failures.append(f"{ROUTE_LABELS[route]} failed: {err}")
+            log(failures[-1])
+    if res is None:
+        hint = "" if key else " Set ANTHROPIC_API_KEY for the helper to use the API as a last resort."
+        raise LLMError("; ".join(failures) + "." + hint)
+    fallback = "; ".join(failures) or None
+    route = res["via"]
     script = clean(res["text"])
     errors = tts.check(script)
     if errors:
@@ -286,7 +385,7 @@ def write(mode: str, source: str, lang: str = "pt", title: str = "",
         retry = (f"{user}\n\nYour script:\n<script>\n{script}\n</script>\n\nIt breaks these rules:\n"
                  + "\n".join(errors) + "\n\nAnswer with the whole corrected script only.")
         try:
-            fixed = clean(call(retry, use_api)["text"])
+            fixed = clean(call(retry, route)["text"])
             if len(tts.check(fixed)) < len(errors):
                 script, errors = fixed, tts.check(fixed)
         except LLMError:
@@ -298,7 +397,7 @@ def write(mode: str, source: str, lang: str = "pt", title: str = "",
                  f"Shorten it to about {target_words} words: drop the less important points, keep "
                  "the format and any questions asked for. Answer with the whole script only.")
         try:
-            shorter = clean(call(retry, use_api)["text"])
+            shorter = clean(call(retry, route)["text"])
             n = word_count(shorter)
             if n < words and len(tts.check(shorter)) <= len(errors):
                 script, words, errors = shorter, n, tts.check(shorter)

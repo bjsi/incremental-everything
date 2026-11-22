@@ -10,6 +10,10 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Filter a Document by Images → A whole-KB run works in the background](Utilities-Finding-and-Navigating.md#whole-kb-background)
 
+**Read Aloud**: **Adapted** scripts are now written by Sonnet through the Antigravity CLI first, on your Google plan, and go to `claude -p` only when its quota is used up.
+
+📖 [Read Aloud → Which AI writes the script](Read-Aloud.md#which-ai)
+
 ## v1.0.250 - November 21st, 2026
 
 ### ✨ Improved
