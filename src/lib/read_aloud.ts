@@ -552,12 +552,19 @@ const PRONOUNCE_TIMEOUT_MS = 120_000;
 /** A finished /tts task, polled every second. */
 async function waitForTts(taskId: string): Promise<TtsResult> {
   const until = Date.now() + PRONOUNCE_TIMEOUT_MS;
+  let stage = '';
   while (Date.now() < until) {
     await new Promise((r) => setTimeout(r, 1000));
     const task = await getTtsTask(taskId);
     if (task.status === 'done') return task.result ?? { ok: false, message: 'no result' };
+    stage = task.stage;
   }
-  return { ok: false, message: 'the helper took more than 2 minutes' };
+  return {
+    ok: false,
+    message: /^waiting for another/.test(stage)
+      ? `the helper was still ${stage} after 2 minutes; try again once it is done`
+      : `the helper took more than 2 minutes${stage ? ` (last step: ${stage})` : ''}`,
+  };
 }
 
 /**

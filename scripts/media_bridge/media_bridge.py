@@ -520,6 +520,10 @@ def _run_upscale(task: dict) -> None:
 
 _tts_tasks: dict[str, dict] = {}
 _tts_lock = threading.Lock()  # one synthesis at a time (Gemini's per-minute limit)
+# Pronunciations (one or two calls each) queue among themselves, not behind a Read
+# aloud that can take half an hour: their few calls barely add to the per-minute count,
+# and a 429 is waited out in tts._post anyway.
+_pron_lock = threading.Lock()
 _tts_mod = None
 
 
@@ -577,8 +581,11 @@ def _run_tts(task: dict) -> None:
     tid = task["id"]
     try:
         tts = _tts_module()
-        task["stage"] = "waiting for another audio" if _tts_lock.locked() else "starting"
-        with _tts_lock:
+        pron = task.get("purpose") == "pronunciation"
+        lock = _pron_lock if pron else _tts_lock
+        task["stage"] = (f"waiting for another {'pronunciation' if pron else 'audio'}"
+                         if lock.locked() else "starting")
+        with lock:
             out = OUT_DIR / f"tts-{tid}.mp3"
             res = tts.synthesize(task["script"], out, task["engine"], task["voice"],
                                  progress=lambda msg: task.__setitem__("stage", msg))
