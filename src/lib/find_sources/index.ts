@@ -1350,7 +1350,7 @@ async function tagByName(plugin: RNPlugin, rem: PluginRem, name: string) {
 /**
  * Find Interference, written as the note's last child:
  *
- *   • Interferências (23/11/2026)                       Extra Card Detail, #Interf
+ *   • Verificação de interferências (23/11/2026)        Extra Card Detail, #Interf
  *       • ≈ Semelhantes, mas distintos
  *           • **Axis**: here × there · nas notas: [[the user's card]]
  *               • “excerpt” (cite, PDF p. N) 📌         pinned on its whole sentence

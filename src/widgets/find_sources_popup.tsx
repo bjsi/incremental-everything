@@ -500,7 +500,7 @@ function FindSourcesPopup() {
             )}
             {rem.interference && rem.passages.length > 0 && (
               <div className="text-xs" style={muted}>
-                Written under the Rem as a dated Interference list (≈ similar · ≠ divergences · = convergences); each quote is pinned
+                Written under the Rem as a dated Interference Check (≈ similar · ≠ divergences · = convergences); each quote is pinned
                 on its whole sentence in the PDF. {rem.interferenceModel ?? ''}
               </div>
             )}

@@ -231,6 +231,9 @@ In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) opened from the queue's 
 - **[Ask Your Sources](Source-Pins.md#ask-your-sources)** — `quick: ask`
   The focused Rem holds a question or a topic: Find Sources looks for the passages that answer it, then Claude answers only from them, with sections, quotes chosen per section and the sources' divergences; after review, written under the Rem as a dated answer. The review takes a [follow-up](Source-Pins.md#ask-follow-up) (`F`) to ask again with what to improve or add. Needs a corpus provider with semantic search and the Claude CLI.
 
+- **[Find Interference](Source-Pins.md#find-interference)** — `quick: intf`
+  What in your library the focused or selected note could be confused with (≈ similar but distinct: the same frame with another value or referent), and what contradicts it (≠, differences of scope included) or confirms it (=), sorted by Claude from the passages found; after review, written under the note as a dated Interference Check with pinned quotes, and `C` turns ≈ and ≠ rows into [discrimination cards](Source-Pins.md#discrimination-cards). Needs a corpus provider with semantic search and the Claude CLI.
+
 - **[Find Sources (by meaning) in descendants](Source-Pins.md#find-sources-in-descendants)** — `quick: fsqd`
   Find Sources on every statement under the focused or selected Rems (a summary or course document): lists read as one statement with their lead-in, headings and short labels left out, statements already pinned skipped; three at a time in the background, one review for the run.
 

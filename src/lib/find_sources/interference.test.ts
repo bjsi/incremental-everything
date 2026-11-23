@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   bestNoteMatch,
   cardPreview,
+  interferenceHeader,
   discriminationCards,
   itemLine,
   noteMatchScore,
@@ -152,5 +153,9 @@ assert.deepEqual([...noteTokens('dada a cerca de 1.000 jds do ponto')].sort(), [
   // Without the note's book, a divergence's own side is "esta nota".
   assert.ok(cardPreview(discriminationCards([{ key: 'e', info: { kind: 'diverges', frame: 'F', here: { subject: 's', value: '1' }, there: { subject: 's', value: '2' } }, book: { cite: 'Miguens' } }], undefined, 'pt')[0]).endsWith('esta nota: 1'));
 }
+
+// The header names the check, dated.
+assert.equal(interferenceHeader('en', new Date(2026, 10, 23)), 'Interference Check (11/23/2026)');
+assert.equal(interferenceHeader('pt', new Date(2026, 10, 23)), 'Verificação de interferências (23/11/2026)');
 
 console.log('interference tests passed');

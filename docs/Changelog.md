@@ -12,7 +12,17 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Reviewing Items in the Editor → Recovering a review after a crash](Reviewing-Items-in-the-Editor.md#recover-interrupted-review)
 
+**Find Interference**: a new command (`intf`) finds what in your library a note could be confused with (similar but distinct statements), what contradicts it (differences of scope included) and what confirms it, writes them under the note as a dated Interference Check with pinned quotes, and turns the look-alikes you choose into discrimination cards.
+
+![The Find Interference review on the spiral-test note](assets/find-interference-review.png){ width="640" }
+
+📖 [Source Pins → Find Interference](Source-Pins.md#find-interference)
+
 ### ✨ Improved
+
+**Settings**: the AI helper's settings moved to a new **AI Helper & Your Library** group, where each one shows only once the helper is paired (and, for Find Interference, once a corpus provider answers).
+
+📖 [Plugin Settings Reference → AI Helper & Your Library](Plugin-Settings-Reference.md#ai-helper)
 
 **Read Points**: Shift+click on **Go to Read Point** (Editor Review Timer, Priority Editor, the Read Point row under a document's title), on the read-point path and on the Read Points popup's entries now opens the Rem in a new pane, keeping the current document open.
 

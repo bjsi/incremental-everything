@@ -70,10 +70,13 @@ export const KIND_ORDER: InterferenceKind[] = ['similar', 'diverges', 'converges
 /** Only these kinds can make a discrimination card: a convergence has nothing to tell apart. */
 export const CARD_KINDS: InterferenceKind[] = ['similar', 'diverges'];
 
-/** "Interferências (23/11/2026)": the header, dated so runs never overwrite each other. */
+/**
+ * "Interference Check (11/23/2026)" / "Verificação de interferências (23/11/2026)": the header,
+ * dated so runs never overwrite each other ("Interference" alone reads too loosely).
+ */
 export function interferenceHeader(lang: 'pt' | 'en', when = new Date()): string {
   const date = when.toLocaleDateString(lang === 'pt' ? 'pt-BR' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  return `${lang === 'pt' ? 'Interferências' : 'Interference'} (${date})`;
+  return `${lang === 'pt' ? 'Verificação de interferências' : 'Interference Check'} (${date})`;
 }
 
 /** "subject, value" (either may be missing). */
