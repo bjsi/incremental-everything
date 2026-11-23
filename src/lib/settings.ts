@@ -367,6 +367,7 @@ export type SettingGroupId =
   | 'queueDashboard'
   | 'performance'
   | 'integrations'
+  | 'aiHelper'
   | 'misc';
 
 export interface SettingGroupSpec {
@@ -456,6 +457,15 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#speed-colour-coding',
   },
   integrations: { label: 'Integrations', blurb: 'Features ported from other plugins.' },
+  aiHelper: {
+    label: 'AI Helper & Your Library',
+    blurb:
+      'The AI helper on this computer (scripts/ai_ocr_helper.py) and what it does with your library: ' +
+      'Pin Source Quote, Find Sources, Check Statement, Ask Your Sources and Find Interference. Pair ' +
+      'the helper first; the settings of the features that need it, or a corpus provider, appear ' +
+      'once those are there.',
+    helpPath: 'Desktop-Helpers/',
+  },
   misc: { label: 'Other', blurb: '' },
 };
 
@@ -498,7 +508,27 @@ interface SettingSpecBase {
    * normally, so turning the parent back on restores what was configured.
    */
   showWhen?: { id: IESettingId; equals: unknown };
+  /**
+   * What on this computer the feature needs, beyond the plugin: 'aiHelper' = the AI helper,
+   * paired (a pairing token is set); 'corpusSearch' = that, plus a corpus provider that
+   * searches by meaning (docs/Corpus-Provider.md). Hidden in the popup until it is there, with
+   * a note in the group saying what is missing. A display rule, like `showWhen`.
+   */
+  requires?: SettingRequirement;
 }
+
+export type SettingRequirement = 'aiHelper' | 'corpusSearch';
+
+/** What the popup knows about this computer; `corpusSearch` is undefined until the provider answers. */
+export interface SettingEnvironment {
+  corpusSearch?: boolean;
+}
+
+/** The note shown in a group for settings hidden by their requirement. */
+export const REQUIREMENT_NOTES: Record<SettingRequirement, string> = {
+  aiHelper: 'appear once the AI helper is paired (the token above)',
+  corpusSearch: 'appear once a corpus provider that searches by meaning answers through the paired AI helper',
+};
 
 export type SettingSpec =
   | (SettingSpecBase & {
@@ -1464,7 +1494,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [aiHelperPairingTokenId]: {
     kind: 'string',
-    group: 'integrations',
+    group: 'aiHelper',
     helpPath: 'Desktop-Helpers/',
     placeholder: 'Not paired',
     wide: true,
@@ -1517,7 +1547,8 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [sourceHighlightColorId]: {
     kind: 'dropdown',
-    group: 'misc',
+    group: 'aiHelper',
+    requires: 'aiHelper',
     title: 'Source Highlight Colour',
     description:
       'Colour of the highlights the plugin creates when it pins the source of a passage ' +
@@ -1537,7 +1568,8 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [findInterferenceModelId]: {
     kind: 'dropdown',
-    group: 'misc',
+    group: 'aiHelper',
+    requires: 'corpusSearch',
     title: 'Find Interference: Claude Model',
     description:
       'The model that reads the passages Find Interference finds and names what your note could ' +
@@ -1551,7 +1583,8 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [pinOtherReaderViewOnCreateIncRemId]: {
     kind: 'boolean',
-    group: 'misc',
+    group: 'aiHelper',
+    requires: 'aiHelper',
     title: 'Create IncRem: Also Pin the Other PDF View',
     description:
       'When a PDF also has a Text Reader version, Create Incremental Rem pins the passage in both ' +
@@ -1788,12 +1821,30 @@ export function useIESetting<K extends IESettingId>(id: K): IESettings[K] {
  * Whether a setting should be shown, given the current values. Settings with no
  * `showWhen` are always shown.
  */
-export function isSettingVisible(id: IESettingId, values: IESettings | undefined): boolean {
+export function isSettingVisible(
+  id: IESettingId,
+  values: IESettings | undefined,
+  env?: SettingEnvironment
+): boolean {
+  if (env && !requirementMet(id, values, env)) return false;
   const dep = IE_SETTINGS_SCHEMA[id].showWhen;
   if (!dep) return true;
   // Nothing loaded yet: show everything rather than flash rows in and out.
   if (!values) return true;
   return JSON.stringify(values[dep.id]) === JSON.stringify(dep.equals);
+}
+
+/**
+ * Whether what a setting `requires` is there: the helper paired (a token is set), and for
+ * 'corpusSearch' the provider's answer too (hidden while it is still unknown).
+ */
+export function requirementMet(id: IESettingId, values: IESettings | undefined, env: SettingEnvironment): boolean {
+  const need = IE_SETTINGS_SCHEMA[id].requires;
+  if (!need) return true;
+  if (!values) return true;
+  const paired = !!String(values[aiHelperPairingTokenId] ?? '').trim();
+  if (!paired) return false;
+  return need === 'aiHelper' || env.corpusSearch === true;
 }
 
 /**

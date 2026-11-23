@@ -2,6 +2,7 @@ import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import { withHoverTips } from '../components/HoverTipLayer';
 import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
 import {
+  aiHelperPairingTokenId,
   SpeedCalibrationPeriod,
   speedCalibrationMarginSecondsId,
   speedCalibrationPeriodId,
@@ -28,7 +29,12 @@ import {
   setIESetting,
   isSettingVisible,
   hiddenDependentsOf,
+  REQUIREMENT_NOTES,
+  requirementMet,
+  SettingEnvironment,
+  SettingRequirement,
 } from '../lib/settings';
+import { getCorpusStatus } from '../lib/corpus';
 
 /**
  * The IE Settings popup: every setting the plugin owns, grouped and layered,
@@ -428,11 +434,37 @@ export function IESettingsWidget() {
     return Object.fromEntries(entries) as unknown as IESettings;
   }, [allIds]);
 
+  // What this computer offers, for settings that `requires` it: asked once the helper is
+  // paired (and again when the token changes), from the shared provider status.
+  const token = values ? String(values[aiHelperPairingTokenId] ?? '').trim() : '';
+  const [env, setEnv] = useState<SettingEnvironment>({});
+  useEffect(() => {
+    let live = true;
+    setEnv({});
+    if (!token) return;
+    getCorpusStatus(plugin, { force: true })
+      .then((status) => live && setEnv({ corpusSearch: status.available && status.capabilities.includes('semantic-search') }))
+      .catch(() => live && setEnv({ corpusSearch: false }));
+    return () => {
+      live = false;
+    };
+  }, [token]);
+
   const query = search.trim().toLowerCase();
   // A setting whose parent switch is off is hidden everywhere, search included:
   // configuring a scheduler you have turned off is exactly the noise the popup
-  // exists to remove.
-  const visible = (id: IESettingId) => isSettingVisible(id, values);
+  // exists to remove. So is one whose helper or provider is not there.
+  const visible = (id: IESettingId) => isSettingVisible(id, values, env);
+  /** A group's settings hidden by what they require, with the note that says what is missing. */
+  const blockedIn = (ids: IESettingId[]) => {
+    const out = new Map<SettingRequirement, string[]>();
+    for (const id of ids) {
+      const need = IE_SETTINGS_SCHEMA[id].requires;
+      if (!need || requirementMet(id, values, env)) continue;
+      out.set(need, [...(out.get(need) ?? []), IE_SETTINGS_SCHEMA[id].title]);
+    }
+    return [...out.entries()];
+  };
   const matches = (id: IESettingId) => {
     if (!visible(id)) return false;
     if (!query) return true;
@@ -618,6 +650,17 @@ export function IESettingsWidget() {
                     hiddenDependents={hiddenDependentsOf(id, values)}
                   />
                 ))}
+                {!query &&
+                  blockedIn(ids).map(([need, titles]) => (
+                    <div
+                      key={need}
+                      style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary, #94a3b8)', padding: '6px 0' }}
+                    >
+                      {need === 'corpusSearch' && token && env.corpusSearch === undefined
+                        ? `Asking the corpus provider… (${titles.join(', ')})`
+                        : `${titles.join(', ')}: ${titles.length === 1 ? 'appears' : 'appear'} ${REQUIREMENT_NOTES[need].replace(/^appear /, '')}.`}
+                    </div>
+                  ))}
                 {group === 'queueDashboard' && values[speedColorModeId] === 'calibrated' && (
                   <SpeedCalibrationReadout
                     period={values[speedCalibrationPeriodId]}
