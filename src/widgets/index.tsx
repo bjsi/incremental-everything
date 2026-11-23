@@ -56,6 +56,7 @@ import { registerSendToWindowWatcher } from '../lib/send_to_window';
 import { registerFollowQueueSources, startFollowingQueueSources } from '../lib/follow_queue_sources';
 import { registerVideoReviewBar } from '../lib/video_review_bar';
 import { registerImageSizeSession } from '../lib/image_size_session';
+import { registerEditorReviewRecovery } from '../lib/editor_review_recovery';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
@@ -181,6 +182,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerExtractEditorHost(plugin);
   // Runs Cycle Image Size's presses, and what its popup and floating widget ask for.
   registerImageSizeSession(plugin);
+  // Copies a running Editor Review Timer to disk; offers back what a crash lost.
+  registerEditorReviewRecovery(plugin);
 
   // Register CSS rules
   // PDF highlight CSS is (re)registered reactively: the "peek" toggle (command +

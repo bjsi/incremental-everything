@@ -17,6 +17,7 @@ import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { sendFocusedPaneToAnotherWindow } from '../lib/send_to_window';
 import { localizeMediaInRems } from '../lib/localize_media';
 import { showMessageDialog } from '../lib/message_dialog';
+import { openEditorReviewRecovery } from '../lib/editor_review_recovery';
 import {
   addVideoTranscript,
   describeTranscript,
@@ -33,6 +34,7 @@ import {
   powerupCode,
   currentIncRemKey,
   editorReviewTimerRemIdKey,
+  recoverEditorReviewCommandId,
   pageRangeWidgetId,
   noIncRemTimerKey,
   alwaysUseLightModeOnMobileId,
@@ -244,6 +246,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // "Peek" toggle: show/hide the pdfextract & incremental marker borders over
   // PDF-viewer highlights, so a cluttered page can be read cleanly on demand.
   // Mirrors the highlight-toolbar button; both share the same local flag.
+  // An Editor Review Timer lost to a crash or quit (lib/editor_review_recovery.ts).
+  await plugin.app.registerCommand({
+    id: recoverEditorReviewCommandId,
+    name: 'Recover Interrupted Editor Review',
+    quickCode: 'rer',
+    action: async () => {
+      if (!(await openEditorReviewRecovery(plugin))) {
+        await plugin.app.toast('No interrupted Editor Review to recover.');
+      }
+    },
+  });
+
   await plugin.app.registerCommand({
     id: togglePdfHighlightBordersCommandId,
     name: 'Toggle PDF Highlight Marker Borders',

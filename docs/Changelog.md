@@ -2,6 +2,16 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.252 - November 23rd, 2026
+
+### ✨ New
+
+**Editor Review Timer**: if RemNote crashes or is closed while the timer is running, the next start offers to resume the review from the time it had recorded, save the repetition with that time, or discard it; the **Recover Interrupted Editor Review** command (`rer`) reopens the offer.
+
+![Interrupted Editor Review popup](assets/editor-review-interrrupted.png){ width="560" }
+
+📖 [Reviewing Items in the Editor → Recovering a review after a crash](Reviewing-Items-in-the-Editor.md#recover-interrupted-review)
+
 ## v1.0.251 - November 22nd, 2026
 
 ### ✨ Improved

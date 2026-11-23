@@ -53,6 +53,9 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Execute Incremental Rem Repetition (Review in Editor)](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command)** (`Ctrl+Shift+J`) — `quick: er`
   Open the Editor Review Timer to log a spaced-repetition event directly from your document, without needing to enter the queue.
 
+- **[Recover Interrupted Editor Review](Reviewing-Items-in-the-Editor.md#recover-interrupted-review)** — `quick: rer`
+  Reopens the offer to resume, save or discard an Editor Review Timer that RemNote lost to a crash or a quit.
+
 - **[Next Item in Queue](Reviewing-Items-in-the-Queue.md#next)** (`Cmd+Right` / `Ctrl+Right`) — `quick: next`
   Records a rep and advances to the next item. Equivalent of clicking the "Next" button. Also saves PDF page history before advancing.
 

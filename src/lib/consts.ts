@@ -689,6 +689,7 @@ export const editorReviewTimerAccumulatedMsKey = 'editor-review-timer-accumulate
 export const editorReviewTimerPausedAtKey = 'editor-review-timer-paused-at';
 export const editorReviewTimerOriginKey = 'editor-review-timer-origin';
 export const editorReviewTimerDateOverrideKey = 'editor-review-timer-date-override';
+export const recoverEditorReviewCommandId = 'recover-editor-review';
 
 export const pdfHighlightColorId = 'pdf-highlight-color'; // Incremental PDF highlight color
 

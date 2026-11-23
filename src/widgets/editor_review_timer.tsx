@@ -30,6 +30,7 @@ import {
   readEditorTimer,
   resumeEditorTimer,
 } from '../lib/editor_review_session';
+import { checkpointEditorReview } from '../lib/editor_review_recovery';
 
 function EditorReviewTimer() {
   const plugin = usePlugin();
@@ -397,6 +398,7 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('inc-rem-main-view-state', undefined);
     await plugin.storage.setSession('inc-rem-main-view-doc-filter', undefined);
     await plugin.storage.setSession('editor-review-timer-queue-list', undefined);
+    await checkpointEditorReview(plugin).catch(() => {});
 
     await plugin.app.toast('Timer cancelled');
   };

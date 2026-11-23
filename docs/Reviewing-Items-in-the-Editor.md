@@ -136,6 +136,26 @@ When the Inc Rem being reviewed has **more than one PDF source**, a small PDF dr
 
 The switcher is hidden when the Inc Rem has zero or one PDF sources. See [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) for the full resolution chain across surfaces.
 
+### Recovering a review after a crash { #recover-interrupted-review }
+
+The timer's clock lives in RemNote's memory, so a crash, a reload or quitting RemNote mid-review used to take the time on the clock and the note you had typed with it. While a review runs, the plugin now saves a copy to your device every 15 seconds, and deletes it as soon as you press **Next**, **End Review**, **Dismiss** or **Cancel**.
+
+When RemNote starts again and finds a copy that was never finished, the **Interrupted Editor Review** popup opens (it can take about a minute, to be sure the other window is really gone):
+
+![Interrupted Editor Review popup](assets/editor-review-interrrupted.png){ width="560" }
+
+- **Resume timer** (`Enter`) — opens the Rem with the timer running again from the time recorded. The time RemNote was down is not counted, and your note comes back.
+- **Save repetition** — records the repetition now, dated when the copy was last saved, with the time recorded and the note. A review that came from the queue only has its time and note filled in, and only while it is still that Rem's latest repetition.
+- **Discard** — forgets the review; nothing is written.
+- **Esc** keeps it for later. The command **Recover Interrupted Editor Review** (quick code `rer`) opens the popup again; copies are kept for 7 days.
+
+Good to know:
+
+- Up to the last 15 seconds before the crash can be missing.
+- Reviews shorter than a minute are not offered.
+- After resuming a review that came from the queue, **End Review and back** lands on the Global Queue, since the queue's document is gone after a restart.
+- A copy belongs to the window that was running it: with several windows open, each window's review is offered separately.
+
 ### Layout & Responsiveness
 
 The timer widget is designed to be fully responsive. If used in a narrow sidebar or a collapsed window, the buttons and controls will automatically wrap into multiple lines to prevent overlap and ensure the timer remains legible.

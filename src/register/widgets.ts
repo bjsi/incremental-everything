@@ -678,6 +678,14 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Editor Review Timer lost to a crash or quit: resume / save / discard (lib/editor_review_recovery.ts).
+  plugin.app.registerWidget('editor_review_recovery', WidgetLocation.Popup, {
+    dimensions: {
+      width: 560,
+      height: 'auto',
+    },
+  });
+
   // Cycle Image Size: the confirmation, and the size it just set (lib/image_size_session.ts).
   plugin.app.registerWidget('image_size_confirm', WidgetLocation.Popup, {
     dimensions: {
