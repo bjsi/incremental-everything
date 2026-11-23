@@ -38,10 +38,21 @@ largar o ferro', given about 100 yd from the anchoring point, the boatswain open
 order, another distance); "the distances are reported every 100 yd" (the same number, another \
 meaning); "stop the engines about three ship lengths from the chosen position" (another \
 action, another distance before anchoring).
-- "diverges": about the SAME thing, with a different value or an incompatible claim: the \
-sources disagree.
+- "diverges": about the SAME thing, and the sources disagree: a different value, an \
+incompatible claim, or a different SCOPE. A difference of scope is when one source gives the \
+thing more or less than the others (a purpose, a cause, a condition, a member of a list), \
+or gives part of it to something else: e.g. the STATEMENT says the bow thruster is used \
+"for berthing and for course-keeping at sea", while a passage says it is "effective mainly \
+at low speeds" and course-keeping at sea is left to the rudder. It is a divergence even \
+when no source excludes the other's claim in so many words; "mainly", "only", "is used to" \
+frame a scope. Keep the passage's own qualifier in "there" ("mainly at low speeds").
 - "converges": about the SAME thing, saying the same: another book, or another place in the \
-same book, confirms it.
+same book, confirms it. When the STATEMENT says several things and the passage confirms \
+only some of them, it converges only if it leaves the rest open; if it frames the thing \
+without the rest (as above), that is a divergence of scope. A partial convergence puts in \
+"here" only the part it confirms.
+When a claim of the STATEMENT is found in no passage while several passages describe the \
+same thing without it, that is worth a divergence item with the clearest of them.
 Whether both are about the same thing decides between "similar" and the other two: the \
 "subject"s must make it visible.
 
