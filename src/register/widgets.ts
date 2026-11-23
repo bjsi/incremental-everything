@@ -117,11 +117,22 @@ const SOURCE_FLOATING_POPUPS_CSS = `
       z-index: 60;
     }
   }
+  /* The reference search ([[) in the reader's Notes is in #keyboard-aware-portal
+     instead; see the Extract Editor rule below. */
+  body:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=pdf_source_floating"]) #keyboard-aware-portal {
+    z-index: 60 !important;
+  }
 `;
 
-// The Extract Editor is a float too, holding a real editor: its slash menu, reference
-// search and formatting bar are host popups, which would open under it for the same
-// reason. Same lift, same exclusion.
+// The Extract Editor is a float too, holding a real editor: its slash menu and
+// formatting bar are host popups, which would open under it for the same reason.
+// Same lift, same exclusion.
+//
+// The reference search ([[ or [ on a selection) is not in that portal either: the rich
+// text editor puts it in #keyboard-aware-portal (fixed, z 30). That portal is already
+// position:fixed, so only its z-index changes, which clips nothing and is safe on
+// tablets too. Its 0.3 s transition animates the change, so a probe must wait before
+// reading it back. Verified live in 1.30.4.
 //
 // The bar that appears over selected text (bold, highlight, cloze…) is not in that
 // portal: RemNote portals it straight into <body> as .rn-selected-text-menu, at z 30
@@ -133,6 +144,9 @@ const EXTRACT_EDITOR_POPUPS_CSS = `
       position: relative;
       z-index: 60;
     }
+  }
+  body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) #keyboard-aware-portal {
+    z-index: 60 !important;
   }
   body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) .rn-selected-text-menu {
     z-index: 55 !important;
