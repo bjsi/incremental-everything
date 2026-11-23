@@ -16,7 +16,15 @@ import {
 } from '../lib/find_sources';
 import { Verdict, VERDICTS } from '../lib/find_sources/check';
 import { emphasisSegments, OUTSIDE_SYLLABUS } from '../lib/find_sources/quote_text';
-import { InterferenceKind, itemLine, KIND_LABELS } from '../lib/find_sources/interference_items';
+import {
+  CARD_KINDS,
+  cardPreview,
+  CardPlan,
+  discriminationCards,
+  InterferenceKind,
+  itemLine,
+  KIND_LABELS,
+} from '../lib/find_sources/interference_items';
 
 /** Remembered per device: what to write besides the pins (an old boolean meant quotes or not). */
 const EXTRAS_KEY = 'find-sources-with-quotes';
@@ -87,6 +95,8 @@ function FindSourcesPopup() {
   const plugin = usePlugin();
   const [review, setReview] = useState<FindSourcesReview | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Find Interference: the rows that go into a discrimination card (🃏, key C). */
+  const [cards, setCards] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState(0);
   const [extras, setExtras] = useState<FindSourcesExtras>('pins');
   const withQuotes = extras !== 'pins';
@@ -165,13 +175,51 @@ function FindSourcesPopup() {
 
   const toggle = (row: Row) => {
     if (!selectable(row)) return;
+    const key = keyOf(row);
+    // A row left out takes its card choice with it.
+    if (selected.has(key)) setCards((c) => (c.has(key) ? new Set([...c].filter((k) => k !== key)) : c));
     setSelected((s) => {
       const next = new Set(s);
-      if (next.has(keyOf(row))) next.delete(keyOf(row));
-      else next.add(keyOf(row));
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
+
+  /** Find Interference: whether a row can go into a discrimination card (≈ or ≠, with a value to hide). */
+  const cardable = (row: Row) =>
+    !!row.p.interference && CARD_KINDS.includes(row.p.interference.kind) && !!row.p.interference.there.value.trim();
+  /** C: put the row into a card (and so into the write), or take it out. */
+  const toggleCard = (row: Row) => {
+    if (!cardable(row)) return;
+    const key = keyOf(row);
+    const on = !cards.has(key);
+    setCards((c) => {
+      const next = new Set(c);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+    if (on) setSelected((s) => new Set([...s, key]));
+  };
+
+  /** The cards the 🃏 rows make, per Rem: rows of one frame share one card. */
+  const cardPlans = useMemo(() => {
+    const out = new Map<string, CardPlan<string>>();
+    review?.rems.forEach((r, i) => {
+      if (!r.interference) return;
+      const chosen = rows
+        .filter((row) => row.rem === i && cards.has(keyOf(row)) && row.p.interference)
+        .map((row) => ({
+          key: keyOf(row),
+          info: row.p.interference!,
+          book: { id: row.p.book.id, cite: row.p.book.cite || row.p.book.title },
+        }));
+      for (const plan of discriminationCards(chosen, r.interferenceNoteBook, r.lang)) for (const k of plan.keys) out.set(k, plan);
+    });
+    return out;
+  }, [review, rows, cards]);
+  const cardCount = new Set(cardPlans.values()).size;
 
   /** A: select the passages scoring 9+ (and only those); with `rem`, in that Rem only, the others untouched. */
   const acceptHigh = (rem?: number) =>
@@ -248,11 +296,14 @@ function FindSourcesPopup() {
       .map((r, i) => ({
         remId: r.remId,
         lang: r.lang,
-        passages: chosen.filter((c) => c.rem === i).map((c) => c.p),
+        passages: chosen
+          .filter((c) => c.rem === i)
+          .map((c) => (c.p.interference ? { ...c.p, interference: { ...c.p.interference, card: cards.has(keyOf(c)) } } : c.p)),
         check: r.check,
         members: r.members,
         answer: r.answer,
         interference: r.interference,
+        noteBook: r.interferenceNoteBook,
       }))
       .filter((r) => r.passages.length || r.check);
     // One hand-off write, awaited before closing (a popup's teardown cuts longer work short).
@@ -264,7 +315,8 @@ function FindSourcesPopup() {
     });
     await plugin.app.toast(
       isInterf
-        ? `📌 Writing ${chosen.length} statement${chosen.length === 1 ? '' : 's'} with their pins…`
+        ? `📌 Writing ${chosen.length} statement${chosen.length === 1 ? '' : 's'} with their pins` +
+            `${cardCount ? ` and ${cardCount} discrimination card${cardCount === 1 ? '' : 's'}` : ''}…`
         : `📌 Pinning ${chosen.length} passage${chosen.length === 1 ? '' : 's'}…`
     );
     close();
@@ -296,6 +348,9 @@ function FindSourcesPopup() {
     } else if (e.key === ' ') {
       e.preventDefault();
       if (row) toggle(row);
+    } else if (isInterf && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      if (row) toggleCard(row);
     } else if (!isInterf && (e.key === 'a' || e.key === 'A')) {
       e.preventDefault();
       acceptHigh(e.shiftKey ? row?.rem : undefined);
@@ -480,6 +535,29 @@ function FindSourcesPopup() {
                   }}
                 >
                   <input type="checkbox" readOnly checked={on} disabled={!selectable(row)} tabIndex={-1} style={{ marginTop: 3 }} />
+                  {review.rems[row.rem].interference && (
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCursor(k);
+                        toggleCard(row);
+                      }}
+                      data-tip={
+                        cardable(row)
+                          ? 'C: make a discrimination card with this statement (rows of one frame share one card)'
+                          : 'No card: only a ≈ or ≠ statement with a value to hide'
+                      }
+                      style={{
+                        cursor: cardable(row) ? 'pointer' : 'default',
+                        opacity: cards.has(keyOf(row)) ? 1 : cardable(row) ? 0.3 : 0.08,
+                        filter: cards.has(keyOf(row)) ? 'none' : 'grayscale(1)',
+                        fontSize: 14,
+                        lineHeight: '18px',
+                      }}
+                    >
+                      🃏
+                    </span>
+                  )}
                   <div className="flex flex-col gap-0.5" style={{ minWidth: 0 }}>
                     <div className="flex items-center gap-2 text-xs" style={muted}>
                       <span style={{ color: role.color, fontWeight: 600 }}>{role.label}</span>
@@ -524,6 +602,22 @@ function FindSourcesPopup() {
                       ”
                     </div>
                     {p.why && <div className="text-xs" style={muted}>{p.why}</div>}
+                    {(() => {
+                      const plan = cardPlans.get(keyOf(row));
+                      if (!plan) return null;
+                      const first = plan.keys[0] === keyOf(row);
+                      return (
+                        <div className="text-xs" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                          {first ? (
+                            <>
+                              🃏 <span style={{ fontFamily: 'ui-monospace, monospace' }}>{cardPreview(plan)}</span>
+                            </>
+                          ) : (
+                            <span style={muted}>🃏 on the card above (same frame)</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {p.interference?.notesText && (
                       <div className="text-xs" style={muted} data-tip="Your own Rem pinned to the same highlight; linked from the written item">
                         In your notes: “{p.interference.notesText}”
@@ -605,6 +699,11 @@ function FindSourcesPopup() {
               <span style={keyStyle}>Q</span> what to add ·{' '}
             </>
           )}
+          {isInterf && (
+            <>
+              <span style={keyStyle}>C</span> card ·{' '}
+            </>
+          )}
           {isAsk && (
             <>
               <span style={keyStyle}>F</span> follow-up ·{' '}
@@ -626,7 +725,7 @@ function FindSourcesPopup() {
           }}
         >
           {isInterf
-            ? `Write ${count || ''}`
+            ? `Write ${count || ''}${cardCount ? ` · ${cardCount} card${cardCount === 1 ? '' : 's'}` : ''}`
             : isCheck
             ? `Write ${isAsk ? 'answer' : 'verdict'}${count ? ` + ${count} passage${count === 1 ? '' : 's'}` : ''}`
             : `Pin ${count || ''}`}{' '}

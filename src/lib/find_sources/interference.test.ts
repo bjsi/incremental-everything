@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
-import { bestNoteMatch, itemLine, noteMatchScore, noteTokens, parseInterferenceItems, sentenceAround } from './interference_items';
+import {
+  bestNoteMatch,
+  cardPreview,
+  discriminationCards,
+  itemLine,
+  noteMatchScore,
+  noteTokens,
+  parseInterferenceItems,
+  sentenceAround,
+} from './interference_items';
 
 const ARTE_NAVAL =
   'À voz de “PREPARAR PARA LARGAR O FERRO”, dada a cerca de 1.000 jds do ponto de fundeio, o Sr. Mestre inicia ' +
@@ -71,32 +80,77 @@ assert.deepEqual([...noteTokens('dada a cerca de 1.000 jds do ponto')].sort(), [
   );
 }
 
-// Items: quotes checked against the passage, kinds validated, duplicates dropped.
+// Items: quotes checked against the passage, kinds validated, duplicates dropped; sides structured.
 {
   const contexts = [ARTE_NAVAL];
   const items = parseInterferenceItems(
     [
       {
         kind: 'similar',
-        axis: 'Distância ao ponto de fundeio',
-        here: '“Atenção para largar o ferro”, ~100 jds',
-        there: '“Preparar para largar o ferro”, ~1.000 jds',
+        frame: 'Distância ao ponto de fundeio',
+        here: { subject: '“Atenção para largar o ferro”', value: '~100 jds' },
+        there: { subject: '“Preparar para largar o ferro”', value: '~1.000 jds' },
         quote: { passage: 1, excerpts: ['dada a cerca de 1.000 jds do ponto de fundeio'], emphasis: ['1.000 jds'], key: '1.000' },
       },
-      { kind: 'similar', axis: 'x', here: 'a', there: 'b', quote: { passage: 1, excerpts: ['dada a cerca de 1.000 jds do ponto de fundeio'] } },
-      { kind: 'invented', axis: 'x', here: 'a', there: 'b', quote: { passage: 1, excerpts: ['as distâncias passam'] } },
-      { kind: 'diverges', axis: 'x', here: 'a', there: 'b', quote: { passage: 1, excerpts: ['typed by the model'] } },
-      { kind: 'converges', axis: 'x', here: 'a', there: 'b', quote: { passage: 2, excerpts: ['as distâncias passam'] } },
+      { kind: 'similar', frame: 'x', here: 'a', there: 'b', quote: { passage: 1, excerpts: ['dada a cerca de 1.000 jds do ponto de fundeio'] } },
+      { kind: 'invented', frame: 'x', here: 'a', there: 'b', quote: { passage: 1, excerpts: ['as distâncias passam'] } },
+      { kind: 'diverges', frame: 'x', here: 'a', there: 'b', quote: { passage: 1, excerpts: ['typed by the model'] } },
+      { kind: 'converges', frame: 'x', here: 'a', there: 'b', quote: { passage: 2, excerpts: ['as distâncias passam'] } },
+      // an older reply: "axis" and plain-string sides still read
+      { kind: 'similar', axis: 'Valor de 100 jds', here: 'Atenção, ~100 jds', there: 'reporte a cada 100 jds', quote: { passage: 1, excerpts: ['as distâncias passam a ser reportadas a cada 100 jds'] } },
     ],
     contexts
   );
-  assert.equal(items.length, 1);
+  assert.equal(items.length, 2);
   assert.equal(items[0].quote.key, '1.000');
   assert.equal(
     itemLine(items[0]),
     '**Distância ao ponto de fundeio**: “Atenção para largar o ferro”, ~100 jds × “Preparar para largar o ferro”, ~1.000 jds'
   );
-  assert.equal(itemLine({ kind: 'converges', axis: 'Distância', here: 'a', there: 'b' }), '**Distância**: b');
+  assert.equal(items[1].frame, 'Valor de 100 jds');
+  assert.deepEqual(items[1].there, { subject: 'reporte a cada 100 jds', value: '' });
+  assert.equal(
+    itemLine({ kind: 'converges', frame: 'Distância', here: { subject: 'a', value: '1' }, there: { subject: 'b', value: '2' } }),
+    '**Distância**: b, 2'
+  );
+}
+
+// Discrimination cards: one ladder per frame, the note's value last and shown; another book named.
+{
+  const frame = 'Distância ao ponto de fundeio';
+  const here = { subject: 'Atenção para largar o ferro', value: '~100 jds' };
+  const arte = { id: 'arte-naval-2', cite: 'Arte Naval' };
+  const plans = discriminationCards(
+    [
+      { key: 'a', info: { kind: 'similar', frame, here, there: { subject: 'Preparar para largar o ferro', value: '~1.000 jds' } }, book: arte },
+      { key: 'b', info: { kind: 'similar', frame: 'Distância ao ponto de fundeio ', here, there: { subject: 'máquinas paradas', value: '~300 jardas' } }, book: { id: 'miguens-1', cite: 'Miguens' } },
+      { key: 'c', info: { kind: 'similar', frame: 'Valor de 100 jds', here, there: { subject: 'reporte', value: '' } }, book: arte },
+      { key: 'd', info: { kind: 'converges', frame, here, there: { subject: 'x', value: 'y' } }, book: arte },
+      { key: 'e', info: { kind: 'diverges', frame: 'Parar as máquinas', here: { subject: 'parar', value: '~3 comprimentos' }, there: { subject: 'parar', value: '~300 jardas' } }, book: { id: 'miguens-1', cite: 'Miguens' } },
+    ],
+    arte,
+    'pt'
+  );
+  assert.equal(plans.length, 2);
+  assert.deepEqual(plans[0].keys, ['a', 'b']);
+  assert.equal(
+    cardPreview(plans[0]),
+    'Distância ao ponto de fundeio — Preparar para largar o ferro: {{~1.000 jds}} · máquinas paradas (Miguens): {{~300 jardas}} · Atenção para largar o ferro: ~100 jds'
+  );
+  assert.equal(cardPreview(plans[1]), 'Parar as máquinas — Miguens: {{~300 jardas}} · Arte Naval: ~3 comprimentos');
+  // A subject already in parentheses takes the book inside them.
+  assert.equal(
+    cardPreview(
+      discriminationCards(
+        [{ key: 'm', info: { kind: 'similar', frame: 'F', here, there: { subject: 'máquinas paradas (Fragatas)', value: '~300 jardas' } }, book: { id: 'miguens-1', cite: 'Miguens I' } }],
+        arte,
+        'pt'
+      )[0]
+    ),
+    'F — máquinas paradas (Fragatas; Miguens I): {{~300 jardas}} · Atenção para largar o ferro: ~100 jds'
+  );
+  // Without the note's book, a divergence's own side is "esta nota".
+  assert.ok(cardPreview(discriminationCards([{ key: 'e', info: { kind: 'diverges', frame: 'F', here: { subject: 's', value: '1' }, there: { subject: 's', value: '2' } }, book: { cite: 'Miguens' } }], undefined, 'pt')[0]).endsWith('esta nota: 1'));
 }
 
 console.log('interference tests passed');

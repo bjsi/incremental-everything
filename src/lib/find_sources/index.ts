@@ -44,8 +44,12 @@ import { placeInline, pinnedIds, RichElement } from './placement';
 import { attribution, ChosenQuote, emphasisSegments, mergedQuote, segmentsToRichText } from './quote_text';
 import { checkHeader, checkStatement, NoteSetting, StatementCheck, VERDICTS } from './check';
 import { AnswerSection, answerHeader, askSources, boldToRichText, FollowUp, SourcesAnswer } from './ask';
+import { HIDE_PARENT_POWERUP_CODE, REMOVE_PARENT_POWERUP_CODE } from '../../register/queue_display_powerups';
+import { autoAssignCardPriority } from '../card_priority';
 import {
   bestNoteMatch,
+  CardPart,
+  discriminationCards,
   findInterference,
   InterferenceInfo,
   InterferenceKind,
@@ -54,6 +58,7 @@ import {
   itemLine,
   KIND_LABELS,
   KIND_ORDER,
+  NoteBook,
   noteMatchScore,
   sentenceAround,
 } from './interference';
@@ -191,6 +196,8 @@ export interface ReviewRem {
   interferenceModel?: string;
   /** Find Interference: why there is no list (the helper or Claude failed). */
   interferenceError?: string;
+  /** Find Interference: the book the note's own statement comes from (named on a card that contrasts books). */
+  interferenceNoteBook?: NoteBook;
 }
 
 export interface FindSourcesReview {
@@ -222,6 +229,8 @@ export interface FindSourcesWrite {
     answer?: SourcesAnswer;
     /** Find Interference: the passages are its items, written under an Interference header. */
     interference?: boolean;
+    /** Find Interference: the note's own book, for its discrimination cards. */
+    noteBook?: NoteBook;
   }[];
 }
 
@@ -897,6 +906,8 @@ async function addInterference(
     const result = await findInterference(plugin, statement, rem.lang, rem.passages, model, setting);
     items = result.items;
     rem.interferenceModel = result.model;
+    const own = result.sourceIndex !== undefined ? rem.passages[result.sourceIndex] : undefined;
+    if (own) rem.interferenceNoteBook = { id: own.book.id, cite: own.book.cite || own.book.title };
     console.log('[FindInterference]', rem.title, result);
   } catch (e) {
     console.error('[FindInterference] failed for', rem.remId, e);
@@ -924,7 +935,7 @@ async function addInterference(
         why: '',
         basis: undefined,
         index: undefined,
-        interference: { kind, axis: item.axis, here: item.here, there: item.there },
+        interference: { kind, frame: item.frame, here: item.here, there: item.there },
       };
       const located = await locateInRemNote(plugin, row, { peek: true });
       const { reused, ...clean } = located;
@@ -1138,6 +1149,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
   let checkCount = 0;
   let answerCount = 0;
   let interferenceCount = 0;
+  let cardCount = 0;
   const problems: string[] = [];
   for (const entry of write.rems) {
     const rem = await plugin.rem.findOne(entry.remId);
@@ -1175,9 +1187,10 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
 
     // Find Interference: its items under an Interference header; the note itself gets no pins.
     if (entry.interference) {
-      const counts = await writeInterference(plugin, rem, entry.lang, pinned);
+      const counts = await writeInterference(plugin, rem, entry.lang, pinned, entry.noteBook);
       quoteCount += counts.quotes;
       pinCount += counts.pins;
+      cardCount += counts.cards;
       interferenceCount++;
       continue;
     }
@@ -1297,6 +1310,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
     : 'Find Sources';
   const done = `\ud83d\udccc ${feature}: ` +
     (interferenceCount ? `${quoteCount} item${quoteCount === 1 ? '' : 's'}, ` : '') +
+    (cardCount ? `${cardCount} discrimination card${cardCount === 1 ? '' : 's'}, ` : '') +
     (answerCount ? `${answerCount} answer${answerCount === 1 ? '' : 's'}, ` : '') +
     (checkCount ? `${checkCount} verdict${checkCount === 1 ? '' : 's'}, ` : '') +
     `${pinCount} pin${pinCount === 1 ? '' : 's'}` +
@@ -1349,9 +1363,12 @@ async function writeInterference(
   plugin: ReactRNPlugin,
   rem: PluginRem,
   lang: 'pt' | 'en',
-  pinned: Pinned[]
-): Promise<{ quotes: number; pins: number }> {
-  const counts = { quotes: 0, pins: 0 };
+  pinned: Pinned[],
+  noteBook?: NoteBook
+): Promise<{ quotes: number; pins: number; cards: number }> {
+  const counts = { quotes: 0, pins: 0, cards: 0 };
+  /** Each written row's item Rem, by its place in `pinned` (a card goes under its first row's item). */
+  const itemRems = new Map<number, PluginRem>();
   const child = async (parent: PluginRem, text: RichElement[]): Promise<PluginRem | undefined> => {
     const r = await plugin.rem.createRem();
     if (!r) return undefined;
@@ -1370,7 +1387,8 @@ async function writeInterference(
     const group = await child(header, [`${label.icon} ${label[lang]}`]);
     if (!group) continue;
     if (kind === 'diverges') await tagByName(plugin, group, DIVERGENCE_TAG);
-    for (const { passage, pins } of mine) {
+    for (const entry of mine) {
+      const { passage, pins } = entry;
       const info = passage.interference!;
       const text: RichElement[] = boldToRichText(itemLine(info));
       if (info.notesRemId && (await plugin.rem.findOne(info.notesRemId))) {
@@ -1378,12 +1396,73 @@ async function writeInterference(
       }
       const itemRem = await child(group, text);
       if (!itemRem) continue;
+      itemRems.set(pinned.indexOf(entry), itemRem);
       const added = await addQuoteRem(plugin, itemRem, passage, pins, false, lang);
       if (added.quote) counts.quotes++;
       counts.pins += pins.length;
     }
   }
+  counts.cards = await writeDiscriminationCards(plugin, pinned, itemRems, noteBook, lang);
   return counts;
+}
+
+/**
+ * The discrimination cards chosen in the review (🃏 on ≈ and ≠ rows): one cloze Rem per frame
+ * (./interference_items discriminationCards), each value a cloze followed by its quote's pins,
+ * the note's own value last and shown. Written under the first row's item, whose line shows the
+ * answers, so the card hides it in the queue: Hide Parent when that powerup is there (the
+ * Hide-in-Queue integration), else Remove Parent (always registered), as Alt+Z does. The card
+ * priority follows the note, as any new card's (flashcard prioritisation on).
+ */
+async function writeDiscriminationCards(
+  plugin: ReactRNPlugin,
+  pinned: Pinned[],
+  itemRems: Map<number, PluginRem>,
+  noteBook: NoteBook | undefined,
+  lang: 'pt' | 'en'
+): Promise<number> {
+  const rows = pinned
+    .map((p, k) => ({ p, k }))
+    .filter(({ p, k }) => p.passage.interference?.card && itemRems.has(k))
+    .map(({ p, k }) => ({
+      key: k,
+      info: p.passage.interference!,
+      book: { id: p.passage.book.id, cite: p.passage.book.cite || p.passage.book.title },
+    }));
+  const plans = discriminationCards(rows, noteBook, lang);
+  if (!plans.length) return 0;
+  const parentPowerup = (await plugin.powerup.getPowerupByCode(HIDE_PARENT_POWERUP_CODE).catch(() => undefined))
+    ? HIDE_PARENT_POWERUP_CODE
+    : REMOVE_PARENT_POWERUP_CODE;
+  const cloze = () => Math.random().toString(36).substring(2, 10);
+  const partText = (part: CardPart<number>): RichElement[] => [
+    ...(part.label ? [`${part.label}: `] : []),
+    part.cloze ? { i: 'm', text: part.value, cId: cloze() } : part.value,
+    ...(part.cloze && part.key !== undefined ? pinned[part.key].pins.flatMap((id) => [' ', { i: 'q', _id: id, pin: true }]) : []),
+  ];
+  let written = 0;
+  // As Alt+Z: no GlobalRemChanged storm (each write would run the priority drift path).
+  await plugin.storage.setSession('plugin_operation_active', true);
+  try {
+    for (const plan of plans) {
+      const parent = itemRems.get(plan.keys[0]);
+      if (!parent) continue;
+      const text: RichElement[] = [
+        ...(plan.title ? [{ i: 'm', text: plan.title, b: true }, ' \u2014 '] : []),
+        ...plan.parts.flatMap((part, n) => [...(n ? [' \u00b7 '] : []), ...partText(part)]),
+      ];
+      const card = await plugin.rem.createRem();
+      if (!card) continue;
+      await card.setText(text as RichTextInterface);
+      await appendAsLastChild(plugin, card, parent._id);
+      await card.addPowerup(parentPowerup);
+      await autoAssignCardPriority(plugin, card).catch((e) => console.warn('[FindInterference] card priority', e));
+      written++;
+    }
+  } finally {
+    setTimeout(() => void plugin.storage.setSession('plugin_operation_active', false), 2000);
+  }
+  return written;
 }
 
 const ANSWER_LABELS = {

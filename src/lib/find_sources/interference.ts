@@ -42,8 +42,8 @@ action, another distance before anchoring).
 sources disagree.
 - "converges": about the SAME thing, saying the same: another book, or another place in the \
 same book, confirms it.
-Whether both are about the same thing decides between "similar" and the other two: "here" and \
-"there" must make it visible.
+Whether both are about the same thing decides between "similar" and the other two: the \
+"subject"s must make it visible.
 
 Leave out: the sentence the STATEMENT itself comes from; statements outside the frame; \
 background and explanations. The passage the statement comes from often holds the most \
@@ -52,18 +52,25 @@ several items; the same statement found in several passages is one item per pass
 when they are different books.
 
 Reply with ONE JSON object and nothing else:
-{"items": [{"kind": "similar" | "diverges" | "converges", "axis": "...", "here": "...", \
-"there": "...", "quote": { ... }}]}
+{"source": 0, "items": [{"kind": "similar" | "diverges" | "converges", "frame": "...", \
+"here": {"subject": "...", "value": "..."}, "there": {"subject": "...", "value": "..."}, \
+"quote": { ... }}]}
 
+- "source": the number of the passage the STATEMENT itself comes from (its sentence is \
+there), or 0 when none is.
 - At most ${MAX_ITEMS} items, the most confusable first. None when nothing qualifies: \
-{"items": []}.
-- "axis": the shared frame in 2 to 6 words, in the language given as LANGUAGE \
-("Distância ao ponto de fundeio").
-- "here": what the STATEMENT gives on the axis, at most 12 words: what it is about and its \
-value ("“Atenção para largar o ferro”, ~100 jds").
-- "there": the same for the passage's statement ("“Preparar para largar o ferro”, ~1.000 \
-jds"). In LANGUAGE, with the sources' own terms and numbers.
-- "here" and "there" are objective: what and how much, nothing else. No judgment, advice or \
+"items": [].
+- "frame": the shared frame in 2 to 6 words, in the language given as LANGUAGE \
+("Distância ao ponto de fundeio"). Items of the same frame get the SAME words, letter for \
+letter: the student may turn them into one card that asks each value next to the others.
+- "here": what the STATEMENT gives on the frame; "there": the same for the passage's \
+statement. Each is {"subject": what it is about, at most 8 words ("Preparar para largar o \
+ferro", "máquinas paradas"), "value": the deciding figure or term, at most 5 words, as the \
+source gives it ("~1.000 jds", "três comprimentos do navio", "Mestre")}. The value will be \
+hidden as a cloze, so it holds only what must be recalled, never the subject; "~" for \
+"cerca de" / "about". A diverging pair has the same subject and different values. In \
+LANGUAGE, with the sources' own terms and numbers.
+- Subjects and values are objective: what and how much, nothing else. No judgment, advice or \
 comparison words ("unlike", "note that", "attention", "cuidado").
 - "quote": the passage's words that state it, as below, in ONE quote object. Only the words \
 that carry what it is about and its value, cut short: the student reads the quote to see \
@@ -95,5 +102,10 @@ export async function findInterference(
     { task: 'find-interference', system: SYSTEM, text: lines.join('\n'), json: true, model },
     { timeoutMs: INTERFERENCE_TIMEOUT_MS }
   );
-  return { items: parseInterferenceItems(res.data?.items, passages.map((p) => p.context || p.quote)), model: res.model };
+  const source = Number(res.data?.source);
+  return {
+    items: parseInterferenceItems(res.data?.items, passages.map((p) => p.context || p.quote)),
+    sourceIndex: Number.isInteger(source) && source >= 1 && source <= passages.length ? source - 1 : undefined,
+    model: res.model,
+  };
 }
