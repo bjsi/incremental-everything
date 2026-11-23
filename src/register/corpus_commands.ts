@@ -3,6 +3,7 @@ import {
   askYourSourcesCommandId,
   checkStatementCommandId,
   checkStatementsInTreeCommandId,
+  findInterferenceCommandId,
   findSourcesCommandId,
   findSourcesInTreeCommandId,
 } from '../lib/consts';
@@ -11,6 +12,7 @@ import {
   askYourSourcesCommand,
   checkStatementCommand,
   checkStatementsInTree,
+  findInterferenceCommand,
   findSources,
   findSourcesInTree,
   SEMANTIC_SEARCH,
@@ -25,7 +27,7 @@ let registered = false;
 /**
  * The commands that need a corpus provider able to search by meaning (`semantic-search`,
  * docs/Corpus-Provider.md), reached through the AI helper: Find Sources, Check Statement,
- * Ask Your Sources and their tree versions. They are not Media Bridge commands, and Pin
+ * Ask Your Sources, Find Interference and the tree versions. They are not Media Bridge commands, and Pin
  * Source Quote, which only needs the AI helper, stays registered for everyone.
  *
  * Registered only once the provider reports the capability, so users without one never see
@@ -70,6 +72,17 @@ export function registerCorpusCommands(plugin: ReactRNPlugin) {
       name: 'Ask Your Sources',
       quickCode: 'ask',
       action: async () => askYourSourcesCommand(plugin),
+    });
+    // What the selected Rems could be confused with in the library (memory interference: the
+    // same frame with another value or referent), and what contradicts or confirms them; the
+    // statements are quoted and pinned under the Rem after review.
+    await plugin.app.registerCommand({
+      id: findInterferenceCommandId,
+      name: 'Find Interference',
+      description:
+        'Find what in your library this note could be confused with (similar but distinct), and what contradicts or confirms it, with pinned quotes.',
+      quickCode: 'intf',
+      action: async () => findInterferenceCommand(plugin),
     });
     // The same over a whole summary or course document, one review for the batch.
     await plugin.app.registerCommand({

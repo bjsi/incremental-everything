@@ -132,6 +132,8 @@ export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
 export const titleCaseAcronymsId = 'title-case-acronyms';
 /** Colour of the PDF highlights the plugin creates for source pins (lib/source_pins). */
 export const sourceHighlightColorId = 'source-highlight-color';
+/** Find Interference: the Claude model that reads the passages ('opus' | 'sonnet'). */
+export const findInterferenceModelId = 'find-interference-model';
 export type HighlightColorName = 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple';
 /** Create IncRem also pins the passage in a PDF's other view (page ↔ Text Reader) — lib/pdf_source_pins pinOtherViewOfHighlight. */
 export const pinOtherReaderViewOnCreateIncRemId = 'pin-other-reader-view-on-create-increm';
@@ -798,6 +800,7 @@ export const pinSourceQuotesInTreeCommandId = 'pin-source-quotes-in-tree';
 export const findSourcesCommandId = 'find-sources';
 export const checkStatementCommandId = 'check-statement';
 export const askYourSourcesCommandId = 'ask-your-sources';
+export const findInterferenceCommandId = 'find-interference';
 export const findSourcesInTreeCommandId = 'find-sources-in-tree';
 export const checkStatementsInTreeCommandId = 'check-statements-in-tree';
 export const FIND_SOURCES_POPUP = 'find_sources_popup';

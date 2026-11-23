@@ -13,14 +13,19 @@
  * 3. The popup hands the accepted passages back (pendingFindSourcesWritesKey); the
  *    tracker pins them (a popup's teardown would cut a long write short) and dismisses
  *    the notice.
+ *
+ * Check Statement (./check), Ask Your Sources (./ask) and Find Interference
+ * (./interference) are the same flow with Claude reading the passages in between.
  */
 import { BuiltInPowerupCodes, PluginRem, ReactRNPlugin, RichTextInterface, RNPlugin } from '@remnote/plugin-sdk';
 import {
   aiNotePowerupCode,
   FIND_SOURCES_POPUP,
+  findInterferenceModelId,
   pendingFindSourcesJobsKey,
   pendingFindSourcesWritesKey,
 } from '../consts';
+import { getIESetting } from '../settings';
 import { CorpusUnavailableError, corpusRequest, getCorpusStatus } from '../corpus';
 import { HelperUnreachableError } from '../helper_client';
 import { showMessageDialog } from '../message_dialog';
@@ -39,6 +44,19 @@ import { placeInline, pinnedIds, RichElement } from './placement';
 import { attribution, ChosenQuote, emphasisSegments, mergedQuote, segmentsToRichText } from './quote_text';
 import { checkHeader, checkStatement, NoteSetting, StatementCheck, VERDICTS } from './check';
 import { AnswerSection, answerHeader, askSources, boldToRichText, FollowUp, SourcesAnswer } from './ask';
+import {
+  bestNoteMatch,
+  findInterference,
+  InterferenceInfo,
+  InterferenceKind,
+  interferenceHeader,
+  InterferenceModel,
+  itemLine,
+  KIND_LABELS,
+  KIND_ORDER,
+  noteMatchScore,
+  sentenceAround,
+} from './interference';
 import { groupOf, OutlineNode, pinTarget, Statement, StatementMember, statementsInOutline } from './outline';
 
 export const SEMANTIC_SEARCH = 'semantic-search';
@@ -115,6 +133,8 @@ export interface FindSourcesJob {
   check?: boolean;
   /** Ask Your Sources: the Rem is a question or topic; Claude answers it from the passages (./ask). */
   ask?: boolean;
+  /** Find Interference: what the note could be confused with, and what contradicts or confirms it (./interference). */
+  interference?: boolean;
 }
 
 /** A passage as the review shows it: where it was found in RemNote, if it was. */
@@ -129,6 +149,14 @@ export interface ReviewPassage extends FoundPassage {
   basis?: boolean;
   /** Its place in the Rem's passage list, which the answer's sections refer to. */
   index?: number;
+  /**
+   * What to find and pin in the PDF, when it is not the excerpts: Find Interference pins
+   * each excerpt's whole sentence (found reliably, reads well in the PDF) and quotes only
+   * the excerpt.
+   */
+  pinQuotes?: string[];
+  /** Find Interference: the statement this row stands for (one row per item). */
+  interference?: InterferenceInfo;
 }
 
 export interface ReviewRem {
@@ -157,6 +185,12 @@ export interface ReviewRem {
   answerError?: string;
   /** Check Statement: why there is no verdict (the helper or Claude failed). */
   checkError?: string;
+  /** Find Interference ran on this Rem: its rows are the statements found (ReviewPassage.interference). */
+  interference?: boolean;
+  /** Find Interference: the model that read the passages. */
+  interferenceModel?: string;
+  /** Find Interference: why there is no list (the helper or Claude failed). */
+  interferenceError?: string;
 }
 
 export interface FindSourcesReview {
@@ -186,11 +220,16 @@ export interface FindSourcesWrite {
     check?: StatementCheck;
     members?: StatementMember[];
     answer?: SourcesAnswer;
+    /** Find Interference: the passages are its items, written under an Interference header. */
+    interference?: boolean;
   }[];
 }
 
 /** The verbatim parts of a passage's quote (one, from a provider without `excerpts`). */
 export const excerptsOf = (p: FoundPassage): string[] => (p.excerpts?.length ? p.excerpts : [p.quote]);
+
+/** What is looked for and pinned in the PDF: the whole sentences when set (ReviewPassage.pinQuotes), else the excerpts. */
+const pinQuotesOf = (p: ReviewPassage): string[] => (p.pinQuotes?.length ? p.pinQuotes : excerptsOf(p));
 
 /**
  * A quote Rem's text, in the skills' format: ⚠️ for a diverging passage, “quote” with its
@@ -334,7 +373,7 @@ async function enqueueStatements(
   plugin: RNPlugin,
   statements: Statement[],
   openSource: string | null | undefined,
-  mode: { check?: boolean; ask?: boolean }
+  mode: { check?: boolean; ask?: boolean; interference?: boolean }
 ): Promise<number> {
   const items: FindSourcesItem[] = [];
   for (const st of statements) {
@@ -344,7 +383,7 @@ async function enqueueStatements(
       remId: st.headId,
       title: shortTitle(st.text),
       texts: [st.text],
-      ...(await surroundings(head, (r) => plainOf(plugin, r.text), !!(mode.check || mode.ask))),
+      ...(await surroundings(head, (r) => plainOf(plugin, r.text), !!(mode.check || mode.ask || mode.interference))),
       members: st.members,
     });
   }
@@ -356,6 +395,7 @@ async function enqueueStatements(
     queuedAt: Date.now(),
     check: !!mode.check,
     ask: !!mode.ask,
+    interference: !!mode.interference,
   };
   const queued = (await plugin.storage.getSession<FindSourcesJob[]>(pendingFindSourcesJobsKey)) || [];
   await plugin.storage.setSession(pendingFindSourcesJobsKey, [...queued, job]);
@@ -367,19 +407,33 @@ export async function enqueueFindSources(
   plugin: RNPlugin,
   remIds: string[],
   openSource?: string | null,
-  options: { check?: boolean; ask?: boolean } = {}
+  options: { check?: boolean; ask?: boolean; interference?: boolean } = {}
 ): Promise<number> {
   const rems = (await plugin.rem.findMany(remIds)) || [];
-  return enqueueStatements(plugin, await statementsForRems(plugin, rems), openSource, options);
+  // Find Interference: each Rem on its own (one fact, one card), never its list group.
+  const statements = options.interference
+    ? (await Promise.all(rems.map(async (r) => ({ headId: r._id, text: await statementText(plugin, r), members: [] }))))
+    : await statementsForRems(plugin, rems);
+  return enqueueStatements(plugin, statements, openSource, options);
 }
 
-type Mode = 'find' | 'check' | 'ask';
-const MODE_NAMES: Record<Mode, string> = { find: 'Find Sources', check: 'Check Statement', ask: 'Ask Your Sources' };
+type Mode = 'find' | 'check' | 'ask' | 'interference';
+const MODE_NAMES: Record<Mode, string> = {
+  find: 'Find Sources',
+  check: 'Check Statement',
+  ask: 'Ask Your Sources',
+  interference: 'Find Interference',
+};
 
 const runningToast = (n: number, mode: Mode = 'find') => {
-  const doing = { find: 'Finding the sources of', check: 'Checking', ask: 'Asking your sources about' }[mode];
-  const how = { find: 'by meaning', check: 'against your library', ask: 'in your library' }[mode];
-  const secs = { find: 25, check: 45, ask: 60 }[mode];
+  const doing = {
+    find: 'Finding the sources of',
+    check: 'Checking',
+    ask: 'Asking your sources about',
+    interference: 'Looking for what could be confused with',
+  }[mode];
+  const how = { find: 'by meaning', check: 'against your library', ask: 'in your library', interference: 'in your library' }[mode];
+  const secs = { find: 25, check: 45, ask: 60, interference: 90 }[mode];
   return (
     `\ud83d\udd0e ${doing} ${n === 1 ? 'this Rem' : `${n} Rems`} ${how}, in the background (about ${secs} s` +
     `${n === 1 ? '' : ' each'}). A notice will say when ${n === 1 ? 'it is' : 'they are'} ready to review.`
@@ -403,13 +457,19 @@ async function startFromCommand(plugin: ReactRNPlugin, mode: Mode) {
   }
   const rems = await selectedOrFocusedRems(plugin);
   if (!rems.length) {
-    const target = { find: 'whose sources you want to find', check: 'to check', ask: 'holding your question or topic' }[mode];
+    const target = {
+      find: 'whose sources you want to find',
+      check: 'to check',
+      ask: 'holding your question or topic',
+      interference: 'whose look-alikes you want to find',
+    }[mode];
     await plugin.app.toast(`Focus or select the Rems ${target}.`);
     return;
   }
   const n = await enqueueFindSources(plugin, rems.map((r) => r._id), await openSourceRemId(plugin), {
     check: mode === 'check',
     ask: mode === 'ask',
+    interference: mode === 'interference',
   });
   await plugin.app.toast(n ? runningToast(n, mode) : 'The selected Rems have no text to look for.');
 }
@@ -509,6 +569,14 @@ export const checkStatementCommand = (plugin: ReactRNPlugin) => startFromCommand
 export const askYourSourcesCommand = (plugin: ReactRNPlugin) => startFromCommand(plugin, 'ask');
 
 /**
+ * Command: Find Interference — the statements of the library a note could be confused with
+ * (the same frame with another value or referent: memory interference), and the ones that
+ * contradict or confirm it (./interference); written under the note with pinned quotes
+ * after review.
+ */
+export const findInterferenceCommand = (plugin: ReactRNPlugin) => startFromCommand(plugin, 'interference');
+
+/**
  * Ask Your Sources, from the review: ask one Rem's question again with a follow-up (what to
  * improve, correct or add). Runs in the background like the first run; a new notice opens
  * a new review.
@@ -574,7 +642,11 @@ export async function findSourcesFromDialog(plugin: RNPlugin, remIds: string[], 
  * Where a passage's quote is in RemNote: the first of its book's PDFs holding it, on
  * which page. Dry run: nothing is written.
  */
-async function locateInRemNote(plugin: ReactRNPlugin, passage: FoundPassage): Promise<ReviewPassage> {
+async function locateInRemNote(
+  plugin: ReactRNPlugin,
+  passage: ReviewPassage,
+  options: { peek?: boolean } = {}
+): Promise<ReviewPassage & { reused?: string[] }> {
   if (!passage.book.pdfRemIds?.length) return { ...passage, unpinnable: 'no PDF of this book in RemNote' };
   let reason = 'not found in its PDF';
   for (const pdfRemId of passage.book.pdfRemIds) {
@@ -588,14 +660,15 @@ async function locateInRemNote(plugin: ReactRNPlugin, passage: FoundPassage): Pr
       const hits = await ensureSourcePins(
         plugin,
         pdfRemId,
-        excerptsOf(passage).map((quote) => ({ quote, page: passage.page ?? undefined })),
+        pinQuotesOf(passage).map((quote) => ({ quote, page: passage.page ?? undefined })),
         ['pdf'],
-        { dryRun: true }
+        { dryRun: true, peek: options.peek }
       );
       const first = hits.find((h) => h.found);
       if (first) {
         const name = await plainOf(plugin, pdf.text as RichTextInterface);
-        return { ...passage, pdfRemId, pdfName: name, pdfPage: first.page };
+        const reused = [...new Set(hits.flatMap((h) => h.reused))];
+        return { ...passage, pdfRemId, pdfName: name, pdfPage: first.page, ...(options.peek ? { reused } : {}) };
       }
     } catch (e) {
       if (e instanceof HelperUnreachableError) throw e;
@@ -607,7 +680,7 @@ async function locateInRemNote(plugin: ReactRNPlugin, passage: FoundPassage): Pr
 
 export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJob): Promise<void> {
   const noticeId = `${job.id}-notice`;
-  const what = job.ask ? 'Ask Your Sources' : job.check ? 'Check Statement' : 'Find Sources';
+  const what = job.interference ? 'Find Interference' : job.ask ? 'Ask Your Sources' : job.check ? 'Check Statement' : 'Find Sources';
   const slots: (ReviewRem | undefined)[] = new Array(job.items.length);
   let stopped: string | undefined;
   let done = 0;
@@ -627,21 +700,23 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
               texts: [...(item.context ? [item.context] : []), ...item.texts, ...(item.followUp ? [item.followUp] : [])],
               ancestors: item.ancestors,
               openSourceRemId: job.openSourceRemId,
-              ...(job.ask ? { mode: 'answer' } : {}),
+              ...(job.ask ? { mode: 'answer' } : job.interference ? { mode: 'interference' } : {}),
             },
           ],
         },
         { timeoutMs: FIND_TIMEOUT_MS, capability: SEMANTIC_SEARCH }
       );
       const found = res.items?.find((it) => it.remId === item.remId)?.passages ?? [];
+      // Find Interference locates only the statements Claude picks (addInterference).
       const located: ReviewPassage[] = [];
-      for (const p of found) located.push(await locateInRemNote(plugin, p));
+      for (const p of found) located.push(job.interference ? { ...p } : await locateInRemNote(plugin, p));
       const passages = item.followUp ? withPreviousPassages(located, item.previousPassages) : located;
       console.log(`[FindSources] ${item.title}: ${passages.length} passage(s)`, passages);
       const rem: ReviewRem = { remId: item.remId, title: item.title, lang, passages, members: item.members, context: item.context, outline: item.outline };
       passages.forEach((p, k) => (p.index = k));
       const setting: NoteSetting = { context: item.context, outline: item.outline };
       if (job.check) await addCheck(plugin, rem, item.texts.join('\n'), setting);
+      if (job.interference) await addInterference(plugin, rem, item.texts.join('\n'), setting, item.ancestors);
       if (job.ask) {
         rem.question = item.texts.join('\n');
         rem.followUp = item.followUp;
@@ -654,7 +729,8 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
         );
       }
       // The full chunks served the verdict or answer; the review and the write do not need them.
-      passages.forEach((p) => delete p.context);
+      // (Find Interference has replaced the list with its rows by now: drop theirs.)
+      rem.passages.forEach((p) => delete p.context);
       return rem;
     } catch (e) {
       console.error('[FindSources] search failed for', item.remId, e);
@@ -693,6 +769,10 @@ export async function runFindSourcesJob(plugin: ReactRNPlugin, job: FindSourcesJ
   const failed = rems.filter((r) => r.error);
   const subject = rems.length === 1 ? `\u201c${rems[0].title}\u201d` : `${rems.length} Rems`;
   const checked = rems.filter((r) => r.check);
+  if (job.interference) {
+    await interferenceNotice(plugin, rems, noticeId, job);
+    return;
+  }
   if (!total && !checked.length && !rems.some((r) => r.answer)) {
     await showNotice(plugin, {
       id: noticeId,
@@ -794,6 +874,153 @@ async function addAnswer(
     console.error('[AskSources] answer failed for', rem.remId, e);
     rem.answerError = (e as Error).message;
   }
+}
+
+/**
+ * Find Interference: Claude reads the passages and names the statements the note could be
+ * confused with (or that contradict or confirm it); each becomes a review row of its own,
+ * the excerpt quoted and its whole sentence located for the pin, with the user's own Rem
+ * that already states it when one is pinned to the same highlight. Rows replace the passages.
+ */
+async function addInterference(
+  plugin: ReactRNPlugin,
+  rem: ReviewRem,
+  statement: string,
+  setting: NoteSetting,
+  ancestors: string[]
+) {
+  rem.interference = true;
+  if (!rem.passages.length) return;
+  const model: InterferenceModel = (await getIESetting(plugin, findInterferenceModelId)) === 'sonnet' ? 'sonnet' : 'opus';
+  let items;
+  try {
+    const result = await findInterference(plugin, statement, rem.lang, rem.passages, model, setting);
+    items = result.items;
+    rem.interferenceModel = result.model;
+    console.log('[FindInterference]', rem.title, result);
+  } catch (e) {
+    console.error('[FindInterference] failed for', rem.remId, e);
+    rem.interferenceError = (e as Error).message;
+    rem.passages = [];
+    return;
+  }
+  const roleOf: Record<InterferenceKind, PassageRole> = { similar: 'related', diverges: 'diverges', converges: 'source' };
+  const rows: ReviewPassage[] = [];
+  for (const kind of KIND_ORDER) {
+    for (const item of items.filter((it) => it.kind === kind)) {
+      const source = rem.passages[item.quote.index];
+      if (!source) continue;
+      const context = source.context || source.quote;
+      const row: ReviewPassage = {
+        ...source,
+        quote: item.quote.excerpts.join(' [\u2026] '),
+        excerpts: item.quote.excerpts,
+        emphasis: item.quote.emphasis,
+        key: item.quote.key,
+        pinQuotes: [...new Set(item.quote.excerpts.map((e) => sentenceAround(context, e)))],
+        role: roleOf[kind],
+        diverges: kind === 'diverges',
+        covers: '',
+        why: '',
+        basis: undefined,
+        index: undefined,
+        interference: { kind, axis: item.axis, here: item.here, there: item.there },
+      };
+      const located = await locateInRemNote(plugin, row, { peek: true });
+      const { reused, ...clean } = located;
+      if (reused?.length) {
+        const note = await userNoteFor(plugin, reused, row.excerpts!.join(' '), new Set([rem.remId, ...ancestors]), rem.remId);
+        if (note) clean.interference = { ...clean.interference!, notesRemId: note.id, notesText: note.text };
+      }
+      rows.push(clean);
+    }
+  }
+  rem.passages = rows;
+}
+
+/** Rems read under each Rem pinned to the highlight: the cards often sit one or two levels down. */
+const NOTE_DEPTH = 2;
+const NOTE_MAX_CANDIDATES = 60;
+
+/**
+ * The user's own Rem that already states an excerpt: among the Rems pinned to the highlights
+ * its sentence would reuse (and their children, where a card often sits under the pinned
+ * lead-in), the one whose words match the excerpt best (./interference_items). Never the note
+ * itself, its ancestors or anything under it, a quote Rem or an AI Note (earlier runs' output).
+ */
+async function userNoteFor(
+  plugin: ReactRNPlugin,
+  highlightIds: string[],
+  excerpt: string,
+  exclude: Set<string>,
+  noteId: string
+): Promise<{ id: string; text: string } | undefined> {
+  const seen = new Set<string>(exclude);
+  const candidates: { rem: PluginRem; text: string }[] = [];
+  const visit = async (r: PluginRem, depth: number) => {
+    if (seen.has(r._id) || candidates.length >= NOTE_MAX_CANDIDATES) return;
+    seen.add(r._id);
+    const text = await statementText(plugin, r).catch(() => '');
+    if (text) candidates.push({ rem: r, text });
+    if (depth > 0) for (const c of (await r.getChildrenRem().catch(() => [])) ?? []) await visit(c, depth - 1);
+  };
+  for (const id of highlightIds.slice(0, 4)) {
+    const highlight = await plugin.rem.findOne(id);
+    const refs = (await highlight?.remsReferencingThis().catch(() => [])) ?? [];
+    for (const r of refs.slice(0, 20)) await visit(r, NOTE_DEPTH);
+  }
+  // Best first; the first one that is the user's own note wins.
+  const ranked = candidates
+    .map((c) => ({ ...c, score: noteMatchScore(c.text, excerpt) }))
+    .filter((c) => bestNoteMatch([c], excerpt))
+    .sort((a, b) => b.score - a.score);
+  for (const c of ranked) {
+    if ((await c.rem.isQuote().catch(() => false)) || (await c.rem.hasPowerup(aiNotePowerupCode).catch(() => false))) continue;
+    if (await isUnder(c.rem, noteId)) continue;
+    return { id: c.rem._id, text: c.text.length > 140 ? `${c.text.slice(0, 139)}\u2026` : c.text };
+  }
+  return undefined;
+}
+
+/** Whether `rem` sits under `ancestorId` (a few levels up at most: our own output is near). */
+async function isUnder(rem: PluginRem, ancestorId: string, max = 12): Promise<boolean> {
+  let parent = await rem.getParentRem().catch(() => undefined);
+  for (let k = 0; parent && k < max; k++) {
+    if (parent._id === ancestorId) return true;
+    parent = await parent.getParentRem().catch(() => undefined);
+  }
+  return false;
+}
+
+/** Find Interference's notice: what was found per kind, or why nothing was. */
+async function interferenceNotice(plugin: ReactRNPlugin, rems: ReviewRem[], noticeId: string, job: FindSourcesJob) {
+  const subject = rems.length === 1 ? `\u201c${rems[0].title}\u201d` : `${rems.length} Rems`;
+  const failed = rems.filter((r) => r.error || r.interferenceError);
+  const rows = rems.flatMap((r) => r.passages);
+  if (!rows.length) {
+    await showNotice(plugin, {
+      id: noticeId,
+      tone: failed.length ? 'error' : 'info',
+      title: 'Find Interference: nothing found',
+      message: failed.length
+        ? `${subject}: ${failed[0].error ?? failed[0].interferenceError}`
+        : `${subject}: nothing in your library is easily confused with it.`,
+      openRemId: rems[0]?.remId,
+    });
+    return;
+  }
+  const parts = KIND_ORDER.map((kind) => [kind, rows.filter((p) => p.interference?.kind === kind).length] as const)
+    .filter(([, n]) => n)
+    .map(([kind, n]) => `${KIND_LABELS[kind].icon} ${n} ${KIND_LABELS[kind].en.toLowerCase()}`);
+  if (failed.length) parts.push(`${failed.length} failed`);
+  const review: FindSourcesReview = { jobId: job.id, noticeId, rems, openSourceRemId: job.openSourceRemId };
+  await showNotice(plugin, {
+    id: noticeId,
+    tone: rows.some((p) => p.interference?.kind === 'diverges') ? 'info' : 'success',
+    title: 'Find Interference: ready to review',
+    message: `${subject}: ${parts.join(' \u00b7 ')}. Nothing is written until you accept it.`,
+    action: { label: 'Review', popup: FIND_SOURCES_POPUP, data: review },
+  });
 }
 
 /**
@@ -910,6 +1137,7 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
   let noteCount = 0;
   let checkCount = 0;
   let answerCount = 0;
+  let interferenceCount = 0;
   const problems: string[] = [];
   for (const entry of write.rems) {
     const rem = await plugin.rem.findOne(entry.remId);
@@ -929,17 +1157,29 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
         const results = await ensureSourcePins(
           plugin,
           passage.pdfRemId,
-          excerptsOf(passage).map((quote) => ({ quote, page: passage.pdfPage ?? passage.page ?? undefined })),
+          pinQuotesOf(passage).map((quote) => ({ quote, page: passage.pdfPage ?? passage.page ?? undefined })),
           ['pdf']
         );
         const pins = [...new Set(results.filter((r) => r.found).flatMap((r) => r.pins))];
-        const byExcerpt = new Map(excerptsOf(passage).map((e, k) => [e, results[k]?.found ? results[k].pins : []]));
+        // Per excerpt (Ask Your Sources' sections); a row pinned by whole sentences has no such map.
+        const byExcerpt = passage.pinQuotes?.length
+          ? undefined
+          : new Map(excerptsOf(passage).map((e, k) => [e, results[k]?.found ? results[k].pins : []]));
         pinned.push({ passage, pins, byExcerpt });
         if (!pins.length) problems.push(`not found again in ${passage.pdfName ?? 'its PDF'}`);
       } catch (e) {
         problems.push((e as Error).message);
         pinned.push({ passage, pins: [] });
       }
+    }
+
+    // Find Interference: its items under an Interference header; the note itself gets no pins.
+    if (entry.interference) {
+      const counts = await writeInterference(plugin, rem, entry.lang, pinned);
+      quoteCount += counts.quotes;
+      pinCount += counts.pins;
+      interferenceCount++;
+      continue;
     }
 
     // Ask Your Sources: the answer under the question; the question itself gets no pins.
@@ -1048,12 +1288,19 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
     }
   }
   await dismissNotices(plugin, write.noticeId);
-  const feature = answerCount ? 'Ask Your Sources' : checkCount ? 'Check Statement' : 'Find Sources';
+  const feature = interferenceCount
+    ? 'Find Interference'
+    : answerCount
+    ? 'Ask Your Sources'
+    : checkCount
+    ? 'Check Statement'
+    : 'Find Sources';
   const done = `\ud83d\udccc ${feature}: ` +
+    (interferenceCount ? `${quoteCount} item${quoteCount === 1 ? '' : 's'}, ` : '') +
     (answerCount ? `${answerCount} answer${answerCount === 1 ? '' : 's'}, ` : '') +
     (checkCount ? `${checkCount} verdict${checkCount === 1 ? '' : 's'}, ` : '') +
     `${pinCount} pin${pinCount === 1 ? '' : 's'}` +
-    (write.extras !== 'pins' ? `, ${quoteCount} quote Rem${quoteCount === 1 ? '' : 's'}` : '') +
+    (write.extras !== 'pins' && !interferenceCount ? `, ${quoteCount} quote Rem${quoteCount === 1 ? '' : 's'}` : '') +
     (write.extras === 'notes' ? `, ${noteCount} AI note${noteCount === 1 ? '' : 's'}` : '') +
     ` on ${write.rems.length} Rem${write.rems.length === 1 ? '' : 's'}.`;
   if (problems.length) {
@@ -1067,6 +1314,76 @@ export async function runFindSourcesWrite(plugin: ReactRNPlugin, write: FindSour
   } else {
     await plugin.app.toast(done);
   }
+}
+
+/**
+ * Tags the Find Interference headers get when the knowledge base has them (top-level Rems of
+ * these names, as the /paralelos skill's #Paral and #Diverg): the user's Custom CSS styles
+ * them. Without them the headers stay plain.
+ */
+const INTERFERENCE_TAG = 'Interf';
+const DIVERGENCE_TAG = 'Diverg';
+
+async function tagByName(plugin: RNPlugin, rem: PluginRem, name: string) {
+  try {
+    const tag = await plugin.rem.findByName([name], null);
+    if (tag) await rem.addTag(tag._id);
+  } catch (e) {
+    console.warn(`[FindInterference] could not tag with ${name}`, e);
+  }
+}
+
+/**
+ * Find Interference, written as the note's last child:
+ *
+ *   • Interferências (23/11/2026)                       Extra Card Detail, #Interf
+ *       • ≈ Semelhantes, mas distintos
+ *           • **Axis**: here × there · nas notas: [[the user's card]]
+ *               • “excerpt” (cite, PDF p. N) 📌         pinned on its whole sentence
+ *       • ≠ Divergências                                 #Diverg
+ *       • = Convergências
+ *
+ * Only the items accepted in the review; empty groups are left out.
+ */
+async function writeInterference(
+  plugin: ReactRNPlugin,
+  rem: PluginRem,
+  lang: 'pt' | 'en',
+  pinned: Pinned[]
+): Promise<{ quotes: number; pins: number }> {
+  const counts = { quotes: 0, pins: 0 };
+  const child = async (parent: PluginRem, text: RichElement[]): Promise<PluginRem | undefined> => {
+    const r = await plugin.rem.createRem();
+    if (!r) return undefined;
+    await r.setText(text as RichTextInterface);
+    await appendAsLastChild(plugin, r, parent._id);
+    return r;
+  };
+  const header = await child(rem, [interferenceHeader(lang)]);
+  if (!header) return counts;
+  await header.addPowerup(BuiltInPowerupCodes.ExtraCardDetail);
+  await tagByName(plugin, header, INTERFERENCE_TAG);
+  for (const kind of KIND_ORDER) {
+    const mine = pinned.filter((p) => p.passage.interference?.kind === kind);
+    if (!mine.length) continue;
+    const label = KIND_LABELS[kind];
+    const group = await child(header, [`${label.icon} ${label[lang]}`]);
+    if (!group) continue;
+    if (kind === 'diverges') await tagByName(plugin, group, DIVERGENCE_TAG);
+    for (const { passage, pins } of mine) {
+      const info = passage.interference!;
+      const text: RichElement[] = boldToRichText(itemLine(info));
+      if (info.notesRemId && (await plugin.rem.findOne(info.notesRemId))) {
+        text.push(` \u00b7 ${lang === 'pt' ? 'nas notas' : 'in your notes'}: `, { i: 'q', _id: info.notesRemId });
+      }
+      const itemRem = await child(group, text);
+      if (!itemRem) continue;
+      const added = await addQuoteRem(plugin, itemRem, passage, pins, false, lang);
+      if (added.quote) counts.quotes++;
+      counts.pins += pins.length;
+    }
+  }
+  return counts;
 }
 
 const ANSWER_LABELS = {

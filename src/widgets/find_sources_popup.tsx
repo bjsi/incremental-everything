@@ -16,6 +16,7 @@ import {
 } from '../lib/find_sources';
 import { Verdict, VERDICTS } from '../lib/find_sources/check';
 import { emphasisSegments, OUTSIDE_SYLLABUS } from '../lib/find_sources/quote_text';
+import { InterferenceKind, itemLine, KIND_LABELS } from '../lib/find_sources/interference_items';
 
 /** Remembered per device: what to write besides the pins (an old boolean meant quotes or not). */
 const EXTRAS_KEY = 'find-sources-with-quotes';
@@ -40,6 +41,9 @@ const ROLE: Record<PassageRole, { label: string; color: string }> = {
   diverges: { label: 'Diverges', color: '#EF4444' },
   related: { label: 'Related', color: '#3B82F6' },
 };
+
+/** Find Interference: its rows by kind instead of by role. */
+const KIND_COLOR: Record<InterferenceKind, string> = { similar: '#F59E0B', diverges: '#EF4444', converges: '#10B981' };
 
 interface Row {
   rem: number;
@@ -103,7 +107,8 @@ function FindSourcesPopup() {
       data?.rems.forEach((r, i) =>
         r.passages.forEach((p, j) => {
           // Sources scoring 8+, and the passages a Check Statement verdict rests on.
-          if (((p.role === 'source' && p.score >= 8) || p.basis) && (p.pdfRemId || p.basis)) initial.add(`${i}:${j}`);
+          // Find Interference: every statement Claude named (it already chose them).
+          if (p.interference || (((p.role === 'source' && p.score >= 8) || p.basis) && (p.pdfRemId || p.basis))) initial.add(`${i}:${j}`);
         })
       );
       setSelected(initial);
@@ -133,7 +138,9 @@ function FindSourcesPopup() {
     const order: PassageRole[] = ['source', 'diverges', 'related'];
     const out: Row[] = [];
     review?.rems.forEach((r, i) => {
-      for (const role of order) r.passages.forEach((p, j) => p.role === role && out.push({ rem: i, passage: j, p }));
+      // Find Interference's rows are already in kind order (similar, diverges, converges).
+      if (r.interference) r.passages.forEach((p, j) => out.push({ rem: i, passage: j, p }));
+      else for (const role of order) r.passages.forEach((p, j) => p.role === role && out.push({ rem: i, passage: j, p }));
     });
     return out;
   }, [review]);
@@ -145,6 +152,8 @@ function FindSourcesPopup() {
   const isAsk = !!review?.rems.some((r) => r.answer || r.answerError);
   /** A verdict or an answer is written even with no passage selected. */
   const isCheck = isAsk || !!review?.rems.some((r) => r.check || r.checkError);
+  /** Find Interference: rows are statements, always written with their quote. */
+  const isInterf = !!review?.rems.some((r) => r.interference);
 
   useEffect(() => {
     rowRefs.current[cursor]?.scrollIntoView({ block: 'nearest' });
@@ -152,7 +161,7 @@ function FindSourcesPopup() {
 
   const keyOf = (row: Row) => `${row.rem}:${row.passage}`;
   /** Without a PDF in RemNote, a passage can only be written as a quote Rem. */
-  const selectable = (row: Row) => !!row.p.pdfRemId || withQuotes;
+  const selectable = (row: Row) => !!row.p.pdfRemId || withQuotes || !!row.p.interference;
 
   const toggle = (row: Row) => {
     if (!selectable(row)) return;
@@ -184,7 +193,7 @@ function FindSourcesPopup() {
    * Find Sources: Check Statement's observation and Ask Your Sources' answer already explain.
    */
   const choices = isCheck ? EXTRAS.filter((e) => e.value !== 'notes') : EXTRAS;
-  const extrasChoice: FindSourcesExtras = choices.some((e) => e.value === extras) ? extras : 'quotes';
+  const extrasChoice: FindSourcesExtras = isInterf ? 'quotes' : choices.some((e) => e.value === extras) ? extras : 'quotes';
   const cycleExtras = () => {
     const next = choices[(choices.findIndex((e) => e.value === extrasChoice) + 1) % choices.length].value;
     setExtras(next);
@@ -231,7 +240,7 @@ function FindSourcesPopup() {
     if (!review || busy) return;
     const chosen = rows.filter((r) => selected.has(keyOf(r)) && selectable(r));
     if (!chosen.length && !isCheck) {
-      await plugin.app.toast('Select at least one passage (Space), or press Esc to close.');
+      await plugin.app.toast(`Select at least one ${isInterf ? 'statement' : 'passage'} (Space), or press Esc to close.`);
       return;
     }
     setBusy(true);
@@ -243,6 +252,7 @@ function FindSourcesPopup() {
         check: r.check,
         members: r.members,
         answer: r.answer,
+        interference: r.interference,
       }))
       .filter((r) => r.passages.length || r.check);
     // One hand-off write, awaited before closing (a popup's teardown cuts longer work short).
@@ -252,7 +262,11 @@ function FindSourcesPopup() {
       extras: extrasChoice,
       rems,
     });
-    await plugin.app.toast(`📌 Pinning ${chosen.length} passage${chosen.length === 1 ? '' : 's'}…`);
+    await plugin.app.toast(
+      isInterf
+        ? `📌 Writing ${chosen.length} statement${chosen.length === 1 ? '' : 's'} with their pins…`
+        : `📌 Pinning ${chosen.length} passage${chosen.length === 1 ? '' : 's'}…`
+    );
     close();
   };
 
@@ -282,13 +296,13 @@ function FindSourcesPopup() {
     } else if (e.key === ' ') {
       e.preventDefault();
       if (row) toggle(row);
-    } else if (e.key === 'a' || e.key === 'A') {
+    } else if (!isInterf && (e.key === 'a' || e.key === 'A')) {
       e.preventDefault();
       acceptHigh(e.shiftKey ? row?.rem : undefined);
     } else if (e.key === 'PageDown' || e.key === 'PageUp') {
       e.preventDefault();
       jumpRem(e.key === 'PageDown' ? 1 : -1);
-    } else if (e.key === 'q' || e.key === 'Q') {
+    } else if (!isInterf && (e.key === 'q' || e.key === 'Q')) {
       e.preventDefault();
       cycleExtras();
     } else if (isAsk && (e.key === 'f' || e.key === 'F')) {
@@ -312,15 +326,19 @@ function FindSourcesPopup() {
       style={{ outline: 'none', color: 'var(--rn-clr-content-primary)', height: '100%', boxSizing: 'border-box' }}
     >
       <div className="flex items-center gap-2">
-        <span style={{ fontSize: 18 }}>{isAsk ? '💬' : isCheck ? '⚖️' : '🔎'}</span>
-        <span className="font-semibold text-base">{isAsk ? 'Ask Your Sources' : isCheck ? 'Check Statement' : 'Find Sources'}</span>
+        <span style={{ fontSize: 18 }}>{isInterf ? '🔀' : isAsk ? '💬' : isCheck ? '⚖️' : '🔎'}</span>
+        <span className="font-semibold text-base">
+          {isInterf ? 'Find Interference' : isAsk ? 'Ask Your Sources' : isCheck ? 'Check Statement' : 'Find Sources'}
+        </span>
         <span className="text-xs ml-auto" style={muted}>
-          {isAsk
+          {isInterf
+            ? 'What your note could be confused with, and what contradicts or confirms it'
+            : isAsk
             ? 'Your question answered from the passages of your library'
             : isCheck
             ? 'Your note checked against the passages of your library'
             : 'Passages that say what your note says, found by meaning'}
-          {multi && ` \u00b7 ${review.rems.length} Rems, ${rows.length} passages`}
+          {multi && ` \u00b7 ${review.rems.length} Rems, ${rows.length} ${isInterf ? 'statements' : 'passages'}`}
         </span>
       </div>
 
@@ -420,16 +438,29 @@ function FindSourcesPopup() {
                 No answer: {rem.answerError}
               </div>
             )}
-            {!rem.error && !rem.passages.length && (
+            {rem.interferenceError && (
+              <div className="text-xs" style={{ color: '#EF4444' }}>
+                No list: {rem.interferenceError}
+              </div>
+            )}
+            {rem.interference && rem.passages.length > 0 && (
               <div className="text-xs" style={muted}>
-                No passage of your library says this.
+                Written under the Rem as a dated Interference list (≈ similar · ≠ divergences · = convergences); each quote is pinned
+                on its whole sentence in the PDF. {rem.interferenceModel ?? ''}
+              </div>
+            )}
+            {!rem.error && !rem.interferenceError && !rem.passages.length && (
+              <div className="text-xs" style={muted}>
+                {rem.interference ? 'Nothing in your library is easily confused with this.' : 'No passage of your library says this.'}
               </div>
             )}
             {rows.map((row, k) => {
               if (row.rem !== i) return null;
               const p = row.p;
               const on = selected.has(keyOf(row)) && selectable(row);
-              const role = ROLE[p.role];
+              const role = p.interference
+                ? { label: `${KIND_LABELS[p.interference.kind].icon} ${KIND_LABELS[p.interference.kind].en}`, color: KIND_COLOR[p.interference.kind] }
+                : ROLE[p.role];
               return (
                 <div
                   key={keyOf(row)}
@@ -455,8 +486,12 @@ function FindSourcesPopup() {
                       {review.rems[row.rem].answer && p.index !== undefined && (
                         <span style={{ color: 'var(--rn-clr-content-primary)', fontWeight: 600 }}>[{p.index + 1}]</span>
                       )}
-                      <span>{p.score}/10</span>
-                      <span>·</span>
+                      {!p.interference && (
+                        <>
+                          <span>{p.score}/10</span>
+                          <span>·</span>
+                        </>
+                      )}
                       <span className="font-medium" style={{ color: 'var(--rn-clr-content-primary)' }}>
                         {p.book.cite || p.book.title}
                       </span>
@@ -470,6 +505,11 @@ function FindSourcesPopup() {
                         </span>
                       )}
                     </div>
+                    {p.interference && (
+                      <div>
+                        <Bold text={itemLine(p.interference)} />
+                      </div>
+                    )}
                     <div className="italic">
                       “
                       {emphasisSegments(p.quote, p.emphasis, p.key).map((seg, n) =>
@@ -484,6 +524,11 @@ function FindSourcesPopup() {
                       ”
                     </div>
                     {p.why && <div className="text-xs" style={muted}>{p.why}</div>}
+                    {p.interference?.notesText && (
+                      <div className="text-xs" style={muted} data-tip="Your own Rem pinned to the same highlight; linked from the written item">
+                        In your notes: “{p.interference.notesText}”
+                      </div>
+                    )}
                     {p.covers && p.role === 'source' && (
                       <div className="text-xs" style={muted}>
                         Supports: “{p.covers.length > 120 ? `${p.covers.slice(0, 119)}…` : p.covers}”
@@ -533,6 +578,7 @@ function FindSourcesPopup() {
       )}
 
       <div className="flex items-center gap-3 text-sm" style={{ borderTop: '1px solid var(--rn-clr-border-primary)', paddingTop: 8 }}>
+        {!isInterf && (
         <button
           onClick={cycleExtras}
           onMouseDown={(e) => e.preventDefault()}
@@ -542,14 +588,23 @@ function FindSourcesPopup() {
         >
           {EXTRAS.find((e) => e.value === extrasChoice)?.label} ▾
         </button>
+        )}
         <span className="text-xs" style={muted}>
-          <span style={keyStyle}>↑↓</span> move · <span style={keyStyle}>Space</span> select · <span style={keyStyle}>A</span> all ≥ {ACCEPT_SCORE} ·{' '}
+          <span style={keyStyle}>↑↓</span> move · <span style={keyStyle}>Space</span> select · {!isInterf && (
+            <>
+              <span style={keyStyle}>A</span> all ≥ {ACCEPT_SCORE} ·{' '}
+            </>
+          )}
           {multi && (
             <>
               <span style={keyStyle}>⇧A</span> this Rem · <span style={keyStyle}>PgDn</span> next Rem ·{' '}
             </>
           )}
-          <span style={keyStyle}>Q</span> what to add ·{' '}
+          {!isInterf && (
+            <>
+              <span style={keyStyle}>Q</span> what to add ·{' '}
+            </>
+          )}
           {isAsk && (
             <>
               <span style={keyStyle}>F</span> follow-up ·{' '}
@@ -570,7 +625,9 @@ function FindSourcesPopup() {
             opacity: busy || (!count && !isCheck) ? 0.5 : 1,
           }}
         >
-          {isCheck
+          {isInterf
+            ? `Write ${count || ''}`
+            : isCheck
             ? `Write ${isAsk ? 'answer' : 'verdict'}${count ? ` + ${count} passage${count === 1 ? '' : 's'}` : ''}`
             : `Pin ${count || ''}`}{' '}
           (Enter)

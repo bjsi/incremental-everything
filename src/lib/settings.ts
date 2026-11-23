@@ -101,6 +101,7 @@ import {
   flashcardResponseTimeLimitId,
   titleCaseAcronymsId,
   sourceHighlightColorId,
+  findInterferenceModelId,
   pinOtherReaderViewOnCreateIncRemId,
   imageSizeConfirmAboveId,
   HighlightColorName,
@@ -218,6 +219,7 @@ export interface IESettings {
   [flashcardResponseTimeLimitId]: number;
   [titleCaseAcronymsId]: string;
   [sourceHighlightColorId]: HighlightColorName;
+  [findInterferenceModelId]: 'opus' | 'sonnet';
   [pinOtherReaderViewOnCreateIncRemId]: boolean;
   [imageSizeConfirmAboveId]: number;
 
@@ -322,6 +324,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [flashcardResponseTimeLimitId]: 180,
   [titleCaseAcronymsId]: '',
   [sourceHighlightColorId]: 'Orange',
+  [findInterferenceModelId]: 'opus',
   [pinOtherReaderViewOnCreateIncRemId]: false,
   [imageSizeConfirmAboveId]: 5,
 
@@ -1530,6 +1533,20 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       { value: 'Green', label: 'Green' },
       { value: 'Blue', label: 'Blue' },
       { value: 'Purple', label: 'Purple' },
+    ],
+  },
+  [findInterferenceModelId]: {
+    kind: 'dropdown',
+    group: 'misc',
+    title: 'Find Interference: Claude Model',
+    description:
+      'The model that reads the passages Find Interference finds and names what your note could ' +
+      'be confused with (through the AI helper and your Claude subscription). Opus judges the ' +
+      'subtle cases best (the same frame with another value, a divergence of one word); Sonnet is ' +
+      'faster and lighter on your usage.',
+    options: [
+      { value: 'opus', label: 'Opus (best judgment)' },
+      { value: 'sonnet', label: 'Sonnet (faster)' },
     ],
   },
   [pinOtherReaderViewOnCreateIncRemId]: {
