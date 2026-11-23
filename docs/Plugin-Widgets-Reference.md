@@ -582,7 +582,7 @@ A side-by-side popup that opens before any restructure change is applied. It re-
 
 The Rem-type analogue of the PDF/HTML Bookmark popup. It lists the **read-point history** of a Rem-type Incremental Rem — each saved reading position (a descendant rem of the outline), most recent first. The owning IncRem's name is shown under the title (resolved with the pin-aware breadcrumb resolver, so a reference *pin* collapses to 📌 instead of expanding to the full referenced text).
 
-- Click any entry to **navigate to that descendant** rem.
+- Click any entry to **navigate to that descendant** rem; **Shift+click** opens it in a new pane beside your current document.
 - The top entry is the **current reading position** — also reachable via the **🔖 Go to Read Point** button on the [Editor Review Timer](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point) and emphasized (blue box + auto-scroll) in the [in-queue read-only card](Reviewing-Items-in-the-Queue.md#read-point-and-status-emphasis-in-rem-type-cards).
 - Read points are created with the **Set Read Point (Bookmark)** command (`Ctrl+F7`, `srp`).
 - The popup is also reachable **without a command**: the **Read Point History ↗** button in the [Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget)'s Read Point panel opens it for the Rem you are on.

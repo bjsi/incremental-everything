@@ -120,17 +120,31 @@ export const waitForPaneOpen = async (
  * `openAndScrollToHighlight`, there is no reader to boot and no highlight to
  * anchor — `plugin.window.openRem` navigates + focuses the rem directly, which
  * is the right behavior for jumping within an outline.
+ *
+ * `inNewPane` (Shift+click on the Go to Read Point buttons and the read-point
+ * crumbs) opens the rem in a pane beside the current layout instead, so the
+ * document the user is in stays open — same as Shift+click in the history sidebars.
  */
 export const openAndFocusRem = async (
   plugin: RNPlugin,
-  descendantRemId: string
+  descendantRemId: string,
+  inNewPane = false
 ): Promise<void> => {
   const rem = await plugin.rem.findOne(descendantRemId);
   if (!rem) {
     await plugin.app.toast('Read point rem not found (it may have been deleted).');
     return;
   }
+  if (inNewPane) {
+    await openRemInNewPane(plugin, rem._id);
+    return;
+  }
   await plugin.window.openRem(rem);
+};
+
+/** Shift+mousedown would start a text selection; a Shift+click here means "new pane". */
+export const preventShiftSelect = (e: { shiftKey: boolean; preventDefault: () => void }) => {
+  if (e.shiftKey) e.preventDefault();
 };
 
 /**

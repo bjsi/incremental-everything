@@ -12,6 +12,12 @@ This page documents the major changes and improvements for each version of the I
 
 📖 [Reviewing Items in the Editor → Recovering a review after a crash](Reviewing-Items-in-the-Editor.md#recover-interrupted-review)
 
+### ✨ Improved
+
+**Read Points**: Shift+click on **Go to Read Point** (Editor Review Timer, Priority Editor, the Read Point row under a document's title), on the read-point path and on the Read Points popup's entries now opens the Rem in a new pane, keeping the current document open.
+
+📖 [Reviewing Items in the Editor → Jumping to the Read Point](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point)
+
 ## v1.0.251 - November 22nd, 2026
 
 ### ✨ Improved

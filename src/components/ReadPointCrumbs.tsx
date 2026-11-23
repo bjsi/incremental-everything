@@ -1,7 +1,7 @@
 import React from 'react';
 import { RNPlugin } from '@remnote/plugin-sdk';
 import type { ReadPointPath } from '../lib/remReadPoint';
-import { openAndFocusRem } from '../lib/remHelpers';
+import { openAndFocusRem, preventShiftSelect } from '../lib/remHelpers';
 
 /** Characters kept per path segment before it is cut with an ellipsis. */
 const DEFAULT_SEGMENT_CHARS = 28;
@@ -36,8 +36,9 @@ export function ReadPointCrumbs({
           <span key={id || i}>
             {i > 0 && <span style={{ opacity: 0.6, margin: '0 3px' }}>›</span>}
             <span
-              onClick={() => { if (id) openAndFocusRem(plugin, id); }}
-              title={`${segment}\n\nClick to open this rem`}
+              onClick={(e) => { if (id) openAndFocusRem(plugin, id, e.shiftKey); }}
+              onMouseDown={preventShiftSelect}
+              title={`${segment}\n\nClick to open this rem\nShift+click: open it in a new pane`}
               style={{
                 cursor: 'pointer',
                 fontWeight: isLast ? 600 : 400,

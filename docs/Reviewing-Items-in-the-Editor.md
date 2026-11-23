@@ -245,6 +245,8 @@ A read point associates one **descendant rem** of the IncRem's outline as its cu
 
 An IncRem can be **both** a reading source (PDF/HTML) **and** an outline with its own descendants. Read points and the document's highlight bookmark are stored independently, so such an IncRem can carry both — they point at genuinely different places (a node in the outline vs. a spot in the document) and jump differently. When both exist, the Editor Review Timer shows **both buttons** — **🔖 Scroll** (to the PDF/HTML highlight) and **🔖 Go to Read Point** (to the descendant) — and tags whichever was saved most recently with a small green **`latest`** badge so you know which reflects your last reading action.
 
+> **Shift+click opens a new pane.** Every way of jumping to a read point (the **Go to Read Point** buttons, the clickable path segments, and the entries of the Read Points popup) navigates the current pane on a plain click. **Shift+click** opens the Rem in a new pane beside your current document instead (or switches to the pane already showing it), so the document you're in stays open.
+
 > Read points are also surfaced **in the queue**: see [Read-point and status emphasis in Rem-type cards](Reviewing-Items-in-the-Queue.md#read-point-and-status-emphasis-in-rem-type-cards).
 
 ---

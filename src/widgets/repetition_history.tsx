@@ -14,7 +14,7 @@ import {
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import { getReadPointPath, ReadPointPath } from '../lib/remReadPoint';
 import { ReadPointIcon } from '../components/ReadPointIcon';
-import { openAndFocusRem } from '../lib/remHelpers';
+import { openAndFocusRem, preventShiftSelect } from '../lib/remHelpers';
 import {
     addExternalSessionRep,
     updateHistoryEntry,
@@ -1569,9 +1569,17 @@ function RepetitionHistoryPopup() {
                                 <React.Fragment key={id || i}>
                                     <span style={{ margin: '0 4px', opacity: 0.6 }}>›</span>
                                     <span
-                                        title={`${segment}\n\nClick to open this rem`}
-                                        onClick={async () => {
+                                        title={`${segment}\n\nClick to open this rem\nShift+click: open it in a new pane`}
+                                        onMouseDown={preventShiftSelect}
+                                        onClick={async (e) => {
                                             if (!id) return;
+                                            if (e.shiftKey) {
+                                                // The pane split reads the window tree first; a popup
+                                                // closed before that can cut the reads short.
+                                                await openAndFocusRem(plugin, id, true);
+                                                await plugin.widget.closePopup();
+                                                return;
+                                            }
                                             await plugin.widget.closePopup();
                                             await openAndFocusRem(plugin, id);
                                         }}

@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { EditorReviewJob } from '../lib/incremental_rem/review_jobs';
 import { determineIncRemType } from '../lib/incRemHelpers';
 import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
-import { openAndScrollToHighlight, openAndFocusRem, openRemInNewPane } from '../lib/remHelpers';
+import { openAndScrollToHighlight, openAndFocusRem, openRemInNewPane, preventShiftSelect } from '../lib/remHelpers';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
@@ -571,7 +571,10 @@ function EditorReviewTimer() {
           )}
           {remReadPoint && (
             <button
-              onClick={async () => {
+              onMouseDown={preventShiftSelect}
+              onClick={async (e) => {
+                // Shift+click: open in a new pane, keeping the current document.
+                const inNewPane = e.shiftKey;
                 // Re-read at click time to catch a read point set mid-session
                 // after the tracker last ran.
                 let targetRemId = remReadPoint.targetRemId;
@@ -579,7 +582,7 @@ function EditorReviewTimer() {
                   const fresh = await getRemReadPoint(plugin, timerData.remId);
                   if (fresh?.highlightId) targetRemId = fresh.highlightId;
                 }
-                await openAndFocusRem(plugin, targetRemId);
+                await openAndFocusRem(plugin, targetRemId, inNewPane);
               }}
               style={{
                 padding: '4px 10px',
@@ -601,7 +604,8 @@ function EditorReviewTimer() {
                 e.currentTarget.style.color = '#3b82f6';
               }}
               title={'Jump to your read point (the bookmarked rem inside this outline)'
-                + (readPointIsLatest ? ' (most recent reading position)' : '')}
+                + (readPointIsLatest ? ' (most recent reading position)' : '')
+                + '\nShift+click: open it in a new pane'}
             >
               🔖 Go to Read Point
               {readPointIsLatest && (
