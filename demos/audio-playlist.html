@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audio Playlist</title>
+<!--
+  Interactive demo for docs/Audio-Playlist.md, embedded in an iframe there and in the
+  Changelog. Unlike the other demos this is not a mock of the widget: the player is the
+  plugin's own (src/widgets/audio_playlist_float.tsx), bundled into
+  audio-playlist/player.js with a stand-in for the RemNote SDK
+  (scripts/demos/audio_playlist_mock_sdk.js), which serves the invented document on the
+  left. Rebuild the bundle with scripts/demos/build_audio_playlist_demo.sh after
+  changing the player.
+
+  The clips in audio-playlist/ were made for this page (macOS voices reading invented
+  notes); positions are kept in this browser's localStorage under "ir-demo-audio:".
+
+  Theme: follows the manual's light/dark toggle (Material's data-md-color-scheme on the
+  parent page, same origin), else the OS setting.
+-->
+<style>
+:root {
+  --page: transparent;
+  --pane: #fff; --border: rgb(231 231 239);
+  --c1: rgb(41 41 54); --c2: rgb(99 99 123); --c3: rgb(145 145 168);
+  --blue: #3b82f6; --chip: rgb(240 240 246); --flash: rgb(254 243 199);
+  /* What the player reads from RemNote's theme. */
+  --rn-clr-background-primary: #fff; --rn-clr-background-secondary: rgb(248 248 252);
+  --rn-clr-background-tertiary: rgb(231 231 239); --rn-clr-content-primary: rgb(41 41 54);
+  --rn-clr-content-secondary: rgb(99 99 123); --rn-clr-content-tertiary: rgb(145 145 168);
+  --rn-clr-border-primary: rgb(222 222 232); --rn-clr-content-accent: #3b82f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+:root.dark {
+  --pane: rgb(30 30 36); --border: rgb(52 52 60);
+  --c1: rgb(235 235 237); --c2: rgb(190 190 198); --c3: rgb(148 148 159);
+  --blue: #768dff; --chip: rgb(43 43 51); --flash: rgb(82 64 20);
+  --rn-clr-background-primary: rgb(38 38 45); --rn-clr-background-secondary: rgb(46 46 54);
+  --rn-clr-background-tertiary: rgb(60 60 70); --rn-clr-content-primary: rgb(235 235 237);
+  --rn-clr-content-secondary: rgb(190 190 198); --rn-clr-content-tertiary: rgb(148 148 159);
+  --rn-clr-border-primary: rgb(66 66 76); --rn-clr-content-accent: #768dff;
+  color-scheme: dark;
+}
+html, body { margin: 0; background: var(--page); color: var(--c1); }
+body { padding: 4px 2px 8px; font-size: 13px; }
+button { font: inherit; color: inherit; }
+
+.start { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 10px; color: var(--c2); font-size: 12px; }
+.start button { border: 1px solid var(--border); background: var(--pane); border-radius: 6px; padding: 5px 10px; cursor: pointer; color: var(--c1); }
+.start button:hover { border-color: var(--blue); }
+.start button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+.stage { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.doc { flex: 1 1 300px; min-width: 0; background: var(--pane); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 14px; }
+.crumbs { font-size: 11px; color: var(--c3); margin-bottom: 6px; }
+.title { font-size: 20px; font-weight: 700; margin: 0 0 8px; }
+.rem { display: flex; gap: 7px; align-items: baseline; padding: 2px 4px; border-radius: 5px; line-height: 1.5; transition: background-color .3s; }
+.rem::before { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--c3); transform: translateY(-2px); }
+.rem.flash { background: var(--flash); }
+.kids { margin-left: 16px; }
+.tag { font-size: 11px; color: var(--blue); background: var(--chip); border-radius: 4px; padding: 0 5px; margin-left: 4px; white-space: nowrap; }
+/* RemNote's own inline player, as it looks: one per audio, each on its own. */
+.inline { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--c2); font-size: 11px; vertical-align: middle; white-space: nowrap; }
+.inline i { display: inline-block; width: 46px; height: 2px; background: var(--border); border-radius: 1px; }
+
+.side { flex: 0 1 380px; min-width: 0; width: 100%; max-width: 380px; margin: 0 auto; }
+#player > div { width: 100% !important; }
+.closed { border: 1px dashed var(--border); border-radius: 12px; padding: 18px 14px; color: var(--c3); text-align: center; font-size: 12px; line-height: 1.5; }
+body.player-open .closed { display: none; }
+.hint { margin-top: 10px; color: var(--c3); font-size: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="start">
+  <span>Start a playlist from:</span>
+  <button id="b-doc">this document</button>
+  <button id="b-tagged">this document, only <b>#AI audio</b></button>
+  <button id="b-tag">every Rem tagged <b>#AI audio</b></button>
+  <button id="b-open">Open Player</button>
+</div>
+
+<div class="stage">
+  <div class="doc">
+    <div class="crumbs" id="crumbs"></div>
+    <p class="title" id="title"></p>
+    <div id="outline"></div>
+  </div>
+  <div class="side">
+    <div id="player"></div>
+    <div class="closed">The player is closed.<br>It kept your place: press <b>Open Player</b>, or start a playlist above.</div>
+    <div class="hint">Drag the bar across the audios, use −15 / +15, change the speed, pick a row, shrink it to a bar with ⌄. ↗ shows where the audio lives in the document. The clip under 5 seconds is left out.</div>
+  </div>
+</div>
+
+<script src="audio-playlist/player.js"></script>
+<script>
+const demo = window.AudioPlaylistDemo;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+// ---- The document, drawn from the same tree the player reads ----
+const DOC = "ch4";
+const byId = new Map(demo.tree.map((r) => [r[0], r]));
+const textOf = (rem) => rem[2].map((el) => typeof el === "string"
+  ? esc(el)
+  : `<span class="inline" title="RemNote's inline player: ${esc(el.url.split("/").pop())}">▷ 0:00 <i></i></span>`).join("");
+const tagsOf = (rem) => (rem[3] || []).map((t) => `<span class="tag">#${esc(byId.get(t)[2].join(""))}</span>`).join("");
+function children(id) {
+  return demo.tree.filter((r) => r[1] === id).map((r) =>
+    `<div class="rem" data-id="${r[0]}"><span>${textOf(r)}${tagsOf(r)}</span></div><div class="kids">${children(r[0])}</div>`).join("");
+}
+const crumbs = [];
+for (let id = byId.get(DOC)[1]; id; id = byId.get(id)[1]) crumbs.unshift(esc(byId.get(id)[2].join("")));
+$("crumbs").innerHTML = crumbs.join(" › ");
+$("title").textContent = byId.get(DOC)[2].join("");
+$("outline").innerHTML = children(DOC);
+
+// ↗ in the player: show the Rem in the document.
+window.addEventListener("demo-open-rem", (e) => {
+  const el = document.querySelector(`.rem[data-id="${e.detail}"]`);
+  if (!el) return;
+  el.classList.add("flash");
+  el.scrollIntoView({ block: "nearest" });
+  setTimeout(() => el.classList.remove("flash"), 1400);
+});
+
+// ---- Starting playlists: the Menu Hub's two entries, the tag filter, the command ----
+$("b-doc").onclick = () => demo.ask({ rootIds: [DOC] }, true);
+$("b-tagged").onclick = () => demo.ask({ rootIds: [DOC], tagId: "tagAI" }, true);
+$("b-tag").onclick = () => demo.ask({ tagId: "tagAI" }, true);
+$("b-open").onclick = () => demo.open();
+// Open on the document, paused: nothing plays until asked.
+demo.ask({ rootIds: [DOC] }, false);
+
+// ---- Theme: the manual's own toggle when embedded, else the OS ----
+function applyTheme() {
+  let dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+  try {
+    const scheme = window.parent !== window && parent.document.body.getAttribute("data-md-color-scheme");
+    if (scheme) dark = scheme === "slate";
+  } catch (e) { /* not same-origin: keep the OS setting */ }
+  document.documentElement.classList.toggle("dark", dark);
+}
+applyTheme();
+try {
+  if (window.parent !== window) new parent.MutationObserver(applyTheme).observe(parent.document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
+} catch (e) {}
+if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+
+// ---- Size the iframe to the content ----
+function fit() {
+  try { if (window.frameElement) window.frameElement.style.height = document.documentElement.scrollHeight + "px"; } catch (e) {}
+}
+new ResizeObserver(fit).observe(document.body);
+window.addEventListener("load", fit);
+</script>
+</body>
+</html>

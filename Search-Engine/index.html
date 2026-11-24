@@ -1,0 +1,3112 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Search-Engine/">
+      
+      
+        <link rel="prev" href="../Utilities-Finding-and-Navigating/">
+      
+      
+        <link rel="next" href="../Utilities-Queue-Display/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Search Engine - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#search-engine" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Search Engine
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AI-Transcription-of-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Transcription of PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Source-Pins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source Pins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Corpus-Provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus Provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Read-Aloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read Aloud
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Audio-Playlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audio Playlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History & Queue Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Repetition-History-and-Statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repetition History & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Desktop-Helpers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Desktop Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Chrome-Companion-Extension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chrome Companion Extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Companion-Privacy-Policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Companion Privacy Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Logos-Bible-Software-Integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logos Bible Software
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Local-Media-Bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Media Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Bridge-for-Other-Plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Priority Bridge for Other Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Text-and-Lists/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & Lists
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Outline-and-Headings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outline & Headings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Finding-and-Navigating/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding & Navigating
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search Engine
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it finds more
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simple searches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to search
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tags, kinds and powerups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources and references
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slots and properties
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recent changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cards
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suppressed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suppressed cards
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search &amp; Browse
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Search &amp; Browse">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acting on the rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✨ AI: search in your own words
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved searches and practice
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wildcards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wildcards
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#special" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matching special characters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When something is wrong
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#not-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not available
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Queue-Display/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue Display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-True-or-False-Cards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    True or False Cards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Multiple-Choice-Cards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple-Choice Cards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Cleaning-Up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning Up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Under-the-Hood/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Under the Hood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    8. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RemNote-Native-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RemNote Native Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Colour-Coding-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Colour Coding Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    9. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it finds more
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simple searches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to search
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tags, kinds and powerups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources and references
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slots and properties
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recent changes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cards
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suppressed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suppressed cards
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search &amp; Browse
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Search &amp; Browse">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acting on the rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✨ AI: search in your own words
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved searches and practice
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wildcards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wildcards
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#special" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matching special characters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When something is wrong
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#not-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not available
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="search-engine">Search Engine<a class="headerlink" href="#search-engine" title="Permanent link">&para;</a></h1>
+<div class="admonition warning">
+<p class="admonition-title">Desktop only, Mac only</p>
+<p>The Search Engine, Search &amp; Browse and ✨ AI work only in <strong>RemNote's desktop app on a Mac</strong>, with the <a href="../Desktop-Helpers/#search">AI helper</a> running and paired. They are not available on Windows, Linux, the web app, the iPhone or Android. Everywhere else, Find Rem uses RemNote's own search and the rest of the plugin works as usual.</p>
+</div>
+<p>On the desktop, the plugin can search your knowledge base with a query language modelled on <a href="https://docs.ankiweb.net/searching.html">Anki's</a>: every word must match, and you can combine words with <code>or</code> and <code>-</code>, search under a document, or filter by tag, Rem type, Source, slot or property value, card state and review history. Two tools use it: <a href="../Utilities-Finding-and-Navigating/#find-rem-reference-or-open">Find Rem</a>, where a ⚡ in the search box means the search engine answered, and <a href="#browse">Search &amp; Browse</a>, a table of everything a search finds.</p>
+<p>The engine runs in the <a href="../Desktop-Helpers/#search">AI helper</a> on your computer, reading RemNote's own database without changing it. On the iPhone, on the web, or with the helper off, Find Rem uses RemNote's search as before, and the keys on this page are read as ordinary words.</p>
+<div class="admonition info">
+<p class="admonition-title">Setting it up</p>
+<ol>
+<li>Run the <a href="../Desktop-Helpers/#setup">AI helper</a>, version 1.0.231 or later, with <code>rem_search.py</code>, <code>rem_index.py</code>, <code>rem_browse.py</code>, <code>fsrs.py</code> and <code>rem_search_ai.py</code> next to it.</li>
+<li>Print its pairing token with <code>python3 ~/.incremental-remnote/ai_ocr_helper.py --pairing-token</code> and paste it in the plugin settings, <strong>AI Helper Pairing Token</strong> (<a href="../Desktop-Helpers/#search">why a token</a>).</li>
+</ol>
+<p>The first time you use a key such as <code>tag:</code> or <code>is:</code>, the helper indexes the knowledge base, which takes about 20 seconds; Find Rem says so and searches the words meanwhile.</p>
+</div>
+<h2 id="why">Why it finds more<a class="headerlink" href="#why" title="Permanent link">&para;</a></h2>
+<p>RemNote's search, the only one a plugin can call, looks for Rems with <strong>any</strong> of your words, then keeps the first 1,000 by a ranking that ignores what you typed. A Rem holding every word can be cut before it is shown. In one knowledge base, <code>bow weather wave</code> matched 5,874 Rems on any word and one Rem on all three; that Rem matched the words better than 5,630 of the others, but sat 2,761st on RemNote's ranking, so it was cut.</p>
+<figure>
+<svg viewBox="0 0 640 132" role="img" aria-label="The 5,874 Rems with any of the words, drawn to scale. The first 1,000 by RemNote's ranking are kept. The note with all three words is 244th by text match but 2,761st by RemNote's ranking, so it is cut." style="max-width:640px;width:100%">
+<style>.se-t{font:13px system-ui,sans-serif;fill:var(--md-default-fg-color,currentColor)}.se-s{font:11px system-ui,sans-serif;fill:var(--md-default-fg-color--light,currentColor)}</style>
+<text class="se-t" x="0" y="24">By text match</text>
+<rect x="150" y="12" width="480" height="20" rx="3" fill="#8a94a0" opacity=".18"/>
+<rect x="150" y="12" width="81.7" height="20" rx="3" fill="#0f8a99" opacity=".35"/>
+<circle cx="169.9" cy="22" r="6" fill="#2e9e55"/>
+<text class="se-s" x="178" y="48">244th: kept on this measure</text>
+<text class="se-t" x="0" y="80">By RemNote's ranking</text>
+<rect x="150" y="68" width="480" height="20" rx="3" fill="#8a94a0" opacity=".18"/>
+<rect x="150" y="68" width="81.7" height="20" rx="3" fill="#0f8a99" opacity=".35"/>
+<circle cx="375.6" cy="78" r="6" fill="#d0453b"/>
+<text class="se-s" x="384" y="104">2,761st: cut</text>
+<text class="se-s" x="150" y="126">1</text>
+<text class="se-s" x="200" y="126">1,000 kept</text>
+<text class="se-s" x="596" y="126">5,874</text>
+</svg>
+<figcaption>The 5,874 Rems with any of the words, to scale. The shaded band is what RemNote keeps.</figcaption>
+</figure>
+
+<p>The search engine runs a real search instead: all your words, against RemNote's whole index, in a few milliseconds.</p>
+<h2 id="simple">Simple searches<a class="headerlink" href="#simple" title="Permanent link">&para;</a></h2>
+<dl>
+<dt><code>bow weather</code></dt>
+<dd>finds Rems with both words. Each word matches from its start: <code>bow</code> also finds <em>bowsprit</em>, not <em>elbow</em>.</dd>
+<dt><code>bow and weather</code></dt>
+<dd>the same; <code>and</code> is optional.</dd>
+<dt><code>bow or bowsprit</code></dt>
+<dd>finds Rems with either word.</dd>
+<dt><code>bow (wave or sea)</code></dt>
+<dd>finds Rems with <code>bow</code> and <code>wave</code>, or <code>bow</code> and <code>sea</code>.</dd>
+<dt><code>-tug</code></dt>
+<dd>finds Rems without <code>tug</code>. <code>bow -tug -pilot</code> excludes both.</dd>
+<dt><code>-(tug or pilot)</code></dt>
+<dd>the same as <code>-tug -pilot</code>.</dd>
+<dt><code>"bow flare"</code></dt>
+<dd>finds the two words side by side.</dd>
+<dt><code>w:bow</code></dt>
+<dd>finds the whole word <code>bow</code> only: not <em>bowsprit</em>.</dd>
+<dt><code>under-keel</code>, <code>6.4</code></dt>
+<dd>words joined by punctuation are searched side by side: <code>under-keel</code> finds <em>under keel clearance</em>.</dd>
+</dl>
+<p>Things to note:</p>
+<ul>
+<li>Words are separated by spaces, and all of them must match. <code>and</code> binds tighter than <code>or</code>: <code>dog cat or mouse</code> is <code>(dog cat) or mouse</code>, as in Anki.</li>
+<li><strong>Accents and capitals never matter</strong>: <code>navegacao</code> finds <em>Navegação</em>. Anki needs <code>nc:</code> for this; here it is always on.</li>
+<li><strong>Clozes don't get in the way</strong>: cloze markup isn't in the index, so clozed words are searched like any other (Anki needs <code>sc:</code>).</li>
+<li>A <strong>reference</strong> in a Rem is searched by the name it shows, but RemNote's index keeps it at the end of the Rem's text: <code>sea margin becomes</code> finds <em>"[sea margin] becomes useless…"</em>, while the phrase <code>"sea margin becomes"</code> doesn't.</li>
+<li>Text in a Rem's back (the answer side) is searched too.</li>
+</ul>
+<h2 id="where">Where to search<a class="headerlink" href="#where" title="Permanent link">&para;</a></h2>
+<dl>
+<dt><code>in:"Wärtsilä Encyclopedia of Ship Technology"</code></dt>
+<dd>searches the document and everything under it. Quotes are needed when a name has spaces.</dd>
+<dt><code>in:*miguens* radar</code></dt>
+<dd><code>*</code> matches part of a name: <code>radar</code> under every <strong>document or folder</strong> whose name contains <em>miguens</em>. When no document or folder matches, any Rem with that name does (up to 200).</dd>
+<dt><code>in:63ZzPW7lNc3ceJWVy</code></dt>
+<dd>a Rem id works too.</dd>
+<dt><code>squat -in:Archive</code></dt>
+<dd>leaves out everything under <em>Archive</em>.</dd>
+<dt><code>parent:"Bow flare"</code></dt>
+<dd>only the direct children of <em>Bow flare</em>.</dd>
+<dt><code>path:pscpp squat</code></dt>
+<dd><code>squat</code> in Rems with <em>pscpp</em> in the name of any Rem above them.</dd>
+</dl>
+<p>A name shared by several Rems covers all of them. A name that matches nothing says so under the box, and suggests a <code>*</code>.</p>
+<h2 id="tags">Tags, kinds and powerups<a class="headerlink" href="#tags" title="Permanent link">&para;</a></h2>
+<dl>
+<dt><code>tag:"Anki Card - Standard Mono"</code></dt>
+<dd>Rems with that tag. RemNote shows powerups as tags, so <code>tag:Incremental</code> finds IncRems too.</dd>
+<dt><code>tag:anki*</code></dt>
+<dd>Rems with a tag whose name starts with <em>anki</em>.</dd>
+<dt><code>tag:none</code></dt>
+<dd>Rems with no tag.</dd>
+<dt><code>is:concept</code>, <code>is:descriptor</code>, <code>is:portal</code></dt>
+<dd>Rems of that type.</dd>
+<dt><code>is:document</code>, <code>is:folder</code></dt>
+<dd>documents and folders.</dd>
+<dt><code>is:flashcard</code>, <code>is:image</code>, <code>is:pdf</code>, <code>is:website</code></dt>
+<dd>Rems with flashcards, images, uploaded PDFs, web pages.</dd>
+<dt><code>is:incremental</code>, <code>is:dismissed</code></dt>
+<dd>IncRems, and Rems you dismissed.</dd>
+<dt><code>is:pdf-highlight</code>, <code>is:html-highlight</code>, <code>is:web-highlight</code></dt>
+<dd>highlights.</dd>
+<dt><code>has:tag</code>, <code>has:alias</code>, <code>has:source</code></dt>
+<dd>Rems with a tag, an alias, a Source.</dd>
+<dt><code>has:powerup:Video</code></dt>
+<dd>Rems with that powerup, by name or code.</dd>
+</dl>
+<h2 id="sources">Sources and references<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h2>
+<dl>
+<dt><code>source:"PDF Carlton Marine Propellers and Propulsion, 4e"</code></dt>
+<dd>Rems with that Rem among their <strong>Sources</strong>.</dd>
+<dt><code>source:*M23*</code></dt>
+<dd>Rems whose Sources include any Rem named with <em>M23</em>. The name is matched only among Rems that are someone's Source, so it is quick.</dd>
+<dt><code>refs:"Service power margin"</code></dt>
+<dd>Rems whose text references <em>Service power margin</em>: its backlinks. <code>refs:*margin*</code> works the same way.</dd>
+<dt><code>alias:"sea margin"</code></dt>
+<dd>Rems found through one of their aliases.</dd>
+<dt><code>id:go7LdXuu9hpAZH12G,rzGXXDY2z0yi0Iefg</code></dt>
+<dd>these Rems. Spaces after the commas are fine, so a pasted list works as it is.</dd>
+<dt><code>id:UpQE*</code></dt>
+<dd>Rems whose id starts with <em>UpQE</em>: enough when you remember only part of an id. <code>*</code> matches any part, <code>?</code> or <code>_</code> one character, and capitals count, as in the ids themselves.</dd>
+</dl>
+<h2 id="properties">Slots and properties<a class="headerlink" href="#properties" title="Permanent link">&para;</a></h2>
+<p>Every powerup slot and every property of a tag can be searched, like Anki's fields. Write the owner and the name, separated by a dot: the owner is the powerup (its name or code) or the tag that has the property. Spaces, capitals and punctuation in both don't matter.</p>
+<dl>
+<dt><code>"Anki Card - Standard Mono.Book:PNA Resistência"</code></dt>
+<dd>Rems whose <em>Book</em> property, from that tag, is exactly <em>PNA Resistência</em>. As in Anki, a value must match exactly unless it has wildcards.</dd>
+<dt><code>ankicardstandardmono.book:pna*</code></dt>
+<dd>the same property, starting with <em>pna</em>.</dd>
+<dt><code>*.book:*carlton*</code></dt>
+<dd>a <em>Book</em> property of any tag, containing <em>carlton</em>. <code>_</code> matches one character.</dd>
+<dt><code>*.chapter:</code></dt>
+<dd>an empty <em>Chapter</em>. <code>*.chapter:_*</code> finds one that isn't empty.</dd>
+<dt><code>incremental.priority&lt;20</code></dt>
+<dd>a number compared: <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>=</code>, <code>!=</code>.</dd>
+<dt><code>incremental.nextrepdate&lt;=0</code></dt>
+<dd>a date compared in <strong>days from today</strong>: <code>&lt;=0</code> is today or earlier, <code>=1</code> tomorrow, <code>&gt;=-7</code> the last week onwards.</dd>
+</dl>
+<p>The plugin's own values have shortcuts:</p>
+<table>
+<thead>
+<tr>
+<th>Shortcut</th>
+<th>Is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prop:priority&lt;20</code></td>
+<td>a flashcard's <a href="../Priorities-for-Flashcards/">card priority</a></td>
+</tr>
+<tr>
+<td><code>prop:incpriority&lt;=10</code></td>
+<td>an IncRem's priority</td>
+</tr>
+<tr>
+<td><code>prop:incdue&lt;=0</code></td>
+<td>an IncRem's next repetition date (days from today): due now</td>
+</tr>
+</tbody>
+</table>
+<dl>
+<dt><code>is:incremental prop:incdue&lt;=0 prop:incpriority&lt;=10</code></dt>
+<dd>IncRems due now with a priority of 10 or better.</dd>
+</dl>
+<h2 id="recent">Recent changes<a class="headerlink" href="#recent" title="Permanent link">&para;</a></h2>
+<dl>
+<dt><code>added:1</code></dt>
+<dd>Rems created today. <code>added:7</code> covers the last 7 days.</dd>
+<dt><code>edited:1</code></dt>
+<dd>Rems whose text was written today. This counts any change to the text, including ones made by a plugin or a bulk command, as Anki's <code>edited:</code> does.</dd>
+</dl>
+<h2 id="cards">Cards<a class="headerlink" href="#cards" title="Permanent link">&para;</a></h2>
+<p>A Rem matches when one of its cards does. Card searches written together must hold for the <strong>same card</strong>: <code>is:due card:cloze</code> is a Rem with a due cloze card, not one with a due card and some other cloze card.</p>
+<dl>
+<dt><code>is:due</code></dt>
+<dd>a card whose next review time has passed. Cards in a paused deck are left out, as RemNote's queue leaves them out.</dd>
+<dt><code>is:new</code></dt>
+<dd>a card never answered (or not since its last Reset).</dd>
+<dt><code>is:review</code></dt>
+<dd>a card answered at least once since its last Reset.</dd>
+<dt><code>is:learn-new</code></dt>
+<dd>a card waiting in RemNote's <em>Learn New</em> queue.</dd>
+<dt><code>card:forward</code>, <code>card:backward</code>, <code>card:cloze</code></dt>
+<dd>the card's type.</dd>
+<dt><code>ml:growing</code></dt>
+<dd>RemNote's mastery level: <code>new</code>, <code>acquiring</code>, <code>growing</code>, <code>solidifying</code>, <code>retaining</code>, <code>notyetlearned</code>.</dd>
+<dt><code>prop:due&lt;=-7</code></dt>
+<dd>next review a week ago or earlier: days from today, <code>0</code> today, <code>1</code> tomorrow. Unlike <code>is:due</code>, it compares the date alone, so it counts cards in paused decks too.</dd>
+<dt><code>prop:ivl&gt;=30</code></dt>
+<dd>an interval of 30 days or more: the days from the last review to the next.</dd>
+<dt><code>prop:reps&gt;10</code>, <code>prop:lapses&gt;3</code></dt>
+<dd>answered more than 10 times; forgotten more than 3 times. Both count since the last Reset, and leave out partial reps of list cards, as RemNote's own scheduling does.</dd>
+<dt><code>prop:s&gt;365</code>, <code>prop:d&gt;=9</code>, <code>prop:r&lt;0.8</code></dt>
+<dd>FSRS <strong>stability</strong> (in days), <strong>difficulty</strong> (1 to 10) and <strong>retrievability</strong> now (the chance of recalling it today, 0 to 1). They are worked out from the card's history with <strong>its own scheduler's</strong> weights, as RemNote's <em>Bullet Information</em> panel does, and match it. Cards on an SM-2 scheduler, and cards never answered, have none. After a <em>Reset</em> they follow RemNote's scheduling, which starts over at the Reset; the panel replays the whole history instead, so the two differ for reset cards.</dd>
+<dt><code>scheduler:vocabulary</code>, <code>scheduler:global</code></dt>
+<dd>cards on that scheduler: the one assigned to a document above them, or the Global Default. A name matches from its start (<code>scheduler:vocabulary</code> finds <em>Vocabulary (FSRS default)</em>); <code>*</code> matches any part.</dd>
+<dt><code>is:fsrs</code>, <code>is:sm2</code></dt>
+<dd>cards whose scheduler is FSRS, or SM-2.</dd>
+<dt><code>rated:1</code></dt>
+<dd>answered today. <code>rated:7</code> covers the last 7 days.</dd>
+<dt><code>rated:7:forgot</code></dt>
+<dd>answered <em>Forgot</em> in the last 7 days; also <code>hard</code>, <code>good</code>, <code>easy</code>, or Anki's buttons <code>1</code> to <code>4</code>, and <code>skip</code> for <em>Too early</em>.</dd>
+<dt><code>introduced:30</code></dt>
+<dd>first answered in the last 30 days.</dd>
+<dt><code>cid:Wb4KrNxFckJjwNkAC</code></dt>
+<dd>these cards. <code>cid:Wb4K*</code> takes the same wildcards as <code>id:</code>.</dd>
+<dt><code>is:due card:cloze in:"PSCPP" prop:lapses&gt;=3</code></dt>
+<dd>due cloze cards under <em>PSCPP</em> that you have forgotten three times or more.</dd>
+<dt><code>is:due prop:r&lt;0.7</code></dt>
+<dd>due cards you are more likely to have forgotten than not by now; sorted by <strong>R</strong> in <a href="#browse">Search &amp; Browse</a>, the most at risk come first.</dd>
+</dl>
+<h2 id="suppressed">Suppressed cards<a class="headerlink" href="#suppressed" title="Permanent link">&para;</a></h2>
+<p>Some cards can never come up in a queue. These keys find them, with the same causes, in the same order, as the <a href="../Prioritization-%26-Sorting/#suppressed-cards">Suppressed Cards</a> tab of the Weighted Shield:</p>
+<dl>
+<dt><code>is:suppressed</code></dt>
+<dd>a card RemNote won't put in any queue, for any reason.</dd>
+<dt><code>suppressed:paused</code> (also <code>is:paused</code>)</dt>
+<dd>inside a paused deck. The nearest deck above decides: an active deck inside a paused one is not paused.</dd>
+<dt><code>suppressed:ancestor</code></dt>
+<dd>under a Rem with <em>Disable Descendant Cards</em>.</dd>
+<dt><code>suppressed:rem</code></dt>
+<dd>cards switched off on the Rem itself (its <em>Enable Cards</em> toggle, or <em>Disable Descendant Cards</em> on the Rem).</dd>
+<dt><code>suppressed:table</code></dt>
+<dd>the same, in a table row or cell: RemNote creates them with cards off.</dd>
+<dt><code>suppressed:direction</code></dt>
+<dd>a forward or backward card whose direction is switched off.</dd>
+<dt><code>suppressed:cloze</code></dt>
+<dd>a cloze switched off card by card, or with <code>/Disable All Cloze Cards</code>.</dd>
+<dt><code>suppressed:removed</code> (also <code>is:not-generated</code>)</dt>
+<dd>the cloze or back side the card came from is gone; its history is kept.</dd>
+<dt><code>suppressed:other</code></dt>
+<dd>none of the above.</dd>
+</dl>
+<p>Each card gets one cause, the first that applies in this order. <code>is:disabled</code> (or Anki's <code>is:suspended</code>) finds every card RemNote won't show except paused ones, which keep their due dates.</p>
+<dl>
+<dt><code>suppressed:rem in:"PSCPP"</code></dt>
+<dd>Rems under <em>PSCPP</em> switched off on purpose: the ones worth a look.</dd>
+</dl>
+<h2 id="browse">Search &amp; Browse<a class="headerlink" href="#browse" title="Permanent link">&para;</a></h2>
+<p><strong>Search &amp; Browse</strong> (quick code <code>sb</code>) lists everything a search finds in a table, as Anki's Browser does, and lets you act on it. <strong>Desktop app on a Mac only</strong>, with the AI helper running. Try it below (example data; the demo knows a subset of the keys):</p>
+<iframe src="../demos/search-browse.html" title="Search & Browse demo" loading="lazy" style="width:100%;height:560px;border:0;display:block"></iframe>
+
+<ul>
+<li><strong>Rems or Cards.</strong> <em>Rems</em> lists each Rem once. <em>Cards</em> lists the cards the search matched: <code>is:due card:cloze</code> lists the due cloze cards, not every card of those Rems.</li>
+<li><strong>Columns:</strong> the Rem (front → back, with its path; clozes in blue, and in <em>Cards</em> a cloze card's own cloze in blue with the Rem's other clozes in grey, as the queue shows them), the card type, in <em>Rems</em> its <strong>Cards</strong> as <em>(on the Rem + below it)</em>, e.g. <em>(2 + 10)</em>, its kind (document, concept, IncRem…), tags, card priority, IncRem priority and next date, due date, interval, reps, lapses, mastery level, FSRS stability <strong>S</strong>, difficulty <strong>D</strong> and retrievability <strong>R</strong>, the scheduler, and why its cards are hidden. In <em>Rems</em>, S, D and R are those of the Rem's card with the lowest R. Click a column title to sort by it, again to reverse; the whole result is sorted, not only the rows on screen. <strong>Load more</strong> adds 100 rows at a time.</li>
+<li><strong>Opening a Rem</strong> (Enter, Shift+Enter for a new pane, or a double-click) opens it in the editor and <strong>collapses</strong> the browser to a bar at the bottom right of the window: <strong>⤢ Browse</strong> brings it back with the same search, rows, selection and scroll; <strong>✕</strong> closes it. Running <code>sb</code> again also brings it back. <strong>Esc</strong> and the <strong>–</strong> button collapse it too.</li>
+<li><strong>Selecting:</strong> Space or Ctrl/Cmd+click selects a row, the box in the header selects every loaded row. The buttons at the bottom act on the selection, or on the highlighted row when nothing is selected: see <a href="#actions">Acting on the rows</a>.</li>
+<li><strong>Keyboard:</strong> in the search box, Enter searches, Ctrl/Cmd+Enter asks <a href="#ai">✨ AI</a>, ↑/↓ go through your last 50 searches (as in Anki), Tab moves into the table. In the table, ↑/↓ move, <strong>m</strong> moves, <strong>t</strong> tags, <strong>⌘C</strong> copies references (⇧⌘C pins, ⌥⌘C text + pin), / or Shift+Tab returns to the box.</li>
+</ul>
+<h3 id="actions">Acting on the rows<a class="headerlink" href="#actions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Set card priority</strong>: as the batch tools do, inheritance included.</li>
+<li><strong>Cards on / Cards off</strong>: as RemNote's own Browser. A Rem (or every card of a Rem) is switched as a whole, like its Enable Cards toggle; a single forward or backward card switches that direction. A single cloze card can't be switched by a plugin and is skipped (the message says how many). This is not the <em>Disable Descendant Cards</em> power-up.</li>
+<li><strong>Move…</strong> (<code>m</code>): a new parent for the Rems, at the end of its children. The picker works as RemNote's Move Bullet: type to search (documents and folders first), <strong>Tab</strong> enters the highlighted Rem to list or search its children, <strong>Shift+Tab</strong> goes back up one level, <strong>Backspace</strong> in an empty box goes back to the whole knowledge base. With the box empty it offers <em>No parent</em> (top level) and your recent destinations (kept on this computer). <strong>+ Create Rem</strong> at the bottom (or <strong>⌘Enter</strong>) makes a new Rem with the typed name, inside the Rem you entered with Tab, and moves into it. A Rem under another selected Rem goes along with it; <strong>Undo</strong> in the message line puts everything back.</li>
+<li><strong>Tag…</strong> (<code>t</code>): the same picker. With the box empty it lists the tags the Rems have, to remove one (power-ups are left out); typing searches for a tag to add, and <strong>+ Create tag</strong> (or <strong>⌘Enter</strong>) makes a new one.</li>
+<li><strong>Copy refs</strong>: references to the Rems, to paste into one Rem with ⌘V: several rows paste side by side. <strong>Shift+click</strong> copies pins, <strong>Opt+click</strong> each Rem's text followed by a pin to it (its clozes left out). In the table: ⌘C, ⇧⌘C, ⌥⌘C. RemNote reads the clipboard the same way whatever paste key you use, so the form is chosen when copying.</li>
+<li><strong>Copy ids</strong>: the Rem (or card) ids, one per line.</li>
+</ul>
+<h3 id="ai">✨ AI: search in your own words<a class="headerlink" href="#ai" title="Permanent link">&para;</a></h3>
+<p><strong>Desktop app on a Mac only</strong>, with the AI helper running and Claude Code signed in. Write what you are looking for in plain language, in any language, and press <strong>✨ AI</strong> (or Ctrl/Cmd+Enter): Claude writes the search, the box shows it, and it runs. The line under the box shows your words and the search they became; the search stays editable, and ↑ brings your words back to rephrase them.</p>
+<p><img alt="✨ AI turning a request into a search in Search &amp; Browse" src="../assets/search-natural-language-AI.png" /></p>
+<dl>
+<dt><em>english cards forgotten more than twice, late (retrievability less than 80%)</em></dt>
+<dd><code>in:english prop:lapses&gt;2 prop:r&lt;0.8</code>, in <em>Cards</em>.</dd>
+<dt><em>overdue cards with interval greater than 1 year, rated again at least once, in the biology folder</em></dt>
+<dd><code>is:due prop:ivl&gt;365 prop:lapses&gt;=1 in:*biology*</code>, in <em>Cards</em>.</dd>
+<dt><em>cartões sobre rebocadores que esqueci mais de duas vezes, com retenção abaixo de 80%</em></dt>
+<dd><code>rebocador prop:lapses&gt;2 prop:r&lt;0.8</code>: a subject becomes words (in the singular, so the plural matches too); <code>in:</code> is kept for a folder, document or deck you name.</dd>
+</dl>
+<p>It runs through the <a href="../Desktop-Helpers/#ai-helper">AI helper</a> with <strong>your</strong> Claude account (Claude Code, the model set for the helper, Sonnet by default), and takes a few seconds. Claude gets the request, the search language, and a few names from your knowledge base so that "the biology folder" becomes a real <code>in:</code>: your schedulers, your 60 most-used tags and your top documents and folders. Only names, never note text. Its answer is checked before it runs; a search that doesn't work goes back to Claude once with the error, and if it still doesn't, you see it with the reason.</p>
+<p>The instructions Claude follows are in <code>~/.incremental-remnote/ai-ocr/search-prompt.md</code>, which you can edit; it is read again on every request. Delete it to get a newer version's instructions after an update.</p>
+<h3 id="saved">Saved searches and practice<a class="headerlink" href="#saved" title="Permanent link">&para;</a></h3>
+<p><strong>Save…</strong> names the current search, its mode and its order; the drop-down brings a saved search back, <strong>Delete</strong> forgets it. Saved searches are kept with your account, so every computer has them.</p>
+<p><strong>▶ Practise</strong> turns a saved search into a document you can practise: it fills <strong>🔎 <em>name</em></strong> under a <strong>Search Queues</strong> document with references to up to 500 of the search's Rems, in the search's order, then opens its queue. RemNote serves exactly the cards of a document of references, as with the <a href="../Priority-Review-Document/">Priority Queue</a>. Each Practise refreshes the document from the search as it stands.</p>
+<dl>
+<dt><code>is:due card:cloze in:"PSCPP" prop:lapses&gt;=3</code>, saved as <em>Leeches PSCPP</em></dt>
+<dd>a practice session of your most-forgotten due cloze cards under <em>PSCPP</em>, refreshed each time you press ▶ Practise.</dd>
+</dl>
+<h2 id="wildcards">Wildcards<a class="headerlink" href="#wildcards" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th><code>*</code></th>
+<th><code>_</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Words</td>
+<td>not needed: a word matches from its start</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>tag:</code></td>
+<td>any part of a tag name</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>in:</code>, <code>parent:</code></td>
+<td>any part of a document's (or Rem's) name</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>source:</code>, <code>refs:</code></td>
+<td>any part of the name</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>owner.name:value</code></td>
+<td>any part of the value</td>
+<td>one character</td>
+</tr>
+<tr>
+<td><code>id:</code>, <code>cid:</code></td>
+<td>any part of the id (<code>?</code> also works)</td>
+<td>one character</td>
+</tr>
+<tr>
+<td><code>*.name</code></td>
+<td>any owner</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h2 id="special">Matching special characters<a class="headerlink" href="#special" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Spaces:</strong> put the whole term in quotes, <code>"tag:anki card"</code>, or only the part after the colon, <code>tag:"anki card"</code>.</li>
+<li><strong><code>and</code>, <code>or</code>:</strong> to search for the word itself, quote it: <code>"or"</code>.</li>
+<li><strong><code>-</code>, <code>"</code>, <code>(</code>, <code>)</code>, <code>\</code>:</strong> put a <code>\</code> before the character, as in <code>\-free</code>, or quote the term.</li>
+<li><strong><code>:</code>:</strong> a colon is a search key only before one of the keys on this page or an <code>owner.name</code>. Anything else stays text, so <code>3:30</code> and a pasted <code>Note: …</code> search as words.</li>
+</ul>
+<h2 id="messages">When something is wrong<a class="headerlink" href="#messages" title="Permanent link">&para;</a></h2>
+<p>Find Rem shows one line under the box, then searches the words with RemNote's search:</p>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>This "(" is never closed</em>, <em>This quote is never closed</em>, <em>"or" needs a search term on each side</em> …</td>
+<td>The query can't be read as written.</td>
+</tr>
+<tr>
+<td><em>No Rem is named exactly "…"</em></td>
+<td>Check the name, or use <code>*</code> for part of it.</td>
+</tr>
+<tr>
+<td><em>… matches 1,074 Rems; make the name more precise</em></td>
+<td>A <code>*</code> in <code>in:</code> matched too many Rems.</td>
+</tr>
+<tr>
+<td><em>The helper is indexing this knowledge base</em></td>
+<td>Once, for about 20 seconds; try again then.</td>
+</tr>
+<tr>
+<td><em>The AI helper is running but not paired</em></td>
+<td>Paste the token (<a href="../Desktop-Helpers/#search">pairing</a>).</td>
+</tr>
+<tr>
+<td><em>… need the AI helper on the desktop</em></td>
+<td>The query uses search keys and the helper isn't answering.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="not-available">Not available<a class="headerlink" href="#not-available" title="Permanent link">&para;</a></h2>
+<p>Not planned: regular expressions (<code>re:</code>), wildcards inside a word (<code>d*g</code>), and Anki's flags, presets and duplicates, which have no counterpart in RemNote.</p>
+<h2 id="how">How it works<a class="headerlink" href="#how" title="Permanent link">&para;</a></h2>
+<p>The helper reads two things, never writing to either:</p>
+<ul>
+<li><strong>RemNote's search index</strong> for words, phrases and where a Rem sits (<code>in:</code>, <code>path:</code>). These searches take a few milliseconds.</li>
+<li><strong>Its own index</strong> of the knowledge base, for everything else: tags, kinds, Sources, references, dates, slot and property values, cards and their reviews, and each card's scheduler and FSRS memory state. It is kept in <code>~/.incremental-remnote/search/</code> (about 240 MB for 440,000 Rems and 72,000 cards, readable only by you), built once in about 30 seconds, and brought up to date before each search from what RemNote wrote since the last one. It reads some switches RemNote never shows a plugin (a Rem's <em>Enable Cards</em> toggle, its directions, its switched-off clozes), which is how it can tell every suppression cause apart.</li>
+</ul>
+<p>A Rem created a moment ago can be missing until RemNote has written it to its database, and its words until RemNote has indexed them; RemNote's own search has the same delay.</p>
+<p>The plugin also uses the helper's index to find which Rems have a PDF or web page as their Source, for the PDF reader and the parent picker, instead of checking every IncRem in turn; and the <a href="../Prioritization-%26-Sorting/#suppressed-cards">Suppressed Cards</a> tab reads each card's cause from it. <a href="#browse">Search &amp; Browse</a> gets each page of its table from the helper in one request, every column included.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

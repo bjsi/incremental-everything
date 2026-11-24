@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flashcard Bar Shield</title>
+<!--
+  Interactive demo for docs/Prioritization-&-Sorting.md#flashcard-bar-shield,
+  embedded there in an iframe. A mock of the flashcard bar (card_info_bar.tsx)
+  with the real shield icons (src/components/ShieldIcon.tsx), the click switch
+  and the pulse. Example numbers only.
+
+  Theme: follows the manual's light/dark toggle (Material's data-md-color-scheme
+  on the parent page, same origin), else the OS setting.
+-->
+<style>
+:root {
+  --page: transparent;
+  --bar: rgb(244 244 250); --border: rgb(231 231 239);
+  --c1: rgb(41 41 54); --c2: rgb(99 99 123); --c3: rgb(145 145 168);
+  --blue: #3b82f6; --hover: rgb(41 41 54 / .06); --chip: rgb(231 231 239);
+  --prio: #3b8fb5; --card: #c8902f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+:root.dark {
+  --bar: rgb(43 43 51); --border: rgb(52 52 60);
+  --c1: rgb(235 235 237); --c2: rgb(190 190 198); --c3: rgb(148 148 159);
+  --blue: #768dff; --hover: rgb(235 235 237 / .07); --chip: rgb(52 52 60);
+  color-scheme: dark;
+}
+html, body { margin: 0; background: var(--page); color: var(--c1); }
+body { padding: 4px 2px 8px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
+
+.bar { background: var(--bar); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: center; min-height: 36px; }
+.sep { color: var(--c3); }
+.lbl { font-size: 12px; font-weight: 600; color: var(--c2); }
+.small { font-size: 12px; color: var(--c3); }
+.badge { color: #fff; font-weight: 700; font-size: 12px; border-radius: 5px; padding: 1px 9px; }
+.group { display: inline-flex; gap: 8px; align-items: center; }
+.click { cursor: pointer; border-radius: 4px; padding: 1px 4px; transition: opacity .15s; }
+.click:hover { opacity: .75; }
+.click:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ico { display: inline-flex; }
+.vals { display: inline-flex; gap: 12px; font-size: 12px; color: var(--c3); }
+.v.on { color: var(--blue); font-weight: 700; animation: glow 2s ease-in-out infinite; }
+.pulse { animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(59,130,246,0)) } 50% { transform: scale(1.15); filter: drop-shadow(0 0 4px rgba(59,130,246,.6)) } }
+@keyframes glow { 0%,100% { filter: brightness(1) } 50% { filter: brightness(1.3); text-shadow: 0 0 4px rgba(59,130,246,.3) } }
+@media (prefers-reduced-motion: reduce) { .pulse, .v.on { animation: none } }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: center; color: var(--c2); font-size: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { font: inherit; font-size: 12px; color: var(--c2); background: transparent; border: 0; padding: 3px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--chip); color: var(--c1); font-weight: 600; }
+.seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.status { min-height: 1.4em; text-align: center; color: var(--c2); font-size: 12px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 10px 28px; justify-content: center; color: var(--c2); font-size: 12px; }
+.legend div { display: inline-flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="bar" id="bar">
+  <span class="group" title="In RemNote, a click here opens the priority editor">
+    <span class="lbl">Priority:</span>
+    <span class="badge" id="badge">P12</span>
+    <span class="small" id="cardPct">(9.8% KB, 21% Doc)</span>
+  </span>
+  <span class="sep">|</span>
+  <span class="group click" id="shield" role="button" tabindex="0">
+    <span class="lbl" style="display:inline-flex;gap:4px;align-items:center">
+      <span class="ico" id="shieldIcon"></span><span id="shieldLabel">Card Shield:</span>
+    </span>
+    <span class="vals">
+      <span class="v" id="kb"></span>
+      <span class="v" id="doc"></span>
+    </span>
+  </span>
+  <span class="sep">|</span>
+  <span class="group click" title="In RemNote, a click here opens the Weighted Shield breakdown of the shield on screen">
+    <span class="lbl">⚖️ Weighted:</span>
+    <span class="vals"><span>KB: <strong id="wkb" style="color:var(--c2)"></strong></span><span>Doc: <strong id="wdoc" style="color:var(--c2)"></strong></span></span>
+  </span>
+</div>
+
+<div class="controls">
+  <span>Card on screen:</span>
+  <span class="seg" role="group" aria-label="Priority of the card on screen">
+    <button type="button" id="p5" data-p="5">P5</button>
+    <button type="button" id="p12" data-p="12">P12</button>
+    <button type="button" id="p36" data-p="36">P36</button>
+  </span>
+  <span>· Click the shield to switch it.</span>
+</div>
+<div class="status" id="status" aria-live="polite"></div>
+
+<div class="legend">
+  <div><span id="lgCard"></span><span><b>Card Shield</b>: flashcards only</span></div>
+  <div><span id="lgPrio"></span><span><b>Priority Shield</b>: IncRems + cards</span></div>
+</div>
+
+<script>
+// ---- Icons: same drawing as src/components/ShieldIcon.tsx ----
+const SHIELD = "M8 1.25 L13.75 3.4 V7.6 C13.75 11.1 11.3 13.6 8 14.75 C4.7 13.6 2.25 11.1 2.25 7.6 V3.4 Z";
+const SHIELD_SMALL = "M8 2.2 L12.1 3.75 V7.4 C12.1 10.25 10.35 12.35 8 13.35 C5.65 12.35 3.9 10.25 3.9 7.4 V3.75 Z";
+let uid = 0;
+function icon(kind, px) {
+  const id = "sh" + (uid++);
+  const color = kind === "priority" ? "var(--prio)" : "var(--card)";
+  const body = kind === "priority" ? `
+    <defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-2" y="-2" width="20" height="20">
+      <rect x="-2" y="-2" width="20" height="20" fill="#fff"/><path d="${SHIELD_SMALL}" fill="#000" stroke="#000" stroke-width="2.6"/></mask></defs>
+    <ellipse cx="8" cy="8.2" rx="7.3" ry="2.45" transform="rotate(-18 8 8.2)" stroke="currentColor" stroke-width="1.1" mask="url(#${id})"/>
+    <path d="${SHIELD_SMALL}" fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width="1.35"/>
+    <path d="M1.06 10.46 A7.3 2.45 -18 0 0 14.94 5.94" stroke="currentColor" stroke-width="1.1"/>` : `
+    <defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16">
+      <rect width="16" height="16" fill="#fff"/><rect x="4.7" y="5.9" width="5.4" height="4.2" rx=".7" fill="#000" stroke="#000" stroke-width="1.1"/></mask></defs>
+    <path d="${SHIELD}" fill="currentColor" fill-opacity=".16" mask="url(#${id})"/>
+    <path d="${SHIELD}" stroke="currentColor" stroke-width="1.35"/>
+    <rect x="5.9" y="4.1" width="5.4" height="4.2" rx=".7" stroke="currentColor" stroke-width="1" mask="url(#${id})"/>
+    <rect x="4.7" y="5.9" width="5.4" height="4.2" rx=".7" stroke="currentColor" stroke-width="1.1"/>`;
+  return `<svg viewBox="0 0 16 16" width="${px}" height="${px}" fill="none" stroke-linejoin="round" stroke-linecap="round" style="color:${color};overflow:visible;display:block" aria-hidden="true">${body}</svg>`;
+}
+
+// ---- Percentile colour: same ramp as percentileToHslColor in src/lib/utils.ts ----
+const STOPS = [[0, 0], [10, 28], [19, 52], [27, 85], [35, 130], [45, 175], [60, 210], [100, 240]];
+function pctColor(p) {
+  p = Math.max(1, Math.min(100, Math.round(p)));
+  for (let i = 1; i < STOPS.length; i++) {
+    const [p1, h1] = STOPS[i];
+    if (p <= p1) { const [p0, h0] = STOPS[i - 1]; return `hsl(${h0 + ((p - p0) / (p1 - p0)) * (h1 - h0)}, 80%, 55%)`; }
+  }
+  return "hsl(240, 80%, 55%)";
+}
+
+// ---- Example numbers ----
+const SHIELDS = {
+  card: { label: "Card Shield:", kb: [15, 17.4], doc: [21, 30.2], w: ["42.2%", "70.1%"],
+    title: "Card Shield: flashcards only. Click to show the Priority Shield (IncRems + cards)." },
+  priority: { label: "Priority Shield:", kb: [9, 6.6], doc: [10, 5.9], w: ["38.9%", "61.4%"],
+    title: "Priority Shield: IncRems and cards ranked together. Click to show the Card Shield (flashcards only).",
+    hover: {
+      kb: "Priority Shield (KB): IncRems and cards ranked together\nIncRem side: P9\nCard side: P15\nUniverse: 21,480 (1,312 IncRems + 20,168 cards; dismissed Rems excluded)",
+      doc: "Priority Shield (Doc): IncRems and cards ranked together\nIncRem side: P10\nCard side: P21\nUniverse: 1,906 (148 IncRems + 1,758 cards; dismissed Rems excluded)",
+    } },
+};
+const CARDS = { 5: [3.1, 8], 12: [9.8, 21], 36: [51.9, 99] };
+const state = { mode: "card", p: 12 };
+
+const $ = (id) => document.getElementById(id);
+function value(el, label, [abs, pct], active, title) {
+  el.className = "v" + (active ? " on" : "");
+  el.title = title || "";
+  el.innerHTML = `${label}: <strong style="color:${pctColor(pct)}">${abs}</strong> (${pct.toFixed(1)}%)`;
+}
+function render() {
+  const s = SHIELDS[state.mode];
+  const [kbPct, docPct] = CARDS[state.p];
+  $("badge").textContent = "P" + state.p;
+  $("badge").style.background = pctColor(kbPct);
+  $("bar").style.borderLeft = `4px solid ${pctColor(kbPct)}`;
+  $("cardPct").textContent = `(${kbPct}% KB, ${docPct}% Doc)`;
+  for (const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-pressed", String(+b.dataset.p === state.p));
+
+  // The pulse follows the shield on screen: the card is at or above its value.
+  const kbOn = state.p <= s.kb[0], docOn = state.p <= s.doc[0];
+  $("shieldIcon").innerHTML = icon(state.mode, 15);
+  $("shieldIcon").className = "ico" + (kbOn || docOn ? " pulse" : "");
+  $("shieldLabel").textContent = s.label;
+  $("shield").title = s.title;
+  value($("kb"), "KB", s.kb, kbOn, s.hover && s.hover.kb);
+  value($("doc"), "Doc", s.doc, docOn, s.hover && s.hover.doc);
+  $("wkb").textContent = s.w[0]; $("wdoc").textContent = s.w[1];
+
+  const name = state.mode === "card" ? "Card Shield" : "Priority Shield";
+  $("status").textContent = kbOn || docOn
+    ? `P${state.p} is at or above the ${name} (${kbOn ? "KB P" + s.kb[0] : ""}${kbOn && docOn ? ", " : ""}${docOn ? "Doc P" + s.doc[0] : ""}), so it pulses: this card is protecting it.`
+    : `P${state.p} is below the ${name} (KB P${s.kb[0]}, Doc P${s.doc[0]}), so nothing pulses.`;
+  fit();
+}
+
+const toggle = () => { state.mode = state.mode === "card" ? "priority" : "card"; render(); };
+$("shield").addEventListener("click", toggle);
+$("shield").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+for (const b of document.querySelectorAll(".seg button")) b.addEventListener("click", () => { state.p = +b.dataset.p; render(); });
+$("lgCard").innerHTML = icon("card", 22);
+$("lgPrio").innerHTML = icon("priority", 22);
+
+// ---- Theme: the manual's own toggle when embedded, else the OS ----
+function applyTheme() {
+  let dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+  try {
+    const scheme = window.parent !== window && parent.document.body.getAttribute("data-md-color-scheme");
+    if (scheme) dark = scheme === "slate";
+  } catch (e) { /* not same-origin: keep the OS setting */ }
+  document.documentElement.classList.toggle("dark", dark);
+}
+applyTheme();
+try {
+  if (window.parent !== window) new parent.MutationObserver(applyTheme).observe(parent.document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
+} catch (e) {}
+if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+
+// ---- Size the iframe to the content (the bar wraps on narrow screens) ----
+function fit() {
+  try { if (window.frameElement) window.frameElement.style.height = document.documentElement.scrollHeight + "px"; } catch (e) {}
+}
+window.addEventListener("resize", fit);
+render();
+</script>
+</body>
+</html>

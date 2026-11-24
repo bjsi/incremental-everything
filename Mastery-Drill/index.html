@@ -1,0 +1,3098 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Mastery-Drill/">
+      
+      
+        <link rel="prev" href="../History-Queue-Dashboard-and-Mastery-Drill/">
+      
+      
+        <link rel="next" href="../Repetition-History-and-Statistics/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Mastery Drill - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mastery-drill" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Mastery Drill
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AI-Transcription-of-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Transcription of PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Source-Pins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source Pins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Corpus-Provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus Provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Read-Aloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read Aloud
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Audio-Playlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audio Playlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History & Queue Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Use It
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minimum-delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimum Delay
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Minimum Delay">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hard-card-delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Hard cards wait longer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drill-priority-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Cap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-drill-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the Drill Runs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where the Drill Runs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regular-queue-drill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regular-queue drill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#queue-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue Management
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#card-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Card List
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Card List">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#card-list-filters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtering the list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editor-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor Access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mastery-drill-keyboard-shortcuts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keyboard Shortcuts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Repetition-History-and-Statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repetition History & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Desktop-Helpers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Desktop Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Chrome-Companion-Extension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chrome Companion Extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Companion-Privacy-Policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Companion Privacy Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Logos-Bible-Software-Integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logos Bible Software
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Local-Media-Bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Media Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Bridge-for-Other-Plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Priority Bridge for Other Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Text-and-Lists/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & Lists
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Outline-and-Headings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outline & Headings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Finding-and-Navigating/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding & Navigating
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Search-Engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Queue-Display/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue Display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-True-or-False-Cards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    True or False Cards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Multiple-Choice-Cards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple-Choice Cards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Cleaning-Up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning Up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Under-the-Hood/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Under the Hood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    8. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RemNote-Native-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RemNote Native Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Colour-Coding-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Colour Coding Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    9. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Use It
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minimum-delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimum Delay
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Minimum Delay">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hard-card-delay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Hard cards wait longer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drill-priority-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Cap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-drill-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the Drill Runs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where the Drill Runs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regular-queue-drill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regular-queue drill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#queue-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue Management
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#card-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Card List
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Card List">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#card-list-filters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtering the list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editor-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor Access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mastery-drill-keyboard-shortcuts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keyboard Shortcuts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="mastery-drill">Mastery Drill<a class="headerlink" href="#mastery-drill" title="Permanent link">&para;</a></h1>
+<iframe src="../demos/mastery-drill-bar.html" title="Mastery Drill bar demo" loading="lazy" style="width:100%;height:190px;border:0;display:block"></iframe>
+
+<p><em>The drill bar — try it (a mock: nothing runs).</em></p>
+<p>Inspired by SuperMemo's <em>Final Drill</em>, the <strong>Mastery Drill</strong> creates a focused sub-queue of cards you have recently struggled with, so you can target them deliberately until they stick.</p>
+<p><img alt="Mastery Drill" src="../assets/mastery-drill.png" width="900" /></p>
+<div class="admonition info">
+<p class="admonition-title">Off by default — switch it on to use it</p>
+<p>Turn on <strong>Enable Mastery Drill</strong> in the <a href="../Plugin-Settings-Reference/#where-the-settings-are">IE Settings popup</a> (command <code>is</code>, under <em>Mastery Drill</em>) and reload RemNote.</p>
+<p>While the drill is on, the plugin listens to every flashcard rating and keeps a list of the cards that need drilling, and it registers the drill popup, its command and the sidebar notification. Off, none of that runs — which is why it is opt-in rather than always present. Your flashcard and Practiced Queue history are unaffected either way.</p>
+<p><em>Upgrading:</em> this replaces the old <strong>Skip Mastery Drill</strong> switch. If you had turned that on, the drill stays off; the value is inverted and carried over for you.</p>
+</div>
+<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Any flashcard you rate <strong>Forgot</strong> or <strong>Hard</strong> is automatically added to the Mastery Drill queue.</li>
+<li><strong>Forgot</strong> cards usually already have a RemNote relearning step. If you complete it successfully (Good/Easy), the card is cleared from the drill. The drill ensures you actually complete the relearning step, especially useful when studying document-scoped queues rather than the global queue.</li>
+<li><strong>Hard</strong> cards are the real differentiator. Drilling them is equivalent to reviewing slightly ahead of time — FSRS accounts for this and the resulting interval is nearly unchanged. The purpose is to confirm the card holds from long-term memory, which is why a Hard card <a href="#hard-card-delay">waits longer</a> before it is drilled.</li>
+<li>Unlike <em>SuperMemo</em>, these reviews <strong>are recorded</strong> in your repetition history.</li>
+<li>Cards stay in the drill until you rate them <strong>Good</strong> or <strong>Easy</strong> inside the Mastery Drill.</li>
+<li>A periodic notification widget appears in the Left Sidebar when ≥ 10 cards are pending, with a motivational phrase and a direct <em>Start Drill</em> button.</li>
+<li>If the <a href="../Getting-Started/#collapsed-panel">Incremental RemNote panel is collapsed</a>, the notification is not shown as a card — the panel's drill icon (a target wrapped in a return arrow) carries the drill instead, with the same count on a badge.</li>
+<li>Cards below the <a href="#drill-priority-cap">Priority Cap</a> are not sent to the drill.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Known limitation — <a href="https://help.remnote.com/en/articles/10104223-card-clusters">Card Clusters</a> in the popup drill</p>
+<p>Inside a cluster, RemNote reports only the <strong>cluster anchor</strong> to plugins: the visible sibling advances on screen, but the card identity the plugin receives stays on the first one. In ordinary queues and the <a href="#regular-queue-drill">regular-queue drill</a>, the plugin sees each sibling and reads its rating back from the card's history, so every sibling you rate <em>Forgot</em>/<em>Hard</em> enters the drill and every one you rate <em>Good</em>/<em>Easy</em> leaves it.</p>
+<p>The <strong>popup drill</strong> cannot see the siblings, with two consequences:</p>
+<ul>
+<li><strong>Only the anchor's rating reaches the drill list.</strong> Ratings of siblings 2 and beyond change nothing there.</li>
+<li><strong>The per-card actions target the anchor.</strong> On siblings 2 and beyond, <em>Remove from Drill</em>, <em>Edit Later</em>, <em>Go to Rem</em>, <em>Edit Current</em> and the priority badge act on the anchor rather than on the card you are looking at.</li>
+</ul>
+<p>This is a limitation of what RemNote exposes to a popup, and it costs at most a stale entry in the drill list — never a wrong rating, and never a lost repetition. Everything outside clusters is unaffected.</p>
+</div>
+<h2 id="why-use-it">Why Use It<a class="headerlink" href="#why-use-it" title="Permanent link">&para;</a></h2>
+<p>Use the Mastery Drill to review only items you struggled with recently, ensuring you master them before they fall back into the scheduled queue. Working in a difficult-only mode puts your brain on an emergency alertness level — you approach repetitions differently when recall failure is expected, which is often enough to finally wrap your mind around harder material.</p>
+<blockquote>
+<p>The Mastery Drill is optional. Not using it has no negative consequences: the scheduler will test you again at the next scheduled repetition and handle failures accordingly. But using it costs little and significantly increases success on subsequent repetitions.</p>
+</blockquote>
+<h2 id="minimum-delay">Minimum Delay<a class="headerlink" href="#minimum-delay" title="Permanent link">&para;</a></h2>
+<p>Cards rated <em>Again</em> or <em>Hard</em> enter the drill queue immediately but wait before they appear in it, so you never re-review a card seconds after rating it. Rating a card <em>Again</em> or <em>Hard</em> again — inside the drill or in a regular queue — restarts the wait. While cards wait, a <strong>"X cooling"</strong> badge shows in the drill toolbar (hover it for when the first one is ready), and the Left Sidebar notification leaves them out of its count, so it only counts cards that are ready to drill.</p>
+<ul>
+<li><strong>Again:</strong> the card waits the <strong>Minimum Delay</strong> (default <strong>180 minutes</strong>), so a lapse is relearned while the failure is fresh — or until the <strong>relearning step</strong> its scheduler gave it is over, if that is longer. A card on a scheduler with a 1-day relearning step (an SM-2 scheduler, say) stays out of the drill until it is due.</li>
+<li><strong>Hard:</strong> the card waits a <strong>share of the new interval</strong> the rating gave it (default <strong>5%</strong>), never less than the Minimum Delay and never more than the <strong>Hard maximum</strong> (default <strong>7 days</strong>).</li>
+</ul>
+<h3 id="hard-card-delay">Why Hard cards wait longer<a class="headerlink" href="#hard-card-delay" title="Permanent link">&para;</a></h3>
+<p>A <em>Hard</em> rating is a pass: the scheduler has already sent the card out, maybe for a year or more. Drilled three hours later, the answer still comes from the review you just did, which says little about whether it will last that long. Drilled days later, recall has to come from long-term memory, so a pass confirms the card is ingrained, and a failure shows it is not — while there is still time to fix it.</p>
+<table>
+<thead>
+<tr>
+<th>New interval after <em>Hard</em></th>
+<th>Wait before the drill (defaults)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2 days</td>
+<td>3 hours (the Minimum Delay)</td>
+</tr>
+<tr>
+<td>10 days</td>
+<td>12 hours</td>
+</tr>
+<tr>
+<td>60 days</td>
+<td>3 days</td>
+</tr>
+<tr>
+<td>1 year</td>
+<td>7 days (the maximum)</td>
+</tr>
+</tbody>
+</table>
+<p>The share and the maximum are the settings <strong>Hard Cards: Share of the Interval</strong> and <strong>Hard Cards: Maximum Delay</strong>. Changing them also applies to cards already waiting. A share of 0 gives Hard cards the Minimum Delay. Cards that entered the drill before this feature (v1.0.173) keep the Minimum Delay.</p>
+<h2 id="drill-priority-cap">Priority Cap<a class="headerlink" href="#drill-priority-cap" title="Permanent link">&para;</a></h2>
+<p><strong>Mastery Drill Priority Cap</strong> (default <strong>100</strong>) keeps low-priority material out of the drill. A card rated <em>Again</em> or <em>Hard</em> enters the drill only if its <a href="../Priorities-for-Flashcards/">priority</a> is the cap or a more important one (a number this low or lower); the rest are left to their normal schedule. At 100 every card goes. A card already in the drill stays until you rate it again; if it is then below the cap, it leaves instead of restarting its wait. To clear the low-priority cards already in the drill, use <a href="#queue-management">Clear → Low priority</a>.</p>
+<h2 id="where-the-drill-runs">Where the Drill Runs<a class="headerlink" href="#where-the-drill-runs" title="Permanent link">&para;</a></h2>
+<p>The drill runs in one of two places, chosen with <strong>Where the Drill Runs</strong> in the <a href="../Plugin-Settings-Reference/#mastery-drill">IE Settings popup</a> (<em>Mastery Drill</em>):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Regular queue (default)</th>
+<th>Popup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Where</strong></td>
+<td>RemNote's own Practice queue</td>
+<td>Its own window, with an embedded queue</td>
+</tr>
+<tr>
+<td><strong>Widgets under the card</strong></td>
+<td>All of them: the card info bar and other plugins' widgets (context trees, repetition history…)</td>
+<td>None: RemNote switches plugin widgets off in embedded queues</td>
+</tr>
+<tr>
+<td><strong>Other cards of a drill Rem</strong></td>
+<td>Skipped by the plugin, behind the Reveal Delay</td>
+<td>Never shown</td>
+</tr>
+<tr>
+<td><strong>Tools</strong></td>
+<td>The <a href="#queue-management">queue tools</a>, in the drill bar</td>
+<td>The queue tools plus the <a href="#editor-access">per-card actions</a></td>
+</tr>
+</tbody>
+</table>
+<p><code>dri</code>, the sidebar notification and the panel's drill icon follow the setting. The commands <strong>Mastery Drill (popup)</strong> and <strong>Mastery Drill (regular queue)</strong> start either one whatever it says.</p>
+<h3 id="regular-queue-drill">The regular-queue drill<a class="headerlink" href="#regular-queue-drill" title="Permanent link">&para;</a></h3>
+<p><img alt="The Mastery Drill running in the regular queue: the queue titled &quot;Mastery Drill&quot; with 12 cards left, the drill bar above the card with Remove from Drill, Card List and the note that RemNote hid some drill cards, the card info bar with priority and FSRS figures under the cloze, and the Queue Dashboard on the right recording a Mastery Drill session with the card's forgetting curve" src="../assets/native-drill.png" width="900" /></p>
+<p>RemNote practises whole Rems, not a hand-picked set of cards. So each session creates a temporary <strong>Mastery Drill</strong> document holding the drill Rems, opens it in <em>Practice All</em>, and deletes it when you leave the queue. RemNote offers every card of those Rems, and the plugin skips the ones that are not ready drill cards.</p>
+<ul>
+<li><strong>Reveal Delay</strong> (default 500 ms): each card stays hidden this long, then fades in, so a skipped card is not seen. Most skips take under 150 ms; one that comes right after a rating can take longer and show briefly. A longer delay hides more of them, but every card appears that much later.</li>
+<li><strong>"Time to Take a Break"</strong>: skipping a card counts as seeing it, and RemNote then hides the other cards of that Rem for an hour, sometimes including its drill card. When RemNote shows its "Time to Take a Break" screen for them, the drill presses <strong>Keep Practicing</strong> itself and a toast says how many drill cards it is continuing with. It affects only the drill session, not your other queues. If the press ever fails, the screen stays up with Keep Practicing highlighted and a note under the buttons: press it, or <strong>Esc</strong>.</li>
+<li><strong>The drill bar</strong>, under the queue's top bar, has the same <a href="#queue-management">queue tools</a> as the popup's toolbar, plus <strong>Edit Later</strong> for the card on screen or the previous one. The Card List and the clear views open in their own popup. The regular queue already lets you edit the card, open its Rem and set its priority.</li>
+<li>Ratings work as in any queue: <em>Again</em>/<em>Hard</em> keep the card in the drill and restart its <a href="#minimum-delay">minimum delay</a>, <em>Good</em>/<em>Easy</em> take it out. The session is recorded as <strong>Mastery Drill</strong> in the <a href="../History-Queue-Dashboard-and-Mastery-Drill/#practiced-queues-history-live-dashboard">Practiced Queues History</a>, and with <strong>Auto-focus Queue Dashboard</strong> on, the dashboard opens in the right sidebar as for any queue (the popup drill never opens it).</li>
+<li><strong><a href="https://help.remnote.com/en/articles/10104223-card-clusters">Card Cluster</a> cards</strong>: RemNote tells plugins nothing when a cluster card is rated, so the drill reads the rating from the card's own history a moment after the next card appears (or after you leave the queue). A cluster card rated <em>Good</em> or <em>Easy</em> leaves the drill like any other, and <em>Again</em>/<em>Hard</em> restarts its delay. When the drill starts, it also drops any card whose last rating since it entered the drill was <em>Good</em> or <em>Easy</em> — which catches any rating that was missed, such as a cluster card rated in the popup. The drill's <strong>Remove from Drill</strong> acts on the sibling on screen.</li>
+</ul>
+<p><a href="#queue-management">Queue Management</a> below applies to both drills; <a href="#editor-access">Editor Access</a> and <a href="#mastery-drill-keyboard-shortcuts">Keyboard Shortcuts</a> describe the popup drill.</p>
+<h2 id="queue-management">Queue Management<a class="headerlink" href="#queue-management" title="Permanent link">&para;</a></h2>
+<p>The left part of the drill toolbar — the whole drill bar in the regular queue — holds the tools for the drill as a whole, in captioned groups (try them in the <a href="#">demo at the top</a>):</p>
+<ul>
+<li><strong>Remaining / cooling:</strong> how many cards are ready now, and how many are still <a href="#minimum-delay">waiting</a>. Click the count to open the <a href="#card-list">Card List</a>.</li>
+<li><strong>Card → List:</strong> lists every card in the drill and whether RemNote can show it — see <a href="#card-list">Card List</a>. <strong>L</strong> opens it too in the popup.</li>
+<li><strong>Card → Remove:</strong> takes the card on screen out of the drill without rating it.</li>
+<li><strong>Edit Later → Current / Previous</strong> (in the popup, among the <a href="#editor-access">per-card groups</a> at the right): asks for an optional note, tags the Rem with RemNote's <em>Edit Later</em> (the note goes in its Message) and takes the card out of the drill. <strong>Previous</strong> acts on the card you just rated and keeps its rating — handy when a card shows its flaws only once you see the answer, and you want to rate it first. <strong>Enter</strong> sets the note, <strong>Esc</strong> cancels.</li>
+<li><strong>Clear → All:</strong> empties the drill to start fresh.</li>
+<li><strong>Clear → Low priority:</strong> opens a distribution view of how many drill cards fall into each of 20 priority buckets (0–5, 6–10, …, 96–100). Set a threshold and remove every card above it in one click. To keep such cards out in the first place, set the <a href="#drill-priority-cap">Priority Cap</a>.</li>
+<li><strong>Clear → Old</strong> (amber, shown only when there are any): the cards ready to drill for longer than the <strong>Old Items Threshold</strong> (default 7 days), e.g. <em>14 &gt; 7d</em>. Time spent cooling does not count, so a Hard card that waited a week is not flagged the day it becomes ready. Hover it to read why stale cards may be better left to the scheduler; click it to remove them.</li>
+</ul>
+<p>The clear views work from the keyboard: <strong>←</strong>/<strong>→</strong> choose a button, <strong>Enter</strong> runs it, <strong>Esc</strong> goes back. In Clear Low Priority, <strong>↑</strong>/<strong>↓</strong> move the threshold by 5.</p>
+<h2 id="card-list">Card List<a class="headerlink" href="#card-list" title="Permanent link">&para;</a></h2>
+<p>The drill toolbar counts a card as <em>Remaining</em> from its id alone, but RemNote only shows cards it can still practise. A card that was deleted, or switched off, stays in the count and never appears — the toolbar says <strong>1 Remaining</strong> while the queue says <em>You've finished practicing all your cards!</em>. <strong>List Cards</strong> shows what is actually in the drill.</p>
+<p>The list opens under the toolbar, in place of the queue. The queue is only hidden, so <strong>← Back</strong> (or <strong>Esc</strong>) returns to the same drill session.</p>
+<p>Each row shows the card's text, its type (e.g. <em>Cloze (…)</em>, <em>Forward Card</em>), where the Rem sits, its priority, when it entered the drill, the time left if it is still cooling, and its last rating. A status tag says whether RemNote will show it; hover the tag for what to do about it.</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OK</strong></td>
+<td>RemNote will show the card.</td>
+</tr>
+<tr>
+<td><strong>Last rated Good</strong></td>
+<td>The last rating was <em>Good</em> or <em>Easy</em>, so the card should already have left the drill.</td>
+</tr>
+<tr>
+<td><strong>Paused deck</strong></td>
+<td>The card sits inside a paused deck.</td>
+</tr>
+<tr>
+<td><strong>Card deleted</strong></td>
+<td>The card no longer exists — its Rem was deleted, or the cloze or back side it came from was edited away.</td>
+</tr>
+<tr>
+<td><strong>Rem deleted</strong></td>
+<td>The card record survives but its Rem is gone.</td>
+</tr>
+<tr>
+<td><strong>Disabled by ancestor</strong></td>
+<td>An ancestor carries <em>Disable Descendant Cards</em>.</td>
+</tr>
+<tr>
+<td><strong>In a table</strong></td>
+<td>The Rem is in a table, where RemNote ships cards switched off.</td>
+</tr>
+<tr>
+<td><strong>Cards off on Rem</strong></td>
+<td><em>Enable Cards</em> is off on the Rem.</td>
+</tr>
+<tr>
+<td><strong>Direction off</strong></td>
+<td>The Rem's flashcard direction no longer includes this card's direction.</td>
+</tr>
+<tr>
+<td><strong>Cloze/back removed</strong></td>
+<td>The cloze or back side the card was made from is no longer in the Rem.</td>
+</tr>
+<tr>
+<td><strong>Card switched off</strong></td>
+<td>The card was switched off on its own; open the Rem and run <em>/Enable All Cloze Cards</em>, or click the greyed cloze → <em>Enable this card</em>.</td>
+</tr>
+<tr>
+<td><strong>Not surfaced</strong></td>
+<td>RemNote does not show the card, and no Rem-level cause explains it.</td>
+</tr>
+</tbody>
+</table>
+<p>Cards RemNote cannot show are listed first, then the <a href="#queue-management">old</a> ones (with an amber <strong>Old · ready 12 days</strong> badge), then the cards that are due now, then the ones still cooling. <strong>Remove N unplayable</strong> takes every card RemNote cannot show out at once. Per row, <strong>Go to Rem</strong> opens the Rem (closing the drill), <strong>↗</strong> opens it in a browser tab and keeps the list open, and <strong>Remove</strong> takes the card out of the drill.</p>
+<h3 id="card-list-filters">Filtering the list<a class="headerlink" href="#card-list-filters" title="Permanent link">&para;</a></h3>
+<p>Under the header, four chips split the drill into groups, each with its count:</p>
+<table>
+<thead>
+<tr>
+<th>Chip</th>
+<th>Cards</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Due now</strong></td>
+<td>Past their cooling time, and RemNote can show them. The drill should be serving these.</td>
+</tr>
+<tr>
+<td><strong>Cooling</strong></td>
+<td>Resting after a recent rating; the drill holds them back until the time is up.</td>
+</tr>
+<tr>
+<td><strong>Unplayable</strong></td>
+<td>RemNote will never show them, cooling or not.</td>
+</tr>
+<tr>
+<td><strong>Old</strong></td>
+<td>Ready to drill for longer than the Old Items Threshold: the cards <strong>Clear → Old</strong> removes.</td>
+</tr>
+</tbody>
+</table>
+<p>Click a chip (or press <strong>1</strong>, <strong>2</strong>, <strong>3</strong>, <strong>4</strong>) to hide or show its group. To find a card that is due but never came up in the drill, turn off <strong>Cooling</strong> and <strong>Unplayable</strong>: what remains is everything the drill should be showing you now. To review the old cards before clearing them, leave only <strong>Old</strong> on.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>↑</strong> / <strong>↓</strong></td>
+<td>Choose a card</td>
+</tr>
+<tr>
+<td><strong>Enter</strong></td>
+<td>Go to the chosen card's Rem</td>
+</tr>
+<tr>
+<td><strong>1</strong> / <strong>2</strong> / <strong>3</strong> / <strong>4</strong></td>
+<td>Show or hide <em>Due now</em> / <em>Cooling</em> / <em>Unplayable</em> / <em>Old</em></td>
+</tr>
+<tr>
+<td><strong>Delete</strong></td>
+<td>Remove the chosen card from the drill</td>
+</tr>
+<tr>
+<td><strong>Shift+Delete</strong></td>
+<td>Remove every card RemNote cannot show</td>
+</tr>
+<tr>
+<td><strong>Esc</strong></td>
+<td>Back to the drill</td>
+</tr>
+</tbody>
+</table>
+<h2 id="editor-access">Editor Access<a class="headerlink" href="#editor-access" title="Permanent link">&para;</a></h2>
+<p>In the popup, the right end of the drill toolbar holds per-card groups for the card on screen (the regular queue offers these natively):</p>
+<ul>
+<li><strong>Rem → priority badge:</strong> the current card's priority. Click it to open an inline priority editor directly in the toolbar — no popup needed.</li>
+<li><strong>Rem → Go to Rem:</strong> opens the Rem in RemNote's native Editor (closes the drill popup; a resume trigger re-opens it on return).</li>
+<li><strong>Edit Later → Current / Previous:</strong> prompts for an optional note, marks the Rem of the card on screen (<strong>Current</strong>) or of the card you just rated (<strong>Previous</strong>, which keeps its rating) with the <em>Edit Later</em> powerup, storing the note in the Message slot, and removes the card from the drill queue.</li>
+<li><strong>Edit → Current:</strong> opens an inline editor for the card on screen.</li>
+<li><strong>Edit → Previous:</strong> opens an inline editor for the card you just rated — useful for quick corrections after seeing the answer.</li>
+</ul>
+<p><img alt="Mastery Drill Editor" src="../assets/uploaded/ee94ab_final-drill-editor.png" width="900" /></p>
+<h2 id="mastery-drill-keyboard-shortcuts">Keyboard Shortcuts<a class="headerlink" href="#mastery-drill-keyboard-shortcuts" title="Permanent link">&para;</a></h2>
+<p>The Mastery Drill popup supports the standard RemNote queue keyboard shortcuts:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1</strong></td>
+<td>Again (if answer revealed) — or reveal answer first</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td>Hard (if answer revealed) — or reveal answer first</td>
+</tr>
+<tr>
+<td><strong>3</strong> / <strong>Space</strong></td>
+<td>Good (if answer revealed) — or reveal answer first</td>
+</tr>
+<tr>
+<td><strong>4</strong></td>
+<td>Easy (if answer revealed) — or reveal answer first</td>
+</tr>
+<tr>
+<td><strong>←</strong></td>
+<td>Go back to the previous card</td>
+</tr>
+<tr>
+<td><strong>→</strong></td>
+<td>Skip the current card (can be undone with ←)</td>
+</tr>
+<tr>
+<td><strong>L</strong></td>
+<td>Open the <a href="#card-list">Card List</a></td>
+</tr>
+</tbody>
+</table>
+<p>If the answer has not yet been revealed, the first rating keystroke reveals it. The second keystroke records the rating. Shortcuts are suppressed when focus is on a text input or editable field.</p>
+<hr />
+<h2 id="how-to-use">How to Use<a class="headerlink" href="#how-to-use" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Rate any flashcard <strong>Forgot</strong> or <strong>Hard</strong> during your regular queue.</li>
+<li>A notification will appear periodically in the Left Sidebar when the queue accumulates ≥ 10 pending cards.</li>
+<li>Open the drill using the <strong><code>Mastery Drill</code></strong> command in the Command Palette (Quick Code: <code>dri</code>), or click <em>Start Drill</em> in the notification widget. It opens in the popup or the regular queue, per <a href="#where-the-drill-runs">Where the Drill Runs</a>.</li>
+<li>The queue clears as you master cards (rate them Good or Easy).</li>
+</ol>
+<p><img alt="The Mastery Drill notification under the Incremental RemNote panel in the left sidebar, showing the number of cards ready for drill, a motivational phrase and the Start Drill button" src="../assets/panel-hub-and-drill-expanded.png" width="400" /></p>
+<hr />
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Enable Mastery Drill</code></td>
+<td>Off</td>
+<td>Master switch for all Mastery Drill features: the drill, its sidebar notification and commands, and the tracking of <em>Again</em>/<em>Hard</em> cards. Flashcard and Practiced Queue history are not affected. Requires a reload.</td>
+</tr>
+<tr>
+<td><code>Old Items Threshold</code></td>
+<td>7 days</td>
+<td>Number of days a card can stay ready to drill before it is flagged as stale (time spent cooling does not count). Hover the warning badge in the toolbar for an explanation.</td>
+</tr>
+<tr>
+<td><code>Mastery Drill Minimum Delay</code></td>
+<td>180 min</td>
+<td>A card rated <em>Again</em> or <em>Hard</em> will not appear in the drill until at least this many minutes have passed. For <em>Again</em>, the wait is this or the scheduler's relearning step, whichever is longer; the floor for <em>Hard</em>. See <a href="#minimum-delay">Minimum Delay</a>.</td>
+</tr>
+<tr>
+<td><code>Hard Cards: Share of the Interval</code></td>
+<td>5%</td>
+<td>A card rated <em>Hard</em> waits this share of its new interval before returning to the drill. 0 gives Hard cards the Minimum Delay. See <a href="#hard-card-delay">Why Hard cards wait longer</a>.</td>
+</tr>
+<tr>
+<td><code>Hard Cards: Maximum Delay</code></td>
+<td>7 days</td>
+<td>The longest a card rated <em>Hard</em> waits, however long its interval.</td>
+</tr>
+<tr>
+<td><code>Mastery Drill Priority Cap</code></td>
+<td>100</td>
+<td>Only cards with this priority or a more important one enter the drill; 100 sends every card. See <a href="#drill-priority-cap">Priority Cap</a>.</td>
+</tr>
+<tr>
+<td><code>Disable Mastery Drill Notification</code></td>
+<td>Off</td>
+<td>Hides the periodic Left Sidebar notification widget. The notification only counts cards that have passed the minimum delay and are genuinely ready to drill.</td>
+</tr>
+<tr>
+<td><code>Where the Drill Runs</code></td>
+<td>Regular queue</td>
+<td><em>Regular queue</em> (RemNote's own queue, with every plugin widget) or <em>Popup</em> (embedded queue). See <a href="#where-the-drill-runs">Where the Drill Runs</a>.</td>
+</tr>
+<tr>
+<td><code>Reveal Delay (regular-queue drill)</code></td>
+<td>500 ms</td>
+<td>How long each card stays hidden before it fades in during a regular-queue drill, so skipped cards are not seen. 0 turns it off.</td>
+</tr>
+</tbody>
+</table>
+<p>📖 See <a href="../Plugin-Settings-Reference/">Plugin Settings Reference</a> for the full settings list.</p>
+<hr />
+<h2 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Quick Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Mastery Drill</code></td>
+<td><code>dri</code></td>
+<td>Opens the Mastery Drill, in the popup or the regular queue per <a href="#where-the-drill-runs">Where the Drill Runs</a>.</td>
+</tr>
+<tr>
+<td><code>Mastery Drill (popup)</code></td>
+<td>—</td>
+<td>Opens the drill in the popup, whatever the setting says.</td>
+</tr>
+<tr>
+<td><code>Mastery Drill (regular queue)</code></td>
+<td>—</td>
+<td>Opens the drill in RemNote's own queue, whatever the setting says.</td>
+</tr>
+</tbody>
+</table>
+<p>📖 See <a href="../Plugin-Commands-Reference/">Plugin Commands Reference</a> for the full command list.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

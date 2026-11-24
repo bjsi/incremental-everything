@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menu Hub</title>
+<!--
+  Interactive demo for docs/Plugin-Widgets-Reference.md#menu-hub, embedded in
+  an iframe there, in the Changelog and in the pages that send readers to the
+  hub. A mock of a document's ⋯ menu and the queue's ⋮ menu, with the single
+  "Incremental RemNote…" entry and the Menu Hub it opens (src/widgets/menu_hub.tsx:
+  same groups, labels, keys and placement). Nothing real happens: a status line
+  says what the action would open.
+
+  ?view=document or ?view=queue shows one menu; no parameter shows both, with
+  a switch.
+
+  Theme: follows the manual's light/dark toggle (Material's data-md-color-scheme
+  on the parent page, same origin), else the OS setting.
+-->
+<style>
+:root {
+  --page: transparent;
+  --pane: #fff; --bar: rgb(248 248 252); --border: rgb(231 231 239);
+  --menu: #fff; --shadow: 0 8px 24px rgb(0 0 0 / .16);
+  --c1: rgb(41 41 54); --c2: rgb(99 99 123); --c3: rgb(145 145 168);
+  --blue: #3b82f6; --hover: rgb(41 41 54 / .06); --sel: rgb(231 231 239); --chip: rgb(231 231 239);
+  --red: #dc2626;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+:root.dark {
+  --pane: rgb(30 30 36); --bar: rgb(38 38 45); --border: rgb(52 52 60);
+  --menu: rgb(43 43 51); --shadow: 0 8px 24px rgb(0 0 0 / .45);
+  --c1: rgb(235 235 237); --c2: rgb(190 190 198); --c3: rgb(148 148 159);
+  --blue: #768dff; --hover: rgb(235 235 237 / .07); --sel: rgb(60 60 70); --chip: rgb(52 52 60);
+  --red: #f87171;
+  color-scheme: dark;
+}
+html, body { margin: 0; background: var(--page); color: var(--c1); }
+body { padding: 4px 2px 8px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+button { font: inherit; color: inherit; }
+
+.switch { display: flex; gap: 8px 14px; align-items: center; justify-content: center; flex-wrap: wrap; color: var(--c2); font-size: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { font-size: 12px; color: var(--c2); background: transparent; border: 0; padding: 3px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--chip); color: var(--c1); font-weight: 600; }
+.seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+
+/* ---- The mock pane ---- */
+.pane { position: relative; background: var(--pane); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.top { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bar); min-height: 24px; }
+.crumbs { flex: 1; min-width: 0; color: var(--c3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool { color: var(--c2); font-size: 12px; white-space: nowrap; }
+.dots { border: 0; background: transparent; cursor: pointer; border-radius: 6px; padding: 2px 8px; font-size: 16px; line-height: 20px; color: var(--c2); }
+.dots:hover, .dots[aria-expanded="true"] { background: var(--hover); color: var(--c1); }
+.dots:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.body { padding: 18px 22px; }
+.title { font-size: 20px; font-weight: 700; margin: 0 0 10px; }
+.line { height: 9px; border-radius: 5px; background: var(--chip); margin: 10px 0; }
+.card { max-width: 420px; margin: 10px auto 0; border: 1px solid var(--border); border-radius: 10px; padding: 18px; text-align: center; color: var(--c2); }
+.card b { color: var(--c1); }
+.hint { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; color: var(--c3); font-size: 12px; pointer-events: none; }
+
+/* ---- RemNote's own menu ---- */
+.native { position: absolute; z-index: 3; min-width: 230px; background: var(--menu); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow); padding: 5px; }
+.native .item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent;
+  padding: 6px 10px 6px 34px; border-radius: 6px; cursor: default; color: var(--c1); position: relative; }
+.native .chev { margin-left: auto; color: var(--c3); }
+.native .item.danger { color: var(--red); }
+.native .sep { height: 1px; background: var(--border); margin: 5px 4px; }
+.native .plugin { cursor: pointer; font-weight: 600; }
+.native .plugin:hover, .native .plugin:focus-visible { background: var(--blue); color: #fff; outline: none; }
+.native .plugin svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); }
+.native .plugin.flash { animation: flash 1.6s ease-in-out infinite; }
+@keyframes flash { 0%,100% { box-shadow: inset 0 0 0 0 transparent } 50% { box-shadow: inset 0 0 0 2px var(--blue) } }
+@media (prefers-reduced-motion: reduce) { .native .plugin.flash { animation: none; box-shadow: inset 0 0 0 2px var(--blue) } }
+
+/* ---- The Menu Hub (menu_hub.tsx) ---- */
+.hub { position: absolute; z-index: 2; width: 300px; max-width: calc(100% - 16px); box-sizing: border-box;
+  background: var(--pane); color: var(--c1); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .18); font-size: 13px; overflow: hidden; outline: none; }
+.hub-head { cursor: move; user-select: none; touch-action: none; display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px 6px 12px; border-bottom: 1px solid var(--border); background: var(--bar); }
+.hub-name { font-weight: 600; }
+.hub-sub { font-size: 11px; color: var(--c2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hub-x { border: 0; background: transparent; color: var(--c2); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
+.hub-x:hover { background: var(--hover); }
+.hub-list { padding: 4px 0; }
+.group { padding: 6px 12px 2px; font-size: 10px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--c3); }
+.act { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 6px 12px; border: 0;
+  background: transparent; color: var(--c1); cursor: pointer; font-size: 13px; }
+.act .n { width: 14px; font-size: 11px; color: var(--c3); flex-shrink: 0; }
+.act.on { background: var(--sel); outline: 2px solid var(--blue); outline-offset: -2px; }
+.hub-foot { padding: 6px 12px; font-size: 11px; color: var(--c3); border-top: 1px solid var(--border); }
+
+.status { min-height: 1.4em; text-align: center; color: var(--c2); font-size: 12px; }
+.status b { color: var(--c1); }
+</style>
+</head>
+<body>
+
+<div class="switch" id="switch">
+  <span>Menu:</span>
+  <span class="seg" role="group" aria-label="Which menu">
+    <button type="button" data-view="document">Document ⋯</button>
+    <button type="button" data-view="queue">Queue ⋮</button>
+  </span>
+</div>
+
+<div class="pane" id="pane">
+  <div class="top" id="top"></div>
+  <div class="body" id="body"></div>
+  <div class="hint" id="hint"></div>
+</div>
+<div class="status" id="status" aria-live="polite"></div>
+
+<script>
+const DOC = "Thermodynamics";
+
+// Same groups, labels and order as src/widgets/menu_hub.tsx.
+const ACTIONS = {
+  document: [
+    { id: "toggle", group: "Incremental Rem" },
+    { id: "priority", group: "Priority", label: "Set Priority", says: `opens the priority popup for <b>${DOC}</b>.` },
+    { id: "batch", group: "Priority", label: "Batch Priority Change", says: `opens Batch Priority Change on <b>${DOC}</b> and everything under it.` },
+    { id: "card-priority", group: "Priority", label: "Batch Card Priority (tagged / referencing)", says: `opens Batch Card Priority for the Rems tagged with, or referencing, <b>${DOC}</b>.` },
+    { id: "queue", group: "Queue", label: "Priority Queue", says: `opens the Priority Queue popup on <b>${DOC}</b>.` },
+    { id: "pdf", group: "PDF", label: "PDF Control Panel", says: `opens the PDF Control Panel for the PDF of <b>${DOC}</b>.` },
+    { id: "shield", group: "Statistics", label: "Priority Shield History", says: `opens Priority Shield History on the <b>${DOC}</b> tab.` },
+    { id: "dashboard", group: "Statistics", label: "Study Dashboard", says: `opens the Study Dashboard in Document mode on <b>${DOC}</b>.` },
+    { id: "audit", group: "Flashcards", label: "Audit Card Enablement", says: `opens Audit Card Enablement for <b>${DOC}</b>.` },
+    { id: "audio", group: "Audio", label: "Audio Playlist (this document)", says: `opens the audio player on every audio under <b>${DOC}</b>.` },
+    { id: "audio-tag", group: "Audio", label: "Audio Playlist (rems tagged with this)", says: `opens the audio player on the audios of every Rem tagged with <b>${DOC}</b>.` },
+    { id: "send-window", group: "Window", label: "Send to Another Window", says: `opens <b>${DOC}</b> in another RemNote window, then closes its pane here.` },
+  ],
+  queue: [
+    { id: "q-priority-queue", group: "This queue", label: "Priority Queue", says: `opens the Priority Queue popup on this queue's scope, <b>${DOC}</b>.` },
+    { id: "q-sorting", group: "This queue", label: "Sorting Criteria", says: "opens Sorting Criteria." },
+    { id: "q-shield", group: "Statistics", label: "Priority Shield History", says: `opens Priority Shield History on the <b>${DOC}</b> tab.` },
+    { id: "q-dashboard", group: "Statistics", label: "Study Dashboard", says: `opens the Study Dashboard in Document mode on <b>${DOC}</b>.` },
+    { id: "q-pause", group: "Incremental Rems" },
+    { id: "q-device", group: "Incremental Rems" },
+  ],
+};
+
+// RemNote's own entries around the plugin's (from the 1.30 bundle); inert here.
+const NATIVE = {
+  document: [["Flashcards", "sub"], ["Learn With AI Tutor"], "-", ["Undo"], ["Find or Filter"], ["Open in New Tab"],
+    ["Move"], "-", ["Export"], ["Stats"], "-", "PLUGIN", ["View Trash"], ["Delete", "danger"]],
+  queue: [["Previous Card"], ["Learning Method", "sub"], ["Queue Variant", "sub"], ["Queue Appearance", "sub"], "-", "PLUGIN"],
+};
+
+// RemNote draws every plugin entry with one fixed icon.
+const PLUG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v7A1.5 1.5 0 0 0 3.5 13H6"/><path d="M9 5l3 3-3 3"/><path d="M12 8H5.5"/></svg>`;
+
+const params = new URLSearchParams(location.search);
+const fixed = params.get("view");
+const state = {
+  view: fixed === "queue" ? "queue" : "document",
+  menuOpen: false, hubOpen: false, selected: 0,
+  incremental: false, pausedUntil: 0, deviceOff: false,
+};
+const $ = (id) => document.getElementById(id);
+
+function label(a) {
+  switch (a.id) {
+    case "toggle": return state.incremental ? "Remove Incremental Rem tag" : "Make Incremental Rem";
+    case "q-pause": {
+      const left = Math.ceil((state.pausedUntil - Date.now()) / 60000);
+      return left > 0 ? `No Inc Rems for 15 min (${left} min left)` : "No Inc Rems for 15 min";
+    }
+    case "q-device": return state.deviceOff ? "Enable Inc Rems on this device" : "Disable Inc Rems on this device";
+    default: return a.label;
+  }
+}
+
+function says(a) {
+  switch (a.id) {
+    case "toggle":
+      return state.incremental
+        ? `<b>${DOC}</b> is now an Incremental Rem, and the priority popup opens.`
+        : `<b>${DOC}</b> is no longer an Incremental Rem.`;
+    case "q-pause": return "Only flashcards for the next 15 minutes; a countdown shows in the queue.";
+    case "q-device": return state.deviceOff
+      ? "Incremental Rems are off on this device until you turn them back on."
+      : "Incremental Rems are back on this device.";
+    default: return `<b>${label(a)}</b> ${a.says}`;
+  }
+}
+
+function renderPane() {
+  const doc = state.view === "document";
+  $("top").innerHTML = doc
+    ? `<span class="crumbs">Notes › Physics</span><span class="tool">Turn into Document</span><span class="tool">Share</span><span class="tool">☆</span>
+       <button class="dots" id="dots" aria-haspopup="menu" aria-expanded="false" title="Document menu">⋯</button>`
+    : `<span class="crumbs">Practising <b style="color:var(--c1)">${DOC}</b> · 12 due</span>
+       <button class="dots" id="dots" aria-haspopup="menu" aria-expanded="false" title="Queue menu">⋮</button>`;
+  $("body").innerHTML = doc
+    ? `<p class="title">${DOC}</p><div class="line" style="width:82%"></div><div class="line" style="width:64%"></div><div class="line" style="width:74%"></div>`
+    : `<div class="card"><b>First law of thermodynamics</b><br>ΔU = Q − W<br><br><span style="font-size:12px;color:var(--c3)">Show Answer</span></div>`;
+  $("pane").style.height = doc ? "590px" : "400px";
+  $("dots").addEventListener("click", (e) => { e.stopPropagation(); state.menuOpen ? closeMenu() : openMenu(); });
+  for (const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-pressed", String(b.dataset.view === state.view));
+  hint();
+  fit();
+}
+
+function hint() {
+  const sym = state.view === "document" ? "⋯" : "⋮";
+  $("hint").textContent = state.hubOpen ? "" : state.menuOpen
+    ? "Choose Incremental RemNote…"
+    : `Click ${sym} at the top right, then Incremental RemNote…`;
+}
+
+// Below the button, right edges aligned: where the plugin's CSS anchor puts it.
+function anchorBelow(el) {
+  const pane = $("pane").getBoundingClientRect();
+  const btn = $("dots").getBoundingClientRect();
+  el.style.top = (btn.bottom - pane.top + 6) + "px";
+  el.style.right = Math.max(8, pane.right - btn.right) + "px";
+  el.style.left = "auto";
+}
+
+function openMenu() {
+  closeHub(true);
+  const m = document.createElement("div");
+  m.className = "native"; m.id = "native"; m.setAttribute("role", "menu");
+  for (const it of NATIVE[state.view]) {
+    if (it === "-") { m.insertAdjacentHTML("beforeend", '<div class="sep"></div>'); continue; }
+    if (it === "PLUGIN") {
+      m.insertAdjacentHTML("beforeend", `<button class="item plugin flash" id="pluginItem" role="menuitem">${PLUG}Incremental RemNote…</button>`);
+      continue;
+    }
+    m.insertAdjacentHTML("beforeend", `<div class="item ${it[1] || ""}" role="menuitem" aria-disabled="true">${it[0]}${it[1] === "sub" ? '<span class="chev">›</span>' : ""}</div>`);
+  }
+  $("pane").appendChild(m);
+  anchorBelow(m);
+  $("pluginItem").addEventListener("click", (e) => { e.stopPropagation(); closeMenu(); openHub(); });
+  $("pluginItem").focus({ preventScroll: true });
+  state.menuOpen = true;
+  $("dots").setAttribute("aria-expanded", "true");
+  hint();
+}
+function closeMenu() {
+  $("native")?.remove();
+  state.menuOpen = false;
+  $("dots")?.setAttribute("aria-expanded", "false");
+  hint();
+}
+
+function openHub() {
+  state.hubOpen = true; state.selected = 0;
+  const h = document.createElement("div");
+  h.className = "hub"; h.id = "hub"; h.tabIndex = -1;
+  $("pane").appendChild(h);
+  renderHub();
+  anchorBelow(h);
+  h.addEventListener("keydown", onKey);
+  h.focus({ preventScroll: true });
+  $("status").innerHTML = "";
+  hint();
+}
+function closeHub(quiet) {
+  $("hub")?.remove();
+  state.hubOpen = false;
+  if (!quiet) hint();
+}
+
+function renderHub() {
+  const acts = ACTIONS[state.view];
+  const sub = state.view === "document" ? `📄 ${DOC}` : `🗂 ${DOC}`;
+  let html = `<div class="hub-head" id="hubHead"><div style="flex:1;min-width:0"><div class="hub-name">Incremental RemNote</div>
+    <div class="hub-sub">${sub}</div></div><button class="hub-x" id="hubX" title="Close (Esc)">✕</button></div><div class="hub-list">`;
+  acts.forEach((a, i) => {
+    if (i === 0 || acts[i - 1].group !== a.group) html += `<div class="group">${a.group}</div>`;
+    html += `<button class="act${i === state.selected ? " on" : ""}" data-i="${i}"><span class="n">${i < 9 ? i + 1 : ""}</span><span>${label(a)}</span></button>`;
+  });
+  html += `</div><div class="hub-foot">↑↓ choose · Enter or 1–${Math.min(9, acts.length)} run · Esc close</div>`;
+  const h = $("hub");
+  h.innerHTML = html;
+  $("hubX").addEventListener("click", () => closeHub());
+  $("hubX").addEventListener("mousedown", (e) => e.preventDefault());
+  for (const b of h.querySelectorAll(".act")) {
+    b.addEventListener("click", () => run(+b.dataset.i));
+    b.addEventListener("mouseenter", () => { state.selected = +b.dataset.i; renderHub(); });
+    b.addEventListener("mousedown", (e) => e.preventDefault());
+  }
+  $("hubHead").addEventListener("pointerdown", drag);
+}
+
+function onKey(e) {
+  const n = ACTIONS[state.view].length;
+  if (e.key === "Escape") { e.preventDefault(); closeHub(); return; }
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    state.selected = (state.selected + (e.key === "ArrowDown" ? 1 : -1) + n) % n;
+    renderHub(); return;
+  }
+  if (e.key === "Enter") { e.preventDefault(); run(state.selected); return; }
+  const d = Number(e.key);
+  if (Number.isInteger(d) && d >= 1 && d <= Math.min(9, n)) { e.preventDefault(); run(d - 1); }
+}
+
+// The hub closes once its action has run.
+function run(i) {
+  const a = ACTIONS[state.view][i];
+  if (a.id === "toggle") state.incremental = !state.incremental;
+  if (a.id === "q-pause" && state.pausedUntil < Date.now()) state.pausedUntil = Date.now() + 15 * 60000;
+  if (a.id === "q-device") state.deviceOff = !state.deviceOff;
+  closeHub();
+  $("status").innerHTML = says(a);
+  fit();
+}
+
+// Drag by the header, kept inside the mock pane.
+function drag(e) {
+  if (e.button !== 0 || e.target.closest("button")) return;
+  e.preventDefault();
+  const h = $("hub"), pane = $("pane").getBoundingClientRect(), r = h.getBoundingClientRect();
+  const dx = e.clientX - r.left, dy = e.clientY - r.top;
+  const head = e.currentTarget; head.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    const left = Math.min(Math.max(ev.clientX - dx - pane.left, 0), pane.width - r.width);
+    const top = Math.min(Math.max(ev.clientY - dy - pane.top, 0), pane.height - 60);
+    h.style.left = left + "px"; h.style.top = top + "px"; h.style.right = "auto";
+  };
+  const end = () => { head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", end); head.removeEventListener("pointercancel", end); };
+  head.addEventListener("pointermove", move); head.addEventListener("pointerup", end); head.addEventListener("pointercancel", end);
+}
+
+document.addEventListener("click", (e) => { if (state.menuOpen && !e.target.closest("#native")) closeMenu(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.menuOpen) closeMenu(); });
+
+if (fixed === "document" || fixed === "queue") $("switch").style.display = "none";
+for (const b of document.querySelectorAll(".seg button")) b.addEventListener("click", () => {
+  closeMenu(); closeHub(true); state.view = b.dataset.view; $("status").innerHTML = ""; renderPane();
+});
+
+// ---- Theme: the manual's own toggle when embedded, else the OS ----
+function applyTheme() {
+  let dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+  try {
+    const scheme = window.parent !== window && parent.document.body.getAttribute("data-md-color-scheme");
+    if (scheme) dark = scheme === "slate";
+  } catch (e) { /* not same-origin: keep the OS setting */ }
+  document.documentElement.classList.toggle("dark", dark);
+}
+applyTheme();
+try {
+  if (window.parent !== window) new parent.MutationObserver(applyTheme).observe(parent.document.body, { attributes: true, attributeFilter: ["data-md-color-scheme"] });
+} catch (e) {}
+if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+
+// ---- Size the iframe to the content ----
+function fit() {
+  try { if (window.frameElement) window.frameElement.style.height = document.documentElement.scrollHeight + "px"; } catch (e) {}
+}
+window.addEventListener("resize", () => {
+  for (const id of ["native", "hub"]) { const el = $(id); if (el && !(id === "hub" && el.style.right === "auto")) anchorBelow(el); }
+  fit();
+});
+renderPane();
+</script>
+</body>
+</html>

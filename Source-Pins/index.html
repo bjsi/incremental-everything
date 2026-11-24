@@ -1,0 +1,3393 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental RemNote plugin.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-remnote/Source-Pins/">
+      
+      
+        <link rel="prev" href="../AI-Transcription-of-PDF-Highlights/">
+      
+      
+        <link rel="next" href="../Corpus-Provider/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Source Pins - Incremental RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#source-pins" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Source Pins
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+    
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16zM12.2 5.5c-.9 0-1.6.2-2.1.5-.6.4-.9 1-.8 1.7h2q0-.45.3-.6c.2-.1.4-.2.7-.2s.6.1.8.3.3.4.3.7-.1.5-.2.7c-.2.2-.4.4-.6.5-.5.3-.9.6-1.1.8-.4.3-.5.6-.5 1.1h2c0-.3.1-.5.1-.7.1-.2.3-.3.5-.5.5-.2.8-.5 1.1-.9s.4-.8.4-1.2c0-.7-.3-1.3-.8-1.7-.4-.3-1.2-.5-2.1-.5M11 12v2h2v-2z"/></svg>
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          
+            <li class="md-select__item">
+              <a
+                href="https://github.com/bjsi/incremental-everything/issues"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Report an issue on GitHub
+              </a>
+            </li>
+          
+            <li class="md-select__item">
+              <a
+                href="https://discord.com/channels/689979930804617224/1201559830431809566"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                Ask on RemNote's Discord
+              </a>
+            </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AI-Transcription-of-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Transcription of PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source Pins
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Source Pins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-source-quote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#no-source-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources that are not open: a source finder
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sources that are not open: a source finder">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#source-finder-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting one up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-source-finder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a source finder
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#find-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find Sources: by meaning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Find Sources: by meaning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-written" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What gets written
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lists in your notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-in-descendants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whole summaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Descriptors and where the note sits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Statement: is my note right?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ask-your-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ask Your Sources: a question to your library
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ask Your Sources: a question to your library">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ask-follow-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking a follow-up
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#find-interference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find Interference: what your note could be confused with
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Find Interference: what your note could be confused with">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#find-interference-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-interference-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-interference-written" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What gets written
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discrimination-cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discrimination cards
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quote-rems-in-descendants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinning every quote in a subtree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-outside" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From outside RemNote
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reusing-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reusing highlights
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#text-reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PDFs with a Text Reader version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-rings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telling the pins apart
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-increm-both-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinning both views on Create IncRem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Corpus-Provider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus Provider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Read-Aloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read Aloud
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Audio-Playlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audio Playlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History & Queue Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Repetition-History-and-Statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Repetition History & Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Desktop-Helpers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Desktop Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Chrome-Companion-Extension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chrome Companion Extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Companion-Privacy-Policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Companion Privacy Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Logos-Bible-Software-Integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logos Bible Software
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Local-Media-Bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Media Bridge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Bridge-for-Other-Plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Priority Bridge for Other Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. Utilities
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. Utilities
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Text-and-Lists/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & Lists
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Outline-and-Headings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outline & Headings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Finding-and-Navigating/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Finding & Navigating
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Search-Engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Queue-Display/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queue Display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-True-or-False-Cards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    True or False Cards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Multiple-Choice-Cards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple-Choice Cards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Cleaning-Up/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning Up
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities-Under-the-Hood/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Under the Hood
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    8. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../RemNote-Native-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RemNote Native Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Colour-Coding-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Colour Coding Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    9. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-source-quote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#no-source-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources that are not open: a source finder
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sources that are not open: a source finder">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#source-finder-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting one up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-source-finder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a source finder
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#find-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find Sources: by meaning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Find Sources: by meaning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-written" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What gets written
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lists in your notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-in-descendants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whole summaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-sources-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Descriptors and where the note sits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Statement: is my note right?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ask-your-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ask Your Sources: a question to your library
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ask Your Sources: a question to your library">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ask-follow-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking a follow-up
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#find-interference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Find Interference: what your note could be confused with
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Find Interference: what your note could be confused with">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#find-interference-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-interference-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#find-interference-written" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What gets written
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discrimination-cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discrimination cards
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quote-rems-in-descendants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinning every quote in a subtree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-outside" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From outside RemNote
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reusing-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reusing highlights
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#text-reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PDFs with a Text Reader version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-rings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telling the pins apart
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-increm-both-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinning both views on Create IncRem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="source-pins">Source Pins<a class="headerlink" href="#source-pins" title="Permanent link">&para;</a></h1>
+<p>A <strong>source pin</strong> is a pin reference to the highlight that holds a passage: click it and the PDF or article opens at that passage. Extracting a highlight with <a href="../Create-Incremental-Rem-from-PDF-Highlights/">Create Incremental Rem</a> gives you one automatically.</p>
+<p><strong>Pin Source Quote</strong> gives one to text you already have — a sentence you typed, pasted or wrote into your notes — without selecting it in the source again. It finds the passage in the open PDF or article, reuses the highlight that already covers it or creates one, and pins it.</p>
+<p><strong>Find Sources</strong> does the same for text that only <em>means</em> what the source says — a summary, a paraphrase, a translation, course notes — by searching your library by meaning. See <a href="#find-sources">Find Sources</a>. <strong>Check Statement</strong> goes one step further and tells you whether a note is right, from those passages. See <a href="#check-statement">Check Statement</a>. <strong>Ask Your Sources</strong> answers a question from them. See <a href="#ask-your-sources">Ask Your Sources</a>.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The <a href="../Desktop-Helpers/#ai-helper">AI helper</a>, running — see <a href="../Desktop-Helpers/#setup">Setting up the AI helper</a>. Pin Source Quote only needs Python and PyMuPDF; no AI and no Claude account are involved.</li>
+<li>RemNote <strong>desktop</strong>.</li>
+<li>The source must already have its <strong>Highlights</strong> document, which RemNote creates with the first highlight. For a PDF or article you have never highlighted, make one highlight first.</li>
+</ul>
+<h2 id="pin-source-quote">Using it<a class="headerlink" href="#pin-source-quote" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Open the source in a pane: a <strong>PDF</strong>, a <strong>saved web article</strong> (RemNote's reader view of a page), or a <strong>PDF in Text Reader mode</strong>. It can sit next to your notes or in another RemNote window: the command looks in the current window first, then in the others.</li>
+<li>Focus the Rem whose text comes from that source, or select several Rems. In the queue (the Learn New queue included), the card on screen is the target; a Rem selected in the previewer (<code>P</code>) takes its place.</li>
+<li>Run <strong>Pin Source Quote</strong>: <code>Opt+Shift+Q</code> / <code>Alt+Shift+Q</code>, or quick code <code>psq</code>.</li>
+</ol>
+<p>A toast reports where the passage was found and what was reused or created — for example <em>📌 PDF p.95: reused 0, created 1</em>.</p>
+<ul>
+<li><strong>Several Rems at once:</strong> with a multi-Rem selection, each Rem is pinned in turn and a final toast reports how many were done. Rems whose passage was not found are listed together at the end instead of stopping the run, and a PDF with a Text Reader version asks <a href="#text-reader">which view</a> once, for the whole selection.</li>
+<li><strong>Front and back:</strong> when the Rem has a back, the command looks for the front, the back, and both joined in either order — a heading on one side and its sentence on the other are often one passage — and pins the version that matches the most of its words. The pin goes at the <strong>end of the back</strong>; on a Rem without a back, at the end of the front.</li>
+<li>The text must be <strong>taken from the source</strong>. Small differences are tolerated — a garbled character from the PDF's text layer, missing punctuation — but a paraphrase, summary or translation will not be found.</li>
+<li>A <strong>leading list marker</strong> in your Rem ("3. ", "b) ", "• ") is ignored: the source shows it as list numbering, not as text.</li>
+<li>The PDF is searched <strong>page by page</strong>; a sentence that runs across a page break is not matched yet.</li>
+<li>If the same short phrase appears <strong>word for word</strong> more than once, the first occurrence is pinned.</li>
+</ul>
+<h2 id="no-source-open">Sources that are not open: a source finder<a class="headerlink" href="#no-source-open" title="Permanent link">&para;</a></h2>
+<p>If no PDF or article is open in any RemNote window, or the one that is open does not hold the passage, Pin Source Quote can still pin the quote when you have set up a <strong>source finder</strong>: a program on your computer that knows your books, for example a search index of your library. Given a quote, it says which book the quote comes from and which of your PDF Rems to try, in order. The quote is pinned from the first of them that holds the passage, in its page view.</p>
+<p>The source finder gets each quote's text and the Rems above it, so it can tell the book from an attribution in the quote (<em>“…” (BPG 5.2.1)</em>), from the notes the quote sits in, or from the text itself. A book split into several PDFs is handled by listing them all.</p>
+<p><strong>When the open source misses:</strong> the passages it holds are pinned there as usual, and only the others are looked up. The open PDF is not searched twice. The dialog says it was searched first and lists it as <em>(the open source)</em> among the PDFs tried.</p>
+<p>Since the PDF was not in front of you, a <strong>confirmation dialog</strong> follows instead of a toast. For each quote it shows the PDF and page it was pinned from, the book and how the source finder knew, and the highlights reused or created. The quotes that were not found are listed with the PDFs that were tried. If a pin points to the wrong PDF, remove it, open the right PDF and run the command again.</p>
+<p>Without a source finder, the command asks you to open the source, or says the passage is not in the open one, as before.</p>
+<h3 id="source-finder-setup">Setting one up<a class="headerlink" href="#source-finder-setup" title="Permanent link">&para;</a></h3>
+<p>The <a href="../Desktop-Helpers/#ai-helper">AI helper</a> runs the source finder. Name its command in <code>~/.incremental-remnote/ai-ocr/source-finder.json</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"/usr/local/bin/python3"</span><span class="p">,</span><span class="w"> </span><span class="s2">"~/my-library-index/find_pdf.py"</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>A <a href="../Corpus-Provider/">corpus provider</a> can take the source finder's place: it answers the same requests, can also give the exact text to search for when a quote was corrected, and serves other features. When both are set up, the corpus provider is used.</p>
+<p>Or set the <code>IR_SOURCE_FINDER</code> environment variable of the helper (<code>IR_SOURCE_FINDER="python3 ~/my-library-index/find_pdf.py"</code>). The file is read on each request, so no restart is needed after changing it. A command ending in a <code>.py</code> file runs from that file's folder.</p>
+<h3 id="writing-a-source-finder">Writing a source finder<a class="headerlink" href="#writing-a-source-finder" title="Permanent link">&para;</a></h3>
+<p>The helper writes one JSON request to the program's standard input and reads one JSON answer from its standard output (exit code 0; anything else is reported as a failure). All the quotes of one run come in a single request.</p>
+<p>Request:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"items"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"remId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"AbC123"</span><span class="p">,</span><span class="w"> </span><span class="nt">"ancestors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"parent id"</span><span class="p">,</span><span class="w"> </span><span class="s2">"grandparent id"</span><span class="p">],</span><span class="w"> </span><span class="nt">"texts"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"front"</span><span class="p">,</span><span class="w"> </span><span class="s2">"back"</span><span class="p">]</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>Answer, books in the order to try:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"items"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"remId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"AbC123"</span><span class="p">,</span><span class="w"> </span><span class="nt">"books"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Bridge Procedures Guide, 6th ed."</span><span class="p">,</span><span class="w"> </span><span class="nt">"cite"</span><span class="p">:</span><span class="w"> </span><span class="s2">"BPG"</span><span class="p">,</span><span class="w"> </span><span class="nt">"how"</span><span class="p">:</span><span class="w"> </span><span class="s2">"named in the quote"</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">      </span><span class="nt">"page"</span><span class="p">:</span><span class="w"> </span><span class="mi">66</span><span class="p">,</span><span class="w"> </span><span class="nt">"pdfRemIds"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"PdF000"</span><span class="p">]</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<ul>
+<li><code>pdfRemIds</code> (required): the RemNote PDF Rems of that book, in the order to try.</li>
+<li><code>title</code> (required) and <code>cite</code> (optional, short): how the book is shown in the dialog.</li>
+<li><code>how</code> (required): how the program knew, shown as is (<em>named in the quote</em>, <em>in its notes</em>, <em>its text matches</em>).</li>
+<li><code>page</code> (optional): a page to search first; the whole PDF is searched if the passage is not near it.</li>
+<li><code>id</code> and <code>detail</code> (optional): passed back by the Local Media Bridge, not shown.</li>
+<li><code>quote</code> (optional, <a href="../Corpus-Provider/#op-find-source">corpus providers</a> with <code>quote-literal</code>): the text to look for instead of the Rem's own, when the Rem's text was corrected and no longer matches the PDF letter for letter.</li>
+</ul>
+<h2 id="find-sources">Find Sources: by meaning<a class="headerlink" href="#find-sources" title="Permanent link">&para;</a></h2>
+<p>Pin Source Quote only finds text taken from the source. <strong>Find Sources</strong> finds the passages of your library that <em>say what a note says</em>, in other words or in another language: a summary you are studying from, course material, your own paraphrase. You review what it found, and the accepted passages are pinned to their highlights in your PDFs, as Pin Source Quote does.</p>
+<p>It needs a <a href="../Corpus-Provider/">corpus provider</a> that searches by meaning (the <code>semantic-search</code> capability), run by the <a href="../Desktop-Helpers/#ai-helper">AI helper</a>. Find Sources, Check Statement, Ask Your Sources and their tree versions appear among the commands only once the provider reports that capability (looked at shortly after RemNote starts, then every few minutes until the helper answers).</p>
+<h3 id="find-sources-run">Running it<a class="headerlink" href="#find-sources-run" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Find Sources (by meaning)</strong> (<code>fsq</code>) on the focused Rem or a multi-Rem selection (in the queue, the card on screen). A PDF open in a pane, or the book whose notes the Rem sits in, is searched first; the rest of your library too.</li>
+<li>Or <strong>🔎 Search by meaning</strong> in Pin Source Quote's <em>Passage not found</em> dialog (←→ to reach it), for the Rems that missed.</li>
+</ul>
+<p>It runs <strong>in the background</strong>, about 20 seconds per Rem. A notice says when the results are ready; nothing is written until you review them.</p>
+<h3 id="find-sources-review">Reviewing<a class="headerlink" href="#find-sources-review" title="Permanent link">&para;</a></h3>
+<p><strong>Review</strong> in the notice opens the list of passages, per Rem:</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Source</strong></td>
+<td>Says what your note says (score 8–10). Selected from the start.</td>
+</tr>
+<tr>
+<td><strong>Diverges</strong></td>
+<td>Contradicts your note: a different number, definition, condition or recommendation.</td>
+</tr>
+<tr>
+<td><strong>Related</strong></td>
+<td>Same point and context, adds to it or explains it (score 5–7).</td>
+</tr>
+</tbody>
+</table>
+<p>Each row shows the book, the page in your RemNote PDF, the quote with the words it turns on in <strong>bold</strong>, and a short note on what the passage says. A passage whose book has no PDF in RemNote (or which is not found in it) cannot be pinned; it can still be written as a quote.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>↑</code> <code>↓</code></td>
+<td>Move</td>
+</tr>
+<tr>
+<td><code>Space</code></td>
+<td>Select or unselect the row</td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td>Select every passage scoring 9 or more</td>
+</tr>
+<tr>
+<td><code>Q</code></td>
+<td>What to write besides the pins (below)</td>
+</tr>
+<tr>
+<td><code>Enter</code></td>
+<td>Pin the selected passages</td>
+</tr>
+<tr>
+<td><code>Esc</code></td>
+<td>Close; <strong>Review</strong> in the notice opens it again</td>
+</tr>
+</tbody>
+</table>
+<h3 id="find-sources-written">What gets written<a class="headerlink" href="#find-sources-written" title="Permanent link">&para;</a></h3>
+<p><code>Q</code> chooses, and the choice is remembered on this device:</p>
+<ul>
+<li><strong>Pins only</strong>: the pins, on the Rem.</li>
+<li><strong>Pins + quotes</strong>: also each quote as a child Rem, in the Quote format, under <strong>Fontes</strong> / <strong>Sources</strong> (sources) and <strong>Material relacionado</strong> / <strong>Related material</strong> (related and diverging passages, the latter marked ⚠️). Both headers are Extra Card Detail, so they show on the back of the Rem's cards.</li>
+<li><strong>Pins + quotes + AI notes</strong>: also, under each quote, the note on what the passage says, as an <strong>AI Note</strong>: small, italic and muted, with a small 🤖 in place of its tag.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>• Métodos de projeto probabilístico são muito utilizados … 📌
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    • Fontes
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        • “Probabilistic design methods are widely used to determine the optimum
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>          dimensions […] and lead to significant savings …” (PIANC 121, PDF p. 29) 📌
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>            • Métodos probabilísticos dão dimensões ótimas e economias…   (AI Note)
+</code></pre></div>
+<ul>
+<li><strong>Quotes</strong> keep only the words that bear on your note: the rest of the passage is cut with <code>[…]</code>, and each part gets its own pin, so the pin opens the whole context. The words the point turns on are in <strong>bold</strong>, the one word or figure it hinges on in <strong><em>bold italics</em></strong>. The attribution reads <code>(book, §section, PDF p. N)</code>, with <code>; fora do edital</code> for a passage the exam does not ask for (<code>; out of the exam syllabus</code> when the note is in English; the review shows the same label).</li>
+<li><strong>Where the pins go:</strong> at the end of the Rem (of its back, when it has one). When the Rem mixes what several passages say, each pin goes right after the sentence it supports, as long as that sentence can be found with certainty; any other goes at the end.</li>
+<li><strong>Running it again</strong> reuses the highlights, the headers and the quote Rems already there, and adds nothing twice.</li>
+</ul>
+<h3 id="find-sources-lists">Lists in your notes<a class="headerlink" href="#find-sources-lists" title="Permanent link">&para;</a></h3>
+<p>Notes often split one sentence over several Rems: a lead-in ending with ":" and its list items as children.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>• A profundidade segura de um canal é determinada por:
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    • fatores do nível d'água,
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    • fatores do navio e
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    • fatores do fundo.
+</code></pre></div>
+<p>Neither part is a statement alone, so Find Sources and Check Statement read them as <strong>one</strong>: <em>"…é determinada por: fatores do nível d'água, fatores do navio e fatores do fundo."</em></p>
+<ul>
+<li><strong>A list</strong> is a Rem ending with ":" (or with a word that waits for its list, like <em>…composta por</em>) whose children are all short (up to 30 words) and not headings. An item can have its own list, which is folded in.</li>
+<li><strong>Running a command on one item</strong> judges its whole list.</li>
+<li><strong>The pin</strong> goes on the item a passage supports when it supports just that one, otherwise on the lead-in. Quotes and Check Rems go under the lead-in.</li>
+<li><strong>Headings are titles, not statements:</strong> they are skipped, and their children are judged one by one. So are labels of fewer than six words and the caption over an audio or image.</li>
+</ul>
+<h3 id="find-sources-in-descendants">Whole summaries<a class="headerlink" href="#find-sources-in-descendants" title="Permanent link">&para;</a></h3>
+<p><strong>Find Sources (by meaning) in descendants</strong> (<code>fsqd</code>) and <strong>Check Statements against Sources in descendants</strong> (<code>cksd</code>) run on every statement under the focused or selected Rems: a course or summary document, or a section of one.</p>
+<ul>
+<li><strong>What is searched:</strong> each statement once, lists read as above. Quotes, AI Notes and what Find Sources and Check Statement already wrote are left out. <code>fsqd</code> also skips statements that already have a pin; <code>cksd</code> checks them all. At most 120 per run.</li>
+<li><strong>Speed:</strong> three statements at a time, in the background. A notice follows the progress and turns into the review when all are done.</li>
+<li><strong>Reviewing:</strong> one list for the whole run, grouped by note. <code>A</code> selects every passage scoring 9 or more, <code>Shift+A</code> only in the current note, and <code>PageDown</code> / <code>PageUp</code> jump between notes.</li>
+</ul>
+<h3 id="find-sources-context">Descriptors and where the note sits<a class="headerlink" href="#find-sources-context" title="Permanent link">&para;</a></h3>
+<p>A note often means something only in its place in the outline. What is sent with it:</p>
+<ul>
+<li><strong>A descriptor</strong> (<em>Não pode rebocar em que método? → no cabo longo</em> under <em>Rebocadores com tubulão</em>) names no subject on its own, so it goes with its <strong>concept</strong>: the first Rem above it that is not a descriptor, then any descriptors in between, front only. The concept is searched with the note, and Claude reads the note as being about it. This applies to Find Sources, Check Statement and Ask Your Sources.</li>
+<li><strong>Check Statement and Ask Your Sources</strong> also give Claude up to three Rems above the note (above the concept, for a descriptor), up to and including its document, so a question under <em>3.3) Tug assistance in ice</em> is read as being about ice. Rems longer than a heading are left out. These go to Claude only, never to the search, where they would pull in passages about the whole topic.</li>
+<li><strong>The review</strong> shows what was sent, under each note's title: <em>3) Assisting methods › 3.3) Tug assistance in ice › Rebocadores com tubulão › this note</em>.</li>
+</ul>
+<h2 id="check-statement">Check Statement: is my note right?<a class="headerlink" href="#check-statement" title="Permanent link">&para;</a></h2>
+<p><strong>Check Statement against Sources</strong> (<code>cks</code>) runs <a href="#find-sources">Find Sources</a> on the focused or selected Rems, then asks Claude (Opus, through the <a href="../Desktop-Helpers/#ai-helper">AI helper</a>, on your Claude subscription) whether each note is right, judging <strong>only from the passages found</strong>, never from its own knowledge. Claude reads each passage in full and picks the words that show its verdict: those become the quotes, with their emphasis, and the pins. Same requirements as Find Sources, plus the Claude CLI signed in.</p>
+<p>It runs in the background (about half a minute per Rem), and the notice shows the verdict:</p>
+<table>
+<thead>
+<tr>
+<th>Verdict</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>✅ Correta / Consistent</td>
+<td>Every claim of the note is supported</td>
+</tr>
+<tr>
+<td>⚠️ Em parte / Partly</td>
+<td>Some claims are supported, others are missing, imprecise or wrong</td>
+</tr>
+<tr>
+<td>❌ Incorreta / Contradicted</td>
+<td>A central claim is contradicted</td>
+</tr>
+<tr>
+<td>❔ Não coberta pelas fontes / Not covered</td>
+<td>No passage settles the note</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Review</strong> opens the same list as Find Sources, with the verdict and an <strong>observation</strong> at the top of each Rem: what is right, what is wrong and what the source says instead, citing book and page. The passages the verdict rests on are marked ◆ and selected from the start. Enter writes the verdict, even with no passage selected:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>• Para canais de acesso expostos à ação de ondas, … 📌
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    • Verificação: ⚠️ Em parte (18/11/2026)        (Extra Card Detail)
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        • A primeira parte está correta: … A segunda parte está errada: …
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>            • “…” (PIANC 121, PDF p. 30) 📌
+</code></pre></div>
+<ul>
+<li>The <strong>source pins</strong> go on the Rem, as in Find Sources.</li>
+<li>With quotes on (<code>Q</code>), the ◆ passages go under the observation; any other accepted passage goes under Fontes / Material relacionado.</li>
+<li>Each check is <strong>dated</strong>: checking again adds a new one and leaves the old one.</li>
+</ul>
+<h2 id="ask-your-sources">Ask Your Sources: a question to your library<a class="headerlink" href="#ask-your-sources" title="Permanent link">&para;</a></h2>
+<p>Write a question or a topic in a Rem, <em>qual deve ser o ângulo de presa das âncoras tipo patente?</em> or just <em>ângulo de presa das âncoras tipo patente</em>, and run <strong>Ask Your Sources</strong> (<code>ask</code>). It finds the passages of your library that answer it, then Claude (Opus) answers <strong>only from them</strong>, the way <code>/explain-with-quotes</code> does, and says so when they do not settle it. Same requirements as Check Statement.</p>
+<ul>
+<li><strong>The answer:</strong> one sentence, then a few short sections from the core idea to the details and conditions, then where the sources disagree. Key terms and figures in <strong>bold</strong>.</li>
+<li><strong>The quotes:</strong> Claude reads each passage in full and quotes, under each section, exactly the words that section rests on, trimmed with <code>[…]</code> and emphasised; the same passage can be quoted differently in two sections. Every quote is checked against the source before it is offered.</li>
+<li><strong>Review:</strong> the answer at the top, each section with its quotes and passage numbers, and the passages below with the same numbers; the ones the answer uses (◆) start selected, a passage that disagrees with another is marked ⚠ diverges.</li>
+</ul>
+<p>Written under the question, first among its children:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>• qual deve ser o ângulo de presa das âncoras tipo patente?
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    • Resposta (18/11/2026): Segundo a Arte Naval, … aproximadamente 45°; Clark … entre 35° e 37°.   (Extra Card Detail)
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        • Nas âncoras tipo patente, o ângulo de presa é … aproximadamente 45°.
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>            • “Nas âncoras tipo patente, é o ângulo máximo …” (Arte Naval II, PDF p. 61) 📌
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>        • O valor do ângulo é um meio-termo: … 30° para areia … 50° para lama …
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>            • “the optimum maximum angle for the flukes varies …” (Clark, PDF p. 200) 📌
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        • Divergências
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>            • A Arte Naval dá cerca de 45°; Clark, 35° a 37° … → each side's quote
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        • Outras passagens → accepted passages the answer did not use
+</code></pre></div>
+<ul>
+<li><code>Q</code> chooses <strong>Pins only</strong> (a section gets its pins at the end of its own text) or <strong>Pins + quotes</strong>; there are no AI notes here, since the answer already explains. The same goes for Check Statement.</li>
+<li>The question itself gets no pin. Each answer is <strong>dated</strong>: asking again adds a new one.</li>
+</ul>
+<h3 id="ask-follow-up">Asking a follow-up<a class="headerlink" href="#ask-follow-up" title="Permanent link">&para;</a></h3>
+<p>When the answer misses a point, or you want another aspect in it, write what to change in the field at the bottom of the review (<code>F</code> puts the cursor there) and press <code>Enter</code> or <strong>Ask again</strong>: <em>include the effect of the ice thickness</em>, <em>shorter</em>, <em>say which book gives 45°</em>.</p>
+<ul>
+<li>The question is <strong>searched again</strong> with your follow-up added, so a new aspect brings its own passages. The passages of the first answer that the new search does not find again are kept.</li>
+<li>Claude <strong>rewrites the whole answer</strong> from the previous one and your request, still only from the passages, and says so when they do not cover what you asked.</li>
+<li>It runs in the background like the first time. A new notice (<em>Ask Your Sources: follow-up ready to review</em>) opens a new review, which shows your follow-up under the question; you can follow up again from there.</li>
+<li>Nothing is written until you accept an answer. With one question in the review, the old notice goes; in a review of several, the follow-up applies to the question under the cursor, and the old notice stays for the others.</li>
+<li><code>Esc</code> in the field goes back to the list.</li>
+</ul>
+<h2 id="find-interference">Find Interference: what your note could be confused with<a class="headerlink" href="#find-interference" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><em>Interference is probably the single greatest cause of forgetting.</em> — Piotr Wozniak, <a href="https://www.supermemo.com/en/blog/twenty-rules-of-formulating-knowledge">20 rules of formulating knowledge</a>, rule 11</p>
+</blockquote>
+<p>Run <strong>Find Interference</strong> (<code>intf</code>) on a note (one fact, one card) and it finds the statements of your library you could <strong>mix it up with</strong>, and those that <strong>contradict</strong> or <strong>confirm</strong> it. Claude (Opus by default, through the <a href="../Desktop-Helpers/#ai-helper">AI helper</a>) reads each passage in full and sorts what it finds:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>≈ Similar but distinct</strong></td>
+<td>Another thing in the same frame (another order, step, stage, test) with a different value or term, or the same value with another meaning. The two can swap places in your memory.</td>
+</tr>
+<tr>
+<td><strong>≠ Divergence</strong></td>
+<td>The same thing, and the sources disagree: a different value, an incompatible claim, or a <strong>different scope</strong>, when one book gives the thing more or less than the others (a purpose, a cause, a member of a list), even if nobody excludes the other's claim in so many words.</td>
+</tr>
+<tr>
+<td><strong>= Convergence</strong></td>
+<td>The same thing, said again in another book, or in another place of the same book.</td>
+</tr>
+</tbody>
+</table>
+<p>It searches your whole library, <strong>your note's own book included</strong>. The passage your note comes from is read too: its other sentences, the steps just before and after yours, are often the most confusable of all. Requirements are the same as Check Statement's: a <a href="../Corpus-Provider/">corpus provider</a> that searches by meaning, the AI helper paired, and the Claude CLI signed in.</p>
+<h3 id="find-interference-examples">Two examples<a class="headerlink" href="#find-interference-examples" title="Permanent link">&para;</a></h3>
+<p><strong>An order and its distance.</strong> The note <em>À voz de "Atenção para largar o ferro", dada a cerca de 100 jds do ponto de fundeio, o Sr. Mestre determina que o freio do cabrestante seja aberto e o cavirão da patola retirado.</em> (Arte Naval) brings:</p>
+<ul>
+<li>≈ from its own paragraph: <em>"Preparar para largar o ferro"</em> at about <strong>1.000 jds</strong>; the distances are then reported <strong>every 100 jds</strong> (the same number, another meaning); at <em>"Largar o ferro"</em> the man strikes the patola with the sledgehammer.</li>
+<li>≈ from the same book, two pages back: stop the engines about <strong>three ship lengths</strong> from the chosen position.</li>
+<li>≈ from Miguens: reduce to 5–7 knots at <strong>1,000 yards</strong>; engines stopped at about <strong>300 yards</strong>.</li>
+<li>≠ inside Arte Naval itself: its anchoring orders on p. 198 (<em>Preparar / Atenção / Largar o ferro</em>) and on p. 97 (<em>Postos de fundear! Preparar para fundear! Larga o ferro!</em>), one with <em>Atenção</em>, the other without.</li>
+</ul>
+<p><strong>A test and its purpose.</strong> The note <em>The spiral test is used to evaluate the turning ability and the yaw stability of the ship.</em> (Bertram) brings:</p>
+<ul>
+<li>≠ of scope: PNA Control, <em>"The spiral maneuver as described earlier serves <strong>mainly</strong> to determine stability characteristics […] The turning maneuver denotes turning qualities"</em>; Mesquita, <em>"O objetivo do teste de espiral direta é determinar se o navio é direcionalmente estável ou não."</em> No book but Bertram gives the spiral turning ability.</li>
+<li>≈: Bertram's own <em>turning circle test … used to evaluate the turning ability</em>; the pull-out, <em>a quick indication of a ship's yaw stability</em>; the zig-zag, <em>to determine control characteristics</em>; PNA's Diagram of Steering, a design technique <em>assessing both turning ability and dynamic stability</em>.</li>
+</ul>
+<h3 id="find-interference-review">Reviewing<a class="headerlink" href="#find-interference-review" title="Permanent link">&para;</a></h3>
+<p>The search takes about a minute (it casts a wider net than Find Sources) and Claude about half a minute more; a notice counts what was found (<em>≈ 7 similar but distinct · ≠ 2 divergences</em>) and opens the review.</p>
+<p><img alt="The Find Interference review on the spiral-test note" src="../assets/find-interference-review.png" width="640" /></p>
+<p><em>Above: each row shows its kind, book and page, one line with the frame and the two values (<strong>this note's × the other's</strong>), the quote, and, when one of your own Rems pinned to the same highlight already states it, <strong>In your notes</strong>. The 🃏 row shows the card it will make.</em></p>
+<ul>
+<li>Every row starts selected: <code>Space</code> leaves one out, <code>Enter</code> writes, <code>Esc</code> closes and keeps the notice.</li>
+<li><code>C</code> (or a click on 🃏) puts a ≈ or ≠ row into a <a href="#discrimination-cards">discrimination card</a>.</li>
+</ul>
+<h3 id="find-interference-written">What gets written<a class="headerlink" href="#find-interference-written" title="Permanent link">&para;</a></h3>
+<p>The last child of the note, dated, so running it again adds a new check:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>• The spiral test is used to evaluate the turning ability and the yaw stability of the ship.
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    • Interference Check (11/23/2026)                              (Extra Card Detail, #Interf)
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>        • ≈ Similar but distinct
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>            • What the trial evaluates: spiral test, turning ability and yaw stability × turning circle test, turning ability · in your notes: [[…]]
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>                • “The turning circle test is used to evaluate the turning ability of the ship.” (Bertram, PDF p. 264) 📌
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        • ≠ Divergences                                              (#Diverg)
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>            • What the trial evaluates: spiral test, turning ability and yaw stability × spiral test, mainly stability characteristics
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>                • ⚠️ “The spiral maneuver as described earlier serves mainly to determine stability characteristics” (PNA Control, PDF p. 21) 📌
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        • = Convergences
+</code></pre></div>
+<ul>
+<li><strong>Quotes</strong> hold only the words that carry the statement; the <strong>pin</strong> covers the whole sentence in the PDF, where it is found reliably and reads in context.</li>
+<li><strong>In your notes</strong> is a reference to your own Rem, so the two look-alikes are one click apart.</li>
+<li>A Portuguese note gets <em>Verificação de interferências</em>, <em>Semelhantes, mas distintos</em>, <em>Divergências</em>, <em>Convergências</em> and <em>nas notas</em>.</li>
+<li><strong>Styling:</strong> when your knowledge base has top-level Rems named <strong>Interf</strong> and <strong>Diverg</strong>, the header and the ≠ group are tagged with them, so your Custom CSS can style them (<code>[data-rem-container-tags~="interf" i] .rem-text { … }</code>).</li>
+</ul>
+<h3 id="discrimination-cards">Discrimination cards<a class="headerlink" href="#discrimination-cards" title="Permanent link">&para;</a></h3>
+<p>The remedy for interference is a card that asks the look-alikes side by side. Press <code>C</code> on the ≈ and ≠ rows you want: rows of the <strong>same frame make one card</strong>, each of their values a cloze, with your note's value last and shown (its own card already asks it). From the anchoring note, with the <em>Preparar</em> and the Miguens <em>máquinas paradas</em> rows chosen:</p>
+<blockquote>
+<p><strong>Distância ao ponto de fundeio</strong> — Preparar para largar o ferro: {{~1.000 jds}} 📌 · máquinas paradas (Fragatas e Corvetas; Miguens I): {{~300 jardas}} 📌 · Atenção para largar o ferro: ~100 jds</p>
+</blockquote>
+<p>A divergence card names the books instead: <em>What the trial evaluates — PNA Control: {{mainly stability characteristics}} · Bertram: turning ability and yaw stability</em>.</p>
+<ul>
+<li>The review previews each card under its first row, and the button counts them (<em>Write 12 · 1 card</em>).</li>
+<li>The card is written under its first row's line, which shows the answers, so it gets <strong>Hide Parent</strong> (Remove Parent when the <a href="../Utilities-Queue-Display/#hide-in-queue">Hide-in-Queue integration</a> is off). Each cloze is followed by its quote's pins.</li>
+<li>RemNote practises cards inside an Extra Card Detail as usual. The card's priority follows the note, as any new card's.</li>
+</ul>
+<p><strong>Model:</strong> <em>Find Interference: Claude Model</em> in <a href="../Plugin-Settings-Reference/#ai-helper">AI Helper &amp; Your Library</a> chooses Opus (the default, best on the subtle cases) or Sonnet (faster, lighter on your usage).</p>
+<h2 id="quote-rems-in-descendants">Pinning every quote in a subtree<a class="headerlink" href="#quote-rems-in-descendants" title="Permanent link">&para;</a></h2>
+<p><strong>Pin Source Quote (Quote Rems in descendants)</strong> — <code>Ctrl+Opt+Shift+Q</code> / <code>Ctrl+Alt+Shift+Q</code> (<code>Ctrl</code> on macOS too), or quick code <code>psqd</code> — runs Pin Source Quote on every Rem formatted as a <strong>Quote</strong> in the focused Rem and all its descendants, the focused Rem included. With several Rems selected, it covers each of them and their descendants; in the queue, the card's Rem and its descendants.</p>
+<p>Other Rems in the subtree are left alone. The run works like a <a href="#pin-source-quote">multi-Rem selection</a>: one question about <a href="#text-reader">which view</a> for a PDF with a Text Reader version, a final toast with the totals, and the passages not found listed together at the end.</p>
+<p>Running it again on the same subtree adds nothing twice, but every Quote Rem is looked up in the source again, so a second run takes as long as the first.</p>
+<h2 id="from-outside">From outside RemNote<a class="headerlink" href="#from-outside" title="Permanent link">&para;</a></h2>
+<p>Scripts and AI assistants writing notes through the RemNote MCP can run Pin Source Quote too, through the <a href="../Local-Media-Bridge/#operations">Local Media Bridge</a>: <code>media_bridge.py pin-quote &lt;rem&gt; --source &lt;PDF or article rem&gt;</code>. The source is named, so it does not need to be open; without <code>--source</code>, each Rem's source comes from your <a href="#no-source-open">source finder</a> and the JSON answer says which PDF and page each quote was pinned from. <code>--quote</code> gives the passage to look for when the Rem's text is not exactly the source's. <code>media_bridge.py pin</code> turns references to highlights that a tool already wrote into pins.</p>
+<h2 id="reusing-highlights">Reusing highlights<a class="headerlink" href="#reusing-highlights" title="Permanent link">&para;</a></h2>
+<p>Highlights never overlap — so every passage keeps a single highlight, and clicking it in the PDF shows every Rem linked to it.</p>
+<table>
+<thead>
+<tr>
+<th>Where the passage is</th>
+<th>What gets pinned</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Inside an existing highlight</td>
+<td>That highlight</td>
+</tr>
+<tr>
+<td>Mostly covered by existing highlights</td>
+<td>Those highlights</td>
+</tr>
+<tr>
+<td>Partly covered</td>
+<td>Those highlights, plus new highlights for the uncovered stretches of at least four words</td>
+</tr>
+<tr>
+<td>Not highlighted</td>
+<td>A new highlight</td>
+</tr>
+</tbody>
+</table>
+<p>Running it again on the same Rem adds nothing twice. With the <a href="../Desktop-Helpers/#ai-helper">AI helper</a> running on the desktop app, this includes pages and highlights RemNote has not loaded yet this session, which it does not report to plugins: they are read from the knowledge base's database, so no second "Page 030" is created beside the real one. New highlights use the <strong>Source Highlight Colour</strong> setting (default orange; see <a href="../Plugin-Settings-Reference/#other">Settings → Other</a>); a reused highlight keeps its own colour.</p>
+<h2 id="text-reader">PDFs with a Text Reader version<a class="headerlink" href="#text-reader" title="Permanent link">&para;</a></h2>
+<p>A PDF converted for the Text Reader has two views, and each keeps its own highlights. When you run Pin Source Quote on such a PDF, a dialog asks where to pin:</p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Both views</strong></td>
+<td>A highlight in the PDF page view and one in the Text Reader, both pinned</td>
+</tr>
+<tr>
+<td><strong>PDF only</strong></td>
+<td>The page view only</td>
+</tr>
+<tr>
+<td><strong>Text Reader only</strong></td>
+<td>The Text Reader only</td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>↑</code> <code>↓</code> and <code>Enter</code>; <code>Esc</code> cancels without pinning. Your last choice is remembered on the device. The plugin asks rather than guessing because it cannot tell which of the two views is on screen.</p>
+<h2 id="pin-rings">Telling the pins apart<a class="headerlink" href="#pin-rings" title="Permanent link">&para;</a></h2>
+<p>With <strong>pin ring indicators</strong> on (<a href="../Plugin-Settings-Reference/#editor-indicators">Settings → Editor Indicators</a>), a pin's ring says where it leads:</p>
+<ul>
+<li><strong>yellow</strong> — a highlight on a PDF page;</li>
+<li><strong>purple</strong> — a highlight in an HTML source: a saved web article or a PDF's Text Reader view.</li>
+</ul>
+<p>So the two pins of a passage pinned in both views are easy to tell apart. See <a href="../Colour-Coding-Reference/#reference-pin-rings">Reference pin rings</a>.</p>
+<h2 id="create-increm-both-views">Pinning both views on Create IncRem<a class="headerlink" href="#create-increm-both-views" title="Permanent link">&para;</a></h2>
+<p>Turn on <strong>Create IncRem: Also Pin the Other PDF View</strong> (<a href="../Plugin-Settings-Reference/#other">Settings → Other</a>; off by default) and extracting a highlight from a PDF that has a Text Reader version pins the passage in <strong>both</strong> views:</p>
+<ul>
+<li>extracting from a <strong>PDF page</strong> highlight also pins the passage in the <strong>Text Reader</strong>, and extracting from a <strong>Text Reader</strong> highlight also pins it on the <strong>PDF page</strong>;</li>
+<li>the other view's highlight is reused when one already covers the passage, created when not, and marked as extracted like the original — including the priority band colour.</li>
+</ul>
+<p>This happens after the Rem is created and never slows down or interrupts Create Incremental Rem: if the helper is not running or the passage cannot be found in the other view, the Rem simply keeps its single pin. Area (image) highlights have no text to look for and are skipped.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>Open the source PDF or web article in a pane first (in any RemNote window).</em></td>
+<td>Open the source next to your notes or in another RemNote window, then run the command again. A source just opened in another window can take a couple of seconds to be seen. Without a source open, it also means no <a href="#no-source-open">source finder</a> is set up.</td>
+</tr>
+<tr>
+<td><em>Passage not found in the PDFs of its book</em></td>
+<td>The source finder named a book, but none of the PDFs it listed holds the passage: the one you use may be a different edition, or missing from its list. Open the right PDF and run the command again.</td>
+</tr>
+<tr>
+<td><em>AI helper is not running</em></td>
+<td>Start the helper (<a href="../Desktop-Helpers/#setup">Setting up the AI helper</a>).</td>
+</tr>
+<tr>
+<td><em>This PDF has no Highlights document yet — make one highlight in it first.</em></td>
+<td>Highlight anything in the source once, so RemNote creates its Highlights document, then try again.</td>
+</tr>
+<tr>
+<td><em>Passage not found</em></td>
+<td>Check that the Rem's text was taken from this source, and that the right PDF or article is open. A paraphrase, translation or summary is not found. With a <a href="#no-source-open">source finder</a>, the dialog also lists the other PDFs it tried.</td>
+</tr>
+</tbody>
+</table>
+<p>In web articles, an existing highlight that starts or ends <strong>inside a formula</strong> is not recognised when deciding what to reuse.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
