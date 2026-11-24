@@ -1,5 +1,5 @@
 import { RNPlugin, PluginRem, Card, RepetitionStatusInterface } from '@remnote/plugin-sdk';
-import { IncrementalRep, repCountsForStats } from './incremental_rem/types';
+import { IncrementalRep, entryCountsForStats } from './incremental_rem/types';
 import {
   powerupCode,
   dismissedPowerupCode,
@@ -165,11 +165,11 @@ export async function planPreserveHistoryAndRemove(
   for (const r of subtree) {
     const inc = await getIncrementalRemFromRem(plugin, r);
     for (const rep of inc?.history || []) {
-      if (repCountsForStats(rep.eventType)) merged.push(rep);
+      if (entryCountsForStats(rep)) merged.push(rep);
     }
     const dis = await getDismissedHistoryFromRem(plugin, r);
     for (const rep of dis?.history || []) {
-      if (repCountsForStats(rep.eventType)) merged.push(rep);
+      if (entryCountsForStats(rep)) merged.push(rep);
     }
   }
 

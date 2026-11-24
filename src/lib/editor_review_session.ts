@@ -14,6 +14,7 @@ import { openIncRemForReview } from './incRemHelpers';
 import { forceSaveSession } from './queue_session';
 import { safeRemTextToString } from './pdfUtils';
 import { pullNativeVideoPosition } from './video_position';
+import { checkpointEditorReview } from './editor_review_recovery';
 
 dayjs.extend(duration);
 
@@ -181,6 +182,9 @@ export async function endEditorReview(
     ].map((key) => plugin.storage.setSession(key, undefined))
   );
 
+  // The review is over: its crash-recovery copy goes too.
+  await checkpointEditorReview(plugin).catch(() => {});
+
   // Explicitly end the active session when Ending Review
   await forceSaveSession(plugin);
 
@@ -257,6 +261,8 @@ async function startNextInList(
   // would carry its time (or the paused state) over.
   await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
   await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
+  // The copy on disk now follows the next Rem, not the one just saved.
+  await checkpointEditorReview(plugin).catch(() => {});
 
   await plugin.app.toast(message(nextRemName));
   await openIncRemForReview(plugin, nextRem);
@@ -331,6 +337,7 @@ export async function dismissEditorReview(
         'editor-review-timer-date-override',
       ].map((key) => plugin.storage.setSession(key, undefined))
     );
+    await checkpointEditorReview(plugin).catch(() => {});
     await forceSaveSession(plugin);
     return;
   }

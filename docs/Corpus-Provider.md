@@ -94,6 +94,7 @@ Asked by Find Sources, one Rem per request. It may take a while (the plugin wait
 - `texts`: the note as one statement (a list joined with its lead-in). For a descriptor, its concept and any descriptors in between come first, as one text ([Descriptors and where the note sits](Source-Pins.md#find-sources-context)); for an Ask Your Sources follow-up, the follow-up comes last. Search them together, as one query.
 - `openSourceRemId`: the PDF or article open in a pane, if any. Search its book first, and the book whose notes `ancestors` belong to.
 - `mode` (optional): `"answer"` when the Rem is a question or a topic ([Ask Your Sources](Source-Pins.md#ask-your-sources)). Rank passages by whether they answer it rather than say the same; `role` then comes from the score, and a passage that disagrees with another one in the list keeps its role with `"diverges": true`.
+- `mode` `"interference"` ([Find Interference](Source-Pins.md#find-interference)): the Rem is one statement, and what is wanted is what a reader could confuse with it (the same frame with another value or referent), what contradicts it and what says the same. Search the Rem's own book too, and keep the passage the statement comes from (its other sentences count; the sentence that states the Rem does not). Cast a wider net than for a source, since Claude reads every passage in full and drops the noise: the PSCPP provider uses 60 candidates, 12 per book and a relevance floor of 4. `role` is only a hint here (`related`, or `diverges`); give each passage its full `context`.
 
 Answer, sources first:
 
@@ -113,7 +114,7 @@ Answer, sources first:
 - `covers`: the part of the Rem's own text this passage supports, copied from it; empty when it supports all of it. Drives where the pin goes.
 - `role`: `source` (says what the Rem says), `related` (same point, adds or explains) or `diverges` (contradicts it). `score`: 0–10.
 - `why`: one line, in the Rem's language, on what the passage says. Written under the quote as an AI Note when the user asks for it.
-- `page`: a page in your copy of the book; the plugin searches its RemNote PDF from there. `sectionNumber` and `edital` (anything but `sim` reads *fora do edital*) go into the attribution.
+- `page`: a page in your copy of the book; the plugin searches its RemNote PDF from there. `sectionNumber` and `edital` (anything but `sim` reads *fora do edital*, or *out of the exam syllabus* in an English note) go into the attribution.
 - `context` (optional): the whole passage the quote was cut from, a few thousand characters at most. Never quoted as is: Check Statement and Ask Your Sources give it to Claude, which picks its own excerpts from it (checked against it before use).
 - Each excerpt should make sense on its own: when it says "these values" or "it", keep the words it points back to.
 

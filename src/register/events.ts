@@ -1469,7 +1469,8 @@ export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
  *   • rate the first sibling Good and later siblings Again/Hard → nothing is added to the drill;
  *   • rate the first sibling and others Again/Hard → only the first sibling is added.
  * So this listener effectively tracks the anchor of a cluster and nothing else.
- * lib/cluster_rating_readback covers siblings only where card_info_bar is mounted, not in the popup.
+ * lib/cluster_rating_readback sights every sibling through RevealAnswer (since Nov 24 2026),
+ * so it covers the siblings this listener misses.
  *
  * Left unfixed deliberately: clusters are a rare shape in a drill-eligible set, and the failure
  * mode is an under-populated drill, never a wrong rating or lost history. The matching gap on the

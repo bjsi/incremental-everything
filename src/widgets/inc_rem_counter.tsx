@@ -9,7 +9,7 @@ import { PriorityDistributionGraphComponent } from './priority_distribution_grap
 import { LocalVideoEditorPlayer } from '../components/LocalVideoEditorPlayer';
 import { ReadPointCrumbs, ReadPointIcon } from '../components';
 import { getReadPointPath, hasRemReadPoint } from '../lib/remReadPoint';
-import { openAndFocusRem } from '../lib/remHelpers';
+import { openAndFocusRem, preventShiftSelect } from '../lib/remHelpers';
 import '../style.css';
 import '../App.css';
 
@@ -173,7 +173,8 @@ function IncRemCounter() {
           {new Date(readPoint.timestamp).toLocaleDateString()}
         </span>
         <button
-          onClick={() => openAndFocusRem(plugin as any, readPoint.remId)}
+          onClick={(e) => openAndFocusRem(plugin as any, readPoint.remId, e.shiftKey)}
+          onMouseDown={preventShiftSelect}
           className="px-2 py-1 text-xs rounded font-semibold"
           style={{
             backgroundColor: 'var(--rn-clr-background-primary)',
@@ -181,7 +182,7 @@ function IncRemCounter() {
             border: '1px solid var(--rn-clr-blue, #3b82f6)',
             whiteSpace: 'nowrap',
           }}
-          title="Open the bookmarked Rem and put the cursor in it"
+          title={"Open the bookmarked Rem and put the cursor in it\nShift+click: open it in a new pane"}
         >
           Go to Read Point
         </button>

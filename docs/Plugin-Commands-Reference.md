@@ -53,6 +53,9 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Execute Incremental Rem Repetition (Review in Editor)](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command)** (`Ctrl+Shift+J`) — `quick: er`
   Open the Editor Review Timer to log a spaced-repetition event directly from your document, without needing to enter the queue.
 
+- **[Recover Interrupted Editor Review](Reviewing-Items-in-the-Editor.md#recover-interrupted-review)** — `quick: rer`
+  Reopens the offer to resume, save or discard an Editor Review Timer that RemNote lost to a crash or a quit.
+
 - **[Next Item in Queue](Reviewing-Items-in-the-Queue.md#next)** (`Cmd+Right` / `Ctrl+Right`) — `quick: next`
   Records a rep and advances to the next item. Equivalent of clicking the "Next" button. Also saves PDF page history before advancing.
 
@@ -145,11 +148,11 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources)** (`Opt+Shift+V` / `Alt+Shift+V`) — `quick: paste`
   Adds the previously copied sources to **all selected Rems** (multi-select supported), or to the focused Rem if nothing is selected. Sources already present are silently skipped (idempotent). Together with **Copy Rem Sources**, this automates the [PDF-Incremental-Reading-Workflow#2-copying-and-pasting-sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources).
 
-- **[Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** (`Opt+Shift+Enter` / `Alt+Shift+Enter`) — `quick: pph`
-  Creates the Rem waiting for a parent (after **📍 Pick in editor** in the Select Parent popup) under the Rem that has the cursor. A target outside the IncRem under review needs a second press to confirm.
+- **[Confirm Pick in Editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** (`Opt+Shift+Enter` / `Alt+Shift+Enter`) — `quick: pph`
+  Creates the Rem waiting for a parent (after **📍 Pick in editor** in the Select Parent popup) under the Rem that has the cursor; a target outside the IncRem under review needs a second press to confirm. After **↪** in Repetition History, it [moves the record's time](Plugin-Widgets-Reference.md#move-to-another-rem) to the Rem that has the cursor instead. *(Called Place Pending Rem Here before v1.0.255.)*
 
-- **[Cancel Parent Pick](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** — `quick: cpp`
-  Drops the Rem waiting for a parent and closes its card, like `Esc`.
+- **[Cancel Pick in Editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** — `quick: cpp`
+  Drops the Rem waiting for a parent, or the history record waiting to be moved, and closes its card, like `Esc`. *(Called Cancel Parent Pick before v1.0.255.)*
 
 ### Queue Menu Actions { #queue-menu-actions }
 
@@ -227,6 +230,9 @@ In the [Menu Hub](Plugin-Widgets-Reference.md#menu-hub) opened from the queue's 
 
 - **[Ask Your Sources](Source-Pins.md#ask-your-sources)** — `quick: ask`
   The focused Rem holds a question or a topic: Find Sources looks for the passages that answer it, then Claude answers only from them, with sections, quotes chosen per section and the sources' divergences; after review, written under the Rem as a dated answer. The review takes a [follow-up](Source-Pins.md#ask-follow-up) (`F`) to ask again with what to improve or add. Needs a corpus provider with semantic search and the Claude CLI.
+
+- **[Find Interference](Source-Pins.md#find-interference)** — `quick: intf`
+  What in your library the focused or selected note could be confused with (≈ similar but distinct: the same frame with another value or referent), and what contradicts it (≠, differences of scope included) or confirms it (=), sorted by Claude from the passages found; after review, written under the note as a dated Interference Check with pinned quotes, and `C` turns ≈ and ≠ rows into [discrimination cards](Source-Pins.md#discrimination-cards). Needs a corpus provider with semantic search and the Claude CLI.
 
 - **[Find Sources (by meaning) in descendants](Source-Pins.md#find-sources-in-descendants)** — `quick: fsqd`
   Find Sources on every statement under the focused or selected Rems (a summary or course document): lists read as one statement with their lead-in, headings and short labels left out, statements already pinned skipped; three at a time in the background, one review for the run.
@@ -340,7 +346,8 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   Scans for images and tags each Rem that holds one with **`HasImage`** — so RemNote's native document filter can isolate them. Checks **front text and back text**, so an image on the back of a flashcard counts.
 
   - **Popup first:** the [Image Scan popup](Plugin-Widgets-Reference.md#69-image-scan-popup) offers two scopes — the **focused Rem** (or the **open document**), named on the button so you can verify the target, or the **whole knowledge base**.
-  - **Reports in place:** the same popup shows live progress and then the result — scanned, holding images, tagged, cleared — alongside how to filter a document and how to build a Search Portal on the tag. It stays open until you close it.
+  - **Reports in place:** for a scoped run, the same popup shows live progress and then the result — scanned, holding images, tagged, cleared — alongside how to filter a document and how to build a Search Portal on the tag. It stays open until you close it.
+  - **Whole KB in the background:** a whole-knowledge-base run closes the popup at once and reports its progress and result in a notice, so you can keep working ([details](Utilities-Finding-and-Navigating.md#whole-kb-background)).
   - **Self-correcting:** Rems inside the scanned scope that carry the tag but no longer hold an image lose it, so a re-run never leaves stale marks. Nothing outside the scope is touched.
   - **Invisible tag:** the `HasImage` chip is hidden from the editor tag bar (your own tags on the same Rem stay visible).
 
@@ -351,7 +358,7 @@ Turn statements into [True or False cards](Utilities-True-or-False-Cards.md). Al
   📖 See [Utilities → Filter a Document by Images](Utilities-Finding-and-Navigating.md#filter-a-document-by-images) for the full workflow.
 
 - **Remove `HasImage` Tags** — `quick: rmimg`
-  Takes the **`HasImage`** tag off every Rem that carries it, in the focused Rem's subtree (or open document) or across the **whole knowledge base**. Same popup, same scopes and keys as the scan above.
+  Takes the **`HasImage`** tag off every Rem that carries it, in the focused Rem's subtree (or open document) or across the **whole knowledge base**. Same popup, same scopes and keys as the scan above; the whole-KB cleanup runs in the background with a notice, too.
 
   - **Nothing is lost:** the tag is derived from the images themselves, so **Tag Rems With Images** rebuilds it exactly. Re-running the scan *is* the undo — which is why this command has none of its own.
   - **Cost:** the same per tag as applying them, so clearing a whole knowledge base takes as long as tagging it. Prefer the document scope unless you want the tag gone everywhere.

@@ -2,6 +2,110 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.256 - November 24th, 2026
+
+### ✨ New
+
+**Card Clusters**: Extra details now show the explanation of the member you are answering, not the one RemNote loaded, and every member's rating reaches the plugin's history, stats and Mastery Drill, also on cards without a priority.
+
+📖 [Plugin Widgets Reference → Card Cluster Extra Details](Plugin-Widgets-Reference.md#cluster-extra-details)
+
+### 🐛 Fixed
+
+**Mastery Drill**: the Priority Cap works again. Since v1.0.225 its check failed silently, so every card rated *Again* or *Hard* entered the drill whatever its priority.
+
+📖 [Mastery Drill → Priority Cap](Mastery-Drill.md#drill-priority-cap)
+
+## v1.0.255 - November 24th, 2026
+
+### ✨ New
+
+**Repetition History**: a review's study time can now be moved to the Rem you actually studied. Press **↪** on the record, click into that Rem and press `Opt+Shift+Enter`. Neither Rem's schedule changes, part of a session can be moved, and **↩ move back** undoes it.
+
+📖 [Plugin Widgets Reference → Moving a record's time to another Rem](Plugin-Widgets-Reference.md#move-to-another-rem)
+
+### ♻️ Changed
+
+**Pick in Editor**: *Place Pending Rem Here* and *Cancel Parent Pick* are now **Confirm Pick in Editor** and **Cancel Pick in Editor**, since they also confirm and cancel a history move. Shortcuts and quick codes are unchanged.
+
+📖 [Create Incremental Rem from PDF Highlights → Pick in editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)
+
+## v1.0.254 - November 24th, 2026
+
+### ✨ Improved
+
+**Search Engine**: `id:` and `cid:` now accept wildcards, so `id:UpQE*` finds a Rem from the first characters of its id, and a pasted id list with spaces after its commas stays one list.
+
+📖 [Search Engine → Sources and references](Search-Engine.md#sources)
+
+## v1.0.253 - November 23rd, 2026
+
+### ✨ New
+
+**Local Media Bridge – `create`**: outside tools can now create many rems in one job, each with its exact text, Quote and Extra Card Detail powerups, tags, heading level and place among its siblings, instead of one MCP call per rem followed by a move. Used by the PSCPP quote tools to add hundreds of source quotes under exercise alternatives.
+
+📖 [Local Media Bridge → Rem operations](Local-Media-Bridge.md#operations)
+
+## v1.0.252 - November 23rd, 2026
+
+### ✨ New
+
+**Editor Review Timer**: if RemNote crashes or is closed while the timer is running, the next start offers to resume the review from the time it had recorded, save the repetition with that time, or discard it; the **Recover Interrupted Editor Review** command (`rer`) reopens the offer.
+
+![Interrupted Editor Review popup](assets/editor-review-interrrupted.png){ width="560" }
+
+📖 [Reviewing Items in the Editor → Recovering a review after a crash](Reviewing-Items-in-the-Editor.md#recover-interrupted-review)
+
+**Find Interference**: a new command (`intf`) finds what in your library a note could be confused with (similar but distinct statements), what contradicts it (differences of scope included) and what confirms it, writes them under the note as a dated Interference Check with pinned quotes, and turns the look-alikes you choose into discrimination cards.
+
+![The Find Interference review on the spiral-test note](assets/find-interference-review.png){ width="640" }
+
+📖 [Source Pins → Find Interference](Source-Pins.md#find-interference)
+
+### ✨ Improved
+
+**Settings**: the AI helper's settings moved to a new **AI Helper & Your Library** group, where each one shows only once the helper is paired (and, for Find Interference, once a corpus provider answers).
+
+📖 [Plugin Settings Reference → AI Helper & Your Library](Plugin-Settings-Reference.md#ai-helper)
+
+**Read Points**: Shift+click on **Go to Read Point** (Editor Review Timer, Priority Editor, the Read Point row under a document's title), on the read-point path and on the Read Points popup's entries now opens the Rem in a new pane, keeping the current document open.
+
+📖 [Reviewing Items in the Editor → Jumping to the Read Point](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point)
+
+## v1.0.251 - November 22nd, 2026
+
+### ✨ Improved
+
+**Tag Rems With Images**: a whole-knowledge-base run (and the whole-KB cleanup of **Remove HasImage Tags**) now works in the background, so the popup closes at once and a notice shows its progress and then its result, instead of the popup having to stay open for the whole run.
+
+📖 [Filter a Document by Images → A whole-KB run works in the background](Utilities-Finding-and-Navigating.md#whole-kb-background)
+
+**Read Aloud**: **Adapted** scripts are now written by Sonnet through the Antigravity CLI first, on your Google plan, and go to `claude -p` only when its quota is used up.
+
+📖 [Read Aloud → Which AI writes the script](Read-Aloud.md#which-ai)
+
+## v1.0.250 - November 21st, 2026
+
+### ✨ Improved
+
+**Read Aloud**: added the **Gemini + Azure** engine, now suggested instead of Azure, which gives Azure only the English lines with Portuguese terms and keeps the rest in the Gemini voice; **Adapted** scripts are now written by Sonnet (**Summary** stays on Opus) and can say formulas too long to follow by ear by what they compute; *fora do edital* in an English line is now said *out of the exam syllabus*.
+
+📖 [Read Aloud → Gemini + Azure](Read-Aloud.md#mixed) · [Long formulas](Read-Aloud.md#long-formulas) · [Reading rules](Read-Aloud.md#reading-rules)
+
+**Repetition History**: each review row of a Rem-type IncRem now records the read point the session ended on, shown under the row like a PDF bookmark (`Read point: “…”`).
+
+📖 [Repetition History → Notes and where you stopped](Repetition-History-and-Statistics.md#notes-and-where-you-stopped)
+
+**Find Sources**: in an English note, a quote from a passage the exam does not ask for now ends its attribution with *out of the exam syllabus* instead of *fora do edital*, in Find Sources, Check Statement and Ask Your Sources and in the review.
+
+📖 [Source Pins → What gets written](Source-Pins.md#find-sources-written)
+
+### 🐛 Fixed
+
+**History Sidebars**: fixed Shift+click on an entry's text in the Flashcard, Visited Rem and Incremental Rem History opening the Rem in place instead of in a new pane, and leaving the whole sidebar's text selected.
+
+📖 [Flashcard History](History-Queue-Dashboard-and-Mastery-Drill.md#flashcard-history)
+
 ## v1.0.249 - November 20th, 2026
 
 ### ✨ Improved

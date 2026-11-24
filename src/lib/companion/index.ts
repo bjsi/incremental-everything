@@ -8,7 +8,7 @@ import { AppEvents, PluginRem, ReactRNPlugin, RichTextInterface } from '@remnote
 import { dismissedPowerupCode, editorReviewTimerRemIdKey, powerupCode } from '../consts';
 import { addExternalSessionRep, updateHistoryEntry } from '../history_edit';
 import { CompanionTargets, companionTargetsKey, refinedReviewSeconds } from './handoff';
-import { repCountsForStats } from '../incremental_rem/types';
+import { repCountsForStats, entryWasReviewHere, hasMovedTime, originalReviewSeconds } from '../incremental_rem/types';
 import { getNextSpacingDateForRem } from '../scheduler';
 import { canonicalUrlKey } from '../duplicate_source/url_key';
 import { markRemsAsFreshlyCreated } from '../incRemHelpers';
@@ -92,8 +92,14 @@ async function isAliveExtract(plugin: ReactRNPlugin, remId: string, kind?: 'high
 async function documentStatus(plugin: ReactRNPlugin, doc: PluginRem, since?: number) {
   const incremental = await doc.hasPowerup(powerupCode);
   const incRem = incremental ? await getIncrementalRemFromRem(plugin, doc) : undefined;
-  const reviews = (incRem?.history ?? []).filter((rep) => repCountsForStats(rep.eventType));
-  const totalSeconds = reviews.reduce((sum, rep) => sum + (rep.reviewTimeSeconds ?? 0), 0);
+  const history = incRem?.history ?? [];
+  // Sittings of this page, including those whose time was later moved to other
+  // rems: the Companion measured that time here, and it is recorded (elsewhere).
+  const reviews = history.filter((rep) => entryWasReviewHere(rep));
+  // The reading time this page's history holds now, as the stats count it.
+  const totalSeconds = history
+    .filter((rep) => repCountsForStats(rep.eventType))
+    .reduce((sum, rep) => sum + (rep.reviewTimeSeconds ?? 0), 0);
   const timerRemId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
   return {
     docId: doc._id,
@@ -110,7 +116,7 @@ async function documentStatus(plugin: ReactRNPlugin, doc: PluginRem, since?: num
             .filter((rep) => rep.date >= since)
             .map((rep) => ({
               date: rep.date,
-              reviewTimeSeconds: rep.reviewTimeSeconds ?? 0,
+              reviewTimeSeconds: originalReviewSeconds(rep),
               eventType: rep.eventType,
               companionHandoffAt: rep.context?.companionHandoffAt,
               companionSeconds: rep.context?.companionSeconds,
@@ -349,6 +355,10 @@ export const OPS: Record<string, (plugin: ReactRNPlugin, data: any) => Promise<u
     const review = incRem?.history?.find((rep) => rep.date === date && rep.context?.companionHandoffAt);
     if (!review) throw new Error('That queue review is no longer in the history.');
     if (review.context?.companionSeconds !== undefined) return { refined: false, reviewTimeSeconds: review.reviewTimeSeconds };
+    // Part of its time was moved to other rems since: rewriting the total here
+    // would count the moved minutes twice. The move refuses pending hand-offs, so
+    // this only happens once that guard's window has passed.
+    if (hasMovedTime(review)) return { refined: false, reviewTimeSeconds: review.reviewTimeSeconds };
     const seconds = Math.max(0, Math.round(Number(companionSeconds)));
     const reviewTimeSeconds = refinedReviewSeconds(review, review.context!.companionHandoffAt!, seconds);
     const result = await updateHistoryEntry(plugin, docId, review, {

@@ -321,11 +321,13 @@ async function ensurePdfPins(
   container: PluginRem,
   quotes: SourceQuote[],
   color: HighlightColorName,
-  dryRun: boolean
+  dryRun: boolean,
+  peek = false
 ): Promise<ViewPinResult[]> {
   const pdfUrl = await source.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
   const located = await helperPost<{ pageCount: number; results: LocateResult[] }>(plugin, '/locate', { pdfUrl, quotes });
-  const index = dryRun ? null : await PdfHighlightIndex.load(plugin, source, container, located.pageCount);
+  // A peek reads the existing highlights (what would be reused) and still writes nothing.
+  const index = dryRun && !peek ? null : await PdfHighlightIndex.load(plugin, source, container, located.pageCount);
 
   const results: ViewPinResult[] = [];
   for (let k = 0; k < quotes.length; k++) {
@@ -344,6 +346,7 @@ async function ensurePdfPins(
     const existing = await index.onPage(hit.page, hit.pageWidth, hit.pageHeight);
     const plan = planSourcePins(hit.words, existing);
     result.reused = plan.reuse;
+    if (dryRun) continue;
 
     const created: { id: string; firstWord: number }[] = [];
     for (const stretch of plan.create) {
@@ -462,14 +465,16 @@ async function ensureHtmlPins(
  * (yellow for a PDF page, purple for an HTML source) tell the views' pins apart.
  *
  * With `dryRun`, nothing is read beyond the source text and nothing is written:
- * each result only says whether, where and how widely the quote matched.
+ * each result only says whether, where and how widely the quote matched. With `peek`
+ * too, a PDF's existing highlights are read and `reused` lists the ones a pin would reuse
+ * (Find Interference looks up the user's own Rems pinned to them); still nothing is written.
  */
 export async function ensureSourcePins(
   plugin: ReactRNPlugin,
   sourceRemId: string,
   quotes: SourceQuote[],
   views?: SourceView[],
-  options: { dryRun?: boolean } = {}
+  options: { dryRun?: boolean; peek?: boolean } = {}
 ): Promise<SourcePinResult[]> {
   const source = await plugin.rem.findOne(sourceRemId);
   const available = source ? await sourceViews(source) : [];
@@ -491,7 +496,7 @@ export async function ensureSourcePins(
   for (const view of wanted) {
     perView.push(
       view === 'pdf'
-        ? await ensurePdfPins(plugin, source, container, quotes, color, dryRun)
+        ? await ensurePdfPins(plugin, source, container, quotes, color, dryRun, !!options.peek)
         : await ensureHtmlPins(plugin, source, container, quotes, color, dryRun)
     );
   }

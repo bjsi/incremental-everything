@@ -1,7 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache, writeIncRemCaches, applyIncRemCacheChanges } from '../lib/incremental_rem/cache';
 import { PriorityChangeEvent } from '../lib/priority_history';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, pendingIncRemTransferTailKey, pendingReadAloudJobsKey, pendingUpscaleJobsKey, pendingFindSourcesJobsKey, pendingFindSourcesWritesKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, pendingReviewJobQueueKey, pendingIncRemTransferTailKey, pendingReadAloudJobsKey, pendingUpscaleJobsKey, pendingImageScanJobsKey, pendingFindSourcesJobsKey, pendingFindSourcesWritesKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -16,6 +16,7 @@ import { runIncRemTransferTail, IncRemTransferTailJob } from '../lib/incremental
 import { showNotice } from '../lib/notice';
 import { ReadAloudJob, runReadAloudJob } from '../lib/read_aloud';
 import { runUpscaleJob, UpscaleJob } from '../lib/upscale_image';
+import { ImageScanJob, runImageScanJob } from '../lib/image_scan';
 import { FindSourcesJob, FindSourcesWrite, runFindSourcesJob, runFindSourcesWrite } from '../lib/find_sources';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
@@ -805,6 +806,23 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       startedUpscaleJobs.add(job.id);
       console.log('[Tracker] upscale job picked up for remId:', job.remId);
       void runUpscaleJob(plugin, job);
+    }
+  });
+
+  // Whole-KB image scans (lib/image_scan.ts): "Tag Rems With Images" and its cleanup on
+  // the whole knowledge base, queued by the popup, which closes at once. Up to an hour of
+  // tag writes, reported as a progress notice that the result replaces. The run takes its
+  // own suppression lease; a second job while one runs is refused with a notice.
+  const startedImageScanJobs = new Set<string>();
+  plugin.track(async (rp) => {
+    const queued = await rp.storage.getSession<ImageScanJob[]>(pendingImageScanJobsKey);
+    if (!queued || queued.length === 0) return;
+    await plugin.storage.setSession(pendingImageScanJobsKey, null);
+    for (const job of queued) {
+      if (startedImageScanJobs.has(job.id)) continue;
+      startedImageScanJobs.add(job.id);
+      console.log('[Tracker] image scan job picked up:', job.mode);
+      void runImageScanJob(plugin, job);
     }
   });
 

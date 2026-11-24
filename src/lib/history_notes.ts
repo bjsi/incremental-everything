@@ -10,6 +10,8 @@ import {
   safeRemTextToString,
 } from './pdfUtils';
 import { buildVideoContext } from './video_position';
+import { getRemReadPoint, hasRemReadPoint } from './remReadPoint';
+import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
 
 /**
  * User notes and machine context attached to history entries (IncrementalRep.notes /
@@ -94,53 +96,90 @@ export async function buildRepContext(
   rem: PluginRem
 ): Promise<RepContext | undefined> {
   try {
-    // A video IncRem: where the video was left (lib/video_position.ts).
-    const video = await buildVideoContext(plugin, rem);
-    if (video) return video;
+    // A video IncRem: where the video was left (lib/video_position.ts);
+    // otherwise where the PDF/HTML reader was left.
+    const context: RepContext =
+      (await buildVideoContext(plugin, rem)) ?? (await buildReaderContext(plugin, rem)) ?? {};
 
-    const pdfRem = await getActivePdfForIncRem(plugin, rem);
-    if (!pdfRem) return undefined;
+    // A read point in the IncRem's own outline. Independent of the reader: a
+    // hybrid IncRem (PDF source + its own descendants) records both.
+    const readPoint = await buildReadPointContext(plugin, rem);
+    if (readPoint) Object.assign(context, readPoint);
 
-    const [page, range, pageHistory] = await Promise.all([
-      getIncrementalReadingPosition(plugin, rem._id, pdfRem._id),
-      getIncrementalPageRange(plugin, rem._id, pdfRem._id),
-      getPageHistory(plugin, rem._id, pdfRem._id),
-    ]);
-
-    // Last bookmark: most recent page-history entry carrying a highlightId.
-    let bookmark: string | undefined;
-    for (let i = pageHistory.length - 1; i >= 0; i--) {
-      const highlightId = pageHistory[i].highlightId;
-      if (highlightId) {
-        const highlightRem = await plugin.rem.findOne(highlightId);
-        if (highlightRem) {
-          const text = await safeRemTextToString(plugin, highlightRem.text);
-          if (text && text !== 'Untitled') {
-            bookmark = text.slice(0, MAX_BOOKMARK_LENGTH);
-          }
-        }
-        break;
-      }
-    }
-
-    const context: RepContext = {};
-    if (typeof page === 'number' && page > 0) context.page = page;
-    if (range) {
-      context.rangeStart = range.start;
-      if (range.end > 0) context.rangeEnd = range.end;
-    }
-    if (bookmark) context.bookmark = bookmark;
-
-    // pdfName alone carries no session info — only include it when it labels
-    // an actual position/range/bookmark snapshot.
-    if (Object.keys(context).length === 0) return undefined;
-    context.pdfName = (await safeRemTextToString(plugin, pdfRem.text)).slice(0, MAX_PDF_NAME_LENGTH);
-
-    return context;
+    return Object.keys(context).length > 0 ? context : undefined;
   } catch (e) {
     console.warn('[history_notes] buildRepContext failed (skipping snapshot):', e);
     return undefined;
   }
+}
+
+/** Page, range and last bookmark of the active PDF/HTML source, if any. */
+async function buildReaderContext(
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<RepContext | undefined> {
+  const pdfRem = await getActivePdfForIncRem(plugin, rem);
+  if (!pdfRem) return undefined;
+
+  const [page, range, pageHistory] = await Promise.all([
+    getIncrementalReadingPosition(plugin, rem._id, pdfRem._id),
+    getIncrementalPageRange(plugin, rem._id, pdfRem._id),
+    getPageHistory(plugin, rem._id, pdfRem._id),
+  ]);
+
+  // Last bookmark: most recent page-history entry carrying a highlightId.
+  let bookmark: string | undefined;
+  for (let i = pageHistory.length - 1; i >= 0; i--) {
+    const highlightId = pageHistory[i].highlightId;
+    if (highlightId) {
+      const highlightRem = await plugin.rem.findOne(highlightId);
+      if (highlightRem) {
+        const text = await safeRemTextToString(plugin, highlightRem.text);
+        if (text && text !== 'Untitled') {
+          bookmark = text.slice(0, MAX_BOOKMARK_LENGTH);
+        }
+      }
+      break;
+    }
+  }
+
+  const context: RepContext = {};
+  if (typeof page === 'number' && page > 0) context.page = page;
+  if (range) {
+    context.rangeStart = range.start;
+    if (range.end > 0) context.rangeEnd = range.end;
+  }
+  if (bookmark) context.bookmark = bookmark;
+
+  // pdfName alone carries no session info — only include it when it labels
+  // an actual position/range/bookmark snapshot.
+  if (Object.keys(context).length === 0) return undefined;
+  context.pdfName = (await safeRemTextToString(plugin, pdfRem.text)).slice(0, MAX_PDF_NAME_LENGTH);
+
+  return context;
+}
+
+/**
+ * The read point of a rem-type IncRem (lib/remReadPoint.ts) as it stands when
+ * the entry is written, so a read point moved mid-session shows where the
+ * session ended. Stamped while the Rem is still Incremental (the dismiss path
+ * stamps before moving to Dismissed), so only that powerup is probed — one
+ * property read for the common Rem without a read point.
+ */
+async function buildReadPointContext(
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<Pick<RepContext, 'readPoint' | 'readPointRemId'> | undefined> {
+  if (!(await hasRemReadPoint(rem))) return undefined;
+  const entry = await getRemReadPoint(plugin, rem._id);
+  if (!entry?.highlightId) return undefined;
+  const target = await plugin.rem.findOne(entry.highlightId);
+  if (!target) return undefined;
+  const text = (await resolveRemTextForBreadcrumb(plugin, target.text || [])).trim();
+  return {
+    readPointRemId: target._id,
+    readPoint: (text || 'Untitled').slice(0, MAX_BOOKMARK_LENGTH),
+  };
 }
 
 /**

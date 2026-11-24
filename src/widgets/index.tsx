@@ -36,8 +36,9 @@ import {
 } from '../register/queue_display_commands';
 import { registerMcScissors } from '../lib/mc_scissors';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, editorReviewTimerHeightsKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, clusterExtraDetailOverrideKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
+import { registerClusterExtraDetailCss } from '../lib/cluster_extra_detail';
 import { registerEditorReviewTimerHeadersCss } from '../lib/editor_review_timer_sticky';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
@@ -56,6 +57,7 @@ import { registerSendToWindowWatcher } from '../lib/send_to_window';
 import { registerFollowQueueSources, startFollowingQueueSources } from '../lib/follow_queue_sources';
 import { registerVideoReviewBar } from '../lib/video_review_bar';
 import { registerImageSizeSession } from '../lib/image_size_session';
+import { registerEditorReviewRecovery } from '../lib/editor_review_recovery';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
@@ -181,6 +183,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerExtractEditorHost(plugin);
   // Runs Cycle Image Size's presses, and what its popup and floating widget ask for.
   registerImageSizeSession(plugin);
+  // Copies a running Editor Review Timer to disk; offers back what a crash lost.
+  registerEditorReviewRecovery(plugin);
 
   // Register CSS rules
   // PDF highlight CSS is (re)registered reactively: the "peek" toggle (command +
@@ -207,6 +211,13 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     const barHeight = await rp.storage.getSession<number>(cardInfoBarHeightKey);
     await registerCardInfoBarDockCss(plugin, barHeight);
+  });
+
+  // cluster_extra_detail draws the tested Card Cluster member's Extra Card Details and
+  // asks for RemNote's own block (the loaded member's) to be hidden meanwhile.
+  plugin.track(async (rp) => {
+    const override = await rp.storage.getSession<boolean>(clusterExtraDetailOverrideKey);
+    await registerClusterExtraDetailCss(plugin, override);
   });
 
   // The pinned Editor Review Timer sits where RemNote draws its sticky headers, so

@@ -54,7 +54,7 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Why use it:** Quickly jump back to documents you were just working on without losing your place.
 
-**Interaction:** You can expand and edit the Rem directly in the right sidebar. Click an entry to open it; **Shift+click** opens it in a new pane beside your current document (or switches to the pane already showing it).
+**Interaction:** You can expand and edit the Rem directly in the right sidebar. Click an entry to open it; **Shift+click** opens it in a new pane beside your current document (or switches to the pane already showing it). It works anywhere on the entry, its text included; that text can't be selected, so expand the entry to select or copy from it.
 
 **Search:** Includes a search bar to instantly filter your history. Supports multi-word queries (e.g., "Biology Exam") and deep text search across all recorded items.
 
@@ -72,7 +72,7 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Why use it:** If you want to check context or edit a flashcard you just reviewed, you can easily find it here without interrupting your session flow.
 
-**Interaction:** Clicking on a flashcard will open the Rem in the Editor; **Shift+click** opens it in a new pane beside your current document instead (or switches to the pane already showing it).
+**Interaction:** Clicking on a flashcard will open the Rem in the Editor; **Shift+click** opens it in a new pane beside your current document instead (or switches to the pane already showing it). It works anywhere on the entry, its text included; that text can't be selected, so expand the entry to select or copy from it.
 
 **Search & Filter:** Effortlessly find a card you practiced moments or days ago. The search checks both the front (question) and back (answer/context) of your cards. You can also filter the history by rating grade (Again, Hard, Good, Easy) using the radio buttons at the top.
 
@@ -80,7 +80,7 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Priority Badge & inline editing:** Each entry also shows a priority badge, right-aligned in the badge row. Click it to open an inline slider editor directly in the row — adjust with the number field or the drag slider, then Save. No popup is opened, so editing a priority here never conflicts with the queue's target-rem selection. The change is written by the plugin's persistent background tracker, so it is saved reliably and still triggers the priority-inheritance cascade. The Incremental Rem History sidebar has the same badge, showing the IncRem priority (colored by its KB-wide percentile).
 
-**Cluster-aware recording:** Inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters), each sibling card you rate is recorded individually, about a second and a half after it leaves the screen, up to and including the cluster's last card. This ensures your history accurately reflects every card you actually reviewed. Cards rated inside the [Mastery Drill](Mastery-Drill.md) popup are recorded here too, for the same reason.
+**Cluster-aware recording:** Inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters), each sibling card you rate is recorded individually, about a second and a half after it leaves the screen, up to and including the cluster's last card, whether or not it has a priority. This ensures your history accurately reflects every card you actually reviewed. Cards rated inside the [Mastery Drill](Mastery-Drill.md) popup are recorded here too, for the same reason.
 
 **Retention:** The list keeps the **500 most recent** cards for the knowledge base you are in. See [How the history lists are stored](#how-the-history-lists-are-stored).
 

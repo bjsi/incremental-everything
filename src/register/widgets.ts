@@ -1,7 +1,8 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT, EXTRACT_EDITOR_FLOAT } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, historyMoveWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT, EXTRACT_EDITOR_FLOAT } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
+import { CLUSTER_EXTRA_DETAIL_WIDGET } from '../lib/cluster_extra_detail';
 
 /* The regular-queue Mastery Drill bar sits at QueueBelowTopBar. Registering anything
    there drops RemNote's own h-2 spacer (it renders only when the location is empty), so
@@ -92,6 +93,20 @@ const SIDEBAR_END_PADDING_CSS = `
   }
 `;
 
+// The Rem text in the history sidebars (Flashcard/Rem/Incremental History) is a
+// <RemViewer>, which RemNote draws in its own page over our iframe. A Shift+click there
+// (open in a new pane) also extends the host's text selection over the whole sidebar,
+// and clicks in the widget can't clear it. The rows are links, not text to copy, so
+// make them unselectable. Only the RemViewer rows carry this class; the expanded
+// RemHierarchyEditorTree stays selectable.
+const HISTORY_ROW_NO_SELECT_CSS = `
+  .ie-history-row-text,
+  .ie-history-row-text * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+`;
+
 // A floating widget's wrapper is z-50, but the reader's Notes (z 12), Explain (z 20)
 // and every default popup (z 30) sit below it, in #controlled-popup-portal. While the
 // Source float is open, lift that whole portal: popups keep their order among themselves.
@@ -103,11 +118,22 @@ const SOURCE_FLOATING_POPUPS_CSS = `
       z-index: 60;
     }
   }
+  /* The reference search ([[) in the reader's Notes is in #keyboard-aware-portal
+     instead; see the Extract Editor rule below. */
+  body:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=pdf_source_floating"]) #keyboard-aware-portal {
+    z-index: 60 !important;
+  }
 `;
 
-// The Extract Editor is a float too, holding a real editor: its slash menu, reference
-// search and formatting bar are host popups, which would open under it for the same
-// reason. Same lift, same exclusion.
+// The Extract Editor is a float too, holding a real editor: its slash menu and
+// formatting bar are host popups, which would open under it for the same reason.
+// Same lift, same exclusion.
+//
+// The reference search ([[ or [ on a selection) is not in that portal either: the rich
+// text editor puts it in #keyboard-aware-portal (fixed, z 30). That portal is already
+// position:fixed, so only its z-index changes, which clips nothing and is safe on
+// tablets too. Its 0.3 s transition animates the change, so a probe must wait before
+// reading it back. Verified live in 1.30.4.
 //
 // The bar that appears over selected text (bold, highlight, cloze…) is not in that
 // portal: RemNote portals it straight into <body> as .rn-selected-text-menu, at z 30
@@ -119,6 +145,9 @@ const EXTRACT_EDITOR_POPUPS_CSS = `
       position: relative;
       z-index: 60;
     }
+  }
+  body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) #keyboard-aware-portal {
+    z-index: 60 !important;
   }
   body:has(iframe[src*="widgetName=${EXTRACT_EDITOR_FLOAT}"]) .rn-selected-text-menu {
     z-index: 55 !important;
@@ -300,6 +329,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   await plugin.app.registerCSS('queue-below-top-bar', QUEUE_BELOW_TOP_BAR_CSS);
   await plugin.app.registerCSS('queue-toolbar-frame', TOOLBAR_FRAME_CSS);
   await plugin.app.registerCSS('sidebar-end-padding', SIDEBAR_END_PADDING_CSS);
+  await plugin.app.registerCSS('history-row-no-select', HISTORY_ROW_NO_SELECT_CSS);
   await plugin.app.registerCSS('editor-review-timer-sticky', EDITOR_REVIEW_TIMER_STICKY_CSS);
 
   // The Priority Queue popup: status, refresh/drain/refill/practise for the
@@ -419,6 +449,16 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Extra details of the Card Cluster member being tested: RemNote shows the loaded
+  // member's instead (lib/cluster_extra_detail). No powerupFilter: RemNote filters
+  // this slot on the loaded member, which says nothing about the tested one.
+  plugin.app.registerWidget(CLUSTER_EXTRA_DETAIL_WIDGET, WidgetLocation.FlashcardExtraDetail, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
   plugin.app.registerWidget('editor_review', WidgetLocation.Popup, {
     dimensions: { height: 'auto', width: '500px' },
   });
@@ -489,6 +529,12 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // "Pick in editor" card (lib/parent_pick.ts): floats over the editor while a
   // new Rem waits for the user to confirm a parent there.
   plugin.app.registerWidget(parentPickWidgetId, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 340 },
+  });
+
+  // "↪ Move to another Rem" card (lib/history_move_pick.ts): floats over the
+  // editor while a Repetition History record waits for the Rem that gets its time.
+  plugin.app.registerWidget(historyMoveWidgetId, WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 340 },
   });
 
@@ -659,6 +705,14 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('true_false_judge_confirm', WidgetLocation.Popup, {
     dimensions: {
       width: 620,
+      height: 'auto',
+    },
+  });
+
+  // Editor Review Timer lost to a crash or quit: resume / save / discard (lib/editor_review_recovery.ts).
+  plugin.app.registerWidget('editor_review_recovery', WidgetLocation.Popup, {
+    dimensions: {
+      width: 560,
       height: 'auto',
     },
   });

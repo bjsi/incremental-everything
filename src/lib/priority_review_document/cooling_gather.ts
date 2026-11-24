@@ -1,7 +1,7 @@
 import { RNPlugin, PluginRem, RemId } from '@remnote/plugin-sdk';
 import { allIncrementalRemKey, allCardPriorityInfoKey } from '../consts';
 import { IncrementalRem } from '../incremental_rem';
-import { repCountsForStats } from '../incremental_rem/types';
+import { entryWasReviewHere } from '../incremental_rem/types';
 import { hasCardClusterPowerup } from './cluster';
 import {
   CardLike,
@@ -179,7 +179,8 @@ function incRemLastReadAt(inc: IncrementalRem | undefined): number | null {
   if (!inc?.history?.length) return null;
   let last: number | null = null;
   for (const rep of inc.history) {
-    if (!repCountsForStats(rep.eventType)) continue;
+    // Time moved in from another rem's review is not a sitting of this one.
+    if (!entryWasReviewHere(rep)) continue;
     if (typeof rep.date !== 'number') continue;
     if (last === null || rep.date > last) last = rep.date;
   }

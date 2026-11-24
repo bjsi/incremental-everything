@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { getPdfInfoFromHighlight, findAllRemsForPDF, findAllRemsForHTML, findPDFinRem, findHTMLinRem, isHtmlSource, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
 import { incrementalQueueActiveKey, currentIncRemKey, editorReviewTimerRemIdKey } from '../lib/consts';
 import { getRemReadPointHistory } from '../lib/remReadPoint';
-import { openAndFocusRem } from '../lib/remHelpers';
+import { openAndFocusRem, preventShiftSelect } from '../lib/remHelpers';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 
 export function PdfBookmarkPopup() {
@@ -300,8 +300,11 @@ export function PdfBookmarkPopup() {
                   display: 'flex', flexDirection: 'column', gap: '2px',
                   fontWeight: 500, transition: 'background-color 0.15s ease', width: '100%'
                 }}
-                onClick={async () => {
-                  if (entry.highlightId) await openAndFocusRem(plugin, entry.highlightId);
+                title="Shift+click: open it in a new pane"
+                onMouseDown={preventShiftSelect}
+                onClick={async (e) => {
+                  // Shift+click: open in a new pane, keeping the current document.
+                  if (entry.highlightId) await openAndFocusRem(plugin, entry.highlightId, e.shiftKey);
                   plugin.widget.closePopup();
                 }}
                 onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-modifier-hover)'}

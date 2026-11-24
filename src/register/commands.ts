@@ -17,6 +17,7 @@ import { toggleFollowQueueSources } from '../lib/follow_queue_sources';
 import { sendFocusedPaneToAnotherWindow } from '../lib/send_to_window';
 import { localizeMediaInRems } from '../lib/localize_media';
 import { showMessageDialog } from '../lib/message_dialog';
+import { openEditorReviewRecovery } from '../lib/editor_review_recovery';
 import {
   addVideoTranscript,
   describeTranscript,
@@ -33,6 +34,7 @@ import {
   powerupCode,
   currentIncRemKey,
   editorReviewTimerRemIdKey,
+  recoverEditorReviewCommandId,
   pageRangeWidgetId,
   noIncRemTimerKey,
   alwaysUseLightModeOnMobileId,
@@ -73,8 +75,11 @@ import {
   parentPickCancelCommandId,
   parentPickActiveIdKey,
   parentPickConfirmRequestKey,
+  historyMoveActiveIdKey,
+  historyMoveConfirmRequestKey,
 } from '../lib/consts';
 import { endParentPick } from '../lib/parent_pick';
+import { endHistoryMove } from '../lib/history_move_end';
 import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
 import {
   planPreserveHistoryAndRemove,
@@ -244,6 +249,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // "Peek" toggle: show/hide the pdfextract & incremental marker borders over
   // PDF-viewer highlights, so a cluttered page can be read cleanly on demand.
   // Mirrors the highlight-toolbar button; both share the same local flag.
+  // An Editor Review Timer lost to a crash or quit (lib/editor_review_recovery.ts).
+  await plugin.app.registerCommand({
+    id: recoverEditorReviewCommandId,
+    name: 'Recover Interrupted Editor Review',
+    quickCode: 'rer',
+    action: async () => {
+      if (!(await openEditorReviewRecovery(plugin))) {
+        await plugin.app.toast('No interrupted Editor Review to recover.');
+      }
+    },
+  });
+
   await plugin.app.registerCommand({
     id: togglePdfHighlightBordersCommandId,
     name: 'Toggle PDF Highlight Marker Borders',
@@ -1224,15 +1241,24 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // "Pick in editor" (lib/parent_pick.ts). The card holds the target and the
   // outside-the-IncRem confirmation, so the shortcut only asks it to act.
   // opt+shift+enter because mod+shift+enter is RemNote's Add Portal.
+  // Also confirms "↪ Move to another Rem" (lib/history_move_pick.ts), whose
+  // card is the same kind of editor pick; only one of the two is open at a time.
   plugin.app.registerCommand({
     id: parentPickConfirmCommandId,
-    name: 'Place Pending Rem Here',
+    name: 'Confirm Pick in Editor',
     quickCode: 'pph',
-    description: 'Create the Rem waiting for a parent under the Rem that has the cursor',
+    description:
+      'Place the Rem waiting for a parent, or move the waiting history record, to the Rem that has the cursor',
     keyboardShortcut: 'opt+shift+enter',
     action: async () => {
+      if (await plugin.storage.getSession<string>(historyMoveActiveIdKey)) {
+        await plugin.storage.setSession(historyMoveConfirmRequestKey, Date.now());
+        return;
+      }
       if (!(await plugin.storage.getSession<string>(parentPickActiveIdKey))) {
-        await plugin.app.toast('No Rem is waiting for a parent. Use 📍 Pick in editor in the Select Parent popup first.');
+        await plugin.app.toast(
+          'Nothing is waiting for a pick. Use 📍 Pick in editor (Select Parent) or ↪ in Repetition History first.'
+        );
         return;
       }
       await plugin.storage.setSession(parentPickConfirmRequestKey, Date.now());
@@ -1241,11 +1267,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
   plugin.app.registerCommand({
     id: parentPickCancelCommandId,
-    name: 'Cancel Parent Pick',
+    name: 'Cancel Pick in Editor',
     quickCode: 'cpp',
-    description: 'Drop the Rem waiting for a parent picked in the editor',
+    description: 'Drop the Rem waiting for a parent, or the history record waiting to be moved',
     action: async () => {
       await endParentPick(plugin);
+      await endHistoryMove(plugin);
     },
   });
 

@@ -137,6 +137,13 @@ export const IncrementalRep = z.object({
    *   those gestures stop being invisible. Carries `previousPriority` and
    *   `priorityEvent`; the reschedule and review paths do NOT emit one, because the
    *   entry they already write records the new priority itself.
+   * - 'movedRep': Study time moved here from a review of ANOTHER rem with "Move to
+   *   another Rem" in the Repetition History popup (lib/history_move.ts) — the
+   *   session came up as that rem in the queue, but what was read was this one.
+   *   It counts for STATISTICS only (time, rep count). The scheduler, the same-day
+   *   rule and Priority Queue cooling ignore it: this rem's schedule never saw it.
+   *   The review it came from stays on the source rem with `context.movedTo`, so
+   *   the source's schedule is untouched too (see entryCountsForStats).
    *
    * The scheduler uses this to count only review events since the last 'madeIncremental' event.
    */
@@ -151,7 +158,8 @@ export const IncrementalRep = z.object({
     'importedRep',
     'externalRep',
     'priorityChange',
-    'transferred'
+    'transferred',
+    'movedRep'
   ]).optional(),
   /**
    * The absolute priority (0-100) at the time of this repetition
@@ -208,6 +216,13 @@ export const IncrementalRep = z.object({
       /** Text of the last bookmark/highlight rem from this session, if any. */
       bookmark: z.string().optional(),
       /**
+       * Read point of a rem-type IncRem (a bookmarked descendant in its own
+       * outline, see lib/remReadPoint.ts) at the time of this entry: its text,
+       * and its id so the row can lead back to it.
+       */
+      readPoint: z.string().optional(),
+      readPointRemId: z.string().optional(),
+      /**
        * Playback position in seconds, where the video was left (any video
        * IncRem: RemNote video, local video, YouTube link, Video Extract). For an
        * extract it is a time in the whole video, between videoStart and videoEnd.
@@ -254,6 +269,28 @@ export const IncrementalRep = z.object({
       companionSeconds: z.number().optional(),
       /** On a Companion session: the queue's own seconds, added when Next found the sitting recorded. */
       queueSeconds: z.number().optional(),
+      /**
+       * On a review whose time was moved to other rems (lib/history_move.ts): one
+       * record per move — where to, how many seconds, and when (`at`, which also
+       * names the 'movedRep' entry written on the target). The entry keeps its
+       * place and its scheduling fields; only `reviewTimeSeconds` shrank.
+       */
+      movedTo: z
+        .array(
+          z.object({
+            remId: z.string(),
+            name: z.string().optional(),
+            seconds: z.number(),
+            at: z.number(),
+          })
+        )
+        .optional(),
+      /** On a 'movedRep' entry: the rem whose review the time came from. */
+      movedFromId: z.string().optional(),
+      /** That rem's text at the moment of the move. */
+      movedFromName: z.string().optional(),
+      /** On a 'movedRep' entry: when it was moved, matching `movedTo[].at` on the source. */
+      movedAt: z.number().optional(),
     })
     .optional(),
 });
@@ -276,8 +313,48 @@ export function repCountsForStats(eventType: IncrementalRep['eventType']): boole
     eventType === 'executeRepetition' ||
     eventType === 'rescheduledInQueue' ||
     eventType === 'importedRep' ||
-    eventType === 'externalRep'
+    eventType === 'externalRep' ||
+    eventType === 'movedRep'
   );
+}
+
+/**
+ * Whether a review had time moved off it to other rems (lib/history_move.ts).
+ */
+export function hasMovedTime(rep: IncrementalRep): boolean {
+  return (rep.context?.movedTo?.length ?? 0) > 0;
+}
+
+/**
+ * Whether this ENTRY counts for statistics (time and rep totals, per-rem stats).
+ * Prefer it over {@link repCountsForStats} wherever whole entries are at hand.
+ *
+ * The one difference: a review whose time was ALL moved to other rems no longer
+ * counts here — its time and its rep now live on the targets as 'movedRep'
+ * entries, and counting it twice would inflate the totals. A review that kept
+ * part of its time still counts (it was split between two pieces of study).
+ */
+export function entryCountsForStats(rep: IncrementalRep): boolean {
+  if (!repCountsForStats(rep.eventType)) return false;
+  if (hasMovedTime(rep) && !((rep.reviewTimeSeconds ?? 0) > 0)) return false;
+  return true;
+}
+
+/**
+ * Whether this entry was a sitting of THIS rem in the queue or the editor — the
+ * reading of "when was it last reviewed" that Priority Queue cooling and the
+ * Companion use. Stats entries minus 'movedRep' (time moved in from a review of
+ * another rem); a review whose time was moved away still counts, since the rem
+ * itself was dealt with.
+ */
+export function entryWasReviewHere(rep: IncrementalRep): boolean {
+  return repCountsForStats(rep.eventType) && rep.eventType !== 'movedRep';
+}
+
+/** The seconds a review originally held, before any of it was moved to other rems. */
+export function originalReviewSeconds(rep: IncrementalRep): number {
+  const moved = (rep.context?.movedTo ?? []).reduce((sum, m) => sum + (m.seconds || 0), 0);
+  return (rep.reviewTimeSeconds ?? 0) + moved;
 }
 
 /**

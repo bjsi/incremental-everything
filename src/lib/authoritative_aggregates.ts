@@ -18,7 +18,7 @@ import {
 } from './queue_aggregates';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
 import type { IncrementalRem, IncrementalRep } from './incremental_rem/types';
-import { repCountsForStats } from './incremental_rem/types';
+import { repCountsForStats, entryCountsForStats } from './incremental_rem/types';
 import { getIESetting } from './settings';
 import { fetchGhosts, filterGhosts, ghostShardKey, GhostRep } from './history_archive';
 import { helperHeaders } from './helper_client';
@@ -304,7 +304,8 @@ function bucketIncRemHistory(
   for (const rep of history as IncrementalRep[]) {
     if (!rep || typeof rep.date !== 'number') continue;
     liveDates?.add(rep.date);
-    if (!isRealIncRemRep(rep.eventType)) continue;
+    // Entry-level: a review whose time was all moved to other rems counts there.
+    if (!entryCountsForStats(rep)) continue;
     const b = findOrCreateBucket(buckets, getLocalDateKey(rep.date), kbId);
     b.incRemsCount += 1;
     const t = (rep.reviewTimeSeconds || 0) * 1000;

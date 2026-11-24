@@ -126,7 +126,7 @@ Each row shows the book, the page in your RemNote PDF, the quote with the words 
             • Métodos probabilísticos dão dimensões ótimas e economias…   (AI Note)
 ```
 
-- **Quotes** keep only the words that bear on your note: the rest of the passage is cut with `[…]`, and each part gets its own pin, so the pin opens the whole context. The words the point turns on are in **bold**, the one word or figure it hinges on in ***bold italics***. The attribution reads `(book, §section, PDF p. N)`, with `; fora do edital` for a passage the exam does not ask for.
+- **Quotes** keep only the words that bear on your note: the rest of the passage is cut with `[…]`, and each part gets its own pin, so the pin opens the whole context. The words the point turns on are in **bold**, the one word or figure it hinges on in ***bold italics***. The attribution reads `(book, §section, PDF p. N)`, with `; fora do edital` for a passage the exam does not ask for (`; out of the exam syllabus` when the note is in English; the review shows the same label).
 - **Where the pins go:** at the end of the Rem (of its back, when it has one). When the Rem mixes what several passages say, each pin goes right after the sentence it supports, as long as that sentence can be found with certainty; any other goes at the end.
 - **Running it again** reuses the highlights, the headers and the quote Rems already there, and adds nothing twice.
 
@@ -224,6 +224,80 @@ When the answer misses a point, or you want another aspect in it, write what to 
 - It runs in the background like the first time. A new notice (*Ask Your Sources: follow-up ready to review*) opens a new review, which shows your follow-up under the question; you can follow up again from there.
 - Nothing is written until you accept an answer. With one question in the review, the old notice goes; in a review of several, the follow-up applies to the question under the cursor, and the old notice stays for the others.
 - `Esc` in the field goes back to the list.
+
+## Find Interference: what your note could be confused with { #find-interference }
+
+> *Interference is probably the single greatest cause of forgetting.* — Piotr Wozniak, [20 rules of formulating knowledge](https://www.supermemo.com/en/blog/twenty-rules-of-formulating-knowledge), rule 11
+
+Run **Find Interference** (`intf`) on a note (one fact, one card) and it finds the statements of your library you could **mix it up with**, and those that **contradict** or **confirm** it. Claude (Opus by default, through the [AI helper](Desktop-Helpers.md#ai-helper)) reads each passage in full and sorts what it finds:
+
+| Kind | What it is |
+|---|---|
+| **≈ Similar but distinct** | Another thing in the same frame (another order, step, stage, test) with a different value or term, or the same value with another meaning. The two can swap places in your memory. |
+| **≠ Divergence** | The same thing, and the sources disagree: a different value, an incompatible claim, or a **different scope**, when one book gives the thing more or less than the others (a purpose, a cause, a member of a list), even if nobody excludes the other's claim in so many words. |
+| **= Convergence** | The same thing, said again in another book, or in another place of the same book. |
+
+It searches your whole library, **your note's own book included**. The passage your note comes from is read too: its other sentences, the steps just before and after yours, are often the most confusable of all. Requirements are the same as Check Statement's: a [corpus provider](Corpus-Provider.md) that searches by meaning, the AI helper paired, and the Claude CLI signed in.
+
+### Two examples { #find-interference-examples }
+
+**An order and its distance.** The note *À voz de "Atenção para largar o ferro", dada a cerca de 100 jds do ponto de fundeio, o Sr. Mestre determina que o freio do cabrestante seja aberto e o cavirão da patola retirado.* (Arte Naval) brings:
+
+- ≈ from its own paragraph: *"Preparar para largar o ferro"* at about **1.000 jds**; the distances are then reported **every 100 jds** (the same number, another meaning); at *"Largar o ferro"* the man strikes the patola with the sledgehammer.
+- ≈ from the same book, two pages back: stop the engines about **three ship lengths** from the chosen position.
+- ≈ from Miguens: reduce to 5–7 knots at **1,000 yards**; engines stopped at about **300 yards**.
+- ≠ inside Arte Naval itself: its anchoring orders on p. 198 (*Preparar / Atenção / Largar o ferro*) and on p. 97 (*Postos de fundear! Preparar para fundear! Larga o ferro!*), one with *Atenção*, the other without.
+
+**A test and its purpose.** The note *The spiral test is used to evaluate the turning ability and the yaw stability of the ship.* (Bertram) brings:
+
+- ≠ of scope: PNA Control, *"The spiral maneuver as described earlier serves **mainly** to determine stability characteristics […] The turning maneuver denotes turning qualities"*; Mesquita, *"O objetivo do teste de espiral direta é determinar se o navio é direcionalmente estável ou não."* No book but Bertram gives the spiral turning ability.
+- ≈: Bertram's own *turning circle test … used to evaluate the turning ability*; the pull-out, *a quick indication of a ship's yaw stability*; the zig-zag, *to determine control characteristics*; PNA's Diagram of Steering, a design technique *assessing both turning ability and dynamic stability*.
+
+### Reviewing { #find-interference-review }
+
+The search takes about a minute (it casts a wider net than Find Sources) and Claude about half a minute more; a notice counts what was found (*≈ 7 similar but distinct · ≠ 2 divergences*) and opens the review.
+
+![The Find Interference review on the spiral-test note](assets/find-interference-review.png){ width="640" }
+
+*Above: each row shows its kind, book and page, one line with the frame and the two values (**this note's × the other's**), the quote, and, when one of your own Rems pinned to the same highlight already states it, **In your notes**. The 🃏 row shows the card it will make.*
+
+- Every row starts selected: `Space` leaves one out, `Enter` writes, `Esc` closes and keeps the notice.
+- `C` (or a click on 🃏) puts a ≈ or ≠ row into a [discrimination card](#discrimination-cards).
+
+### What gets written { #find-interference-written }
+
+The last child of the note, dated, so running it again adds a new check:
+
+```
+• The spiral test is used to evaluate the turning ability and the yaw stability of the ship.
+    • Interference Check (11/23/2026)                              (Extra Card Detail, #Interf)
+        • ≈ Similar but distinct
+            • What the trial evaluates: spiral test, turning ability and yaw stability × turning circle test, turning ability · in your notes: [[…]]
+                • “The turning circle test is used to evaluate the turning ability of the ship.” (Bertram, PDF p. 264) 📌
+        • ≠ Divergences                                              (#Diverg)
+            • What the trial evaluates: spiral test, turning ability and yaw stability × spiral test, mainly stability characteristics
+                • ⚠️ “The spiral maneuver as described earlier serves mainly to determine stability characteristics” (PNA Control, PDF p. 21) 📌
+        • = Convergences
+```
+
+- **Quotes** hold only the words that carry the statement; the **pin** covers the whole sentence in the PDF, where it is found reliably and reads in context.
+- **In your notes** is a reference to your own Rem, so the two look-alikes are one click apart.
+- A Portuguese note gets *Verificação de interferências*, *Semelhantes, mas distintos*, *Divergências*, *Convergências* and *nas notas*.
+- **Styling:** when your knowledge base has top-level Rems named **Interf** and **Diverg**, the header and the ≠ group are tagged with them, so your Custom CSS can style them (`[data-rem-container-tags~="interf" i] .rem-text { … }`).
+
+### Discrimination cards { #discrimination-cards }
+
+The remedy for interference is a card that asks the look-alikes side by side. Press `C` on the ≈ and ≠ rows you want: rows of the **same frame make one card**, each of their values a cloze, with your note's value last and shown (its own card already asks it). From the anchoring note, with the *Preparar* and the Miguens *máquinas paradas* rows chosen:
+
+> **Distância ao ponto de fundeio** — Preparar para largar o ferro: {{~1.000 jds}} 📌 · máquinas paradas (Fragatas e Corvetas; Miguens I): {{~300 jardas}} 📌 · Atenção para largar o ferro: ~100 jds
+
+A divergence card names the books instead: *What the trial evaluates — PNA Control: {{mainly stability characteristics}} · Bertram: turning ability and yaw stability*.
+
+- The review previews each card under its first row, and the button counts them (*Write 12 · 1 card*).
+- The card is written under its first row's line, which shows the answers, so it gets **Hide Parent** (Remove Parent when the [Hide-in-Queue integration](Utilities-Queue-Display.md#hide-in-queue) is off). Each cloze is followed by its quote's pins.
+- RemNote practises cards inside an Extra Card Detail as usual. The card's priority follows the note, as any new card's.
+
+**Model:** *Find Interference: Claude Model* in [AI Helper & Your Library](Plugin-Settings-Reference.md#ai-helper) chooses Opus (the default, best on the subtle cases) or Sonnet (faster, lighter on your usage).
 
 ## Pinning every quote in a subtree { #quote-rems-in-descendants }
 

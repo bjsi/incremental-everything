@@ -132,6 +132,8 @@ export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
 export const titleCaseAcronymsId = 'title-case-acronyms';
 /** Colour of the PDF highlights the plugin creates for source pins (lib/source_pins). */
 export const sourceHighlightColorId = 'source-highlight-color';
+/** Find Interference: the Claude model that reads the passages ('opus' | 'sonnet'). */
+export const findInterferenceModelId = 'find-interference-model';
 export type HighlightColorName = 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple';
 /** Create IncRem also pins the passage in a PDF's other view (page ↔ Text Reader) — lib/pdf_source_pins pinOtherViewOfHighlight. */
 export const pinOtherReaderViewOnCreateIncRemId = 'pin-other-reader-view-on-create-increm';
@@ -410,6 +412,15 @@ export const parentPickConfirmRequestKey = 'parent-pick-confirm-request';
 export const parentPickConfirmCommandId = 'place-pending-rem-here';
 export const parentPickCancelCommandId = 'cancel-parent-pick';
 
+// "Move to another Rem" (lib/history_move_pick.ts): the Repetition History popup
+// hands one review to a floating card and closes, and the user picks the Rem
+// that gets its time in the editor, confirming with the same shortcut as the
+// parent pick (parentPickConfirmCommandId), which asks whichever card is open.
+export const historyMoveWidgetId = 'history_move_floating';
+export const historyMoveContextKey = 'history-move-context';
+export const historyMoveActiveIdKey = 'history-move-active-id';
+export const historyMoveConfirmRequestKey = 'history-move-confirm-request';
+
 // css
 export const collapseTopBarId = 'collapse-top-bar';
 export const collapseTopBarKey = 'collapseTopBarState';
@@ -457,6 +468,10 @@ export const queueHideElementsId = 'incremental-everything-queue-hide-elements';
 // index-only, so a plugin.track in index.tsx re-registers on each new height.
 export const cardInfoBarDockCssId = 'incremental-everything-card-info-bar-dock';
 export const cardInfoBarHeightKey = 'card-info-bar-height';
+// Same arrangement for cluster_extra_detail: the widget sets the key while it draws
+// the tested cluster member's Extra Card Details, and index.tsx hides RemNote's own.
+export const clusterExtraDetailCssId = 'incremental-everything-cluster-extra-detail';
+export const clusterExtraDetailOverrideKey = 'cluster-extra-detail-override';
 // Same arrangement for the pinned Editor Review Timer: its instances write their
 // heights (per document id) and index.tsx moves RemNote's sticky headers below it.
 export const editorReviewTimerHeadersCssId = 'incremental-everything-editor-review-timer-headers';
@@ -689,6 +704,7 @@ export const editorReviewTimerAccumulatedMsKey = 'editor-review-timer-accumulate
 export const editorReviewTimerPausedAtKey = 'editor-review-timer-paused-at';
 export const editorReviewTimerOriginKey = 'editor-review-timer-origin';
 export const editorReviewTimerDateOverrideKey = 'editor-review-timer-date-override';
+export const recoverEditorReviewCommandId = 'recover-editor-review';
 
 export const pdfHighlightColorId = 'pdf-highlight-color'; // Incremental PDF highlight color
 
@@ -797,6 +813,7 @@ export const pinSourceQuotesInTreeCommandId = 'pin-source-quotes-in-tree';
 export const findSourcesCommandId = 'find-sources';
 export const checkStatementCommandId = 'check-statement';
 export const askYourSourcesCommandId = 'ask-your-sources';
+export const findInterferenceCommandId = 'find-interference';
 export const findSourcesInTreeCommandId = 'find-sources-in-tree';
 export const checkStatementsInTreeCommandId = 'check-statements-in-tree';
 export const FIND_SOURCES_POPUP = 'find_sources_popup';
@@ -836,6 +853,10 @@ export const pendingReadAloudJobsKey = 'pendingReadAloudJobs';
 // Upscale jobs (lib/upscale_image.ts): the command starts them and returns; the tracker
 // waits for ChatGPT and posts a notice whose Review button opens the comparison popup.
 export const pendingUpscaleJobsKey = 'pendingUpscaleJobs';
+// Whole-KB image scans (lib/image_scan.ts): "Tag Rems With Images" / "Remove HasImage
+// Tags" on the whole knowledge base run for up to an hour, so the popup queues them here
+// and closes; the tracker runs them and reports progress and the result as a notice.
+export const pendingImageScanJobsKey = 'pendingImageScanJobs';
 // Notices (lib/notice.ts): reports of background work, shown in a floating card instead
 // of a popup so they never close the popup the user is working in. Any widget appends to
 // this list; the index opens the card while it is non-empty.

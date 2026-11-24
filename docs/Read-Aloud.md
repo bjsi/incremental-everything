@@ -30,9 +30,21 @@ An audio Rem and everything under it is never read again, so running Read aloud 
 
 In **Adapted** and **Summary**, press **Write the script with AI** (`⌘↵`), read the result, edit it if you like, then **Generate**. Formulas are read the way a teacher reads them: subscripts as “V sub A” in English and “V índice A” in Portuguese.
 
+### Long formulas { #long-formulas }
+
+Adapted reads every formula in full. Tick **Simplify formulas too long to follow by ear** (Adapted only) and a formula with an integral, a sum, nested fractions or more than about a dozen symbols is said by what it computes and depends on instead: *the yaw moment comes out proportional to L squared, times a function of a, times the cosine of omega sub e t*, rather than every limit, `dx` and fraction. Short formulas (*F = m a*) are still read in full, and nothing is added that the note does not say. The checkbox is kept with the note's draft, and it needs the media-bridge helper at version 20 or later.
+
 With **Also insert the summary text under the audio** (on by default), a Summary's text is also added under its audio Rem, headed *Summary of this document, written by AI*, with one Rem per line and the foreign terms in italics.
 
-The AI step runs `claude -p` with your Claude subscription, at no per-call charge. When that fails (usage limit reached, the `claude` command not installed, any error) and an Anthropic API key is set, it runs on the API instead; the popup then shows the cost (a few cents for a note) and why `claude -p` failed. See [Setup](#setup).
+### Which AI writes the script { #which-ai }
+
+Sonnet writes **Adapted**, which only rewords the note, and Opus writes **Summary**, which has to choose what to keep. Each try below is used only when the one before it fails, and the line next to the button says which one wrote the script and why the others failed:
+
+1. **Adapted only:** Sonnet through the Antigravity CLI (`agy`), on your Google plan's quota, so your Claude subscription is kept for the rest ([`agyModel`](#options) changes the model or turns this off).
+2. `claude -p` with your Claude subscription, at no per-call charge ([`llmModel`](#options) changes either mode's model).
+3. The Anthropic API, when its key is set; the popup then shows the cost (a few cents for a note).
+
+See [Setup](#setup).
 
 ### Summary length { #summary-length }
 
@@ -73,10 +85,20 @@ The popup lists every engine with its own estimate, and greys out those whose ke
 |---|---|---|
 | **Gemini TTS (Google Cloud)** | `GOOGLE_CLOUD_API_KEY` (optional `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`) | Gemini 3.8 Flash TTS through Vertex AI, billed to a Google Cloud billing account (and its credits). Suggested first when set. Each call gets its locale (`pt-BR` or `en-US`), as through the Gemini API. |
 | **Gemini TTS** | `GEMINI_API_KEY` | The same model through the Gemini API ([Google AI Studio](https://aistudio.google.com/apikey) key). |
-| **Azure multilingual** | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | Voice `en-US-AndrewMultilingualNeural`. The only engine that switches language **inside a sentence**, so it is suggested for scripts with 3 or more Portuguese terms marked inside English lines. English terms in Portuguese lines do not count: Gemini reads them well, while Portuguese words in an English sentence come out Spanish or English. |
+| **Azure multilingual** | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | Voice `en-US-AndrewMultilingualNeural`. The only engine that switches language **inside a sentence**. Suggested for scripts with 3 or more Portuguese terms marked inside English lines when **Gemini + Azure** is not available. English terms in Portuguese lines do not count: Gemini reads them well, while Portuguese words in an English sentence come out Spanish or English. |
+| **Gemini + Azure (mixed)** | `GOOGLE_CLOUD_API_KEY` (or `GEMINI_API_KEY`) and the Azure keys | Azure reads only the English lines with Portuguese terms; Gemini reads the rest. Suggested for scripts with 3 or more Portuguese terms in English lines. See [below](#mixed). |
 | **ElevenLabs** | `ELEVENLABS_API_KEY` | Your account's voices, by first name. Suggested only when no other engine has a key. |
 
 Gemini and ElevenLabs speak one language per call: a marked foreign term is read in its line's language, and the popup says so when the script has any.
+
+### Gemini + Azure (mixed) { #mixed }
+
+A long note often has only a few English lines with Portuguese words in them: a *Parallels in the bibliography* section naming *A manobrabilidade do navio no século 21*, a term like *calado aéreo*. Gemini would read those words in Spanish or English, and Azure would read the whole note in its own voice. **Gemini + Azure** splits the script line by line:
+
+- an English line with a Portuguese term marked in it goes to **Azure**, which switches language mid-sentence;
+- every other line, Portuguese quotes and English lines alike, goes to **Gemini** (on Google Cloud when its key is set), in the voice you pick.
+
+So the note keeps the Gemini voice and only those lines change to Andrew; the popup says how many (*3 English lines with Portuguese terms read by Azure (Andrew), the rest by Gemini: two voices*). The estimate prices each part at its own engine's rate, Gemini's lines are [checked](#checked) as usual, and the audio's caption names both voices (*Charon + Andrew*). It is suggested instead of Azure whenever both keys are set; `mixedAzureTerms` in [`tts.json`](#options) sets how many Portuguese terms a line needs to go to Azure (default 1).
 
 Prices checked in November 2026 (the helper's `tts.py` holds them; check your provider's current prices):
 
@@ -113,6 +135,7 @@ Without whisper, only the length of each call is checked. A redone call is paid 
 | A descriptor you start on | Its concept first (front only), then any descriptors in between, then the Rem and its children, as [Add pronunciation](#pronunciation-descriptors) reads one. The audio is still named after the Rem. |
 | Bold, italic, links, page numbers, emoji, arrows | Formatting dropped; `p. 12` is read “page 12”, `kN` “kilonewtons” (and the Portuguese equivalents). |
 | Italic words in the other language | Marked as foreign terms (for example `<en>fairway</en>` in a Portuguese line), so Azure pronounces them in their own language. Acronyms are never marked. |
+| *fora do edital* in an English line (a passage the exam does not ask for) | Said in English, *out of the exam syllabus*, in the line's own voice; a Portuguese line keeps *fora do edital*. The helper makes the swap even in a script you edited by hand. |
 
 ### The script format { #script-format }
 
@@ -139,6 +162,7 @@ Anything an engine would read out wrongly (markdown, LaTeX, links, page numbers,
     The helper reads the keys on every request, so a new key works without a restart. Keys never go into the plugin's settings, which RemNote syncs in plain text.
 
 4. For **Adapted** and **Summary**:
+    - for Adapted, optionally the Antigravity CLI `agy` (`brew install --cask antigravity-cli`, then run `agy` once to sign in);
     - the [Claude Code](https://claude.com/claude-code) command `claude`, signed in with your Claude subscription; and/or
     - `ANTHROPIC_API_KEY` in the same `.env`, with the `anthropic` package installed in the Python that runs the helper (`python3 -m pip install anthropic`).
 
@@ -155,7 +179,9 @@ Anything an engine would read out wrongly (markdown, LaTeX, links, page numbers,
 | `geminiModel`, `vertexModel` | `gemini-3.8-flash-tts` | The Gemini TTS model. |
 | `azureVoices` | `["en-US-AndrewMultilingualNeural"]` | The Azure voices offered. |
 | `elevenModel` | `eleven_multilingual_v2` | The ElevenLabs model. |
-| `llmModel` | `claude-opus-5-5` | The Claude model for Adapted and Summary (CLI and API). |
+| `mixedAzureTerms` | `1` | How many Portuguese terms an English line needs to go to Azure in [Gemini + Azure](#mixed). |
+| `llmModel` | `claude-sonnet-5-5` for Adapted, `claude-opus-5-5` for Summary | The Claude model (CLI and API): one model for both modes, or `{"adapted": …, "summary": …}`. |
+| `agyModel` | `claude-sonnet-5-5-medium` for Adapted, none for Summary | The model tried first through Antigravity (see `agy models`), in the same shape; `""` or `null` skips Antigravity for that mode. |
 | `geminiUsdPerMTokens`, `elevenUsdPerMChars` | list prices | Your own prices, for the estimates. |
 | `verifySpeech` | `true` | `false` turns off the [check of Gemini's audio](#checked). |
 | `whisperCli`, `whisperModel`, `whisperVadModel` | `whisper-cli` on the PATH, the AI helper's models | The transcriber used for the check. |
@@ -175,6 +201,7 @@ python3 spoken_script.py outline.md --mode summary --lang pt --words 350
 ## Troubleshooting { #troubleshooting }
 
 - **The command is not in the omnibar:** turn on **Local Media Bridge**. Turning the setting off hides the command from the next reload.
+- **The popup still says `claude -p` after updating the helper:** an older helper is still running and answering. `pgrep -fl "media_bridge.py serve"` should show one process; stop any other, and the one started at login takes over.
 - **“The media-bridge helper … is version N”:** restart the helper (`curl -X POST localhost:3460/shutdown`, then `launchctl kickstart -k gui/$(id -u)/com.incrementalremnote.media-bridge` when it runs at login).
 - **Every engine shows “no key”:** the helper did not find the `.env`. Check `envFile` in `tts.json`, and the variable names above.
 - **Portuguese spoken with a Spanish or English accent:** the line is missing its `[pt]` mark, or the engine read a marked term in the line's language (choose Azure for an English text with many Portuguese terms).

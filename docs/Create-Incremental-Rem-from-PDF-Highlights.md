@@ -81,7 +81,7 @@ The tree only lists Rems linked to the PDF. When the right place is somewhere yo
 
 **Outside the IncRem you are reviewing.** When the target isn't inside the Incremental Rem under review, the card warns you in amber (**⚠ Outside …**). The first confirm then only turns the warning red and asks again; a second `Opt+Shift+Enter` (or **Place anyway**) places it. Moving to another Rem cancels the pending confirmation. With no IncRem under review — a highlight made outside a review session — there's nothing to compare against, so there's no warning. The highlight itself can't be chosen.
 
-**Leaving the card.** **`Esc`** cancels, even while you are typing in the editor. **Back to list** reopens the popup, and the **Cancel Parent Pick** command (`quick: cpp`) does the same as `Esc`. Starting another highlight replaces a pick still pending.
+**Leaving the card.** **`Esc`** cancels, even while you are typing in the editor. **Back to list** reopens the popup, and the **Cancel Pick in Editor** command (`quick: cpp`) does the same as `Esc`. Starting another highlight replaces a pick still pending.
 
 The card works with the keyboard too: when it has focus, the arrow keys move between its buttons and `Enter` presses the selected one.
 

@@ -136,6 +136,26 @@ When the Inc Rem being reviewed has **more than one PDF source**, a small PDF dr
 
 The switcher is hidden when the Inc Rem has zero or one PDF sources. See [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) for the full resolution chain across surfaces.
 
+### Recovering a review after a crash { #recover-interrupted-review }
+
+The timer's clock lives in RemNote's memory, so a crash, a reload or quitting RemNote mid-review used to take the time on the clock and the note you had typed with it. While a review runs, the plugin now saves a copy to your device every 15 seconds, and deletes it as soon as you press **Next**, **End Review**, **Dismiss** or **Cancel**.
+
+When RemNote starts again and finds a copy that was never finished, the **Interrupted Editor Review** popup opens (it can take about a minute, to be sure the other window is really gone):
+
+![Interrupted Editor Review popup](assets/editor-review-interrrupted.png){ width="560" }
+
+- **Resume timer** (`Enter`) — opens the Rem with the timer running again from the time recorded. The time RemNote was down is not counted, and your note comes back.
+- **Save repetition** — records the repetition now, dated when the copy was last saved, with the time recorded and the note. A review that came from the queue only has its time and note filled in, and only while it is still that Rem's latest repetition.
+- **Discard** — forgets the review; nothing is written.
+- **Esc** keeps it for later. The command **Recover Interrupted Editor Review** (quick code `rer`) opens the popup again; copies are kept for 7 days.
+
+Good to know:
+
+- Up to the last 15 seconds before the crash can be missing.
+- Reviews shorter than a minute are not offered.
+- After resuming a review that came from the queue, **End Review and back** lands on the Global Queue, since the queue's document is gone after a restart.
+- A copy belongs to the window that was running it: with several windows open, each window's review is offered separately.
+
 ### Layout & Responsiveness
 
 The timer widget is designed to be fully responsive. If used in a narrow sidebar or a collapsed window, the buttons and controls will automatically wrap into multiple lines to prevent overlap and ensure the timer remains legible.
@@ -217,13 +237,15 @@ A read point associates one **descendant rem** of the IncRem's outline as its cu
 - **View Read Points (History)** (`Ctrl+Shift+F7`, quick code `vrp`) opens the **[Read Points popup](Plugin-Widgets-Reference.md#68-read-points-popup)** — the read-point history for the current IncRem (resolved from the focused rem or the active session). Each entry shows the descendant's text and date; click one to jump there, and the IncRem's name is shown under the title.
 - **Priority Editor — a 🔖 Read Point panel.** The widget on the right of every Incremental Rem marks a Rem that has a read point with a small **green bookmark** while collapsed — existence only, nothing about where it points. Expand it and a **Read Point** section appears (below the PDF Range / Web Source panels, so a hybrid IncRem shows both): the date it was set, the clickable path down to the bookmarked descendant, a **Go to Read Point** button, and a **Read Point History ↗** button opening the [Read Points popup](Plugin-Widgets-Reference.md#68-read-points-popup).
 - **Under the document title — a Read Point row.** Open the IncRem itself as a page (zoomed in) and the [IncRem Counter](IncRem-List-and-Main-View.md#increm-list-scoped) bar below its title gains a **Read Point** row: the clickable path down to the bookmarked descendant, the date it was set, a **Go to Read Point** button and a **History ↗** button opening the [Read Points popup](Plugin-Widgets-Reference.md#68-read-points-popup). The Priority Editor cannot show on a zoomed-in title, so this row takes its place there. It covers the document's own read point only — zooming into a chapter *inside* the IncRem shows nothing.
-- **Repetition History popup — read-point footer.** `Ctrl+Shift+H` on the IncRem shows a footer with the full path from the IncRem down to its read point (`Chapter › Section › Read point`) and the date it was set — the outline counterpart of the popup's [PDF reading-progress footer](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view). Any segment of the path can be clicked to open that Rem, and the footer is shown for **dismissed** Rems too. If the bookmarked rem has since been moved out of the outline, the footer says so and shows its nearest ancestors instead of the path.
+- **Repetition History popup — read-point footer.** `Ctrl+Shift+H` on the IncRem shows a footer with the full path from the IncRem down to its read point (`Chapter › Section › Read point`) and the date it was set — the outline counterpart of the popup's [PDF reading-progress footer](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view). Any segment of the path can be clicked to open that Rem, and the footer is shown for **dismissed** Rems too. If the bookmarked rem has since been moved out of the outline, the footer says so and shows its nearest ancestors instead of the path. Each review row also records the read point that session ended on, under the row ([Notes and where you stopped](Repetition-History-and-Statistics.md#notes-and-where-you-stopped)).
 
 <iframe src="../demos/increm-counter.html?view=read-point" title="Read Point row demo" loading="lazy" style="width:100%;height:430px;border:0;display:block"></iframe>
 
 #### Hybrid IncRems (a PDF/HTML source *and* their own descendant content)
 
 An IncRem can be **both** a reading source (PDF/HTML) **and** an outline with its own descendants. Read points and the document's highlight bookmark are stored independently, so such an IncRem can carry both — they point at genuinely different places (a node in the outline vs. a spot in the document) and jump differently. When both exist, the Editor Review Timer shows **both buttons** — **🔖 Scroll** (to the PDF/HTML highlight) and **🔖 Go to Read Point** (to the descendant) — and tags whichever was saved most recently with a small green **`latest`** badge so you know which reflects your last reading action.
+
+> **Shift+click opens a new pane.** Every way of jumping to a read point (the **Go to Read Point** buttons, the clickable path segments, and the entries of the Read Points popup) navigates the current pane on a plain click. **Shift+click** opens the Rem in a new pane beside your current document instead (or switches to the pane already showing it), so the document you're in stays open.
 
 > Read points are also surfaced **in the queue**: see [Read-point and status emphasis in Rem-type cards](Reviewing-Items-in-the-Queue.md#read-point-and-status-emphasis-in-rem-type-cards).
 

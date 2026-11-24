@@ -23,6 +23,7 @@ import {
 import { ParentSelectorContext } from './hierarchical_parent_selector/types';
 import { getHeadingLevel, HeadingLevel } from './outline_restructure';
 import { safeRemTextToString } from './pdfUtils';
+import { endHistoryMove } from './history_move_end';
 
 // How many of the target's nearest ancestors the card shows.
 const BREADCRUMB_DEPTH = 3;
@@ -53,6 +54,8 @@ export async function startParentPick(plugin: RNPlugin): Promise<void> {
   const ctx = await plugin.storage.getSession<ParentSelectorContext>('parentSelectorContext');
   if (!ctx) return;
 
+  // One card listens for the confirm shortcut at a time.
+  await endHistoryMove(plugin);
   await plugin.storage.setSession(parentPickContextKey, ctx);
   await plugin.storage.setSession(parentPickConfirmRequestKey, undefined);
   await closeParentPickCard(plugin);

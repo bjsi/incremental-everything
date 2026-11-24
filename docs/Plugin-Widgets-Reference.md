@@ -94,6 +94,19 @@ A compact PDF dropdown that appears in the Reader's top bar, just to the right o
 
 📖 **Full documentation:** [Multiple PDF Sources](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) — covers the full resolution chain (pin → `#preferthispdf` → first PDF) and every surface that exposes the switcher (queue Reader, Editor Review Timer, Execute Repetition popup, PDF Control Panel, Priority Editor).
 
+### 1.6. Card Cluster Extra Details { #cluster-extra-details }
+*(Flashcards in a [Card Cluster](https://help.remnote.com/en/articles/10104223-card-clusters), after Show Answer)*
+
+In a Card Cluster, RemNote shows the **Extra details** of the member the queue happened to load, not of the member you are answering. The cluster starts on its first due member and steps through the others, so most members show another member's explanation. Every member keeps showing it, too.
+
+The plugin fixes this without any setup. When the member on screen isn't the one the queue loaded, it hides RemNote's block and shows the Extra Card Details of the member you are answering, under the same **Extra details** heading. A member without Extra Card Details shows none. RemNote's block may appear for a moment before it is replaced.
+
+- Put the Extra Card Details as usual, as children of each member. Nothing changes in your notes.
+- Children of an Extra Card Detail are shown below it, in RemNote's editor, so they can be edited from the queue.
+- Video explanations ([Link Local Video as Card Extra](Incremental-Video.md#card-video)) still follow the member the queue loaded.
+
+This is a RemNote bug and has been reported to RemNote. Once it is fixed there, this widget will simply stop appearing.
+
 ---
 
 ## 2. History & Progress Tracking
@@ -168,6 +181,7 @@ Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`
   - **🃏 Cards History** *(header button)* — appears when the Rem also generates flashcards, and switches to the [Flashcard Repetition History](#211-flashcard-repetition-history) for all of them. The reverse button lives there.
   - **➕ Session — recording study done outside RemNote** — see [Recording and correcting records](#recording-and-correcting-records) below.
   - **✏️ / 🗑 per record** — hover a **review** row to edit or delete it; see the same section.
+  - **↪ per record** — move a review's study time to the Rem you actually studied; see [Moving a record's time to another Rem](#move-to-another-rem).
 
 ![IncRem Repetition History Popup](assets/repetition-history-popup.png){ width="400" }
 
@@ -215,6 +229,23 @@ Event banners (▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, 
 
 ![Edit record dialog](assets/repetition-history-edit-record.png){ width="400" }
 
+##### Moving a record's time to another Rem { #move-to-another-rem }
+
+Sometimes a session comes up as one Rem but is spent on another. You open a new version of a regulation from the queue, and what you actually read is one of its sections, which lives elsewhere in your notes. **↪ Move** gives the time to the Rem you studied, so the per-Rem statistics show where the time really went.
+
+1. Hover the record and press **↪**. The popup closes and a card appears at the top right.
+2. **Click into the Rem you studied.** The card follows the cursor and shows the target with its last three parents. It must be an Incremental Rem (or a dismissed one); the Rem the record is on can't be chosen. Expanding, collapsing and navigating are free.
+3. To move only part of the session, type the minutes in the **Move** field (`20`, `1h 5`, `1:05`). Left as it is, the whole session moves, to the second.
+4. Press **`Opt+Shift+Enter`** (`Alt+Shift+Enter` on Windows), or click **Move here**. **Back to history** reopens the popup, and **`Esc`** cancels.
+
+**Neither Rem's schedule changes.** The record stays where it was on the first Rem, with its interval and due date: that Rem *was* the one in the queue. Only its time leaves, and a line under it reads `↪ 41m moved to …`. The other Rem gets a **↪ … moved in** record, which counts for its time, its reps, the [Study Dashboard](Study-Dashboard.md) and the Aggregated view, but never for its scheduler. A session moved whole is counted once, on the Rem that received it; a split one counts on both.
+
+**↩ move back** on either line undoes a move: the time returns to the original record, and the moved-in record disappears. Moved-in records have no ✏️ or 🗑, so the two sides can't drift apart.
+
+The move is refused while a review of either Rem is still being saved, while the [Editor Review Timer](Reviewing-Items-in-the-Editor.md) runs on either of them, or while the [Chrome Companion](Chrome-Companion-Extension.md) still has to report a reading handed to it from the queue (for up to a day).
+
+> **Note:** On a Rem that reads a PDF, moving time away also raises the **pages/h** and lowers the **estimated remaining time** in the PDF footer, since less time now stands against the same pages.
+
 ---
 
 ### 2.2. Last seen items history in Right-Sidebar
@@ -231,7 +262,7 @@ A distinct widget that serves as a **chronological log** of all your Incremental
 - Each entry also shows an **item-type badge** — 📄 PDF, 🖍️ PDF Extract, 📑 PDF Note, 🌐 Web, 🔖 Web Extract, ▶️ YouTube, ✂️ Video Extract, 🎬 Video or 📝 Rem — the same labels the [IncRem List & Main View](#51-increm-list-main-view) uses, so you can tell at a glance whether a line in the log was a PDF page you read or a note you extracted. It is resolved in the background for the rows on screen and appears a moment after the list does; entries whose Rem no longer exists simply have none.
 - Each entry also shows a **priority badge** (colored by KB-wide percentile) — click it to edit the IncRem's priority with an inline slider, without leaving the sidebar.
 - Searchable by text content; shows "seen X ago" (reviews), "created X ago" (creation events), or "dismissed X ago" (standalone dismissals).
-- Click an entry to open the Rem; **Shift+click** opens it in a new pane beside your current document.
+- Click an entry to open the Rem; **Shift+click** (anywhere on the entry, its text included) opens it in a new pane beside your current document. The entry text can't be selected; expand the entry to select or copy from it.
 - Useful companion to the [History and Final Drill](https://www.remnote.com/plugins/final_drill_and_history) plugin.
 
 ![Incremental Rem History Widget showing Created and Reviewed badges](assets/incremental-history-created.png){ width="400" }
@@ -582,7 +613,7 @@ A side-by-side popup that opens before any restructure change is applied. It re-
 
 The Rem-type analogue of the PDF/HTML Bookmark popup. It lists the **read-point history** of a Rem-type Incremental Rem — each saved reading position (a descendant rem of the outline), most recent first. The owning IncRem's name is shown under the title (resolved with the pin-aware breadcrumb resolver, so a reference *pin* collapses to 📌 instead of expanding to the full referenced text).
 
-- Click any entry to **navigate to that descendant** rem.
+- Click any entry to **navigate to that descendant** rem; **Shift+click** opens it in a new pane beside your current document.
 - The top entry is the **current reading position** — also reachable via the **🔖 Go to Read Point** button on the [Editor Review Timer](Reviewing-Items-in-the-Editor.md#jumping-to-the-read-point) and emphasized (blue box + auto-scroll) in the [in-queue read-only card](Reviewing-Items-in-the-Queue.md#read-point-and-status-emphasis-in-rem-type-cards).
 - Read points are created with the **Set Read Point (Bookmark)** command (`Ctrl+F7`, `srp`).
 - The popup is also reachable **without a command**: the **Read Point History ↗** button in the [Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget)'s Read Point panel opens it for the Rem you are on.
@@ -599,7 +630,7 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 ![The Image Scan popup showing both scope options and the keyboard hints](assets/tag-rems-with-images-popup.png){ width="600" }
 
 - **Two scopes.** The first button names the Rem it would scan — the **focused Rem**, or the **open document** when nothing is focused — so you can see the target before committing. The second scans the **whole knowledge base** (slow on a large one). If there was no focused Rem or open document, the first button is disabled and the whole-KB option still works.
-- **Live progress** while it runs (`Scanning 1,400 / 5,200 Rems…`), because a whole-KB scan is not instant.
+- **Live progress** while a scoped run works (`Scanning 1,400 / 5,200 Rems…`). A **whole-KB** run closes the popup at once instead and reports its progress and result in a [notice](Utilities-Finding-and-Navigating.md#whole-kb-background), so it never holds the popup open.
 - **The report stays on screen**: Rems scanned, how many hold an image, how many were newly tagged, and how many had the tag cleared. Under it sit the two ways to use the tag — the document **Filter** and a **Search Portal** — so you don't have to remember the shortcut.
 - **Scan again** returns to the scope choice without reopening the command; **?** in the header opens this feature's documentation.
 - **Keyboard-driven:** `↑`/`↓` move between the scopes, `Enter` runs the selected one (and closes the popup from the report), `Esc` cancels — ignored while a scan is running so a reflex press can't abort it.

@@ -111,6 +111,8 @@ RemNote's built-in defaults are listed in [RemNote-Native-Shortcuts](../docs/Rem
 
 **New widget files need `npm run dev` restarted.** Webpack entries are globbed at startup.
 
+**Never use a dynamic `import()`.** A lazily loaded chunk always fails in RemNote. In production, the plugin sandbox evaluates it as a classic script, so the `import.meta` banner throws `SyntaxError` and then `ChunkLoadError`. The dev server 404s it (`missing: http://localhost:8080/vendors-src_lib_….js`). The caller's try/catch usually hides the failure. It happened four times: `highlightActions` (Jul 2026), `priority_bands`, `shared_read` (`9304.js`, v1.0.222), and `card_priority` (`4071.js`, Nov 12 to 24 2026). The last one broke the Mastery Drill Priority Cap: the check failed, was caught, and let every card in. That was its only lazy load; the tracker's `card_priority` imports were already bundled inline. `LimitChunkCountPlugin({ maxChunks: 1 })` did not prevent it, because a lazy module shared by several entries stays one chunk. Since Nov 24, `module.parser.javascript.dynamicImportMode: 'eager'` inlines every `import()` into its entry. Still write static imports: if one breaks a node test, add the missing value to `src/lib/sdk_test_stub.ts`; if it creates a cycle, import from a leaf module.
+
 ## A Chrome extension can host RemNote and reach plugin frames
 
 Tested Nov 1, 2026 on Chrome 156 with `spikes/companion-extension/`, on the web client inside the extension's side panel.

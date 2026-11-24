@@ -1,5 +1,7 @@
 // Side effect: times this widget's RemNote calls (must load before the plugin object is built).
 import '../lib/stall_diagnostics';
+// Side effect: Shift/Ctrl on clicks over <RemViewer> & co. reach our handlers.
+import '../lib/forwarded_event_modifiers';
 import React from 'react';
 
 const SHOW_DELAY_MS = 350;

@@ -9,6 +9,7 @@ import {
   masteryDrillMinDelayMinutesId,
 } from './consts';
 import { getIESetting, useIESetting } from './settings';
+import { getCardPriorityValue } from './card_priority';
 import {
   DrillCooling,
   FinalDrillEntry,
@@ -70,9 +71,6 @@ export async function drillAcceptsRem(plugin: RNPlugin, rem: PluginRem | null | 
   const cap = Number(await getIESetting(plugin, masteryDrillMaxPriorityId));
   if (!Number.isFinite(cap) || cap >= 100 || !rem) return true;
   try {
-    // Loaded here, not at the top: the card-priority module drags in most of the SDK's
-    // built-in tables, and this file is imported by node tests (cluster_rating_readback).
-    const { getCardPriorityValue } = await import('./card_priority');
     return (await getCardPriorityValue(plugin, rem)) <= cap;
   } catch (e) {
     console.warn('[MasteryDrill] could not read the priority of', rem._id, e);

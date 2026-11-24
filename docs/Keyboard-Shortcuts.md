@@ -100,7 +100,7 @@ On web pages, with the [Chrome Companion Extension](Chrome-Companion-Extension.m
 | `Alt` + `Shift` + `V` | [Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources) | Adds the copied sources to **every selected Rem** (or the focused Rem). Sources already present are skipped, so it is safe to re-run. | Editor Only |
 | `Alt` + `Shift` + `Q` | [Pin Source Quote](Source-Pins.md) | Finds the focused Rem's text in the open PDF or article, reuses the highlight that covers it or creates one, and pins it to the Rem. | Editor Only |
 | `Ctrl` + `Alt` + `Shift` + `Q` | [Pin Source Quote (Quote Rems in descendants)](Source-Pins.md#quote-rems-in-descendants) | Runs Pin Source Quote on every Quote Rem in the focused Rem and its descendants (or in each selected Rem's subtree). `Ctrl` on macOS too. | Editor Only |
-| `Alt` + `Shift` + `Enter` | [Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | After **📍 Pick in editor** in the Select Parent popup, creates the new Rem under the Rem that has the cursor. Outside the IncRem under review, press it twice to confirm. *(Not `Cmd/Ctrl+Shift+Enter`: that is RemNote's Add Portal.)* | Editor Only |
+| `Alt` + `Shift` + `Enter` | [Confirm Pick in Editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | After **📍 Pick in editor** in the Select Parent popup, creates the new Rem under the Rem that has the cursor (outside the IncRem under review, press it twice to confirm). After **↪** in Repetition History, [moves the record's time](Plugin-Widgets-Reference.md#move-to-another-rem) to the Rem that has the cursor. *(Not `Cmd/Ctrl+Shift+Enter`: that is RemNote's Add Portal.)* | Editor Only |
 
 ### In Logos Bible Software (LogosBridge helper)
 
@@ -181,7 +181,7 @@ Function keys carry the utilities whose natural letter combination was already t
 | Shortcut | Command | Context |
 | :--- | :--- | :--- |
 | `Alt` + `Shift` + `C` | Batch Assign Card Priority | Editor |
-| `Alt` + `Shift` + `Enter` | [Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | Editor |
+| `Alt` + `Shift` + `Enter` | [Confirm Pick in Editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | Editor |
 | `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities-Finding-and-Navigating.md#find-rem-reference-or-open) | Editor |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Global |
 | `Alt` + `Shift` + `L` | [Priority Queue](Priority-Review-Document.md#the-priority-queue-popup) | Editor |
@@ -229,7 +229,7 @@ These commands ship **without** a shortcut, so nothing collides with your own bi
 | Open Priority Shield Graph | `shi` |
 | Open Weighted Shield Popup | `wsh` |
 | PDF Control Panel | `pdf` |
-| [Cancel Parent Pick](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | `cpp` |
+| [Cancel Pick in Editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor) | `cpp` |
 
 The [Plugin Commands Reference](Plugin-Commands-Reference.md) lists every command, bound or not.
 

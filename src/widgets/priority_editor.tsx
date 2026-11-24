@@ -30,7 +30,7 @@ import {
   safeRemTextToString,
   PageHistoryEntry,
 } from '../lib/pdfUtils';
-import { openAndScrollToHighlight, openAndFocusRem } from '../lib/remHelpers';
+import { openAndScrollToHighlight, openAndFocusRem, preventShiftSelect } from '../lib/remHelpers';
 import { getReadPointPath, hasRemReadPoint, ReadPointPath } from '../lib/remReadPoint';
 import { getIESetting } from '../lib/settings';
 
@@ -1066,14 +1066,15 @@ export function PriorityEditor() {
               )}
 
               <button
-                onClick={() => openAndFocusRem(plugin as any, readPoint.remId)}
+                onClick={(e) => openAndFocusRem(plugin as any, readPoint.remId, e.shiftKey)}
+                onMouseDown={preventShiftSelect}
                 className="w-full mt-2 py-1 rounded text-[11px] font-semibold transition-colors"
                 style={{
                   backgroundColor: 'var(--rn-clr-background-secondary)',
                   color: 'var(--rn-clr-blue, #3b82f6)',
                   border: '2px solid var(--rn-clr-blue, #3b82f6)',
                 }}
-                title="Open the bookmarked descendant and put the cursor in it"
+                title={"Open the bookmarked descendant and put the cursor in it\nShift+click: open it in a new pane"}
               >
                 <span className="inline-flex items-center justify-center gap-1">
                   <ReadPointIcon size={11} />

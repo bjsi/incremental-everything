@@ -44,6 +44,8 @@ export type { Lang, ReadAloudStats };
 
 /** The helper version with /tts/write (Adapted, Summary), ElevenLabs, /tts/play and the pronunciation folder. */
 const MIN_HELPER_VERSION = 12;
+/** The helper version that knows Adapted's simplifyLongFormulas (older ones ignore it). */
+const LONG_FORMULAS_HELPER_VERSION = 20;
 export interface ReadAloudContext {
   remId: string;
   title: string;
@@ -66,7 +68,7 @@ export interface WriteResult {
   message?: string;
   script?: string;
   errors?: string[];
-  via?: 'claude-cli' | 'anthropic-api';
+  via?: 'antigravity' | 'claude-cli' | 'anthropic-api';
   model?: string;
   costUsd?: number;
   fallbackReason?: string;
@@ -140,14 +142,17 @@ export interface TtsTask<R = TtsResult> {
 
 // --- helper -------------------------------------------------------------------------
 
-async function helperProblem(): Promise<string | undefined> {
+async function helperProblem(
+  minVersion = MIN_HELPER_VERSION,
+  what = 'Read aloud'
+): Promise<string | undefined> {
   try {
     const res = await fetch(`${MEDIA_BRIDGE_URL}/health`);
     const health = await res.json();
-    if ((health?.version ?? 1) < MIN_HELPER_VERSION) {
+    if ((health?.version ?? 1) < minVersion) {
       return (
         `The media-bridge helper running on this computer is version ${health?.version ?? 1}; ` +
-        `Read aloud needs ${MIN_HELPER_VERSION}. Restart it: curl -X POST localhost:3460/shutdown, then ` +
+        `${what} needs ${minVersion}. Restart it: curl -X POST localhost:3460/shutdown, then ` +
         'launchctl kickstart -k gui/$(id -u)/com.incrementalremnote.media-bridge'
       );
     }
@@ -207,8 +212,14 @@ export async function startWrite(
   context: ReadAloudContext,
   mode: 'adapted' | 'summary',
   targetWords: number | null,
-  instructions: string
+  instructions: string,
+  /** Adapted: say formulas too long to follow by ear by what they compute. */
+  simplifyLongFormulas = false
 ): Promise<string> {
+  if (simplifyLongFormulas) {
+    const problem = await helperProblem(LONG_FORMULAS_HELPER_VERSION, 'Simplifying long formulas');
+    if (problem) throw new Error(problem);
+  }
   const body = await postJSON<{ taskId?: string }>('/tts/write', {
     mode,
     source: context.source,
@@ -217,6 +228,7 @@ export async function startWrite(
     remId: context.remId,
     targetWords,
     instructions,
+    simplifyLongFormulas,
   });
   if (!body.taskId) throw new Error('the helper started no task');
   return body.taskId;
@@ -490,6 +502,8 @@ export interface ReadAloudDraft {
   share?: number;
   instructions?: string;
   insertText?: boolean;
+  /** Adapted: the "long formulas" checkbox. */
+  simplifyLongFormulas?: boolean;
 }
 
 const DRAFTS_KEY = 'read-aloud-drafts';
@@ -538,12 +552,19 @@ const PRONOUNCE_TIMEOUT_MS = 120_000;
 /** A finished /tts task, polled every second. */
 async function waitForTts(taskId: string): Promise<TtsResult> {
   const until = Date.now() + PRONOUNCE_TIMEOUT_MS;
+  let stage = '';
   while (Date.now() < until) {
     await new Promise((r) => setTimeout(r, 1000));
     const task = await getTtsTask(taskId);
     if (task.status === 'done') return task.result ?? { ok: false, message: 'no result' };
+    stage = task.stage;
   }
-  return { ok: false, message: 'the helper took more than 2 minutes' };
+  return {
+    ok: false,
+    message: /^waiting for another/.test(stage)
+      ? `the helper was still ${stage} after 2 minutes; try again once it is done`
+      : `the helper took more than 2 minutes${stage ? ` (last step: ${stage})` : ''}`,
+  };
 }
 
 /**

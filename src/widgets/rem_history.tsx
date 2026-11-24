@@ -390,7 +390,7 @@ function RemHistoryItem({
                         <RemViewer
                             remId={remId}
                             width="100%"
-                            className="font-medium cursor-pointer line-clamp-2"
+                            className="ie-history-row-text font-medium cursor-pointer line-clamp-2"
                         />
                         <div className="text-xs rn-clr-content-tertiary">
                             {timeSince(new Date(data.time))}

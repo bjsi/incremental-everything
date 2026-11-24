@@ -651,7 +651,11 @@ def handle_locate(req, entry):
 
 SOURCE_FINDER_CONFIG = HOME / 'source-finder.json'
 CORPUS_PROVIDER_CONFIG = HOME / 'corpus-provider.json'
-SOURCE_FINDER_TIMEOUT_S = 120
+# A provider run (a semantic search with an LLM rerank) may take this long. Kept under
+# the plugin's own wait for find-passages (FIND_TIMEOUT_MS, 180 s in
+# src/lib/find_sources/index.ts), so a slow run ends here with a reason instead of
+# the plugin giving up at the same moment.
+SOURCE_FINDER_TIMEOUT_S = 170
 CORPUS_STATUS_TIMEOUT_S = 15
 
 

@@ -305,8 +305,19 @@ RemNote's search indexes **text**. An image carries no searchable token, so neit
 
     ![The Image Scan popup: the first button names the Rem it would scan, the second offers the whole knowledge base, and the footer lists the keys](assets/tag-rems-with-images-popup.png){ width="700" }
 
-3. Progress is reported live while it runs. **Keep the popup open until it finishes** — the scan runs inside it, so closing it stops the walk. Nothing is corrupted if you do: whatever was already tagged stays correct, and running the command again picks the work up.
+3. A **scoped run** reports its progress live in the popup. Keep the popup open until it finishes — it runs inside it, so closing it stops the walk. Nothing is corrupted if you do: whatever was already tagged stays correct, and running the command again picks the work up.
 4. When it finishes, the **same popup reports the work done** — Rems scanned, how many hold an image, how many were newly tagged, how many had the tag cleared — and repeats the two ways to use it. **Scan again** goes back to the scope choice; **?** in the header opens this page.
+
+A **whole-KB run** works differently — see the next section.
+
+### A whole-KB run works in the background { #whole-kb-background }
+
+**Scan the whole knowledge base** closes the popup at once and runs on its own, so you can keep working while it does.
+
+- A **notice** in the top-right corner shows its progress (`Tagging 750 / 22916 Rems…`). Dismiss it if it is in the way — the run goes on, and only the result comes back.
+- When it ends, the notice is **replaced by the result**: Rems scanned, how many hold an image, newly tagged, cleared, PDF area highlights, and how long it took.
+- Starting a second whole-KB run while one is going is refused with a notice.
+- **Reloading RemNote stops it.** Nothing breaks: the tags already written stay correct, and running the command again picks up where it left off.
 
 ### Seeing the result
 
@@ -344,7 +355,7 @@ So the whole-KB scan is a **one-time cost**, and only on a knowledge base of tha
 If you would rather not sit through the first pass, run it **per document as you go**; the tag accumulates, and a whole-KB run afterwards finds most of the work already done.
 
 !!! tip "Leave it running"
-    The scan lives inside the popup, so keep it open. If you do close it, nothing breaks — the tags already written stay correct, and running the command again picks up where it left off.
+    A whole-KB run [works in the background](#whole-kb-background), so you can keep using RemNote during the first pass — just don't reload it. If it does stop, nothing breaks: the tags already written stay correct, and running the command again picks up where it left off.
 
 ### Clearing the tag
 
@@ -352,7 +363,7 @@ If you would rather not sit through the first pass, run it **per document as you
 
 **Nothing is lost.** The tag is derived from the images themselves, so **Tag Rems With Images** rebuilds it exactly — the same relationship *Remove All Priority Band Tags* has to *Refresh Priority Badges*. That is why there is no undo: re-running the scan *is* the undo.
 
-The scopes and keys match the scan's, and it costs the same per tag — clearing 23,000 tags takes about as long as applying them, so prefer the document scope unless you really do want the tag gone everywhere.
+The scopes and keys match the scan's — a whole-knowledge-base cleanup also [runs in the background](#whole-kb-background) with a notice — and it costs the same per tag — clearing 23,000 tags takes about as long as applying them, so prefer the document scope unless you really do want the tag gone everywhere.
 
 ### The tag is invisible in the outline
 

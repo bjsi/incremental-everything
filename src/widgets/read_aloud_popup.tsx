@@ -51,14 +51,22 @@ const DEFAULT_SHARE = 50;
 /** Words per minute when the helper has not said yet (Gemini measures ~143). */
 const FALLBACK_WPM = 140;
 
-function writtenInfo(w: WriteResult | undefined, currentHash: string | undefined): string {
+function writtenInfo(
+  w: WriteResult | undefined,
+  currentHash: string | undefined,
+  mode: ReadAloudMode
+): string {
   if (!w) {
-    return "Written with claude -p (your Claude subscription); if that fails, with the Anthropic API key in the helper's .env.";
+    return mode === 'adapted'
+      ? "Written with Claude Sonnet through the Antigravity CLI (your Google plan); if its quota is used up, with claude -p (your Claude subscription), then with the Anthropic API key in the helper's .env."
+      : "Written with claude -p (your Claude subscription); if that fails, with the Anthropic API key in the helper's .env.";
   }
   const how =
-    w.via === 'claude-cli'
-      ? 'with claude -p (your subscription)'
-      : `with the Anthropic API, ~US$${(w.costUsd ?? 0).toFixed(2)}`;
+    w.via === 'antigravity'
+      ? 'through Antigravity (your Google plan)'
+      : w.via === 'claude-cli'
+        ? 'with claude -p (your subscription)'
+        : `with the Anthropic API, ~US$${(w.costUsd ?? 0).toFixed(2)}`;
   const when = w.writtenAt
     ? ` on ${new Date(w.writtenAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
     : '';
@@ -66,10 +74,16 @@ function writtenInfo(w: WriteResult | undefined, currentHash: string | undefined
     w.sourceHash && currentHash && w.sourceHash !== currentHash
       ? ' The note has changed since: rewrite to include the changes.'
       : '';
+  // Results saved before Antigravity carry the bare claude -p error.
+  const fallback = w.fallbackReason
+    ? / failed: /.test(w.fallbackReason)
+      ? ` ${w.fallbackReason}.`
+      : ` claude -p failed: ${w.fallbackReason}.`
+    : '';
   return (
     `Written by ${w.model ?? 'Claude'} ${how}${when}` +
     (w.targetWords ? ` (${w.words ?? '?'} words for a target of ${w.targetWords}).` : '.') +
-    (w.fallbackReason ? ` claude -p failed: ${w.fallbackReason}.` : '') +
+    fallback +
     stale
   );
 }
@@ -153,6 +167,7 @@ export function ReadAloudPopup() {
   const [share, setShare] = useState(DEFAULT_SHARE);
   const [instructions, setInstructions] = useState('');
   const [insertText, setInsertText] = useState(true);
+  const [simplifyLongFormulas, setSimplifyLongFormulas] = useState(false);
   const [engine, setEngine] = useState('auto');
   const [voice, setVoice] = useState('');
   const [plan, setPlan] = useState<TtsPlan | null>(null);
@@ -183,6 +198,7 @@ export function ReadAloudPopup() {
         if (draft.share) setShare(draft.share);
         if (draft.instructions) setInstructions(draft.instructions);
         if (draft.insertText !== undefined) setInsertText(draft.insertText);
+        if (draft.simplifyLongFormulas) setSimplifyLongFormulas(true);
         if (draft.mode && (draft.mode === 'literal' || draft[draft.mode])) setMode(draft.mode);
       }
       setRestored(true);
@@ -208,13 +224,25 @@ export function ReadAloudPopup() {
         share,
         instructions,
         insertText,
+        ...(simplifyLongFormulas ? { simplifyLongFormulas } : {}),
       };
       const worthKeeping =
         literalEdited || !!scripts.adapted || !!scripts.summary || !!instructions.trim();
       saveDraft(plugin, context.remId, worthKeeping ? draft : undefined).catch(() => {});
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [restored, context, scripts, written, maxMinutes, share, instructions, insertText, mode]);
+  }, [
+    restored,
+    context,
+    scripts,
+    written,
+    maxMinutes,
+    share,
+    instructions,
+    insertText,
+    simplifyLongFormulas,
+    mode,
+  ]);
 
   // Summary length: a share of the note (its Literal script), capped by the maximum length.
   const literalWords = scriptWords(scripts.literal);
@@ -256,7 +284,8 @@ export function ReadAloudPopup() {
         context,
         target,
         target === 'summary' ? targetWords : null,
-        target === 'summary' ? instructions : ''
+        target === 'summary' ? instructions : '',
+        target === 'adapted' && simplifyLongFormulas
       );
       for (;;) {
         await sleep(POLL_MS);
@@ -446,6 +475,22 @@ export function ReadAloudPopup() {
         </div>
       )}
 
+      {mode === 'adapted' && (
+        <label className="flex items-center gap-1 text-xs" style={{ flexShrink: 0 }}>
+          <input
+            type="checkbox"
+            checked={simplifyLongFormulas}
+            onChange={(e) => setSimplifyLongFormulas(e.target.checked)}
+            disabled={busy}
+          />
+          Simplify formulas too long to follow by ear
+          <span style={muted}>
+            : say what they compute and depend on, not every symbol (short ones are still read in
+            full)
+          </span>
+        </label>
+      )}
+
       {mode !== 'literal' && (
         <div className="flex items-center gap-2 text-xs" style={{ flexShrink: 0 }}>
           <Button
@@ -455,7 +500,7 @@ export function ReadAloudPopup() {
             title={script.trim() ? 'Replaces the script below' : '⌘↵'}
           />
           <span style={muted}>
-            {writtenInfo(written[mode], context ? sourceHash(context.source) : undefined)}
+            {writtenInfo(written[mode], context ? sourceHash(context.source) : undefined, mode)}
           </span>
         </div>
       )}

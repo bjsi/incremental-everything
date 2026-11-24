@@ -10,20 +10,26 @@ import { isNativeDrillActive } from './mastery_drill_native';
  * card that was not due, and by the time it arrives on a cluster's last sibling the queue has
  * moved on. The card's repetitionHistory is the one reliable record.
  *
- * HOW: cards come on screen through QueueLoadCard (a cluster's anchor) and the
- * clusterVisibleCardId broadcast (each sibling). QueueCompleteCard takes a card off the list,
- * so an ordinary rating costs no read here. The rest are read READ_DELAY_MS after the last
- * card change. A new rating on a Rem in a cluster is passed to the shared rating handler; any
- * other card that left unrated was skipped, and needs nothing.
+ * HOW: cards are sighted through QueueLoadCard (the card the queue loaded) and RevealAnswer.
+ * Inside a cluster, RevealAnswer is the one queue event that fires for every member, with the
+ * member's own cardId (checked live on 1.30.5-beta, findings/QUEUE_AND_PRACTICE.md). A member
+ * can't be rated before its answer is revealed, so each rated member is sighted before its
+ * rating. QueueCompleteCard takes a card off the list, so an ordinary rating costs no read
+ * here. The rest are read READ_DELAY_MS after the last sighting. A new rating on a Rem in a
+ * cluster is passed to the shared rating handler; any other card that left unrated was
+ * skipped, and needs nothing.
  *
- * Known limits: a sibling rated before the widget's 500 ms poll reported it is not seen, and
- * a rating made just before leaving the queue arrives after the session stats were saved.
+ * This used to follow card_info_bar's clusterVisibleCardId broadcast instead, which needs the
+ * bar mounted (only on cards with a priority) and polls every 500 ms, so a member rated
+ * quickly could go unseen.
+ *
+ * Known limit: a rating made just before leaving the queue arrives after the session stats
+ * were saved.
  */
 
 const READ_DELAY_MS = 1500;
-/** The widget reports a sibling up to its poll interval late, so a rating can predate its sighting. */
+/** Slack for clock skew between a sighting and the rating's stamp in the card's history. */
 const SIGHTING_LAG_MS = 2000;
-const CLUSTER_VISIBLE_CARD_KEY = 'clusterVisibleCardId';
 
 export interface ReadBackRating {
   score: QueueInteractionScore;
@@ -70,8 +76,8 @@ export function registerClusterRatingReadback(
   /** Per card, the time up to which its ratings are already accounted for. */
   const settled = new Map<string, number>();
   const clusterByRem = new Map<RemId, boolean>();
-  let anchorId: string | undefined;
-  let visibleId: string | undefined;
+  /** The card that may still be rated: the last one loaded or revealed. */
+  let currentId: string | undefined;
   let queueOpen = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let reading = false;
@@ -117,11 +123,10 @@ export function registerClusterRatingReadback(
     if (reading) return schedule();
     reading = true;
     try {
-      // The card on screen may still be rated. Inside a cluster the anchor stays named by
-      // QueueLoadCard while the siblings pass, so only the widget's card counts as current.
-      const current = visibleId ?? anchorId;
+      // The card on screen may still be rated. Inside a cluster QueueLoadCard keeps naming
+      // the loaded member while the others pass, so the last reveal decides.
       for (const [cardId, entry] of [...watched]) {
-        if (cardId === current) continue;
+        if (cardId === currentId) continue;
         watched.delete(cardId);
         try {
           const card = await plugin.card.findOne(cardId);
@@ -137,16 +142,18 @@ export function registerClusterRatingReadback(
 
   plugin.event.addListener(AppEvents.QueueLoadCard, undefined, (data: any) => {
     queueOpen = true;
-    anchorId = data?.cardId;
-    visibleId = undefined;
+    currentId = data?.cardId;
     if (data?.cardId) watch(data.cardId);
     schedule();
   });
 
-  plugin.event.addListener(AppEvents.StorageSessionChange, CLUSTER_VISIBLE_CARD_KEY, async () => {
-    const cardId = await plugin.storage.getSession<string>(CLUSTER_VISIBLE_CARD_KEY);
-    if (!queueOpen || !cardId) return;
-    visibleId = cardId;
+  // Fires once per cluster member, before it can be rated. Synchronous: this runs on every
+  // reveal of every card, and needs no bridge call.
+  plugin.event.addListener(AppEvents.RevealAnswer, undefined, (data: any) => {
+    const cardId: string | undefined = data?.cardId;
+    if (!cardId) return;
+    queueOpen = true;
+    currentId = cardId;
     watch(cardId);
     schedule();
   });
@@ -160,8 +167,7 @@ export function registerClusterRatingReadback(
 
   plugin.event.addListener(AppEvents.QueueExit, undefined, () => {
     queueOpen = false;
-    anchorId = undefined;
-    visibleId = undefined;
+    currentId = undefined;
     clusterByRem.clear();
     schedule();
   });

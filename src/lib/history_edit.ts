@@ -4,13 +4,16 @@ import {
   repHistorySlotCode,
   dismissedPowerupCode,
   dismissedHistorySlotCode,
+  pendingReviewJobQueueKey,
+  editorReviewTimerRemIdKey,
 } from './consts';
-import { IncrementalRep } from './incremental_rem/types';
+import { IncrementalRep, repCountsForStats } from './incremental_rem/types';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { updateIncrementalRemCache } from './incremental_rem/cache';
 import { updateSRSDataForRem } from './scheduler';
 import { sanitizeNote } from './history_notes';
 import { tryParseJson } from './utils';
+import { safeRemTextToString } from './pdfUtils';
 
 /**
  * After-the-fact editing of a rem's repetition history, backing the Repetition
@@ -373,4 +376,306 @@ export async function deleteHistoryEntry(
 
   await persist(plugin, store, preserveNextRepStamp(next, previousStamp));
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Move a review's time to another rem
+// ---------------------------------------------------------------------------
+//
+// "↪ Move to another Rem" in the Repetition History popup, for the session that
+// came up as one IncRem in the queue but was spent reading another (a new
+// version of a norm opened, and the section actually studied is elsewhere).
+//
+// A review carries two things, and the move separates them:
+//   - its QUEUE FOOTPRINT (scheduler count and interval, same-day rule, early/
+//     late, Priority Queue cooling) stays on the source: the entry keeps its
+//     place, its eventType, interval and nextRepMs. Only `reviewTimeSeconds`
+//     shrinks, and `context.movedTo` records where the time went.
+//   - its STUDY TIME goes to the target as a new 'movedRep' entry, which counts
+//     for statistics only (see types.ts). The target's schedule never sees it.
+// So neither rem's schedule changes. A source review left with no time stops
+// counting for stats (entryCountsForStats), so the rep is counted once.
+//
+// Two slot writes with no transaction: the target is written first and rolled
+// back if the source write fails, so a failure never counts the time twice.
+
+/** How long a queue → Companion hand-off may still be refined by the Companion. */
+const COMPANION_HANDOFF_GRACE_MS = 24 * 60 * 60 * 1000;
+/** Rem names stored on move links are capped like transfer names. */
+const MOVED_NAME_MAX_CHARS = 60;
+
+/** Context fields that describe what was read — copied onto the moved entry. */
+const READING_CONTEXT_KEYS = [
+  'page',
+  'rangeStart',
+  'rangeEnd',
+  'pdfName',
+  'bookmark',
+  'readPoint',
+  'readPointRemId',
+  'videoTime',
+  'videoStart',
+  'videoEnd',
+  'videoDuration',
+  'videoRate',
+  'webUrl',
+] as const;
+
+async function shortRemName(plugin: RNPlugin, rem: PluginRem): Promise<string> {
+  const text = (await safeRemTextToString(plugin, rem.text)).trim() || 'Untitled';
+  return text.length > MOVED_NAME_MAX_CHARS ? text.slice(0, MOVED_NAME_MAX_CHARS).trimEnd() + '…' : text;
+}
+
+/** A review still being written by the tracker, or a running Editor Review Timer, on these rems. */
+async function busyWith(plugin: RNPlugin, remIds: string[]): Promise<string | null> {
+  const jobs = (await plugin.storage.getSession<{ remId?: string }[]>(pendingReviewJobQueueKey)) || [];
+  if (jobs.some((job) => job?.remId && remIds.includes(job.remId))) {
+    return 'A review of one of these Rems is still being saved — try again in a moment.';
+  }
+  const timerRemId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
+  if (timerRemId && remIds.includes(timerRemId)) {
+    return 'The Editor Review Timer is running on one of these Rems — end that review first.';
+  }
+  return null;
+}
+
+/**
+ * Why a review can't be moved, or null when it can. Shared by the popup (to
+ * offer the button) and the move itself (which re-checks on a fresh read).
+ */
+export function moveRefusal(rep: IncrementalRep, now = Date.now()): string | null {
+  if (!repCountsForStats(rep.eventType)) return 'Only reviews can be moved.';
+  if (rep.eventType === 'movedRep') return 'This time was already moved here — move it back first.';
+  if (!((rep.reviewTimeSeconds ?? 0) > 0)) return 'This record has no time left to move.';
+  const handoff = rep.context?.companionHandoffAt;
+  if (handoff && rep.context?.companionSeconds === undefined && now - handoff < COMPANION_HANDOFF_GRACE_MS) {
+    return 'The Chrome Companion has not reported this reading yet — move it once it has.';
+  }
+  return null;
+}
+
+export interface MoveTarget {
+  ok: boolean;
+  /** Name for display, set even when the target is refused. */
+  name?: string;
+  kind?: HistoryStoreKind;
+  /** The target's due date, for an active IncRem. */
+  nextRepDate?: number;
+  error?: string;
+}
+
+/** Whether `targetRemId` can receive time moved from `sourceRemId`. */
+export async function checkMoveTarget(
+  plugin: RNPlugin,
+  sourceRemId: string,
+  targetRemId: string
+): Promise<MoveTarget> {
+  const rem = await plugin.rem.findOne(targetRemId);
+  if (!rem) return { ok: false, error: 'Rem not found.' };
+  const name = await shortRemName(plugin, rem);
+  if (targetRemId === sourceRemId) return { ok: false, name, error: 'That is the Rem the record is on.' };
+  if (await rem.hasPowerup(powerupCode)) {
+    const inc = await getIncrementalRemFromRem(plugin, rem);
+    return { ok: true, name, kind: 'incremental', nextRepDate: inc?.nextRepDate };
+  }
+  if (await rem.hasPowerup(dismissedPowerupCode)) return { ok: true, name, kind: 'dismissed' };
+  return {
+    ok: false,
+    name,
+    error: 'Not an Incremental Rem. Make it Incremental first if its time should be counted.',
+  };
+}
+
+export interface MoveResult extends HistoryWriteResult {
+  movedSeconds?: number;
+  targetName?: string;
+}
+
+/**
+ * Move `seconds` of a review's time from `sourceRemId` to `targetRemId` (see the
+ * section comment). `seconds` defaults to all of it.
+ */
+export async function moveHistoryEntryTime(
+  plugin: RNPlugin,
+  sourceRemId: string,
+  target: IncrementalRep,
+  targetRemId: string,
+  seconds?: number,
+  hintIndex?: number
+): Promise<MoveResult> {
+  if (sourceRemId === targetRemId) return { ok: false, error: 'That is the Rem the record is on.' };
+
+  const busy = await busyWith(plugin, [sourceRemId, targetRemId]);
+  if (busy) return { ok: false, error: busy };
+
+  const source = await resolveHistoryStore(plugin, sourceRemId);
+  if (!source) return { ok: false, error: 'No history found on the source Rem.' };
+  const destination = await resolveHistoryStore(plugin, targetRemId);
+  if (!destination) {
+    return { ok: false, error: 'The target is not an Incremental Rem. Make it Incremental first.' };
+  }
+
+  const index = locateEntry(source.history, target, hintIndex);
+  if (index === -1) {
+    return { ok: false, error: 'That entry is no longer in the history — reopen the popup and try again.' };
+  }
+  const original = source.history[index];
+  const refusal = moveRefusal(original);
+  if (refusal) return { ok: false, error: refusal };
+
+  const available = original.reviewTimeSeconds ?? 0;
+  const amount = Math.round(seconds ?? available);
+  if (!(amount > 0)) return { ok: false, error: 'Enter how much of the time to move.' };
+  if (amount > available) {
+    return { ok: false, error: `Only ${Math.round(available / 60)} min are left on this record.` };
+  }
+
+  const [sourceName, targetName] = await Promise.all([
+    shortRemName(plugin, source.rem),
+    shortRemName(plugin, destination.rem),
+  ]);
+  const at = Date.now();
+
+  // ── The target's new entry: when and what was read, never the schedule ──
+  const readingContext: NonNullable<IncrementalRep['context']> = {};
+  for (const key of READING_CONTEXT_KEYS) {
+    const value = original.context?.[key];
+    if (value !== undefined) (readingContext as Record<string, unknown>)[key] = value;
+  }
+  const moved: IncrementalRep = {
+    date: original.date,
+    // Required by the schema; equal to the date so no early/late is implied.
+    scheduled: original.date,
+    reviewTimeSeconds: amount,
+    eventType: 'movedRep',
+    ...(original.notes ? { notes: original.notes } : {}),
+    context: { ...readingContext, movedFromId: sourceRemId, movedFromName: sourceName, movedAt: at },
+  };
+
+  // ── The source entry: same place, same scheduling fields, less time ──
+  const remaining = available - amount;
+  const shell: IncrementalRep = {
+    ...original,
+    context: {
+      ...original.context,
+      movedTo: [
+        ...(original.context?.movedTo ?? []),
+        { remId: targetRemId, name: targetName, seconds: amount, at },
+      ],
+    },
+  };
+  if (remaining > 0) shell.reviewTimeSeconds = remaining;
+  else delete shell.reviewTimeSeconds;
+
+  const targetBefore = destination.history;
+  const targetStamp = latestNextRepStamp(targetBefore);
+  await persist(
+    plugin,
+    destination,
+    preserveNextRepStamp(sortChronologically([...targetBefore, moved]), targetStamp)
+  );
+
+  try {
+    const next = [...source.history];
+    next[index] = shell;
+    await persist(plugin, source, next);
+  } catch (e) {
+    console.error('[history_edit] move: source write failed, rolling the target back', e);
+    try {
+      await persist(plugin, destination, targetBefore);
+    } catch (rollbackError) {
+      console.error('[history_edit] move: rollback failed', rollbackError);
+      return {
+        ok: false,
+        error: `Moving failed half-way: "${targetName}" now has the time, and "${sourceName}" still has it too. Delete the moved record on "${targetName}".`,
+      };
+    }
+    return { ok: false, error: 'Could not update the source record; nothing was moved.' };
+  }
+
+  return { ok: true, movedSeconds: amount, targetName };
+}
+
+/**
+ * Undo one move: delete the 'movedRep' entry on the target and give its seconds
+ * back to the source review. Callable from either side — the source's link
+ * (`movedTo[]`) or the target's entry (`movedFromId` + `movedAt`).
+ */
+export async function moveHistoryEntryTimeBack(
+  plugin: RNPlugin,
+  sourceRemId: string,
+  targetRemId: string,
+  at: number
+): Promise<MoveResult> {
+  const busy = await busyWith(plugin, [sourceRemId, targetRemId]);
+  if (busy) return { ok: false, error: busy };
+
+  const source = await resolveHistoryStore(plugin, sourceRemId);
+  const shellIndex =
+    source?.history.findIndex((rep) => rep.context?.movedTo?.some((m) => m.at === at && m.remId === targetRemId)) ??
+    -1;
+  if (!source || shellIndex === -1) {
+    return {
+      ok: false,
+      error: 'The original record is no longer on the Rem it came from (deleted or transferred), so there is nothing to give the time back to.',
+    };
+  }
+  const shell = source.history[shellIndex];
+  const link = shell.context!.movedTo!.find((m) => m.at === at && m.remId === targetRemId)!;
+
+  // The target side. When the target is gone, or is no longer Incremental or
+  // dismissed, its history went with it: the time only needs restoring here.
+  // When it is there but the entry is not, it went somewhere we can't see (a
+  // transfer to its parent): restoring would count it twice.
+  const targetRem = await plugin.rem.findOne(targetRemId);
+  const destination = targetRem ? await resolveHistoryStore(plugin, targetRemId) : null;
+  let destinationNext: IncrementalRep[] | null = null;
+  let seconds = link.seconds;
+  if (destination) {
+    const movedIndex = destination.history.findIndex(
+      (rep) =>
+        rep.eventType === 'movedRep' && rep.context?.movedAt === at && rep.context?.movedFromId === sourceRemId
+    );
+    if (movedIndex === -1) {
+      return {
+        ok: false,
+        error: 'The moved record is no longer on the target Rem (deleted or transferred) — moving it back would count it twice.',
+      };
+    }
+    seconds = destination.history[movedIndex].reviewTimeSeconds ?? link.seconds;
+    destinationNext = preserveNextRepStamp(
+      destination.history.filter((_, i) => i !== movedIndex),
+      latestNextRepStamp(destination.history)
+    );
+  }
+
+  const remainingLinks = shell.context!.movedTo!.filter((m) => m !== link);
+  const restored: IncrementalRep = {
+    ...shell,
+    reviewTimeSeconds: (shell.reviewTimeSeconds ?? 0) + seconds,
+    context: { ...shell.context },
+  };
+  if (remainingLinks.length > 0) restored.context!.movedTo = remainingLinks;
+  else delete restored.context!.movedTo;
+
+  const sourceBefore = source.history;
+  const sourceNext = [...sourceBefore];
+  sourceNext[shellIndex] = restored;
+  await persist(plugin, source, sourceNext);
+
+  if (destination && destinationNext) {
+    try {
+      await persist(plugin, destination, destinationNext);
+    } catch (e) {
+      console.error('[history_edit] move back: target write failed, rolling the source back', e);
+      try {
+        await persist(plugin, source, sourceBefore);
+      } catch (rollbackError) {
+        console.error('[history_edit] move back: rollback failed', rollbackError);
+      }
+      return { ok: false, error: 'Could not remove the moved record from the target; nothing was moved back.' };
+    }
+  }
+
+  return { ok: true, movedSeconds: seconds, targetName: link.name };
 }
