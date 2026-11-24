@@ -22,3 +22,7 @@ export enum QueueInteractionScore {
 export enum BuiltInPowerupCodes {
     Link = 'b',
 }
+
+/** Read at load time by powerupSlotFilter (reached through card_priority). Empty is
+    enough: no test exercises the slot filter. */
+export const PowerupSlotCodeMap = {};

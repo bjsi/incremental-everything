@@ -34,6 +34,15 @@ const config = {
     extensions: ['.js', '.jsx', '.ts', '.tsx'],
   },
   module: {
+    // Every import() is bundled into the chunk that calls it, in dev and prod alike.
+    // A lazily loaded chunk always fails here: RemNote evaluates it as a classic
+    // script (import.meta banner → SyntaxError), and the dev server 404s it.
+    // LimitChunkCountPlugin below can't prevent that on its own: a lazy module
+    // shared by several entries stays one chunk (4071.js, card_priority, Nov 24).
+    // Don't write import() in src anyway: use a static import.
+    parser: {
+      javascript: { dynamicImportMode: 'eager' },
+    },
     rules: [
       {
         test: /\.(ts|tsx|jsx|js)?$/,
