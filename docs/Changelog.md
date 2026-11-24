@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.256 - November 24th, 2026
+
+### ✨ New
+
+**Card Clusters**: Extra details now show the explanation of the member you are answering, not the one RemNote loaded, and every member's rating reaches the plugin's history, stats and Mastery Drill, also on cards without a priority.
+
+📖 [Plugin Widgets Reference → Card Cluster Extra Details](Plugin-Widgets-Reference.md#cluster-extra-details)
+
+### 🐛 Fixed
+
+**Mastery Drill**: the Priority Cap works again. Since v1.0.225 its check failed silently, so every card rated *Again* or *Hard* entered the drill whatever its priority.
+
+📖 [Mastery Drill → Priority Cap](Mastery-Drill.md#drill-priority-cap)
+
 ## v1.0.255 - November 24th, 2026
 
 ### ✨ New

@@ -468,6 +468,10 @@ export const queueHideElementsId = 'incremental-everything-queue-hide-elements';
 // index-only, so a plugin.track in index.tsx re-registers on each new height.
 export const cardInfoBarDockCssId = 'incremental-everything-card-info-bar-dock';
 export const cardInfoBarHeightKey = 'card-info-bar-height';
+// Same arrangement for cluster_extra_detail: the widget sets the key while it draws
+// the tested cluster member's Extra Card Details, and index.tsx hides RemNote's own.
+export const clusterExtraDetailCssId = 'incremental-everything-cluster-extra-detail';
+export const clusterExtraDetailOverrideKey = 'cluster-extra-detail-override';
 // Same arrangement for the pinned Editor Review Timer: its instances write their
 // heights (per document id) and index.tsx moves RemNote's sticky headers below it.
 export const editorReviewTimerHeadersCssId = 'incremental-everything-editor-review-timer-headers';

@@ -2,6 +2,7 @@ import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sd
 import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, historyMoveWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT, EXTRACT_EDITOR_FLOAT } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
+import { CLUSTER_EXTRA_DETAIL_WIDGET } from '../lib/cluster_extra_detail';
 
 /* The regular-queue Mastery Drill bar sits at QueueBelowTopBar. Registering anything
    there drops RemNote's own h-2 spacer (it renders only when the location is empty), so
@@ -442,6 +443,16 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // is mounted only after Show Answer, where Extra Card Details show.
   plugin.app.registerWidget('card_video', WidgetLocation.FlashcardExtraDetail, {
     powerupFilter: cardVideoPowerupCode,
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
+  // Extra details of the Card Cluster member being tested: RemNote shows the loaded
+  // member's instead (lib/cluster_extra_detail). No powerupFilter: RemNote filters
+  // this slot on the loaded member, which says nothing about the tested one.
+  plugin.app.registerWidget(CLUSTER_EXTRA_DETAIL_WIDGET, WidgetLocation.FlashcardExtraDetail, {
     dimensions: {
       width: '100%',
       height: 'auto',

@@ -94,6 +94,19 @@ A compact PDF dropdown that appears in the Reader's top bar, just to the right o
 
 📖 **Full documentation:** [Multiple PDF Sources](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) — covers the full resolution chain (pin → `#preferthispdf` → first PDF) and every surface that exposes the switcher (queue Reader, Editor Review Timer, Execute Repetition popup, PDF Control Panel, Priority Editor).
 
+### 1.6. Card Cluster Extra Details { #cluster-extra-details }
+*(Flashcards in a [Card Cluster](https://help.remnote.com/en/articles/10104223-card-clusters), after Show Answer)*
+
+In a Card Cluster, RemNote shows the **Extra details** of the member the queue happened to load, not of the member you are answering. The cluster starts on its first due member and steps through the others, so most members show another member's explanation. Every member keeps showing it, too.
+
+The plugin fixes this without any setup. When the member on screen isn't the one the queue loaded, it hides RemNote's block and shows the Extra Card Details of the member you are answering, under the same **Extra details** heading. A member without Extra Card Details shows none. RemNote's block may appear for a moment before it is replaced.
+
+- Put the Extra Card Details as usual, as children of each member. Nothing changes in your notes.
+- Children of an Extra Card Detail are shown below it, in RemNote's editor, so they can be edited from the queue.
+- Video explanations ([Link Local Video as Card Extra](Incremental-Video.md#card-video)) still follow the member the queue loaded.
+
+This is a RemNote bug and has been reported to RemNote. Once it is fixed there, this widget will simply stop appearing.
+
 ---
 
 ## 2. History & Progress Tracking

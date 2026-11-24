@@ -36,8 +36,9 @@ import {
 } from '../register/queue_display_commands';
 import { registerMcScissors } from '../lib/mc_scissors';
 import { registerTrueFalseClusterTracker, registerTrueFalseCommands, registerTrueFalsePowerups } from '../register/true_false';
-import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, editorReviewTimerHeightsKey } from '../lib/consts';
+import { autoRefreshPriorityQueueId, enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey, priorityColorScaleKey, cardInfoBarHeightKey, clusterExtraDetailOverrideKey, editorReviewTimerHeightsKey } from '../lib/consts';
 import { registerCardInfoBarDockCss } from '../lib/card_info_bar_dock';
+import { registerClusterExtraDetailCss } from '../lib/cluster_extra_detail';
 import { registerEditorReviewTimerHeadersCss } from '../lib/editor_review_timer_sticky';
 import { refreshKbPriorityQueueAtStartup } from '../lib/priority_review_document/queue_doc';
 import { bandVerboseLogsEnabled } from '../lib/priority_bands';
@@ -210,6 +211,13 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     const barHeight = await rp.storage.getSession<number>(cardInfoBarHeightKey);
     await registerCardInfoBarDockCss(plugin, barHeight);
+  });
+
+  // cluster_extra_detail draws the tested Card Cluster member's Extra Card Details and
+  // asks for RemNote's own block (the loaded member's) to be hidden meanwhile.
+  plugin.track(async (rp) => {
+    const override = await rp.storage.getSession<boolean>(clusterExtraDetailOverrideKey);
+    await registerClusterExtraDetailCss(plugin, override);
   });
 
   // The pinned Editor Review Timer sits where RemNote draws its sticky headers, so
