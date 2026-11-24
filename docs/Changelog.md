@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.254 - November 24th, 2026
+
+### ✨ Improved
+
+**Search Engine**: `id:` and `cid:` now accept wildcards, so `id:UpQE*` finds a Rem from the first characters of its id.
+
+📖 [Search Engine → Sources and references](Search-Engine.md#sources)
+
 ## v1.0.253 - November 23rd, 2026
 
 ### ✨ New

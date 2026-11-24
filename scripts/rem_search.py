@@ -34,7 +34,7 @@ Terms (plans/implemented/SEARCH_ENGINE_PLAN.md §4):
     source:<name|id>  has that Rem among its Sources (names as for in:, `*` matched
                     among the Rems that are someone's Source)
     refs:<name|id>  its text references that Rem (`*` among referenced Rems)
-    id:a,b,c        these Rems
+    id:a,b,c        these Rems; `*` (any part) and `?` or `_` (one character) wildcards (id:UpQE*)
     added:N, edited:N  created / text edited in the last N days (1 = today)
     owner.name:text   a slot or property value: owner is a powerup's code or name, or
                     the property's tag, `*` for any; text is exact (folded) with `*` and
@@ -64,7 +64,7 @@ Terms (plans/implemented/SEARCH_ENGINE_PLAN.md §4):
                     matches from its start; `*` for any part)
     rated:7, rated:7:forgot|hard|good|easy (or 1-4, Anki's buttons), rated:7:skip
     introduced:30   first answered in the last 30 days
-    cid:a,b         these cards
+    cid:a,b         these cards (wildcards as id:)
 Any other `x:y` is plain text, so "3:30" or a pasted "Note: …" still search as words.
 
 The text index (remsContents) is RemNote's own: lower-case, accents and clozes removed,
@@ -88,6 +88,25 @@ import rem_index  # noqa: E402  (the helper's own index, for structural terms)
 DEFAULT_LIMIT = 200
 MAX_LIMIT = 2000
 REM_ID_RE = re.compile(r'^[A-Za-z0-9]{17}$')
+# An id with `*` (any run) and `?` or `_` (one character) wildcards, read by SQLite's GLOB:
+# case-sensitive like the ids, and a literal start (`UpQE*`) stays an index range scan.
+ID_GLOB_RE = re.compile(r'^(?=.*[A-Za-z0-9])[A-Za-z0-9*?]{1,40}$')
+
+
+def id_list(value):
+    """`a,b,UpQE*` → its ids, or None when one is neither an id nor an id pattern."""
+    ids = [i.replace('_', '?') for i in re.split(r'[,\s]+', value.strip()) if i]
+    ok = ids and all(REM_ID_RE.match(i) or (re.search(r'[*?]', i) and ID_GLOB_RE.match(i)) for i in ids)
+    return ids if ok else None
+
+
+def id_clause(column, ids):
+    """SQL + args matching `column` against exact ids and GLOB patterns."""
+    exact = [i for i in ids if not re.search(r'[*?]', i)]
+    globs = [i for i in ids if re.search(r'[*?]', i)]
+    parts = [f'{column} IN ({",".join("?" * len(exact))})'] if exact else []
+    parts += [f'{column} GLOB ?'] * len(globs)
+    return (parts[0] if len(parts) == 1 else '(' + ' OR '.join(parts) + ')'), exact + globs
 
 # Keys that belong to a later phase: a clear error rather than a silent text search.
 LATER_KEYS = {'sort'}
@@ -437,9 +456,10 @@ class Parser:
                 self.fail('missing-value', 'Put a scheduler name after "scheduler:" (or scheduler:global).', at)
             return Term('card', value.strip(), at=at, name='scheduler')
         if k == 'cid':
-            ids = [i for i in re.split(r'[,\s]+', value.strip()) if i]
-            if not ids or not all(REM_ID_RE.match(i) for i in ids):
-                self.fail('bad-id', 'cid: takes card ids separated by commas.', at)
+            ids = id_list(value)
+            if not ids:
+                self.fail('bad-id', 'cid: takes card ids separated by commas; * and ? match any part '
+                          '(cid:Wb4K*).', at)
             return Term('card', ','.join(ids), at=at, name='cid')
         if k == 'has':
             v = value.strip()
@@ -453,9 +473,10 @@ class Parser:
                 self.fail('missing-value', f'Put a Rem name or id after "{k}:".', at)
             return Term(k, value.strip(), at=at)
         if k == 'id':
-            ids = [i for i in re.split(r'[,\s]+', value.strip()) if i]
-            if not ids or not all(REM_ID_RE.match(i) for i in ids):
-                self.fail('bad-id', 'id: takes Rem ids separated by commas.', at)
+            ids = id_list(value)
+            if not ids:
+                self.fail('bad-id', 'id: takes Rem ids separated by commas; * and ? match any part '
+                          '(id:UpQE*).', at)
             return Term('id', ','.join(ids), at=at)
         if k in ('added', 'edited'):
             if not re.fullmatch(r'\d{1,5}', value.strip()) or int(value) < 1:
@@ -723,8 +744,8 @@ class Compiler:
         if t.name == 'introduced':
             return 'c.first_rep >= ?', [days_ago_ms(int(t.num))], False
         if t.name == 'cid':
-            ids = t.value.split(',')
-            return f'c.id IN ({",".join("?" * len(ids))})', ids, False
+            sql, args = id_clause('c.id', t.value.split(','))
+            return sql, args, False
         if t.name == 'scheduler':
             name = fold(t.value)
             if name in ('global', 'default', 'global default'):
@@ -865,9 +886,9 @@ class Compiler:
             self.args += [*ids, 'source' if k == 'source' else 'text']
             return f's.id IN (SELECT rem FROM refs WHERE target IN ({",".join("?" * len(ids))}) AND kind = ?)'
         if k == 'id':
-            ids = term.value.split(',')
-            self.args += ids
-            return f's.id IN ({",".join("?" * len(ids))})'
+            sql, args = id_clause('s.id', term.value.split(','))
+            self.args += args
+            return sql
         if k in ('added', 'edited'):
             self.args.append(days_ago_ms(int(term.num)))
             col = 'created' if k == 'added' else 'edited'

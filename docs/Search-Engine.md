@@ -147,6 +147,9 @@ A name shared by several Rems covers all of them. A name that matches nothing sa
 `id:go7LdXuu9hpAZH12G,rzGXXDY2z0yi0Iefg`
 :   these Rems.
 
+`id:UpQE*`
+:   Rems whose id starts with *UpQE*: enough when you remember only part of an id. `*` matches any part, `?` or `_` one character, and capitals count, as in the ids themselves.
+
 ## Slots and properties { #properties }
 
 Every powerup slot and every property of a tag can be searched, like Anki's fields. Write the owner and the name, separated by a dot: the owner is the powerup (its name or code) or the tag that has the property. Spaces, capitals and punctuation in both don't matter.
@@ -238,7 +241,7 @@ A Rem matches when one of its cards does. Card searches written together must ho
 :   first answered in the last 30 days.
 
 `cid:Wb4KrNxFckJjwNkAC`
-:   these cards.
+:   these cards. `cid:Wb4K*` takes the same wildcards as `id:`.
 
 `is:due card:cloze in:"PSCPP" prop:lapses>=3`
 :   due cloze cards under *PSCPP* that you have forgotten three times or more.
@@ -340,6 +343,7 @@ The instructions Claude follows are in `~/.incremental-remnote/ai-ocr/search-pro
 | `in:`, `parent:` | any part of a document's (or Rem's) name | — |
 | `source:`, `refs:` | any part of the name | — |
 | `owner.name:value` | any part of the value | one character |
+| `id:`, `cid:` | any part of the id (`?` also works) | one character |
 | `*.name` | any owner | — |
 
 ## Matching special characters { #special }

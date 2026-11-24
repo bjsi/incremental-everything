@@ -246,7 +246,7 @@ class ParserTest(unittest.TestCase):
             '- bow': 'lone-minus', 'sort:due': 'not-yet', 'card:list': 'unknown-value', 'is:bogus': 'unknown-value',
             'ml:old': 'unknown-value', 'rated:0': 'bad-number', 'rated:7:great': 'unknown-value',
             'introduced:7:good': 'unknown-value', 'cid:x': 'bad-id',
-            'prop:bogus<3': 'unknown-value', 'has:nothing': 'unknown-value', 'id:short': 'bad-id',
+            'prop:bogus<3': 'unknown-value', 'has:nothing': 'unknown-value', 'id:short': 'bad-id', 'id:*': 'bad-id', 'id:Up-Q*': 'bad-id',
             'added:0': 'bad-number', 'in:': 'missing-value', '...': 'no-words', 'bow\\': 'unknown-escape',
         }
         for query, kind in cases.items():
@@ -413,6 +413,10 @@ class IndexSearchTest(unittest.TestCase):
             rs.search(KB, 'source:*bow*', db_path=self.db, index_file=self.index)  # bow is no one's Source
         self.assertEqual(ctx.exception.kind, 'not-found')
         self.assertEqual(self.rems(f'id:{BOW},{OTHER}'), {BOW, OTHER})
+        self.assertEqual(self.rems('id:*R2'), {BOW})  # wildcards: GLOB, case-sensitive like the ids
+        self.assertEqual(self.rems(f'id:00000000000000?R2,{OTHER}'), {BOW, OTHER})
+        self.assertEqual(self.rems('id:*r2'), set())
+        self.assertEqual(self.rems('id:00000000000000_R2'), {BOW})
 
     def test_dates(self):
         self.assertEqual(self.rems('added:1'), {MARGIN})
@@ -503,6 +507,7 @@ class IndexSearchTest(unittest.TestCase):
         self.assertEqual(self.card_rems('rated:7'), {BOW, OTHER})
         self.assertEqual(self.card_rems('introduced:10'), {OTHER, DUP2})
         self.assertEqual(self.card_rems(f'cid:{C_CLOZE}'), {FLARE})
+        self.assertEqual(self.card_rems('cid:*C2'), {FLARE})
 
     def test_suppression_causes(self):
         self.assertEqual(self.rems('suppressed:paused'), {DUP2})  # ARCHIVE itself has no card
