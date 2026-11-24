@@ -168,6 +168,7 @@ Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`
   - **🃏 Cards History** *(header button)* — appears when the Rem also generates flashcards, and switches to the [Flashcard Repetition History](#211-flashcard-repetition-history) for all of them. The reverse button lives there.
   - **➕ Session — recording study done outside RemNote** — see [Recording and correcting records](#recording-and-correcting-records) below.
   - **✏️ / 🗑 per record** — hover a **review** row to edit or delete it; see the same section.
+  - **↪ per record** — move a review's study time to the Rem you actually studied; see [Moving a record's time to another Rem](#move-to-another-rem).
 
 ![IncRem Repetition History Popup](assets/repetition-history-popup.png){ width="400" }
 
@@ -214,6 +215,23 @@ Event banners (▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, 
 **Edit** changes the **date**, **end time**, **total time** and note of an existing record; early/late status is recomputed, and the log is kept in chronological order. Editing never changes the schedule. **Delete** asks for confirmation first, reporting the study time that will disappear from the Rem's totals. Deletion cannot be undone.
 
 ![Edit record dialog](assets/repetition-history-edit-record.png){ width="400" }
+
+##### Moving a record's time to another Rem { #move-to-another-rem }
+
+Sometimes a session comes up as one Rem but is spent on another. You open a new version of a regulation from the queue, and what you actually read is one of its sections, which lives elsewhere in your notes. **↪ Move** gives the time to the Rem you studied, so the per-Rem statistics show where the time really went.
+
+1. Hover the record and press **↪**. The popup closes and a card appears at the top right.
+2. **Click into the Rem you studied.** The card follows the cursor and shows the target with its last three parents. It must be an Incremental Rem (or a dismissed one); the Rem the record is on can't be chosen. Expanding, collapsing and navigating are free.
+3. To move only part of the session, type the minutes in the **Move** field (`20`, `1h 5`, `1:05`). Left as it is, the whole session moves, to the second.
+4. Press **`Opt+Shift+Enter`** (`Alt+Shift+Enter` on Windows), or click **Move here**. **Back to history** reopens the popup, and **`Esc`** cancels.
+
+**Neither Rem's schedule changes.** The record stays where it was on the first Rem, with its interval and due date: that Rem *was* the one in the queue. Only its time leaves, and a line under it reads `↪ 41m moved to …`. The other Rem gets a **↪ … moved in** record, which counts for its time, its reps, the [Study Dashboard](Study-Dashboard.md) and the Aggregated view, but never for its scheduler. A session moved whole is counted once, on the Rem that received it; a split one counts on both.
+
+**↩ move back** on either line undoes a move: the time returns to the original record, and the moved-in record disappears. Moved-in records have no ✏️ or 🗑, so the two sides can't drift apart.
+
+The move is refused while a review of either Rem is still being saved, while the [Editor Review Timer](Reviewing-Items-in-the-Editor.md) runs on either of them, or while the [Chrome Companion](Chrome-Companion-Extension.md) still has to report a reading handed to it from the queue (for up to a day).
+
+> **Note:** On a Rem that reads a PDF, moving time away also raises the **pages/h** and lowers the **estimated remaining time** in the PDF footer, since less time now stands against the same pages.
 
 ---
 

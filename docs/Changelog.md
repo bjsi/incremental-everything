@@ -2,6 +2,20 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.255 - November 24th, 2026
+
+### ✨ New
+
+**Repetition History**: a review's study time can now be moved to the Rem you actually studied. Press **↪** on the record, click into that Rem and press `Opt+Shift+Enter`. Neither Rem's schedule changes, part of a session can be moved, and **↩ move back** undoes it.
+
+📖 [Plugin Widgets Reference → Moving a record's time to another Rem](Plugin-Widgets-Reference.md#move-to-another-rem)
+
+### ♻️ Changed
+
+**Pick in Editor**: *Place Pending Rem Here* and *Cancel Parent Pick* are now **Confirm Pick in Editor** and **Cancel Pick in Editor**, since they also confirm and cancel a history move. Shortcuts and quick codes are unchanged.
+
+📖 [Create Incremental Rem from PDF Highlights → Pick in editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)
+
 ## v1.0.254 - November 24th, 2026
 
 ### ✨ Improved

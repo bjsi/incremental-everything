@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT, EXTRACT_EDITOR_FLOAT } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, parentPickWidgetId, historyMoveWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId, onboardingTipsWidgetId, cardVideoPowerupCode, mcScissorsWidgetId, mcAssertionsWidgetId, menuHubWidgetId, READ_ALOUD_POPUP, AUDIO_PLAYLIST_FLOAT, EXTRACT_EDITOR_FLOAT } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { screenFittedHeight } from '../lib/utils';
 
@@ -518,6 +518,12 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // "Pick in editor" card (lib/parent_pick.ts): floats over the editor while a
   // new Rem waits for the user to confirm a parent there.
   plugin.app.registerWidget(parentPickWidgetId, WidgetLocation.FloatingWidget, {
+    dimensions: { height: 'auto', width: 340 },
+  });
+
+  // "↪ Move to another Rem" card (lib/history_move_pick.ts): floats over the
+  // editor while a Repetition History record waits for the Rem that gets its time.
+  plugin.app.registerWidget(historyMoveWidgetId, WidgetLocation.FloatingWidget, {
     dimensions: { height: 'auto', width: 340 },
   });
 

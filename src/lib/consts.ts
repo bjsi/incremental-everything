@@ -412,6 +412,15 @@ export const parentPickConfirmRequestKey = 'parent-pick-confirm-request';
 export const parentPickConfirmCommandId = 'place-pending-rem-here';
 export const parentPickCancelCommandId = 'cancel-parent-pick';
 
+// "Move to another Rem" (lib/history_move_pick.ts): the Repetition History popup
+// hands one review to a floating card and closes, and the user picks the Rem
+// that gets its time in the editor, confirming with the same shortcut as the
+// parent pick (parentPickConfirmCommandId), which asks whichever card is open.
+export const historyMoveWidgetId = 'history_move_floating';
+export const historyMoveContextKey = 'history-move-context';
+export const historyMoveActiveIdKey = 'history-move-active-id';
+export const historyMoveConfirmRequestKey = 'history-move-confirm-request';
+
 // css
 export const collapseTopBarId = 'collapse-top-bar';
 export const collapseTopBarKey = 'collapseTopBarState';

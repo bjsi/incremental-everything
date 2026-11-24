@@ -148,11 +148,11 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources)** (`Opt+Shift+V` / `Alt+Shift+V`) — `quick: paste`
   Adds the previously copied sources to **all selected Rems** (multi-select supported), or to the focused Rem if nothing is selected. Sources already present are silently skipped (idempotent). Together with **Copy Rem Sources**, this automates the [PDF-Incremental-Reading-Workflow#2-copying-and-pasting-sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources).
 
-- **[Place Pending Rem Here](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** (`Opt+Shift+Enter` / `Alt+Shift+Enter`) — `quick: pph`
-  Creates the Rem waiting for a parent (after **📍 Pick in editor** in the Select Parent popup) under the Rem that has the cursor. A target outside the IncRem under review needs a second press to confirm.
+- **[Confirm Pick in Editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** (`Opt+Shift+Enter` / `Alt+Shift+Enter`) — `quick: pph`
+  Creates the Rem waiting for a parent (after **📍 Pick in editor** in the Select Parent popup) under the Rem that has the cursor; a target outside the IncRem under review needs a second press to confirm. After **↪** in Repetition History, it [moves the record's time](Plugin-Widgets-Reference.md#move-to-another-rem) to the Rem that has the cursor instead. *(Called Place Pending Rem Here before v1.0.255.)*
 
-- **[Cancel Parent Pick](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** — `quick: cpp`
-  Drops the Rem waiting for a parent and closes its card, like `Esc`.
+- **[Cancel Pick in Editor](Create-Incremental-Rem-from-PDF-Highlights.md#pick-in-editor)** — `quick: cpp`
+  Drops the Rem waiting for a parent, or the history record waiting to be moved, and closes its card, like `Esc`. *(Called Cancel Parent Pick before v1.0.255.)*
 
 ### Queue Menu Actions { #queue-menu-actions }
 

@@ -11,7 +11,7 @@ import {
   originalIncrementalDateSlotCode,
   pendingIncRemTransferTailKey,
 } from '../consts';
-import { IncrementalRem, IncrementalRep, repCountsForStats } from './types';
+import { IncrementalRem, IncrementalRep, entryCountsForStats } from './types';
 import { getIncrementalRemFromRem, registerInKnownHostIndexes } from './index';
 import { mergeHistoryFromDismissed } from '../dismissed';
 import { readRawPdfState, writeRawPdfState, rekeyPdfStateForNewHost } from '../pdf_state';
@@ -214,7 +214,7 @@ export async function planTransferIncRemToParent(
     sourceName,
     destinationName,
     history,
-    repCount: history.filter((h) => repCountsForStats(h.eventType)).length,
+    repCount: history.filter((h) => entryCountsForStats(h)).length,
     totalReviewSeconds: history.reduce((sum, h) => sum + (h.reviewTimeSeconds || 0), 0),
     // 'fallback' means nothing was readable — see UNREADABLE_PRIORITY_FALLBACK.
     priority: incRem && incRem.prioritySource !== 'fallback' ? incRem.priority : null,
@@ -277,7 +277,7 @@ async function planFinishTransfer(
     sourceName,
     destinationName,
     history: sourceHistory,
-    repCount: sourceHistory.filter((h) => repCountsForStats(h.eventType)).length,
+    repCount: sourceHistory.filter((h) => entryCountsForStats(h)).length,
     totalReviewSeconds: sourceHistory.reduce((sum, h) => sum + (h.reviewTimeSeconds || 0), 0),
     priority:
       destinationIncRem && destinationIncRem.prioritySource !== 'fallback'

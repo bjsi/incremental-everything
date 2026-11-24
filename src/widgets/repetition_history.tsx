@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderWidget, usePlugin, WidgetLocation, useRunAsync, RNPlugin } from '@remnote/plugin-sdk';
 import { withHoverTips } from '../components/HoverTipLayer';
-import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
+import { IncrementalRep, repCountsForStats, entryCountsForStats, hasMovedTime } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import dayjs from 'dayjs';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
@@ -20,7 +20,10 @@ import {
     updateHistoryEntry,
     deleteHistoryEntry,
     isNewestEntry,
+    moveRefusal,
+    moveHistoryEntryTimeBack,
 } from '../lib/history_edit';
+import { startHistoryMove } from '../lib/history_move_pick';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
 import { getRemSchedulerInfo } from '../lib/scheduler_choice';
 import { describeScheduler, sameDayRepeatIndexes } from '../lib/scheduler_core';
@@ -171,7 +174,9 @@ function formatCompanionContext(ctx: NonNullable<IncrementalRep['context']>): st
  * user note (📝) and/or a machine context snapshot.
  */
 function NoteAndContextLine({ rep }: { rep: IncrementalRep }) {
-    if (!rep.notes && !rep.context) return null;
+    // A context holding only move bookkeeping formats to nothing (MovedTimeLine shows it).
+    const contextText = rep.context ? formatRepContext(rep.context) : '';
+    if (!rep.notes && !contextText) return null;
     return (
         <div
             style={{
@@ -195,7 +200,7 @@ function NoteAndContextLine({ rep }: { rep: IncrementalRep }) {
                     📝 {rep.notes}
                 </div>
             )}
-            {rep.context && (
+            {contextText && (
                 <div
                     style={{
                         fontSize: '10px',
@@ -204,9 +209,100 @@ function NoteAndContextLine({ rep }: { rep: IncrementalRep }) {
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                     }}
-                    title={formatRepContext(rep.context)}
+                    title={contextText}
                 >
-                    {formatRepContext(rep.context)}
+                    {contextText}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/**
+ * Sub-row for time moved between rems (lib/history_edit.ts › moveHistoryEntryTime):
+ * on a review that gave time away, one line per move with a ↩ to undo it; on a
+ * 'movedRep' entry, where the time came from. Names open their Rem.
+ */
+function MovedTimeLine({
+    rep,
+    remId,
+    canEdit,
+    onMoveBack,
+}: {
+    rep: IncrementalRep;
+    remId: string | null;
+    canEdit: boolean;
+    onMoveBack: (sourceRemId: string, targetRemId: string, at: number) => void;
+}) {
+    const plugin = usePlugin();
+    const links = rep.context?.movedTo ?? [];
+    const from = rep.eventType === 'movedRep' ? rep.context : undefined;
+    if (links.length === 0 && !from?.movedFromId) return null;
+
+    const remLink = (id: string, name: string | undefined) => (
+        <span
+            title={`${name ?? ''}\n\nClick to open this rem\nShift+click: open it in a new pane`}
+            onMouseDown={preventShiftSelect}
+            onClick={async (e) => {
+                if (e.shiftKey) {
+                    await openAndFocusRem(plugin, id, true);
+                    await plugin.widget.closePopup();
+                    return;
+                }
+                await plugin.widget.closePopup();
+                await openAndFocusRem(plugin, id);
+            }}
+            style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
+        >
+            {name || 'another Rem'}
+        </span>
+    );
+
+    const undoButton = (sourceRemId: string, targetRemId: string, at: number) =>
+        canEdit && (
+            <button
+                title="Move this time back to the record it came from"
+                onClick={() => onMoveBack(sourceRemId, targetRemId, at)}
+                style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '0 2px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    color: 'var(--rn-clr-content-secondary)',
+                }}
+            >
+                ↩ move back
+            </button>
+        );
+
+    const lineStyle: React.CSSProperties = {
+        fontSize: '10px',
+        color: '#0d9488',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+    };
+
+    return (
+        <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '-4px' }}>
+            {remId &&
+                links.map((link) => (
+                    <div key={link.at} style={lineStyle}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            ↪ {formatDuration(link.seconds) || '0s'} moved to {remLink(link.remId, link.name)}
+                        </span>
+                        {undoButton(remId, link.remId, link.at)}
+                    </div>
+                ))}
+            {remId && from?.movedFromId && (
+                <div style={lineStyle}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        ↪ Moved here from {remLink(from.movedFromId, from.movedFromName)}
+                    </span>
+                    {from.movedAt !== undefined && undoButton(from.movedFromId, remId, from.movedAt)}
                 </div>
             )}
         </div>
@@ -732,6 +828,32 @@ function RepetitionHistoryPopup() {
     const [refreshKey, setRefreshKey] = React.useState(0);
     const [dialog, setDialog] = React.useState<DialogTarget | null>(null);
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
+    const [movingBack, setMovingBack] = React.useState(false);
+    const [moveError, setMoveError] = React.useState<string | null>(null);
+
+    // ↩ on a moved-time line: either side of the move can undo it. Failures show
+    // in the popup itself: a message dialog would replace it, and a toast raised
+    // over another plugin toast can vanish.
+    const handleMoveBack = async (sourceRemId: string, targetRemId: string, at: number) => {
+        if (movingBack) return;
+        setMovingBack(true);
+        setMoveError(null);
+        try {
+            const result = await moveHistoryEntryTimeBack(plugin, sourceRemId, targetRemId, at);
+            if (!result.ok) {
+                setMoveError(result.error || 'Could not move the time back.');
+                return;
+            }
+            setHoveredIndex(null);
+            setRefreshKey((k) => k + 1);
+            await plugin.app.toast(`↩ Moved ${formatDuration(result.movedSeconds ?? 0)} back — schedules unchanged`);
+        } catch (e) {
+            console.error('[RepetitionHistoryPopup] move back failed:', e);
+            setMoveError(`Could not move the time back: ${String(e)}`);
+        } finally {
+            setMovingBack(false);
+        }
+    };
     const ignoreSameDay = useIESetting(ignoreSameDayReviewsId);
 
     const data = useRunAsync(async () => {
@@ -930,7 +1052,7 @@ function RepetitionHistoryPopup() {
 
     const gridHeaderStyle: React.CSSProperties = {
         display: 'grid',
-        gridTemplateColumns: '95px 60px 50px 40px 75px 46px',
+        gridTemplateColumns: '95px 60px 50px 40px 75px 64px',
         padding: '8px 16px',
         fontSize: '10px',
         fontWeight: 600,
@@ -945,7 +1067,7 @@ function RepetitionHistoryPopup() {
 
     const gridRowStyle: React.CSSProperties = {
         display: 'grid',
-        gridTemplateColumns: '95px 60px 50px 40px 75px 46px',
+        gridTemplateColumns: '95px 60px 50px 40px 75px 64px',
         padding: '10px 16px',
         fontSize: '12px',
         borderBottom: '1px solid var(--rn-clr-border-secondary)',
@@ -998,7 +1120,7 @@ function RepetitionHistoryPopup() {
             : null;
     // Count only events that represent actual reviews (shared stats predicate;
     // includes imported flashcard reps on preserved-history tombstones).
-    const repCount = history?.filter(h => repCountsForStats(h.eventType)).length || 0;
+    const repCount = history?.filter(h => entryCountsForStats(h)).length || 0;
 
     // Calculate days late/early for next scheduled rep
     const now = Date.now();
@@ -1208,6 +1330,30 @@ function RepetitionHistoryPopup() {
                 </div>
             ) : (
                 <div style={gridContainerStyle}>
+                    {moveError && (
+                        <div
+                            style={{
+                                margin: '4px 16px 8px',
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                lineHeight: 1.4,
+                                color: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                display: 'flex',
+                                gap: '8px',
+                                justifyContent: 'space-between',
+                            }}
+                        >
+                            <span>{moveError}</span>
+                            <button
+                                onClick={() => setMoveError(null)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                    )}
                     <div style={gridHeaderStyle}>
                         <span>Date</span>
                         <span>Time</span>
@@ -1225,6 +1371,11 @@ function RepetitionHistoryPopup() {
                         // rule stays "if it counted as study, you can correct it"; every
                         // other event type renders as a banner and is read-only.
                         const canEditEntry = canEditHistory && repCountsForStats(rep.eventType);
+                        // Time moved in from another rem's review: it is undone from
+                        // its sub-row (↩ move back), not edited or deleted, so the two
+                        // sides of a move can't drift apart.
+                        const isMovedIn = rep.eventType === 'movedRep';
+                        const cannotMove = moveRefusal(rep);
 
                         // Edit / delete affordances, revealed on hover. Their space is
                         // reserved even while hidden so rows don't shift under the cursor.
@@ -1247,6 +1398,29 @@ function RepetitionHistoryPopup() {
                                     visibility: hovered ? 'visible' : 'hidden',
                                 }}
                             >
+                                <button
+                                    style={{ ...rowActionButtonStyle, opacity: cannotMove ? 0.3 : 0.75 }}
+                                    title={
+                                        cannotMove
+                                            ? `Move to another Rem — ${cannotMove}`
+                                            : "Move this record's time to another Rem, picked in the editor. Neither Rem's schedule changes."
+                                    }
+                                    onClick={async () => {
+                                        if (cannotMove) {
+                                            await plugin.app.toast(cannotMove);
+                                            return;
+                                        }
+                                        if (!remId) return;
+                                        await startHistoryMove(plugin, {
+                                            sourceRemId: remId,
+                                            sourceName: remName,
+                                            entry: rep,
+                                            index: storedIndex,
+                                        });
+                                    }}
+                                >
+                                    ↪
+                                </button>
                                 <button
                                     style={rowActionButtonStyle}
                                     title="Edit this record (date, end time, total time)"
@@ -1274,6 +1448,12 @@ function RepetitionHistoryPopup() {
                             >
                                 {content}
                                 <NoteAndContextLine rep={rep} />
+                                <MovedTimeLine
+                                    rep={rep}
+                                    remId={remId}
+                                    canEdit={canEditHistory}
+                                    onMoveBack={handleMoveBack}
+                                />
                             </div>
                         );
 
@@ -1313,7 +1493,7 @@ function RepetitionHistoryPopup() {
                                     {/* Empty gutter, not the row actions: markers are read-only
                                         (see `canEditEntry`). Kept so a banner ends where the rows'
                                         action column starts instead of jutting past them. */}
-                                    {canEditHistory && <span style={{ flex: '0 0 44px' }} />}
+                                    {canEditHistory && <span style={{ flex: '0 0 62px' }} />}
                                 </div>
                             );
 
@@ -1431,6 +1611,7 @@ function RepetitionHistoryPopup() {
                             if (rep.eventType === 'executeRepetition') return '⌨️ ';
                             if (rep.eventType === 'importedRep') return '🃏 ';
                             if (rep.eventType === 'externalRep') return rep.context?.webUrl ? '🌐 ' : '📖 ';
+                            if (isMovedIn) return '↪ ';
                             return '';
                         };
 
@@ -1449,7 +1630,14 @@ function RepetitionHistoryPopup() {
                                 <span>{formatDuration(rep.reviewTimeSeconds || 0) || '—'}</span>
                                 <span>{rep.interval !== undefined ? `${rep.interval}d` : '—'}</span>
                                 <span>{rep.priority !== undefined ? rep.priority : '—'}</span>
-                                {sameDayRepeats.has(storedIndex) ? (
+                                {isMovedIn ? (
+                                    <span
+                                        style={{ color: '#0d9488' }}
+                                        title="Study time moved here from a review of another Rem. It counts in this Rem's statistics only: its schedule never saw it."
+                                    >
+                                        moved in
+                                    </span>
+                                ) : sameDayRepeats.has(storedIndex) ? (
                                     <span
                                         style={{ color: 'var(--rn-clr-content-tertiary)' }}
                                         title="A second review the same day, before the item was due: scheduling counts that day once (Ignore Same-Day Reviews), and a review recorded with the setting on keeps the next review date. Its time still counts."
@@ -1467,7 +1655,7 @@ function RepetitionHistoryPopup() {
                                     {formatEarlyLate(rep)}
                                 </span>
                                 )}
-                                {canEditEntry ? actions : <span />}
+                                {canEditEntry && !isMovedIn ? actions : <span />}
                             </div>
                         );
                     })}

@@ -24,6 +24,10 @@ A row can have a line under it with the **📝 note** you typed during that revi
 
 Since each row keeps its own position, the history shows how far every session got.
 
+### Moving time to the Rem you studied
+
+A session that came up as one Rem but was spent on another can give its time to that Rem: hover the record, press **↪**, click into the Rem you studied and press `Opt+Shift+Enter`. Neither Rem's schedule changes. See [Moving a record's time to another Rem](Plugin-Widgets-Reference.md#move-to-another-rem).
+
 ## 2. Aggregated History View
 
 Gives you a high-level overview of progress stats for a Rem and **all its descendants**. Perfect for checking your progress on a specific book, course, or topic.
@@ -64,6 +68,7 @@ The history includes special event markers:
 | ⏸ **Dismissed** | When the Rem was dismissed via the Dismiss button |
 | 🎚 **Priority change** | The priority changed on its own — no review, no reschedule. Shows the move (`60 → 45`) and which gesture made it |
 | 🔀 **Transferred from …** | The history above this line was studied on another Rem and moved here by [Transfer to Parent](Create-Incremental-Rem-from-PDF-Highlights.md#transfer-to-parent) |
+| ↪ **moved in** | Study time [moved here](Plugin-Widgets-Reference.md#move-to-another-rem) from a review of another Rem. It counts in this Rem's statistics, never in its schedule |
 
 When you set a priority right after creating the Rem — **[Alt+Shift+X](Keyboard-Shortcuts.md#core-commands)**, the PDF highlight toolbar's **Create IncRem**, or **Toggle Incremental** — the priority and interval you choose are written *into* this marker rather than added beside it, so one action leaves one entry. Rescheduling later (**[Alt+P](Keyboard-Shortcuts.md#priority-commands)**, **[Ctrl+J](Keyboard-Shortcuts.md#core-commands)**) is still recorded as its own event.
 

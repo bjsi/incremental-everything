@@ -11,7 +11,7 @@ import {
     WidgetLocation,
 } from '@remnote/plugin-sdk';
 import { withHoverTips } from '../components/HoverTipLayer';
-import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
+import { IncrementalRep, entryCountsForStats } from '../lib/incremental_rem/types';
 import {
   dismissedHistorySlotCode,
   dismissedPowerupCode,
@@ -183,8 +183,9 @@ interface ProgressState {
 
 // Stats predicate (Study Dashboard) — delegates to the shared source of truth so
 // it can't drift. INCLUDES 'importedRep' (reviews imported from removed flashcards).
-function isRealIncRep(et: IncrementalRep['eventType']): boolean {
-    return repCountsForStats(et);
+// Entry-level, so a review whose time was all moved to other rems counts there.
+function isRealIncRep(rep: IncrementalRep): boolean {
+    return entryCountsForStats(rep);
 }
 
 /**
@@ -279,7 +280,7 @@ function statsFromRem(
     for (const rep of rem.incHistory) {
         if (!rep || typeof rep.date !== 'number') continue;
         if (rep.date < startMs || rep.date >= endMs) continue;
-        if (!isRealIncRep(rep.eventType)) continue;
+        if (!isRealIncRep(rep)) continue;
         s.incRemReps += 1;
         s.incRemTimeSec += rep.reviewTimeSeconds || 0;
         hasIncReps = true;
@@ -287,7 +288,7 @@ function statsFromRem(
     for (const rep of rem.dismHistory) {
         if (!rep || typeof rep.date !== 'number') continue;
         if (rep.date < startMs || rep.date >= endMs) continue;
-        if (!isRealIncRep(rep.eventType)) continue;
+        if (!isRealIncRep(rep)) continue;
         s.incRemReps += 1;
         s.incRemTimeSec += rep.reviewTimeSeconds || 0;
         hasDismReps = true;
@@ -352,7 +353,7 @@ function buildTimelineDays(
             for (const rep of history) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
-                if (!isRealIncRep(rep.eventType)) continue;
+                if (!isRealIncRep(rep)) continue;
                 const b = dayBucket(rep.date);
                 b.incReps += 1;
                 b.incTimeMs += (rep.reviewTimeSeconds || 0) * 1000;
@@ -958,7 +959,7 @@ function aggregateDocumentData(
             for (const rep of rd.incHistory) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
-                if (!isRealIncRep(rep.eventType)) continue;
+                if (!isRealIncRep(rep)) continue;
                 incReps += 1;
                 incTime += rep.reviewTimeSeconds || 0;
             }
@@ -973,7 +974,7 @@ function aggregateDocumentData(
             for (const rep of rd.dismHistory) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
-                if (!isRealIncRep(rep.eventType)) continue;
+                if (!isRealIncRep(rep)) continue;
                 dismReps += 1;
                 dismTime += rep.reviewTimeSeconds || 0;
             }
@@ -1269,7 +1270,7 @@ function aggregateGlobalData(
             for (const rep of rd.incHistory) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
-                if (!isRealIncRep(rep.eventType)) continue;
+                if (!isRealIncRep(rep)) continue;
                 incReps += 1;
                 incTime += rep.reviewTimeSeconds || 0;
             }
@@ -1288,7 +1289,7 @@ function aggregateGlobalData(
             for (const rep of rd.dismHistory) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
-                if (!isRealIncRep(rep.eventType)) continue;
+                if (!isRealIncRep(rep)) continue;
                 dismReps += 1;
                 dismTime += rep.reviewTimeSeconds || 0;
             }

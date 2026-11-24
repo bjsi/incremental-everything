@@ -76,7 +76,7 @@ function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
  * @param history Full cleansed history array (after early-response filtering)
  * @returns Only the events that count for interval after the last 'madeIncremental' marker
  */
-function getRepsSinceLastMadeIncremental(history: IncrementalRep[]): IncrementalRep[] {
+export function getRepsSinceLastMadeIncremental(history: IncrementalRep[]): IncrementalRep[] {
   // Find the index of the last 'madeIncremental' marker
   let lastSessionStartIndex = -1;
   for (let i = history.length - 1; i >= 0; i--) {
@@ -115,7 +115,13 @@ export const removeLastInteraction = (history: IncrementalRep[]): IncrementalRep
   if (history.length === 0) {
     return history;
   }
-  return history.slice(0, -1);
+  // Time moved in from another rem's review ('movedRep') is not an interaction
+  // with this rem, and the redo rewrites the history from this array: dropping
+  // it would delete that time. Remove the last entry before it instead.
+  let last = history.length - 1;
+  while (last >= 0 && history[last].eventType === 'movedRep') last--;
+  if (last < 0) return history;
+  return history.filter((_, i) => i !== last);
 };
 
 /**
