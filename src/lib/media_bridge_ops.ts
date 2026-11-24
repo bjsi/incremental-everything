@@ -1001,6 +1001,107 @@ export async function runOutline(plugin: ReactRNPlugin, job: BridgeOpJob): Promi
   };
 }
 
+// --- create ------------------------------------------------------------------
+
+/**
+ * Bulk create: many rems in one job, each born with its exact rich text, its
+ * built-in powerups (Quote, Extra Card Detail) and tags, at its place among the
+ * parent's children. The MCP's append_doc writes one rem per call, only at the top
+ * or bottom, and turns consecutive `> ` lines into one rem.
+ *
+ * `items`: [{key, parent, text, backText?, quote?, ecd?, tags?, position?, after?, before?}]
+ *   - `parent`, `after`, `before`: rem ids, or keys of items made earlier (in this job or
+ *     an earlier one, via `keys`), so a quote and the explanation after it go in together.
+ *   - `position`: 'last' (default), 'first' or a 0-based index among all children.
+ *   - `after`/`before`: place right after/before that sibling (wins over `position`).
+ *   - `heading`: 1–6 makes the new rem a heading of that level (as the `heading` op).
+ * Returns `keys` (every key → id) and per item {key, remId, ok, quote, ecd, error}.
+ */
+export async function runCreate(plugin: ReactRNPlugin, job: BridgeOpJob): Promise<BridgeOpResult> {
+  type Item = {
+    key: string;
+    parent: string;
+    text: RichTextInterface;
+    backText?: RichTextInterface;
+    quote?: boolean;
+    ecd?: boolean;
+    tags?: string[];
+    position?: 'first' | 'last' | number;
+    after?: string;
+    before?: string;
+    heading?: number;
+  };
+  const items = (Array.isArray(job.items) ? job.items : []) as Item[];
+  if (!items.length) throw new OpError('No items given.');
+  const keys: Record<string, string> = { ...((job.keys as Record<string, string>) ?? {}) };
+  const idOf = (ref: string) => (ref.startsWith('new:') ? keys[ref] : ref);
+  const results = [];
+  let created = 0;
+  for (const it of items) {
+    if (keys[it.key]) {
+      results.push({ key: it.key, remId: keys[it.key], ok: true, already: true });
+      continue;
+    }
+    try {
+      const parentId = idOf(it.parent);
+      const parent = parentId ? await plugin.rem.findOne(parentId) : undefined;
+      if (!parent) throw new Error(`parent not found: ${it.parent}`);
+      if (!Array.isArray(it.text) || !it.text.length) throw new Error('no text');
+      const children = ((await parent.getChildrenRem()) ?? []).map((c) => c._id);
+      let index = children.length;
+      const sibling = it.after ?? it.before;
+      if (sibling) {
+        const at = children.indexOf(idOf(sibling) ?? '');
+        if (at < 0) throw new Error(`sibling not under the parent: ${sibling}`);
+        index = it.after ? at + 1 : at;
+      } else if (it.position === 'first') index = 0;
+      else if (typeof it.position === 'number') index = Math.max(0, Math.min(it.position, children.length));
+
+      const rem = await plugin.rem.createRem();
+      if (!rem) throw new Error('RemNote did not create the rem');
+      keys[it.key] = rem._id; // before anything else can fail: a retry must not make it twice
+      await rem.setText(it.text);
+      if (it.backText?.length) await rem.setBackText(it.backText);
+      await rem.setParent(parent, index);
+      if (it.quote) await rem.addPowerup(BuiltInPowerupCodes.Quote);
+      if (it.ecd) await rem.addPowerup(BuiltInPowerupCodes.ExtraCardDetail);
+      for (const tag of it.tags ?? []) await rem.addTag(tag);
+      const level = Number(it.heading ?? 0);
+      if (level >= 1 && level <= 6) await applyHeadingLevel(rem, level as HeadingLevel);
+      created++;
+
+      const fresh = (await plugin.rem.findOne(rem._id)) ?? rem;
+      const quote = it.quote ? await fresh.hasPowerup(BuiltInPowerupCodes.Quote) : undefined;
+      const ecd = it.ecd ? await fresh.hasPowerup(BuiltInPowerupCodes.ExtraCardDetail) : undefined;
+      const placed = ((await parent.getChildrenRem()) ?? []).findIndex((c) => c._id === rem._id);
+      const problems = [
+        ...(quote === false ? ['Quote powerup missing'] : []),
+        ...(ecd === false ? ['Extra Card Detail missing'] : []),
+        ...(placed !== index ? [`landed at ${placed}, not ${index}`] : []),
+      ];
+      results.push({
+        key: it.key,
+        remId: rem._id,
+        ok: problems.length === 0,
+        index: placed,
+        ...(quote !== undefined ? { quote } : {}),
+        ...(ecd !== undefined ? { ecd } : {}),
+        ...(problems.length ? { error: problems.join('; ') } : {}),
+      });
+    } catch (err) {
+      results.push({ key: it.key, remId: keys[it.key], ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  const done = results.filter((r) => r.ok).length;
+  return {
+    ok: done === items.length,
+    summary: `create: ${plural(created, 'rem')} created` + (done < items.length ? `, ${items.length - done} failed` : ''),
+    keys,
+    created,
+    results,
+  };
+}
+
 // --- audio -------------------------------------------------------------------
 
 /**
@@ -1206,6 +1307,7 @@ const OPS: Record<string, (plugin: ReactRNPlugin, job: BridgeOpJob) => Promise<B
   'set-text': runSetText,
   remove: runRemove,
   outline: runOutline,
+  create: runCreate,
 };
 
 /** Runs a non-localize job. Errors come back as `{ok: false, message}`, never thrown. */

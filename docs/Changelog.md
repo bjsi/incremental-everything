@@ -2,6 +2,14 @@
 
 This page documents the major changes and improvements for each version of the Incremental RemNote plugin.
 
+## v1.0.253 - November 23rd, 2026
+
+### ✨ New
+
+**Local Media Bridge – `create`**: outside tools can now create many rems in one job, each with its exact text, Quote and Extra Card Detail powerups, tags, heading level and place among its siblings, instead of one MCP call per rem followed by a move. Used by the PSCPP quote tools to add hundreds of source quotes under exercise alternatives.
+
+📖 [Local Media Bridge → Rem operations](Local-Media-Bridge.md#operations)
+
 ## v1.0.252 - November 23rd, 2026
 
 ### ✨ New

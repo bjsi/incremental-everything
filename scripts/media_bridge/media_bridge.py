@@ -106,7 +106,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-VERSION = 20  # 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal, 18: ask + /answers, outline, 19: strip-priority, card --practice, 20: /tts/write simplifyLongFormulas
+VERSION = 21  # 21: create (bulk rems with Quote/Extra Card Detail/tags, placed), 3: /upscale, 4: /clipboard, 5: pin, pin-quote, card, 6: tag, 7: audio, 8: /tts, 9: /tts/plan lists engines, 10: /tts/write, ElevenLabs, 11: /tts/play, 12: /tts purpose, 13: POST /files, restore-audio, 14: notice, 15: set-text, remove, 16: heading, 17: portal, 18: ask + /answers, outline, 19: strip-priority, card --practice, 20: /tts/write simplifyLongFormulas
 # The jobs a plugin build understands, by the protocol version it polls with.
 OPS_BY_PLUGIN_VERSION = {
     1: {"localize"},
@@ -130,6 +130,9 @@ OPS_BY_PLUGIN_VERSION = {
          "restore-audio", "notice", "set-text", "remove", "heading", "portal", "ask", "outline"},
     13: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
          "restore-audio", "notice", "set-text", "remove", "heading", "portal", "ask", "outline", "strip-priority"},
+    14: {"localize", "move", "tag", "untag", "get-image", "incrementalize", "pin", "pin-quote", "card", "audio",
+         "restore-audio", "notice", "set-text", "remove", "heading", "portal", "ask", "outline", "strip-priority",
+         "create"},
 }
 # Jobs that may name no rem at all.
 OPS_WITHOUT_REMS = {"notice", "ask"}
@@ -952,6 +955,104 @@ def outline(path: str, chunk: int, timeout: float, dry_run: bool) -> None:
     finish({"ok": ok, **totals, "keys": str(keys_file), "failures": failures}, ok)
 
 
+# Inline markdown → RemNote rich text, for `create`. Handles what the quote/explanation
+# rems use: ***bold italic***, **bold**, *italic* / _italic_, `code`, \(inline LaTeX\),
+# ![](image url) and [[label]](/doc/ID) / [label](/doc/ID) rem references. Anything else
+# stays literal text. A trailing " #[[Extra Card Detail]]" is NOT parsed here: use "ecd".
+_MD_TOKEN = re.compile(
+    r"\\\((?P<tex>.+?)\\\)"
+    r"|!\[[^\]]*\]\((?P<img>[^)\s]+)\)"
+    r"|\[\[(?P<rlab>[^\]]*)\]\]\(/doc/(?P<rid>[A-Za-z0-9]+)\)"
+    r"|\[(?P<rlab2>[^\]]*)\]\(/doc/(?P<rid2>[A-Za-z0-9]+)\)"
+    r"|`(?P<code>[^`]+)`"
+    r"|\*\*\*(?P<bi>.+?)\*\*\*"
+    r"|\*\*(?P<b>.+?)\*\*"
+    r"|(?<![\w*])\*(?P<i>[^*\s](?:[^*]*[^*\s])?)\*(?![\w*])"
+    r"|(?<![\w_])_(?P<i2>[^_\s](?:[^_]*[^_\s])?)_(?![\w_])"
+)
+
+
+def md_to_rich(md: str, fmt: dict | None = None) -> list:
+    out: list = []
+    fmt = fmt or {}
+    pos = 0
+
+    def text(t: str, f: dict) -> None:
+        if not t:
+            return
+        if f:
+            out.append({"i": "m", "text": t, **f})
+        elif out and isinstance(out[-1], str):
+            out[-1] += t
+        else:
+            out.append(t)
+
+    for m in _MD_TOKEN.finditer(md):
+        text(md[pos:m.start()], fmt)
+        pos = m.end()
+        g = m.groupdict()
+        if g["tex"] is not None:
+            out.append({"i": "x", "text": g["tex"]})
+        elif g["img"] is not None:
+            out.append({"i": "i", "url": g["img"]})
+        elif g["rid"] or g["rid2"]:
+            out.append({"i": "q", "_id": g["rid"] or g["rid2"]})
+        elif g["code"] is not None:
+            out.append({"i": "m", "text": g["code"], "code": True})
+        else:
+            inner, extra = next((g[k], f) for k, f in (("bi", {"b": True, "l": True}), ("b", {"b": True}),
+                                                     ("i", {"l": True}), ("i2", {"l": True})) if g[k] is not None)
+            for el in md_to_rich(inner, {**fmt, **extra}):
+                if isinstance(el, str):
+                    text(el, {**fmt, **extra})
+                else:
+                    out.append(el)
+    text(md[pos:], fmt)
+    return out
+
+
+def create(path: str, chunk: int, timeout: float, dry_run: bool) -> None:
+    """Plan file: JSON list of {key, parent, markdown | text, back?, quote?, ecd?, tags?, heading?, position?,
+    after?, before?} (see runCreate in the plugin; heading 1–6). `markdown` is inline markdown turned into rich text here
+    (md_to_rich); `parent`/`after`/`before` may name the key ("new:…") of an item earlier in the plan.
+    Created ids go to <plan>.keys.json as they come back, so a rerun resumes instead of creating twice."""
+    plan = json.loads(Path(path).read_text())
+    items = plan["items"] if isinstance(plan, dict) else plan
+    keys_file = Path(path).with_suffix(".keys.json")
+    keys: dict = json.loads(keys_file.read_text()) if keys_file.exists() else {}
+    todo = []
+    for it in items:
+        if not str(it.get("key", "")).startswith("new:"):
+            sys.exit(f"every item needs a key starting with 'new:': {it}")
+        if it["key"] in keys:
+            continue
+        x = {k: v for k, v in it.items() if k not in ("markdown", "back")}
+        if "markdown" in it:
+            x["text"] = md_to_rich(it["markdown"])
+        if it.get("back"):
+            x["backText"] = md_to_rich(it["back"])
+        todo.append(x)
+    if dry_run:
+        finish({"ok": True, "dryRun": True, "create": len(todo), "alreadyCreated": len(keys),
+                "items": todo[:5]}, True)
+    _need_version("create", 21)
+    results: list = []
+    ok = True
+    for start in range(0, len(todo), chunk):
+        part = todo[start:start + chunk]
+        refs = {keys.get(r, r) for it in part for r in (it["parent"], it.get("after"), it.get("before"))
+                if r and (not r.startswith("new:") or r in keys)}
+        result = run_job("create", sorted(refs), {"items": part, "keys": keys}, timeout)
+        keys.update(result.get("keys") or {})
+        keys_file.write_text(json.dumps(keys, indent=1))
+        results.extend(result.get("results") or [{"key": None, "ok": False, "error": result.get("message")}])
+        ok = ok and bool(result.get("ok"))
+        print(f"create {min(start + chunk, len(todo))}/{len(todo)}: {result.get('summary')}", file=sys.stderr, flush=True)
+    bad = [r for r in results if not r.get("ok")]
+    finish({"ok": ok and not bad, "summary": f"{len(results) - len(bad)}/{len(results)} created",
+            "keys": str(keys_file), "failures": bad, "results": results}, ok and not bad)
+
+
 def set_text(path: str, chunk: int, timeout: float) -> None:
     """Edits file: JSON list of {remId, text?: {before, after}, backText?: {before, after}} (RemNote rich text)."""
     edits = json.loads(Path(path).read_text())
@@ -1259,6 +1360,11 @@ def main() -> None:
     p_ol.add_argument("--chunk", type=int, default=30, help="items per plugin job (default 30)")
     p_ol.add_argument("--dry-run", action="store_true", help="count what would be sent")
     p_ol.add_argument("--timeout", type=float, default=300, help="seconds to wait for each job")
+    p_cr = sub.add_parser("create", help="bulk-create rems (rich text, Quote/Extra Card Detail, tags, position) from a plan file")
+    p_cr.add_argument("plan", help="JSON list of {key: 'new:…', parent, markdown|text, quote?, ecd?, tags?, heading?, position?, after?, before?}")
+    p_cr.add_argument("--chunk", type=int, default=40, help="items per plugin job (default 40)")
+    p_cr.add_argument("--dry-run", action="store_true", help="convert and count, send nothing")
+    p_cr.add_argument("--timeout", type=float, default=300, help="seconds to wait for each job")
     p_ask = sub.add_parser("ask", help="ask the user in RemNote: a notice with Accept / Reject (or other) buttons")
     p_ask.add_argument("--title", required=True)
     p_ask.add_argument("--message", default="")
@@ -1320,6 +1426,8 @@ def main() -> None:
         notice(a.title, a.message, a.detail, a.rem, a.tone, a.wait)
     elif a.cmd == "outline":
         outline(a.plan, max(1, a.chunk), a.timeout, a.dry_run)
+    elif a.cmd == "create":
+        create(a.plan, max(1, a.chunk), a.timeout, a.dry_run)
     elif a.cmd == "ask":
         ask(a.title, a.message, a.detail, a.items, a.rem, a.choices, a.tone, a.wait)
     elif a.cmd == "answer":
