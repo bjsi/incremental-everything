@@ -145,7 +145,7 @@ A name shared by several Rems covers all of them. A name that matches nothing sa
 :   Rems found through one of their aliases.
 
 `id:go7LdXuu9hpAZH12G,rzGXXDY2z0yi0Iefg`
-:   these Rems.
+:   these Rems. Spaces after the commas are fine, so a pasted list works as it is.
 
 `id:UpQE*`
 :   Rems whose id starts with *UpQE*: enough when you remember only part of an id. `*` matches any part, `?` or `_` one character, and capitals count, as in the ids themselves.

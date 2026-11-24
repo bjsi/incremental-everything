@@ -417,6 +417,11 @@ class IndexSearchTest(unittest.TestCase):
         self.assertEqual(self.rems(f'id:00000000000000?R2,{OTHER}'), {BOW, OTHER})
         self.assertEqual(self.rems('id:*r2'), set())
         self.assertEqual(self.rems('id:00000000000000_R2'), {BOW})
+        # A pasted list with spaces after (or before) its commas stays one list.
+        self.assertEqual(self.rems(f'id:{BOW}, {OTHER}'), {BOW, OTHER})
+        self.assertEqual(self.rems(f'id:{BOW} ,{OTHER}'), {BOW, OTHER})
+        self.assertEqual(self.rems(f'id:{BOW}, {OTHER} flare'), {BOW})
+        self.assertEqual(self.rems(f'id:{BOW},  (bow or flare)'), {BOW})
 
     def test_dates(self):
         self.assertEqual(self.rems('added:1'), {MARGIN})

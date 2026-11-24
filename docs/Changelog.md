@@ -6,7 +6,7 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ Improved
 
-**Search Engine**: `id:` and `cid:` now accept wildcards, so `id:UpQE*` finds a Rem from the first characters of its id.
+**Search Engine**: `id:` and `cid:` now accept wildcards, so `id:UpQE*` finds a Rem from the first characters of its id, and a pasted id list with spaces after its commas stays one list.
 
 📖 [Search Engine → Sources and references](Search-Engine.md#sources)
 

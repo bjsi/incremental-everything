@@ -369,6 +369,8 @@ class Parser:
                 key_end = len(raw) + 1
             raw.append(c)
             self.i += 1
+        if key_end is not None and ''.join(raw[:key_end - 1]).lower() in ('id', 'cid'):
+            self.id_list_tail(raw)
         word = ''.join(raw)
         if not word:
             self.fail('parse', 'Unexpected character.')
@@ -379,6 +381,20 @@ class Parser:
         if key_end is not None:
             return self.keyed(word[:key_end - 1], word[key_end:], start, quoted=False)
         return self.term_for(word, start, quoted=False)
+
+    def id_list_tail(self, raw):
+        """A pasted id list keeps going past a space next to a comma ("a, b" or "a ,b"):
+        ids are never words, and without this the rest became a text term ANDed on."""
+        while True:
+            j = self.i
+            while j < len(self.q) and self.q[j] in SPACES:
+                j += 1
+            if j == self.i or j >= len(self.q) or not (raw[-1] == ',' or self.q[j] == ','):
+                return
+            self.i = j
+            while self.i < len(self.q) and self.q[self.i] not in SPACES and self.q[self.i] not in '()"\\':
+                raw.append(self.q[self.i])
+                self.i += 1
 
     def term_for(self, text, at, quoted):
         # As in Anki, a quoted term can still be a search key: "tag:anki card".
